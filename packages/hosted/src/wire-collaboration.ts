@@ -4,7 +4,7 @@
  * Words a newer server may add to (`send`, an ask's `state` and `answer`, a block's `code`) are read as strings and
  * settled to the nearest safe one here.
  */
-import type { ThreadCollaboration, ThreadPerson } from "@openorc/protocol";
+import type { ThreadCollaboration, ThreadNote, ThreadPerson } from "@openorc/protocol";
 import { z } from "zod";
 import type { Route } from "./wire.js";
 import { toImage } from "./translate.js";
@@ -34,6 +34,40 @@ export type WireCollaboration = z.infer<typeof wireCollaboration>;
 export const wireTurnSenders = z.object({ turns: z.array(z.object({ id: z.string(), sender: person.nullable() })) });
 export const wirePeople = z.object({ people: z.array(person.extend({ email: z.string() })) });
 
+const wireNote = z.object({
+  id: z.string(),
+  seq: z.number().int(),
+  threadId: z.string(),
+  author: person.nullable(),
+  text: z.string(),
+  mentions: z.array(z.object({ person: person.nullable(), userId: z.string(), start: z.number().int().nonnegative(), end: z.number().int().nonnegative() })),
+  replyTo: z.string().nullable(),
+  createdAt: iso,
+  afterEventSeq: z.number().int().nonnegative(),
+  mentionedYou: z.boolean(),
+  read: z.boolean(),
+});
+type WireNote = z.infer<typeof wireNote>;
+export const wireNotesPage = z.object({ notes: z.array(wireNote), head: z.number().int(), hasBefore: z.boolean(), hasAfter: z.boolean() });
+export const wirePosted = z.object({ note: wireNote });
+
+/** A note as a window draws it. */
+export function toNote(wire: WireNote): ThreadNote {
+  const nullable = (each: WirePerson | null) => (each ? toPerson(each) : null);
+  return {
+    id: wire.id,
+    seq: wire.seq,
+    author: nullable(wire.author),
+    text: wire.text,
+    mentions: wire.mentions.map((mention) => ({ ...mention, person: nullable(mention.person) })),
+    replyTo: wire.replyTo,
+    createdAt: wire.createdAt,
+    afterEventSeq: wire.afterEventSeq,
+    mentionedYou: wire.mentionedYou,
+    read: wire.read,
+  };
+}
+
 /** The most turns one read of their senders names, as the server takes them. */
 export const SENDERS_PER_READ = 100;
 
@@ -52,6 +86,10 @@ export const COLLABORATION_ROUTES = {
   startQueued: (id: string, messageId: string): Route<z.infer<typeof wireSent>> => ({ method: "POST", path: `${thread(id)}/messages/${encodeURIComponent(messageId)}/start`, reply: wireSent }),
   /** Saves the thread's work again after a failed save, as server recovery: no agent turn, no sign-in. Answered with nothing. */
   retrySave: (id: string): Route<null> => ({ method: "POST", path: `${thread(id)}/retry-save`, reply: null }),
+  /** A page of the thread's notes, by one bound at most. */
+  notes: (id: string, query: URLSearchParams) => route(`${thread(id)}/notes${query.size ? `?${query}` : ""}`, wireNotesPage),
+  /** Posts a note; the same id again answers the note it made. */
+  postNote: (id: string): Route<z.infer<typeof wirePosted>> => ({ method: "POST", path: `${thread(id)}/notes`, reply: wirePosted }),
 };
 
 /** A person as a window draws them: a picture only when it is held in a data URL. */

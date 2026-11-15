@@ -15,4 +15,6 @@ export const threadCollaborationHandlers: Pick<Handlers, keyof typeof threadColl
   "threads.people": elsewhere,
   "threads.startQueued": elsewhere,
   "threads.retrySave": elsewhere,
+  "threads.notes": elsewhere,
+  "threads.postNote": elsewhere,
 };

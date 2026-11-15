@@ -32,6 +32,7 @@ import { titleFromPrompt } from "@openorc/protocol";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 import { attachedPath, StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInCollaboration } from "./stand-in-collaboration.js";
+import { StandInNotes } from "./stand-in-notes.js";
 import type { UploadedFile } from "../wire-files.js";
 
 export interface StandInPeer {
@@ -186,6 +187,8 @@ export class StandInThreads {
   readonly files = new StandInThreadFiles();
   /** Who writes, sends and waits in a thread, and the server's capability for it. */
   readonly collaboration: StandInCollaboration;
+  /** The notes of each thread, for the people they tag. */
+  readonly notes: StandInNotes;
 
   constructor(
     private readonly peers: () => Iterable<StandInPeer>,
@@ -193,10 +196,13 @@ export class StandInThreads {
     private readonly spaces: StandInSpaces,
     person: (email: string) => { name: string; image: string | null },
   ) {
-    this.collaboration = new StandInCollaboration(person, (threadId) => {
+    const readers = (threadId: string) => {
       const thread = this.#threads.get(threadId);
       return thread ? this.spaces.readers(thread.space).filter((who) => this.#reads(who, thread)) : [];
-    });
+    };
+    this.collaboration = new StandInCollaboration(person, readers);
+    this.notes = new StandInNotes((email) => this.collaboration.personOf(email), readers);
+    this.collaboration.noteHead = (threadId) => this.notes.head(threadId);
   }
 
   /** The person's spaces, and the routes under /projects and /hosted, for `who` in the space they name; null for any other path. */
@@ -237,10 +243,22 @@ export class StandInThreads {
       }
       return { status: 202, body: null };
     }
+    const notes = this.#notesRoute(request, as, body);
+    if (notes) return notes;
     const read = /^\/hosted\/threads\/([^/]+)\/(collaboration|turn-senders|people)$/.exec(request.path);
     if (!read) return null;
     const thread = this.#readable(as, decodeURIComponent(read[1]!));
     return thread ? this.collaboration.route(request.method, read[2]!, request.query, thread, as.who) : missing();
+  }
+
+  /** A thread's notes: posted once shared writing opens past joining, paged by any reader. */
+  #notesRoute(request: { method: string; path: string; query: URLSearchParams }, as: { who: string; space: string }, body: Record<string, unknown>): Reply | null {
+    const noted = /^\/hosted\/threads\/([^/]+)\/notes$/.exec(request.path);
+    if (!noted) return null;
+    const thread = this.#readable(as, decodeURIComponent(noted[1]!));
+    if (!thread) return missing();
+    if (request.method === "POST" && (!this.collaboration.sharedWrites || this.collaboration.joinOnly)) return READ_ONLY;
+    return this.notes.route(request.method, request.query, body, { id: thread.id, head: headOf(thread) }, as.who, () => this.#changed(thread));
   }
 
   /** The list, one thread, its log, its title and settings, its removal, and a background command's stop. */
@@ -414,11 +432,7 @@ export class StandInThreads {
     return this.#joinRefusal(thread, who, body) ?? this.#handoffRefusal(thread, who, body);
   }
 
-  /**
-   * A new turn the thread's handoff holds: an idle send, or an explicit Queue, by someone the block stops. Refused with
-   * the block, nothing stored. A join of the running turn is never held, and a join that missed its turn is checked when
-   * it is taken.
-   */
+  /** A new turn the handoff holds (an idle send, an explicit Queue): refused with the block, nothing stored; never a join. */
   #handoffRefusal(thread: Thread, who: string, body: Record<string, unknown>): Reply | null {
     if (!this.collaboration.sharedWrites || this.collaboration.joinOnly || !this.collaboration.holds(thread, who)) return null;
     if (thread.messages.some((message) => message.id === body["id"])) return null;
@@ -522,10 +536,7 @@ export class StandInThreads {
     if (starts) this.append(thread.id, [{ type: "turn.started", ts: Date.now(), turnId: agentTurn(thread.turnId!) }]);
   }
 
-  /**
-   * The handoff to a new sender failed after the message was accepted: it stays pending and paused for its author, the
-   * block names the previous sender, and the thread says so in the block's words. No turn starts and nobody is charged.
-   */
+  /** A handoff that fails after acceptance: the message waits paused for its author, with the block and its words. */
   #handoffFails(thread: Thread, message: Message): boolean {
     const code = this.collaboration.failNextHandoff;
     const previous = [...thread.turns.values()].at(-1) ?? null;

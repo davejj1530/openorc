@@ -72,6 +72,8 @@ export class StandInCollaboration {
   readonly handoffs = new Map<string, StandInHandoff>();
   /** The next turn a teammate starts fails its handoff this way: the message waits paused for its author. */
   failNextHandoff: StandInHandoff["code"] | null = null;
+  /** The thread's last note `seq`, which every reader's collaboration carries. */
+  noteHead: (threadId: string) => number = () => 0;
   /** Addresses whose accounts are gone: they read as null wherever a person is named. */
   readonly gone = new Set<string>();
 
@@ -110,7 +112,7 @@ export class StandInCollaboration {
           canStart: open && Boolean(message.paused) && message.author === who && !thread.turn && !this.holds(thread, who),
         })),
       mentions: { unread: false, firstUnreadNoteId: null },
-      noteHead: 0,
+      noteHead: this.noteHead(thread.id),
     };
   }
 
@@ -203,7 +205,7 @@ export class StandInCollaboration {
           canStart: creator && Boolean(message.paused) && message.author === who && !thread.turn,
         })),
       mentions: { unread: false, firstUnreadNoteId: null },
-      noteHead: 0,
+      noteHead: this.noteHead(thread.id),
     };
   }
 

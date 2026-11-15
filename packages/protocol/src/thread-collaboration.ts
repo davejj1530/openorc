@@ -86,6 +86,32 @@ export type ThreadAuthors = z.infer<typeof ThreadAuthors>;
 export const ThreadTaggable = ThreadPerson.extend({ address: z.string().nullable() });
 export type ThreadTaggable = z.infer<typeof ThreadTaggable>;
 
+/** A person tagged in a note, by the span of the note's text that names them. Offsets count UTF-16 code units. */
+export const ThreadNoteMention = z.object({ person: ThreadPerson.nullable(), userId: z.string(), start: z.number().int().nonnegative(), end: z.number().int().nonnegative() });
+export type ThreadNoteMention = z.infer<typeof ThreadNoteMention>;
+
+/**
+ * A note: words for the people it tags, posted in the thread beside the agent's work. It is not a message to the agent,
+ * which reads it on its next turn. `afterEventSeq` places it among the thread's events; notes of one place keep `seq`.
+ */
+export const ThreadNote = z.object({
+  id: z.string(),
+  seq: z.number().int(),
+  author: ThreadPerson.nullable(),
+  text: z.string(),
+  mentions: z.array(ThreadNoteMention),
+  replyTo: z.string().nullable(),
+  createdAt: z.string(),
+  afterEventSeq: z.number().int().nonnegative(),
+  mentionedYou: z.boolean(),
+  read: z.boolean(),
+});
+export type ThreadNote = z.infer<typeof ThreadNote>;
+
+/** A page of a thread's notes in `seq` order, and whether more lie on either side. */
+export const ThreadNotesPage = z.object({ notes: z.array(ThreadNote), head: z.number().int(), hasBefore: z.boolean(), hasAfter: z.boolean() });
+export type ThreadNotesPage = z.infer<typeof ThreadNotesPage>;
+
 export const threadCollaborationRpcParams = {
   /** The thread's collaboration now; unsupported on a server that predates it, and for any thread not on OpenOrc Cloud. */
   "threads.collaboration": z.object({ threadId: z.string() }).strict(),
@@ -95,6 +121,29 @@ export const threadCollaborationRpcParams = {
   "threads.startQueued": z.object({ threadId: z.string(), messageId: z.string() }).strict(),
   /** Asks the server to save the thread's work again after a failed save; no turn starts. */
   "threads.retrySave": z.object({ threadId: z.string() }).strict(),
+  /** A page of the thread's notes: the newest, or those after or before a `seq`, or around one note. */
+  "threads.notes": z
+    .object({
+      threadId: z.string(),
+      after: z.number().int().nonnegative().optional(),
+      before: z.number().int().nonnegative().optional(),
+      around: z.string().optional(),
+      limit: z.number().int().min(1).max(200).optional(),
+    })
+    .strict(),
+  /** Posts a note that tags at least one person. The same id again is the same note; it never starts a turn. */
+  "threads.postNote": z
+    .object({
+      threadId: z.string(),
+      id: z.string().uuid(),
+      text: z.string().min(1).max(100_000),
+      mentions: z
+        .array(z.object({ userId: z.string(), start: z.number().int().nonnegative(), end: z.number().int().nonnegative() }))
+        .min(1)
+        .max(20),
+      replyTo: z.string().optional(),
+    })
+    .strict(),
 };
 
 export interface ThreadCollaborationRpcResults {
@@ -103,4 +152,6 @@ export interface ThreadCollaborationRpcResults {
   "threads.people": { people: ThreadTaggable[] };
   "threads.startQueued": null;
   "threads.retrySave": null;
+  "threads.notes": ThreadNotesPage;
+  "threads.postNote": { note: ThreadNote };
 }

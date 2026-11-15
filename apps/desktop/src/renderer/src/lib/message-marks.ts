@@ -1,4 +1,4 @@
-import { skillNames, skillSegments, type SkillPrefix } from "@openorc/client";
+import { PERSON_TAG, personTag, skillNames, skillSegments, type SkillPrefix } from "@openorc/client";
 import type { UsableConnector } from "@openorc/protocol";
 import { connectorSpans } from "./connector-mentions";
 
@@ -26,9 +26,7 @@ export interface MarkSources {
   people?: readonly { id: string; name: string }[] | undefined;
 }
 
-/** A tag of a person as the message carries it: their identity, never their name. */
-export const PERSON_TAG = /@\[user:([^\]\s]+)\]/g;
-export const personTag = (id: string) => `@[user:${id}]`;
+export { PERSON_TAG, personTag };
 
 function splitPeople(pieces: Piece[], people: readonly { id: string; name: string }[]): Piece[] {
   if (!people.length) return pieces;

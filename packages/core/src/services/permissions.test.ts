@@ -523,6 +523,46 @@ it("remembers Allow for this run for the same Claude command, and asks again for
   }
 });
 
+it("asks for each Claude Artifact call in words, and never allows one for the rest of the run", async () => {
+  const thread = threads.insert(core.db, { projectId: project.id, title: "Artifact", agent: "claude", model: "fixture", mode: "act", permissionMode: "review" });
+  provider("claude");
+  const run = await core.runs.start({ scope: { thread, task: null }, project, agent: "claude", model: "fixture", mode: "act", permissionMode: "review", prompt: "Publish the report", resume: false });
+  const page = "https://claude.ai/artifact/abc";
+  const later = "Claude can update the page later in this conversation without asking.";
+  /** One request, answered once the card asking for it says `reason`, or shows the request alone when that is undefined. */
+  const request = async (approvalId: string, input: Record<string, unknown>, reason: string | undefined, decision: "allow_for_run" | "deny" = "deny") => {
+    const pending = core.runs.requestApproval(run.id, approvalId, "Artifact", input);
+    await vi.waitFor(() => {
+      const event = questionEvents(run.id).find((item) => item.type === "approval.requested" && item.approvalId === approvalId);
+      expect(event).toMatchObject({ toolName: "Artifact", onceOnly: true });
+      expect((event as { reason?: string }).reason).toBe(reason);
+    });
+    core.runs.resolveApproval(run.id, approvalId, decision);
+    expect(await pending).toMatchObject({ decision });
+  };
+  try {
+    // Claude Code notes on a publish it asks about that the page is new.
+    const created = { file_path: "/work/report.html", title: "Report", __artifactPublishTarget: null };
+    // Sent anyway, as by an older client, an Allow for this run still covers only this call.
+    await request("publish", created, `Publish /work/report.html to claude.ai as a new private page? ${later}`, "allow_for_run");
+    await request("again", created, `Publish /work/report.html to claude.ai as a new private page? ${later}`);
+    await request(
+      "replace",
+      { action: "publish", file_path: "/work/report.html", url: page, force: true, __artifactPublishTarget: page },
+      `Publish /work/report.html to claude.ai, replacing the page at ${page} and overwriting any newer version there? ${later}`,
+    );
+    // An ask rule of the user's own asks before that note is made, when the file may have a page already, and asks for reads too.
+    await request("ruled", { file_path: "/work/report.html" }, `Publish /work/report.html to claude.ai? ${later}`);
+    await request("list", { action: "list" }, "Allow Artifact list on claude.ai?");
+    // A request that cannot be put in words is shown as it came, never summed up as something milder.
+    await request("files", { file_paths: ["/work/a.html", "/work/b.html"] }, undefined);
+    await request("address", { file_path: "/work/report.html", url: "the page (your own draft)" }, undefined);
+    await request("action", { action: "read and share", url: page }, undefined);
+  } finally {
+    await core.runs.closeAndWait(run.id);
+  }
+});
+
 describe("app actions follow the conversation's mode", () => {
   /** An MCP call that may fail: returns whether it failed and its text. */
   async function toolCall(url: string, name: string, args: Record<string, unknown>): Promise<{ isError: boolean; text: string }> {

@@ -6,6 +6,7 @@ import { executionMode, harnessCatalog, isHarnessId, stricterPermission, type Ag
 import { randomUUID } from "node:crypto";
 import type { Logger } from "../transport.js";
 import { appActionPolicy, blockedInPlan, type AppAction } from "./app-actions.js";
+import { artifactAsk } from "./artifact-approval.js";
 import type { LiveRun, PendingApproval, RunScope, ThreadPermissionState } from "./run-types.js";
 
 /** Words and answer requirements for one Codex transport request. */
@@ -46,8 +47,10 @@ function codexApprovalDetail(kind: CodexApprovalRequest["kind"], input: Record<s
 /**
  * What "Allow for this run" covers for one of Claude's own tool calls, the way Claude's own "don't ask again" reads:
  * the same command, the same file, the same site, or the same MCP tool. Anything else only as exactly the same call.
+ * Nothing covers an Artifact call: its file is what it publishes, not the page it changes, so one file could replace any page.
  */
-function runAllowance(toolName: string, input: unknown): string {
+function runAllowance(toolName: string, input: unknown): string | null {
+  if (toolName === "Artifact") return null;
   const value = (input ?? {}) as Record<string, unknown>;
   const file = value["file_path"] ?? value["notebook_path"];
   const url = value["url"];
@@ -178,21 +181,34 @@ export class RunApprovals {
     const category = integration?.toolNames.some((name) => toolName === `mcp__${integration.serverName}__${name}`) ? "internal_app" : "external";
     // Claude and MCP Apps ask for every call, so OpenOrc remembers what the user allowed for the rest of the run. Plan mode still refuses it.
     const allowance = runAllowance(toolName, input);
-    if (entry?.toolsAllowed?.has(allowance) && entry.run.mode !== "plan") {
+    if (allowance !== null && entry?.toolsAllowed?.has(allowance) && entry.run.mode !== "plan") {
       audit.record(this.deps.db, { actor: "openorc", action: "approval.auto_allow", resourceType: "run", resourceId: runId, metadata: { approvalId, policy: "allowed_for_run" } });
       return { decision: "allow" };
     }
+    const reason = toolName === "Artifact" ? artifactAsk(input) : undefined;
     const result = await this.awaitApproval(
       runId,
       approvalId,
-      toolName,
-      () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind: "tool", toolName, input }),
+      reason ?? toolName,
+      () =>
+        this.deps.emit({
+          type: "approval.requested",
+          runId,
+          ts: Date.now(),
+          approvalId,
+          kind: "tool",
+          toolName,
+          input,
+          ...(reason ? { reason } : {}),
+          ...(allowance === null ? { onceOnly: true } : {}),
+        }),
       false,
       category,
       undefined,
       subagentId,
     );
-    if (result.decision === "allow_for_run" && entry) (entry.toolsAllowed ??= new Set()).add(allowance);
+    // An Allow for this run sent anyway, as by an older client, still covers only this call.
+    if (result.decision === "allow_for_run" && entry && allowance !== null) (entry.toolsAllowed ??= new Set()).add(allowance);
     return result;
   }
 

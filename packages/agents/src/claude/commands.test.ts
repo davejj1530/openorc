@@ -26,7 +26,7 @@ async function cli(commands: unknown[]) {
     binary,
     `#!${process.execPath}
 const fs = require("node:fs");
-fs.writeFileSync(${JSON.stringify(calls)}, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd() }));
+fs.writeFileSync(${JSON.stringify(calls)}, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd(), artifact: process.env.CLAUDE_CODE_ARTIFACT ?? null }));
 require("node:readline").createInterface({ input: process.stdin }).on("line", (line) => {
   const request = JSON.parse(line);
   process.stdout.write(JSON.stringify({ type: "control_response", response: { request_id: request.request_id, subtype: "success", response: { commands: ${JSON.stringify(commands)} } } }) + "\\n");
@@ -35,7 +35,7 @@ setInterval(() => {}, 1000);
 `,
     { mode: 0o755 },
   );
-  return { binary, started: async () => JSON.parse(await readFile(calls, "utf8")) as { args: string[]; cwd: string } };
+  return { binary, started: async () => JSON.parse(await readFile(calls, "utf8")) as { args: string[]; cwd: string; artifact: string | null } };
 }
 
 describe.skipIf(process.platform === "win32")("Claude Code's own command list", () => {
@@ -58,7 +58,7 @@ describe.skipIf(process.platform === "win32")("Claude Code's own command list", 
       { name: 7 },
     ]);
 
-    const commands = await listClaudeCommands({ binary: f.binary, env: { ...process.env, [SHARED_CLAUDE_CONFIG_DIR]: shared } }, folder);
+    const commands = await listClaudeCommands({ binary: f.binary, env: { ...process.env, [SHARED_CLAUDE_CONFIG_DIR]: shared, CLAUDE_CODE_ARTIFACT: undefined } }, folder);
 
     expect(commands).toEqual([
       { name: "code-review", description: "Review the current diff", builtin: true, aliases: ["review"] },
@@ -67,6 +67,8 @@ describe.skipIf(process.platform === "win32")("Claude Code's own command list", 
     const started = await f.started();
     expect(started.cwd).toBe(folder);
     expect(started.args).not.toContain("--setting-sources");
+    // A run has the Artifact tool, so the list holds the skills that use it.
+    expect(started.artifact).toBe("1");
     expect(started.args.filter((_arg, index) => started.args[index - 1] === "--plugin-dir")).toEqual([plugin]);
   });
 

@@ -81,7 +81,9 @@ export class StandInNotes {
 
   #markRead(threadId: string, who: string, ids: unknown, changed: () => void): Reply {
     const notes = new Set((this.#notes.get(threadId) ?? []).map((note) => note.id));
-    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100 || new Set(ids).size !== ids.length) return refused(400, "note_ids_invalid", "Name between one and a hundred notes.");
+    // As the server's validation answers it: a plain 400 with no code of its own.
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100 || new Set(ids).size !== ids.length)
+      return { status: 400, body: { statusCode: 400, message: "Name between one and a hundred notes.", error: "Bad Request" } };
     if (ids.some((id) => !notes.has(id as string))) return gone();
     const seen = this.#seen(threadId, who);
     for (const id of ids as string[]) seen.add(id);
@@ -156,7 +158,8 @@ export class StandInNotes {
     let from: number;
     if (after !== null) from = notes.findIndex((note) => note.seq > Number(after));
     else if (before !== null) from = Math.max(0, notes.filter((note) => note.seq < Number(before)).length - limit);
-    else if (around !== null) from = Math.max(0, notes.findIndex((note) => note.id === around) - Math.floor((limit - 1) / 2));
+    // Around a note: it sits in the middle where there is room, and near an end the page is still `limit` long.
+    else if (around !== null) from = Math.max(0, Math.min(notes.length - limit, notes.findIndex((note) => note.id === around) - Math.floor((limit - 1) / 2)));
     else from = Math.max(0, notes.length - limit);
     if (from < 0) from = notes.length;
     const end = before !== null ? Math.min(notes.length, notes.filter((note) => note.seq < Number(before)).length) : Math.min(notes.length, from + limit);

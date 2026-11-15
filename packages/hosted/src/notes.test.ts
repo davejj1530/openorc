@@ -95,6 +95,8 @@ describe("a thread's notes", () => {
     expect(await ada.threads.call("threads.notes", { threadId: thread, before: 4, limit: 2 })).toMatchObject({ hasBefore: true, hasAfter: true, notes: [{ seq: 2 }, { seq: 3 }] });
     expect((await ada.threads.call("threads.notes", { threadId: thread, after: 3 })).notes.map((note) => note.seq)).toEqual([4, 5]);
     expect((await ada.threads.call("threads.notes", { threadId: thread, around: noteId(3), limit: 3 })).notes.map((note) => note.seq)).toEqual([2, 3, 4]);
+    // Near an end of the thread the page is still the page's length, as the server fills it.
+    expect((await ada.threads.call("threads.notes", { threadId: thread, around: noteId(5), limit: 3 })).notes.map((note) => note.seq)).toEqual([3, 4, 5]);
     await expect(ada.threads.call("threads.notes", { threadId: thread, around: noteId(9) })).rejects.toThrow("That note isn't here.");
   });
 

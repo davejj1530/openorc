@@ -90,6 +90,11 @@ export class StandInCollaboration {
     return email && !this.gone.has(email) ? { id: userOf(email), ...this.person(email) } : null;
   }
 
+  /** A person as the server names them in an ask's words: by their first name. */
+  #firstName(email: string | null): string {
+    return this.personOf(email)?.name.trim().split(/\s+/)[0] || "The previous sender";
+  }
+
   /** The reader's collaboration on a thread, for its row and its own read; undefined from an older server. */
   projection(thread: CollaborationThread, who: string) {
     if (!this.served) return undefined;
@@ -162,8 +167,7 @@ export class StandInCollaboration {
       if (body["expectedState"] !== (live ? "waiting" : "parked") || body["expectedTurnId"] !== ask.turnId) return changed;
     } else if (sender !== who) return changed;
     if (!live || sender === who) return null;
-    const name = this.personOf(sender)?.name ?? "The previous sender";
-    return { status: 403, body: { code: "ask_sender_only", message: `${name} can answer while this turn is running.`, statusCode: 403 } };
+    return { status: 403, body: { code: "ask_sender_only", message: `${this.#firstName(sender)} can answer while this turn is running.`, statusCode: 403 } };
   }
 
   /**
@@ -237,7 +241,7 @@ export class StandInCollaboration {
       sender: this.personOf(sender),
       answer: answerOf(ownsLive, startable),
       canDecline: ownsLive || startable,
-      reason: live && sender !== who ? `${this.personOf(sender)?.name ?? "The previous sender"} can answer while this turn is running.` : null,
+      reason: live && sender !== who ? `${this.#firstName(sender)} can answer while this turn is running.` : null,
     };
   }
 

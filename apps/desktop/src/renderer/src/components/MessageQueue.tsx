@@ -145,11 +145,14 @@ function QueuedRemove({ index, pending, granted, onRemove }: { index: number; pe
   );
 }
 
-/** The author's own paused message starts their own turn, on their sign-in and hours; not while a turn runs. */
+/**
+ * The author's own paused message starts their own turn, on their sign-in and hours; not while a turn runs. It is the
+ * one move that starts paid work from the pile, so it is the ink pill.
+ */
 function QueuedStart({ canStart, blocked, pending, onStart }: { canStart: boolean; blocked: string | null; pending: boolean; onStart: () => void }) {
   const control = useComposerControl(!canStart || pending, canStart ? "Uses your sign-in and hours." : (blocked ?? "This message can't start a turn now."));
   return (
-    <Button size="sm" disabled={control.disabled} data-tip={control.reason} onClick={onStart}>
+    <Button size="sm" variant="primary" disabled={control.disabled} data-tip={control.reason} onClick={onStart}>
       Start turn
     </Button>
   );

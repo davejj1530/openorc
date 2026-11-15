@@ -36,6 +36,7 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "threads.people": together.people,
   "threads.startQueued": (threads, params) => shared.startQueued({ ...threads.calls, starts: threads.starts }, params),
   "threads.retrySave": (threads, params) => shared.retrySave(threads.calls, params),
+  "threads.stopWork": (threads, params) => shared.stopWork(threads.calls, params),
   "threads.notes": notes.notes,
   "threads.postNote": notes.postNote,
   "threads.readNotes": notes.readNotes,

@@ -306,6 +306,7 @@ const idInvalidations: MethodRules = {
   "threads.unqueue": (p) => ["threads", `thread:${String(p["id"])}`, `runs:thread:${String(p["id"])}`, `comments:thread:${String(p["id"])}`],
   "threads.startQueued": (p) => ["threads", `thread:${String(p["threadId"])}`, `runs:thread:${String(p["threadId"])}`],
   "threads.retrySave": (p) => ["threads", `thread:${String(p["threadId"])}`],
+  "threads.stopWork": (p) => ["threads", `thread:${String(p["threadId"])}`],
   "threads.postNote": (p) => [`notes:${String(p["threadId"])}`],
   "threads.readNotes": (p) => [`notes:${String(p["threadId"])}`, "mentions"],
   "review.commitThread": (p) => ["workspace-diff", `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`, "threads"],

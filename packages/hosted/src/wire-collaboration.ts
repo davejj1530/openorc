@@ -14,7 +14,15 @@ const person = z.object({ id: z.string(), name: z.string(), image: z.string().nu
 type WirePerson = z.infer<typeof person>;
 
 const note = z.object({ to: person, text: z.string(), mention: z.object({ start: z.number().int().nonnegative(), end: z.number().int().nonnegative() }) });
-const block = z.object({ code: z.string(), message: z.string(), responsible: person.nullable(), commandIds: z.array(z.string()), retrySave: z.boolean(), note: note.nullish() });
+const block = z.object({
+  code: z.string(),
+  message: z.string(),
+  responsible: person.nullable(),
+  commandIds: z.array(z.string()),
+  retrySave: z.boolean(),
+  stopWork: z.boolean().optional(),
+  note: note.nullish(),
+});
 
 export const wireCollaboration = z.object({
   version: z.number(),
@@ -98,6 +106,7 @@ export const COLLABORATION_ROUTES = {
   startQueued: (id: string, messageId: string): Route<z.infer<typeof wireSent>> => ({ method: "POST", path: `${thread(id)}/messages/${encodeURIComponent(messageId)}/start`, reply: wireSent }),
   /** Saves the thread's work again after a failed save, as server recovery: no agent turn, no sign-in. Answered with nothing. */
   retrySave: (id: string): Route<null> => ({ method: "POST", path: `${thread(id)}/retry-save`, reply: null }),
+  stopWork: (id: string): Route<null> => ({ method: "POST", path: `${thread(id)}/work/stop`, reply: null }),
   /** A page of the thread's notes, by one bound at most. */
   notes: (id: string, query: URLSearchParams) => route(`${thread(id)}/notes${query.size ? `?${query}` : ""}`, wireNotesPage),
   /** Posts a note; the same id again answers the note it made. */
@@ -136,6 +145,7 @@ export function toCollaboration(wire: WireCollaboration): ThreadCollaboration | 
           responsible: nullable(handoff.responsible),
           commandIds: handoff.commandIds,
           retrySave: handoff.retrySave,
+          stopWork: handoff.stopWork ?? false,
           note: handoff.note ? { to: toPerson(handoff.note.to), text: handoff.note.text, mention: handoff.note.mention } : null,
         }
       : null,

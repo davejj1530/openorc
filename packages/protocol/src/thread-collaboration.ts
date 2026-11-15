@@ -26,6 +26,8 @@ export const ThreadHandoffBlock = z.object({
   commandIds: z.array(z.string()),
   /** Whether this reader may ask the server to save the thread's work again. */
   retrySave: z.boolean(),
+  /** Whether this reader, one of the thread's people, may stop the work that reports back; false from an older server. */
+  stopWork: z.boolean().default(false),
   /** The note to post when the reader has nothing else to press; none from an older server. */
   note: ThreadHandoffNote.nullable().default(null),
 });
@@ -133,6 +135,8 @@ export const threadCollaborationRpcParams = {
   "threads.startQueued": z.object({ threadId: z.string(), messageId: z.string() }).strict(),
   /** Asks the server to save the thread's work again after a failed save; no turn starts. */
   "threads.retrySave": z.object({ threadId: z.string() }).strict(),
+  /** Stops the work that reports back and holds the next turn; no turn starts and nothing is written to the thread. */
+  "threads.stopWork": z.object({ threadId: z.string() }).strict(),
   /** A page of the thread's notes: the newest, or those after or before a `seq`, or around one note. */
   "threads.notes": z
     .object({
@@ -175,6 +179,7 @@ export interface ThreadCollaborationRpcResults {
   "threads.people": { people: ThreadTaggable[] };
   "threads.startQueued": null;
   "threads.retrySave": null;
+  "threads.stopWork": null;
   "threads.notes": ThreadNotesPage;
   "threads.postNote": { note: ThreadNote };
   "threads.readNotes": null;

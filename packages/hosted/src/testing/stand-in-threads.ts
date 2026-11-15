@@ -210,24 +210,21 @@ export class StandInThreads {
     return this.#read(method, path, request.query, { who, space }, body);
   }
 
-  /** A thread's collaboration reads, an author's Start of a paused message, and Retry save. */
+  /** A thread's collaboration reads, an author's Start of a paused message, Retry save and Stop work. */
   #together(request: { method: string; path: string; query: URLSearchParams }, as: { who: string; space: string }, body: Record<string, unknown>): Reply | null {
     const start = /^\/hosted\/threads\/([^/]+)\/messages\/([^/]+)\/start$/.exec(request.path);
     const retry = /^\/hosted\/threads\/([^/]+)\/retry-save$/.exec(request.path);
-    const write = start ?? retry;
+    const stopWork = /^\/hosted\/threads\/([^/]+)\/work\/stop$/.exec(request.path);
+    const write = start ?? retry ?? stopWork;
     if (write && request.method === "POST") {
       const thread = this.#readable(as, decodeURIComponent(write[1]!));
       if (!thread) return missing();
       if (!this.collaboration.sharedWrites) return READ_ONLY;
       if (start) return this.#startPaused(thread, as.who, decodeURIComponent(start[2]!), body);
-      this.saveRetries.push(thread.id);
-      const block = this.collaboration.handoffs.get(thread.id);
-      // The save succeeds for the previous sender; nothing paused starts by itself.
-      if (block?.code === "handoff_save" && block.responsible === as.who) {
-        this.collaboration.handoffs.delete(thread.id);
-        this.#changed(thread);
-      }
-      return { status: 202, body: null };
+      if (retry) this.saveRetries.push(thread.id);
+      const { changed, ...reply } = retry ? this.collaboration.retrySave(thread, as.who) : this.collaboration.stopWork(thread, as.who);
+      if (changed) this.#changed(thread);
+      return reply;
     }
     const notes = this.#notesRoute(request, as, body);
     if (notes) return notes;

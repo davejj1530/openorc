@@ -231,6 +231,22 @@ describe("a teammate's own turn once handoff opens", () => {
     await live(ada, thread, "Bob");
   });
 
+  it("lets one of the thread's people stop the work that reports back, and gives a reader not in it the note instead", async () => {
+    const { thread, ada, bob, runId } = await shared(true);
+    await ada.threads.call("runs.send", { runId, text: "Start", messageId: id(1) });
+    stand.endTurn(thread);
+    await bob.threads.call("runs.send", { runId, text: "My turn", messageId: id(2) });
+    stand.endTurn(thread);
+    // Bob's turn left work reporting back; Ada, one of the thread's people, may stop it.
+    stand.threadCollaboration.handoffs.set(thread, { code: "handoff_unavailable", responsible: BOB, commandIds: [] });
+    const adas = await collaborationOf(ada, thread);
+    expect(adas?.handoff).toMatchObject({ code: "handoff_unavailable", stopWork: true, note: null });
+    await ada.threads.call("threads.stopWork", { threadId: thread });
+    expect((await collaborationOf(ada, thread))?.handoff).toBeNull();
+    // The work had already ended, as after a lost reply: what was asked for holds.
+    await expect(ada.threads.call("threads.stopWork", { threadId: thread })).resolves.toBeNull();
+  });
+
   it("pauses a teammate's message whose handoff fails, for them to start once the save is retried", async () => {
     const { thread, ada, bob, runId } = await shared(true);
     await ada.threads.call("runs.send", { runId, text: "Start", messageId: id(1) });

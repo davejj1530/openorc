@@ -143,23 +143,26 @@ function hostedNotice({
 }
 
 /**
- * A handoff the reader can release: Retry save asks the server to save the thread's work again, and Stop ends the
- * previous sender's commands that keep the thread from moving. A reader with neither tags the person who can: the
- * server's note opens in the composer, to post as it is or in their own words. None of them starts a turn.
+ * A handoff the reader can release: Retry save asks the server to save the thread's work again, Stop ends the
+ * previous sender's commands that keep the thread from moving, and Stop work ends the work that reports back. A reader
+ * with none of them tags the person who can: the server's note opens in the composer, to post as it is or in their own
+ * words. None of them starts a turn.
  */
 function HandoffCard({ threadId, words, action, composer }: { threadId: string; words: string; action: HandoffAction; composer: RefObject<ComposerHandle | null> }) {
   const retry = useRpcMutation("threads.retrySave");
   const stop = useRpcMutation("threads.stopCommand");
-  const pending = retry.isPending || stop.isPending;
+  const stopWork = useRpcMutation("threads.stopWork");
+  const pending = retry.isPending || stop.isPending || stopWork.isPending;
   const release = async () => {
     if (action.kind === "note") return composer.current?.note(action.note);
     if (action.kind === "retry-save") return retry.mutate({ threadId });
+    if (action.kind === "stop-work") return stopWork.mutate({ threadId });
     for (const commandId of action.commandIds) await stop.mutateAsync({ id: threadId, commandId }).catch(() => undefined);
   };
   const label = handoffLabel(action);
   return (
     <section role="status" aria-label="OpenOrc Cloud" data-plane className={cn(card, "flex flex-wrap items-center justify-between gap-x-3")}>
-      <div className="py-1.5 text-ink">{retry.error?.message ?? stop.error?.message ?? words}</div>
+      <div className="py-1.5 text-ink">{retry.error?.message ?? stop.error?.message ?? stopWork.error?.message ?? words}</div>
       <Button variant="secondary" disabled={pending} onClick={() => void release()}>
         {label}
       </Button>
@@ -170,6 +173,7 @@ function HandoffCard({ threadId, words, action, composer }: { threadId: string; 
 function handoffLabel(action: HandoffAction): string {
   if (action.kind === "note") return `Tag ${personFirst(action.note.to)}`;
   if (action.kind === "retry-save") return "Retry save";
+  if (action.kind === "stop-work") return "Stop work";
   return action.commandIds.length > 1 ? "Stop commands" : "Stop command";
 }
 

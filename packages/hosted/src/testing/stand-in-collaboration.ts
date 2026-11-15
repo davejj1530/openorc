@@ -18,7 +18,8 @@ type Person = { id: string; name: string; image: string | null };
 
 /** A handoff block as the stand-in keeps it: whose turn left it, by address, and the commands that must end. */
 export interface StandInHandoff {
-  code: "handoff_command" | "handoff_save";
+  /** handoff_unavailable: work of the previous sender's turn still reports back, with no command to name. */
+  code: "handoff_command" | "handoff_save" | "handoff_unavailable";
   responsible: string | null;
   commandIds: string[];
 }
@@ -147,11 +148,40 @@ export class StandInCollaboration {
     if (!block || (block.code === "handoff_command" && block.responsible === who)) return null;
     const responsible = this.personOf(block.responsible);
     const first = responsible?.name.split(" ")[0];
-    const message =
-      block.code === "handoff_command"
-        ? `${first ? `${first}'s` : "The previous sender's"} command is still running. Stop it before starting your turn.`
-        : `The thread's work could not be saved.${first ? ` ${first} can retry the save.` : ""}`;
-    return { code: block.code, message, responsible, commandIds: block.commandIds, retrySave: block.code === "handoff_save" && block.responsible === who, note: null };
+    const words: Record<StandInHandoff["code"], string> = {
+      handoff_command: `${first ? `${first}'s` : "The previous sender's"} command is still running. Stop it before starting your turn.`,
+      handoff_save: `The thread's work could not be saved.${first ? ` ${first} can retry the save.` : ""}`,
+      handoff_unavailable: `Only ${first ?? "the previous sender"} can run the agent in this cloud thread for now.`,
+    };
+    const message = words[block.code];
+    return { code: block.code, message, responsible, commandIds: block.commandIds, retrySave: block.code === "handoff_save" && block.responsible === who, stopWork: false, note: null };
+  }
+
+  /** One of the thread's people: its starter, or anyone who sent a turn in it. */
+  #inThread(thread: CollaborationThread, who: string): boolean {
+    return thread.owner === who || [...thread.turns.values()].includes(who);
+  }
+
+  /** Retry save, as the server answers it: the save succeeds for the previous sender; nothing paused starts by itself. */
+  retrySave(thread: { id: string }, who: string): Reply & { changed: boolean } {
+    const block = this.handoffs.get(thread.id);
+    const changed = block?.code === "handoff_save" && block.responsible === who;
+    if (changed) this.handoffs.delete(thread.id);
+    return { status: 202, body: null, changed };
+  }
+
+  /**
+   * Stop work, as the server answers it: one of the thread's people other than the work's own sender ends the work that
+   * reports back, which lifts the block; nothing starts and nothing is written to the thread.
+   */
+  stopWork(thread: CollaborationThread, who: string): Reply & { changed: boolean } {
+    const block = this.handoffs.get(thread.id);
+    const refused = (status: number, code: string | null, message: string) => ({ status, body: { ...(code && { code }), message, statusCode: status }, changed: false });
+    if (block?.code !== "handoff_unavailable") return refused(409, "work_changed", "That work has ended. Check the thread before stopping again.");
+    if (!this.#inThread(thread, who)) return refused(403, null, "You can read this thread, but only the people in it can send to it or act on it.");
+    if (thread.turn) return refused(409, "thread_busy", "A turn is running. Wait for it to finish.");
+    this.handoffs.delete(thread.id);
+    return { status: 204, body: null, changed: true };
   }
 
   /**
@@ -162,8 +192,7 @@ export class StandInCollaboration {
   #withNote<B extends { code: string; responsible: object | null; retrySave: boolean }>(thread: CollaborationThread, who: string, block: B | null, notes: boolean) {
     const held = this.handoffs.get(thread.id);
     if (!block || !held || !notes || !block.responsible || held.responsible === who || block.code === "handoff_command" || block.retrySave) return block;
-    const inThread = thread.owner === who || [...thread.turns.values()].includes(who);
-    if (block.code === "handoff_unavailable" && inThread) return block;
+    if (block.code === "handoff_unavailable" && this.#inThread(thread, who)) return { ...block, stopWork: true };
     const tag = `@${this.#firstName(held.responsible)}`;
     const ask = block.code === "handoff_save" ? "the thread's work could not be saved. Can you retry the save?" : "your turn left work running here. Can you stop it, or tell me when it is done?";
     return { ...block, note: { to: block.responsible, text: `${tag} ${ask}`, mention: { start: 0, end: tag.length } } };
@@ -206,6 +235,7 @@ export class StandInCollaboration {
       responsible: this.personOf(thread.owner),
       commandIds: [],
       retrySave: false,
+      stopWork: false,
       note: null,
     };
   }

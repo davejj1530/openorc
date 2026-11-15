@@ -4,6 +4,7 @@
  */
 import type { RpcParams } from "@openorc/protocol";
 import { refuse, type Calls } from "./sends.js";
+import { Refused } from "./session.js";
 import { COLLABORATION_ROUTES } from "./wire-collaboration.js";
 import { TASK_ROUTES } from "./wire-tasks.js";
 
@@ -33,6 +34,21 @@ async function taskNow(calls: Calls, threadId: string, messageId: string): Promi
   if (queued?.pause?.kind !== "task" || !queued.task) return {};
   const { task } = await calls.on(threadId).request(TASK_ROUTES.get(queued.task.id));
   return { task: { id: task.id, ifRevision: task.revision } };
+}
+
+/**
+ * threads.stopWork: the server stops the work that reports back and holds the next turn. Work that has already ended
+ * (as after a lost reply) is what was asked for, so it is done; the row's blocker says how it went.
+ */
+export async function stopWork(calls: Calls, { threadId }: RpcParams<"threads.stopWork">): Promise<null> {
+  await calls
+    .on(threadId)
+    .request(COLLABORATION_ROUTES.stopWork(threadId), {})
+    .catch((error: unknown) => {
+      if (!(error instanceof Refused && error.code === "work_changed")) throw error;
+    });
+  await calls.refresh();
+  return null;
 }
 
 /** threads.retrySave: the server saves the thread's work again; the row's blocker says how it went. */

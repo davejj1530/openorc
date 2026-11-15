@@ -102,6 +102,7 @@ describe("a teammate's cloud thread on today's server", () => {
       responsible: MARA,
       commandIds: ["c1"],
       retrySave: false,
+      stopWork: false,
       note: null,
     };
     expect(threadWriteBlock(row(together(THEO, { canWrite: true, send: "blocked", handoff }), "idle", mara))).toBe(handoff.message);
@@ -111,7 +112,7 @@ describe("a teammate's cloud thread on today's server", () => {
   it("gives the handoff card the one move that releases it, to the reader the server lets make it", () => {
     const idle = (handoff: ThreadCollaboration["handoff"], viewer = THEO) => row(together(viewer, { canWrite: true, send: "blocked", handoff }), "idle", mara);
     const saveWords = "The thread's work could not be saved. Mara can retry the save.";
-    const save = { code: "handoff_save" as const, message: saveWords, responsible: MARA, commandIds: [], retrySave: false, note: null };
+    const save = { code: "handoff_save" as const, message: saveWords, responsible: MARA, commandIds: [], retrySave: false, stopWork: false, note: null };
     expect(handoffCard(idle(save))).toEqual({ words: saveWords, action: null });
     // The person who can recover is not told that they can: the button says it.
     expect(handoffCard(idle({ ...save, retrySave: true }, MARA))).toEqual({ words: "The thread's work could not be saved.", action: { kind: "retry-save" } });
@@ -126,12 +127,23 @@ describe("a teammate's cloud thread on today's server", () => {
       responsible: MARA,
       commandIds: ["c1"],
       retrySave: false,
+      stopWork: false,
       note: null,
     };
     expect(handoffCard(idle(command))).toEqual({ words: command.message, action: { kind: "stop-commands", commandIds: ["c1"] } });
     expect(handoffCard(idle({ ...command, commandIds: [] }))).toEqual({ words: command.message, action: null });
-    const unavailable = { code: "handoff_unavailable" as const, message: "Only Mara can run the agent in this cloud thread for now.", responsible: MARA, commandIds: [], retrySave: false, note: null };
+    const unavailable = {
+      code: "handoff_unavailable" as const,
+      message: "Only Mara can run the agent in this cloud thread for now.",
+      responsible: MARA,
+      commandIds: [],
+      retrySave: false,
+      stopWork: false,
+      note: null,
+    };
     expect(handoffCard(idle(unavailable))).toEqual({ words: unavailable.message, action: null });
+    // One of the thread's people may stop the work that reports back.
+    expect(handoffCard(idle({ ...unavailable, stopWork: true }))).toEqual({ words: unavailable.message, action: { kind: "stop-work" } });
     // A reader with nothing else to press gets the server's note to the person who can release the block.
     const note = { to: MARA, text: "@Mara the thread's work could not be saved. Can you retry the save?", mention: { start: 0, end: 5 } };
     expect(handoffCard(idle({ ...save, note }))).toEqual({ words: saveWords, action: { kind: "note", note } });
@@ -284,6 +296,7 @@ describe("acting on a cloud thread's work: commit, push, publish", () => {
       responsible: MARA,
       commandIds: ["c1"],
       retrySave: false,
+      stopWork: false,
       note: null,
     };
     expect(hostedPublishReason(live(row(together(THEO, { canWrite: true, send: "blocked", handoff }), "idle", mara)), state)).toBe(handoff.message);

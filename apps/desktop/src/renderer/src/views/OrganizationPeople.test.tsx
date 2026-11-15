@@ -186,7 +186,7 @@ it("shows a read failure and retry instead of an empty roster", async () => {
   expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
 });
 
-it("shows a frozen admin the people and their plans, with no project count, role change, removal, edit or delete", async () => {
+it("shows a frozen admin the people and their plans, with no project count, role change, removal or edit, and still the way to delete", async () => {
   changeRole("mira", "admin");
   gate = "frozen";
   show();
@@ -203,7 +203,7 @@ it("shows a frozen admin the people and their plans, with no project count, role
   fireEvent.click(screen.getByRole("button", { name: "More for Birch Studio" }));
   expect((await screen.findByRole("menuitem", { name: "Leave organization…" })).getAttribute("aria-disabled")).toBeNull();
   expect(screen.queryByRole("menuitem", { name: "Edit organization…" })).toBeNull();
-  expect(screen.queryByRole("menuitem", { name: "Delete organization…" })).toBeNull();
+  expect(screen.getByRole("menuitem", { name: "Delete organization…" })).toBeTruthy();
 });
 
 it("gives an admin whose access is open every control back", async () => {

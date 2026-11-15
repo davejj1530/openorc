@@ -34,7 +34,8 @@ export function FrozenOrganization({
   onAccount,
   menu,
 }: {
-  organization: OrganizationIdentity;
+  /** `accessMessage` is the server's words for this person in this organization; the shared reason's words stand in without it. */
+  organization: OrganizationIdentity & { accessMessage?: string | null | undefined };
   access: Extract<OrganizationAccess, { state: "frozen" }>;
   onAccount(): void;
   /** The organization page's "…", in the same place as on that page. */
@@ -52,7 +53,7 @@ export function FrozenOrganization({
         <div className="organization-frozen-content">
           <OrganizationMark name={organization.name} logo={organization.logo} size={40} />
           <h1>{organization.name}</h1>
-          <p>{access.message}</p>
+          <p>{organization.accessMessage ?? access.message}</p>
           <Button variant="primary" onClick={onAccount}>
             Upgrade to Pro
           </Button>

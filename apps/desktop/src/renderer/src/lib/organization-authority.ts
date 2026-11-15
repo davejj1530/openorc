@@ -43,5 +43,6 @@ export function useOrganizationAuthority(organization: OrganizationSpace | null,
 /** This person's private words for why the organization is frozen to them; nothing while it is open. */
 export function useFrozenReason(spaceId: string): string | undefined {
   const gate = useOrganizationContentGate(spaceId);
-  return gate.blocked === "frozen" && gate.access?.state === "frozen" ? gate.access.message : undefined;
+  if (gate.blocked !== "frozen" || gate.access?.state !== "frozen") return undefined;
+  return (gate.space?.kind === "organization" ? gate.space.accessMessage : null) ?? gate.access.message;
 }

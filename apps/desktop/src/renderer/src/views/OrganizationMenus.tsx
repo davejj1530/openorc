@@ -16,13 +16,13 @@ export function OrganizationMoreMenu({
 }: {
   people: OrganizationPeople;
   disabled: boolean;
-  /** A frozen admin keeps leaving; editing and deleting the organization wait for their access. */
+  /** A frozen admin keeps leaving and deleting the organization; editing it waits for their access. */
   frozen?: boolean;
   onAction(action: "edit" | "leave" | "delete", trigger: HTMLButtonElement | null): void;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
-  const onlyAdmin = people.viewer.role === "admin" && people.adminCount === 1;
-  const admin = people.viewer.role === "admin" && !frozen;
+  const admin = people.viewer.role === "admin";
+  const onlyAdmin = admin && people.adminCount === 1;
   return (
     <Menu.Root>
       <Menu.Trigger ref={trigger} render={<IconButton aria-label={`More for ${people.organization.name}`} />}>
@@ -32,7 +32,7 @@ export function OrganizationMoreMenu({
         <CoversPreview />
         <Menu.Positioner sideOffset={8} align="end" collisionPadding={8} className="z-40">
           <Menu.Popup ref={floatingGround} className={`${menuPopup} people-organization-menu`}>
-            {admin ? (
+            {admin && !frozen ? (
               <Menu.Item className={menuItem} disabled={disabled} onClick={() => onAction("edit", trigger.current)}>
                 <Pencil size={14} />
                 Edit organization…

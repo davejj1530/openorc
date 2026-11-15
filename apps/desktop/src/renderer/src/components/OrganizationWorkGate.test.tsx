@@ -108,3 +108,18 @@ it("gives a frozen admin's frozen screen no menu: their own People page keeps th
   );
   expect(screen.queryByRole("button", { name: "More for Northwind" })).toBeNull();
 });
+
+it("shows the organization's own words for this person when the server sends them, else the shared ones", () => {
+  const own = "You need Pro to use this organization. Open Account, or give yourself a seat in Seats.";
+  gate.state = { ...state("frozen"), space: { ...space("member"), accessMessage: own } };
+  render(
+    <OrganizationWorkGate route={{ view: "tasks" }}>
+      <p>Team work</p>
+    </OrganizationWorkGate>,
+  );
+  expect(screen.getByText(own)).toBeTruthy();
+  expect(screen.queryByText(message)).toBeNull();
+  cleanup();
+  gate.state = { ...state("frozen"), space: { ...space("member"), accessMessage: null } };
+  expect(shows({ view: "tasks" })).toEqual({ work: false, frozen: true });
+});

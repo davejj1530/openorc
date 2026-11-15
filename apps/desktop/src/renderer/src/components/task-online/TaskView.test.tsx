@@ -90,6 +90,11 @@ it("does not mark a listed assignment seen, then acknowledges its exact generati
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("tasks.online.seen", expect.objectContaining({ spaceId: onlineReference.spaceId, id: onlineReference.id, assignmentRevision: 3 })));
   expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "tasks.get" || method === "tasks.update" || method === "tasks.openThread")).toBe(false);
 });
+it("marks an assignee who can't use the project with a lock, and keeps them assigned", async () => {
+  task = { ...task, assignee: { ...task.assignee!, available: false } };
+  render(wrap(<OnlineTaskView reference={onlineReference} tab="spec" />));
+  expect(await screen.findByRole("button", { name: "Assignee: Alex. This person can’t use the project right now." })).toBeTruthy();
+});
 it("never reads a Mac task when an online task is refused", async () => {
   getFails = true;
   render(wrap(<OnlineTaskView reference={onlineReference} tab="spec" />));

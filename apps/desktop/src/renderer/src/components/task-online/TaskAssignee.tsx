@@ -7,10 +7,12 @@ import { CoversPreview } from "../../lib/browser-preview";
 import { floatingGround } from "../../lib/use-anchor-ground";
 import { cn } from "../../lib/cn";
 import { AccountFace } from "../AccountFace";
-import { Check, ChevronDown, CircleUser } from "../icons";
+import { Check, ChevronDown, CircleUser, Lock } from "../icons";
 import { menuItem, menuPopup, menuSeparator } from "../menu";
 import { Button, Input } from "../ui";
 import "./tasks.css";
+
+const AWAY = "This person can’t use the project right now.";
 
 export function TaskAssignee({
   scope,
@@ -28,13 +30,20 @@ export function TaskAssignee({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const roster = useTaskRoster(scope, projectId, open && !disabled, search);
+  // A frozen assignee keeps the task; the lock says they can't work on it for now.
+  const away = value !== null && !value.available;
   return (
     <Menu.Root open={open} onOpenChange={setOpen}>
-      <Menu.Trigger className="property-chip min-w-0 max-w-64" disabled={disabled} aria-label={`Assignee: ${value?.name ?? "Unassigned"}`}>
+      <Menu.Trigger className="property-chip min-w-0 max-w-64" disabled={disabled} aria-label={`Assignee: ${value?.name ?? "Unassigned"}${away ? `. ${AWAY}` : ""}`}>
         {value ? <AccountFace name={value.name} image={value.image} className="task-assignee-face" /> : <CircleUser size={14} />}
         <span className="truncate" data-tip={value?.name}>
           {value?.name ?? "Unassigned"}
         </span>
+        {away ? (
+          <span className="shrink-0 text-ink-3" data-tip={AWAY}>
+            <Lock size={12} />
+          </span>
+        ) : null}
         <ChevronDown size={12} />
       </Menu.Trigger>
       <Menu.Portal>
@@ -53,13 +62,7 @@ export function TaskAssignee({
             </Menu.Item>
             <Menu.Separator className={menuSeparator} />
             {roster.people.map((person) => (
-              <Menu.Item
-                key={person.memberId}
-                className={menuItem}
-                disabled={!person.available}
-                data-tip={!person.available ? "This person can’t use the project right now." : undefined}
-                onClick={() => onChange(person)}
-              >
+              <Menu.Item key={person.memberId} className={menuItem} disabled={!person.available} data-tip={!person.available ? AWAY : undefined} onClick={() => onChange(person)}>
                 <AccountFace name={person.name} image={person.image} className="task-assignee-face" />
                 <span className="min-w-0 flex-1 truncate" data-tip={person.name}>
                   {person.name}

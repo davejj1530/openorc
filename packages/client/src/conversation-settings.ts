@@ -25,9 +25,6 @@ export function useConversationSettingsWith(queries: ClientQueries, permissions:
   const updateThread = queries.useRpcMutation("threads.update");
   const stored = savedModelChoice(thread, activeRun);
   const [choice, setChoice] = useState<ModelChoice | null>(stored);
-  // Settings whose save failed. A queued message runs with what the Mac saved, so a send first saves what the composer
-  // shows for them: the failed pick, or the thread's own value if another window changed it since.
-  const unsaved = useRef(new Set<Setting>());
   const storedKey = JSON.stringify(stored);
   const previousStored = useRef(storedKey);
   useEffect(() => {
@@ -41,11 +38,7 @@ export function useConversationSettingsWith(queries: ClientQueries, permissions:
     if (!models.data) return;
     const prefer = thread ? thread.agent : (activeRun?.agent ?? null);
     // Keep saved execution settings visible even while the catalog is stale or unavailable.
-    if (choice) return;
-    // A thread made with no model, as a task's cloud thread is, shows a default: the send saves it first, so the thread
-    // runs, and says it runs, what the composer showed.
-    if (!stored && thread) unsaved.current.add("model");
-    setChoice(stored ?? defaultChoice(models.data, prefer));
+    if (!choice) setChoice(stored ?? defaultChoice(models.data, prefer));
   }, [choice, models.data, stored, thread, activeRun?.agent]);
   const [mode, setMode] = useState<RunMode>(thread ? thread.mode : (activeRun?.mode ?? "act"));
   const savedMode = thread?.mode ?? activeRun?.mode;
@@ -59,6 +52,9 @@ export function useConversationSettingsWith(queries: ClientQueries, permissions:
   const { permission, select: setPermission, error: permissionError, ready: permissionReady } = permissions.usePermissionSelection(thread?.permissionMode ?? activeRun?.permissionMode);
   // Autonomous also updates approvals on the running turn; other settings persist for resume.
   const settingsSave = useRef<Promise<unknown>>(Promise.resolve());
+  // Settings whose save failed. A queued message runs with what the Mac saved, so a send first saves what the composer
+  // shows for them: the failed pick, or the thread's own value if another window changed it since.
+  const unsaved = useRef(new Set<Setting>());
   const write = (threadId: string, patch: SettingsPatch) =>
     updateThread.mutateAsync({ id: threadId, patch }).then(
       () => settingsIn(patch).forEach((setting) => unsaved.current.delete(setting)),

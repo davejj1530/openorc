@@ -118,18 +118,3 @@ it("saves the model the composer shows after the thread's saved model changes el
   });
   expect(updates().slice(failed)).toEqual([{ agent: "codex", model: "gpt-6-luna", effort: "medium", fastMode: false }]);
 });
-
-it("saves the default model a thread made with none shows before the send goes", async () => {
-  call.mockImplementation((method) => {
-    if (method === "agents.models") return Promise.resolve([{ agent: "claude", id: "claude-sonnet-5", label: "Claude Sonnet 5", isDefault: true, defaultEffort: "medium", efforts: ["medium"] }]);
-    return Promise.resolve({});
-  });
-  const empty = { ...thread, agent: "codex" as const, model: null, effort: null };
-  const { result } = renderHook(() => client.useConversationSettings({ thread: empty, activeRun: undefined }), { wrapper });
-  await waitFor(() => expect(result.current.choice?.model).toBe("claude-sonnet-5"));
-  expect(updates()).toEqual([]);
-  await act(async () => {
-    await result.current.waitForSave();
-  });
-  expect(updates()).toEqual([{ agent: "claude", model: "claude-sonnet-5", effort: "medium", fastMode: false }]);
-});

@@ -1,4 +1,4 @@
-import { composerActivity, composerSendBlock, sendCluster, sendsNow, type SendPayer, type SkillCommand, type SkillListNotice, type WaitingAsk } from "@openorc/client";
+import { composerActivity, composerSendBlock, personTag, sendCluster, sendsNow, tagsPerson, type SendPayer, type SkillCommand, type SkillListNotice, type WaitingAsk } from "@openorc/client";
 import {
   ExecutionMode,
   executionMode,
@@ -14,6 +14,7 @@ import {
   type RunMode,
   type UsableConnector,
   type HostedFileScope,
+  type ThreadPerson,
 } from "@openorc/protocol";
 import { useCallback, useContext, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 import { useRpcMutation } from "../lib/client";
@@ -31,6 +32,7 @@ import { ComposerAsk } from "./ComposerAsk";
 import { ComposerInput, type ComposerLists } from "./ComposerInput";
 import type { ComposerEditorHandle } from "./composer-editor/ComposerEditor";
 import { ComposerSendCluster } from "./ComposerSendButton";
+import { useDraftNote, type ComposerNotes } from "./composer-notes";
 import { ContextUsage } from "./ContextUsage";
 import { useHostedControlReason } from "./HostedConversationBoundary";
 import { hostedCommandReason } from "./HostedComposerControls";
@@ -42,6 +44,7 @@ import { Tooltip } from "./ui";
 export const permissionLabel: Record<PermissionPreset, string> = { review: "Review", trusted: "Workspace access", autonomous: "Autonomous" };
 
 export type { Attachment } from "../lib/composer-attachments";
+export type { ComposerNotes } from "./composer-notes";
 
 function composerDestination(props: ComposerProps): ReactNode {
   if (props.hasStarted) return null;
@@ -86,6 +89,8 @@ export interface ComposerChanges {
 export interface ComposerHandle {
   /** Puts a message's words back after what is written, as one step to undo, and its files back beside it. */
   append: (text: string, attachments: readonly string[]) => void;
+  /** Puts a person's tag before what is written, as Reply to their note does, with the keyboard after it all. */
+  tag: (person: ThreadPerson) => void;
 }
 
 export interface ComposerProps {
@@ -187,6 +192,8 @@ export interface ComposerProps {
   asksBlocked?: string | null;
   /** Whether an ask's answer continues on the reader's own sign-in and hours, in words; null where it does not. */
   askContinues?: ((approvalId: string) => string | null) | undefined;
+  /** In a cloud thread where the reader may post notes: `@` offers its people, and a draft that tags one posts as a note. */
+  notes?: ComposerNotes | null | undefined;
   children?: ReactNode;
 }
 
@@ -242,6 +249,8 @@ export function Composer(props: ComposerProps) {
   const { value, onChange } = props;
   const editor = useRef<ComposerEditorHandle>(null);
   const appendFiles = files.append;
+  const note = useDraftNote(props.notes, props.draftKey, value, attachments.length + uploading);
+  const pickPerson = note.pick;
   useImperativeHandle(
     props.handle,
     () => ({
@@ -251,8 +260,14 @@ export function Composer(props: ComposerProps) {
         editor.current?.write(next, next.length);
         appendFiles(paths);
       },
+      tag: (person) => {
+        pickPerson(person);
+        const next = `${personTag(person.id)} ${value.trimStart()}`;
+        editor.current?.write(next, next.length);
+        editor.current?.focus();
+      },
     }),
-    [value, appendFiles],
+    [value, appendFiles, pickPerson],
   );
   const interrupt = useRpcMutation("runs.interrupt");
   const { submission, submit: submitDraft, acknowledge } = useComposerSubmission(props.draftKey);
@@ -269,8 +284,7 @@ export function Composer(props: ComposerProps) {
   }, [submission, value, onChange, acknowledge]);
   const drop = useComposerDrop((dropped) => void addFiles(dropped));
   const attachmentBlock = files.pendingReason ?? (attachments.length > 0 ? files.blocked : null);
-  const canSend =
-    Boolean(props.allowEmpty || props.value.trim() || attachments.length > 0) && !props.busy && !submitting && !props.readOnlyReason && !props.disabledReason && !attachmentBlock && uploading === 0;
+  const canSend = note.isNote ? Boolean(note.post) && !submitting && !props.readOnlyReason : messageSends(props, { attachments: attachments.length, uploading, submitting, attachmentBlock });
 
   const canStop = turnStops(props);
   const asks = props.asks ?? [];
@@ -285,11 +299,13 @@ export function Composer(props: ComposerProps) {
     canStop,
     hasDraft: Boolean(props.value.trim()) || attachments.length > 0 || uploading > 0,
     startsTask: props.allowEmpty,
+    note: note.isNote,
     asked: asks.length > 0 ? `${props.model ? harnessShortName(props.model.agent) : "The agent"} is waiting for your answer.` : null,
   });
   const submit = (otherWay: boolean) => {
     if (!canSend) return;
     files.clearError();
+    if (note.post) return submitDraft(props.value.trim(), [], note.post);
     const sent = attachments.map((attachment) => attachment.path);
     const text = props.value.trim();
     const now = sendsNow(cluster, otherWay);
@@ -329,7 +345,7 @@ export function Composer(props: ComposerProps) {
             onChange={props.onChange}
             onSubmit={submit}
             onFiles={addFiles}
-            onReady={props.readOnlyReason ? undefined : props.onReady}
+            onReady={props.readOnlyReason || note.isNote ? undefined : readyForMessages(props.onReady, Boolean(props.notes))}
             draftKey={props.draftKey}
             disabled={Boolean(props.busy || submitting)}
             placeholder={props.placeholder}
@@ -348,6 +364,7 @@ export function Composer(props: ComposerProps) {
             editor={editor}
             lists={lists}
             ask={asks.length > 0 ? { enter: () => shell.current?.querySelector<HTMLElement>("[data-ask-control='head']")?.focus() } : null}
+            people={note.people}
           />
           {sent.ghost ? (
             <div key={sent.ghost.key} className="composer-sent-ghost" aria-hidden="true" onAnimationEnd={sent.clear}>
@@ -377,7 +394,7 @@ export function Composer(props: ComposerProps) {
             <ComposerSendCluster
               cluster={cluster}
               canSend={canSend}
-              block={composerSendBlock({ disabledReason: props.readOnlyReason ?? props.disabledReason, attachmentBlock })}
+              block={note.isNote ? (note.block ?? props.readOnlyReason ?? null) : composerSendBlock({ disabledReason: props.readOnlyReason ?? props.disabledReason, attachmentBlock })}
               stopping={stopping}
               payer={props.sendPayer}
               onSend={submit}
@@ -390,6 +407,26 @@ export function Composer(props: ComposerProps) {
     </div>
   );
   return <ComposerReadOnly.Provider value={props.readOnlyReason ?? null}>{content}</ComposerReadOnly.Provider>;
+}
+
+/**
+ * The readiness hints of a draft to the agent. Where drafts can be notes, one that starts with a person's tag, as Reply
+ * writes it, is a note and asks for none.
+ */
+function readyForMessages(onReady: ComposerProps["onReady"], notes: boolean): ComposerProps["onReady"] {
+  if (!onReady || !notes) return onReady;
+  return (why, message?: string) => {
+    if (why !== "words" || !message || !tagsPerson(message)) onReady(why);
+  };
+}
+
+/** Whether a message can go to the agent now: it has words or files, or may go empty, and nothing holds it. */
+function messageSends(
+  props: Pick<ComposerProps, "allowEmpty" | "value" | "busy" | "readOnlyReason" | "disabledReason">,
+  { attachments, uploading, submitting, attachmentBlock }: { attachments: number; uploading: number; submitting: boolean; attachmentBlock: string | null | undefined },
+): boolean {
+  if (props.busy || submitting || props.readOnlyReason || props.disabledReason || attachmentBlock || uploading > 0) return false;
+  return Boolean(props.allowEmpty || props.value.trim() || attachments > 0);
 }
 
 function guardHostedCommand(props: ComposerProps, hosted: string | null): ComposerProps {

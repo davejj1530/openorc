@@ -38,8 +38,8 @@ export interface ComposerEditorProps {
   /** Keys the composer answers ahead of the editor: true for each it took. */
   onKeyDown: (event: KeyboardEvent) => boolean;
   onFiles: (files: File[]) => void;
-  /** The person is about to write: the field took focus, or its first words. */
-  onReady?: ((why?: "focus" | "words") => void) | undefined;
+  /** The person is about to write: the field took focus, or its first words, which come with it. */
+  onReady?: ((why?: "focus" | "words", message?: string) => void) | undefined;
   disabled: boolean;
   placeholder: string;
   autoFocus?: boolean | undefined;

@@ -304,6 +304,7 @@ const idInvalidations: MethodRules = {
   "threads.unqueue": (p) => ["threads", `thread:${String(p["id"])}`, `runs:thread:${String(p["id"])}`, `comments:thread:${String(p["id"])}`],
   "threads.startQueued": (p) => ["threads", `thread:${String(p["threadId"])}`, `runs:thread:${String(p["threadId"])}`],
   "threads.retrySave": (p) => ["threads", `thread:${String(p["threadId"])}`],
+  "threads.postNote": (p) => [`notes:${String(p["threadId"])}`],
   "review.commitThread": (p) => ["workspace-diff", `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`, "threads"],
   "review.pushThread": (p) => ["workspace-diff", "threads", `thread:${String(p["threadId"])}`, `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`],
   "review.createThreadPr": (p) => ["threads", `thread:${String(p["threadId"])}`, `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`],

@@ -112,6 +112,17 @@ describe("sendCluster", () => {
       cluster: { kind: "turn", stop: true, enter: "queue", other: { way: "now", blocked: "Claude is waiting for your answer." } },
     },
     { name: "a task's empty first send names that it starts the task", input: { ...typed, hasDraft: false, startsTask: true }, cluster: { kind: "send", stop: false, startsTask: true } },
+    { name: "Post note for a draft that tags a person, with nothing running", input: { ...typed, note: true }, cluster: { kind: "note", stop: false } },
+    {
+      name: "Post note with Stop beside it, never Send now or Queue, while a turn runs",
+      input: { ...typed, note: true, queueing: true, canStop: true, steerable: true },
+      cluster: { kind: "note", stop: true },
+    },
+    {
+      name: "Post note while an ask waits, which the note never answers",
+      input: { ...typed, note: true, queueing: true, canStop: true, asked: "Claude is waiting for your answer." },
+      cluster: { kind: "note", stop: true },
+    },
   ])("$name", ({ input, cluster }) => {
     expect(sendCluster(input)).toEqual(cluster);
   });
@@ -122,6 +133,7 @@ describe("sendCluster", () => {
     const queue = sendCluster({ ...typed, queueing: true, canStop: true });
     expect([sendsNow(queue, false), sendsNow(queue, true)]).toEqual([false, true]);
     expect(sendsNow(sendCluster(typed), true)).toBe(false);
+    expect(sendsNow(sendCluster({ ...typed, note: true, queueing: true, steerable: true }), false)).toBe(false);
   });
 });
 

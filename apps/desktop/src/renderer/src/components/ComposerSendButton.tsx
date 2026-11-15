@@ -1,12 +1,15 @@
 import type { SendCluster, SendPayer, SendWay } from "@openorc/client";
 import { useState } from "react";
+import { NOTE_TIP } from "./composer-notes";
 import { ArrowUp } from "./icons";
 
 const WAY_WORDS: Record<SendWay, string> = { now: "Send now", queue: "Queue" };
 const START_WORDS = "Start from the task";
+const NOTE_WORDS = "Post note";
 
-/** The words the ink button carries, if any: what Enter does mid-turn, or that an empty send starts the task. */
+/** The words the ink button carries, if any: what Enter does mid-turn, that an empty send starts the task, or a note. */
 function inkWords(cluster: SendCluster): string | null {
+  if (cluster.kind === "note") return NOTE_WORDS;
   if (cluster.kind === "turn") return WAY_WORDS[cluster.enter];
   if (cluster.kind === "send" && cluster.startsTask) return START_WORDS;
   return null;
@@ -23,6 +26,7 @@ function useFoldingWords(words: string | null): string {
 function inkTip(cluster: SendCluster, words: string | null, reason: string | undefined, payer: SendPayer | null): string | undefined {
   if (cluster.kind === "stop") return payer?.stop ?? "Stop";
   if (cluster.kind === "turn") return reason ?? payer?.[cluster.enter] ?? undefined;
+  if (cluster.kind === "note") return reason ?? NOTE_TIP;
   if (words) return reason;
   return reason ?? payer?.send ?? "Send";
 }
@@ -33,7 +37,8 @@ function inkTip(cluster: SendCluster, words: string | null, reason: string | und
  * does mid-turn, so a turn starting or ending swaps it in place. Mid-turn, Stop steps aside as a white key and the other
  * way waits beside the pill as a quiet word, dimmed with its reason when the turn cannot take it. While an ask waits with
  * nothing typed, the ink is the ask's and Stop stands alone as the white key. In a cloud thread others are in, each says
- * on demand whose sign-in and hours it uses (`payer`).
+ * on demand whose sign-in and hours it uses (`payer`). A draft that tags a person makes the pill Post note, which says
+ * on demand where the note goes; Stop stays beside it while something runs.
  */
 export function ComposerSendCluster({
   cluster,

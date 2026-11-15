@@ -2,7 +2,6 @@ import { askKeyAct, askKeyName, commandWordAt, useCommandWord, type AskPlace, ty
 import type { FileScope, UsableConnector } from "@openorc/protocol";
 import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from "react";
 import { useRpc } from "../lib/client";
-import { cn } from "../lib/cn";
 import { filterMentions, mentionQueryAt, usePickedFiles, type MentionEntry } from "../lib/composer-mentions";
 import type { SlashCommand } from "./Composer";
 import {
@@ -22,7 +21,9 @@ import {
 import { ComposerSuggestions } from "./ComposerSuggestions";
 import { useHostedControlReason } from "./HostedConversationBoundary";
 import { blockHostedCommandKey, cloudCommandRows, hostedFileSuggestion, HostedSuggestion, nextCommandSuggestion } from "./HostedComposerControls";
-import { ConnectorLogo } from "./ConnectorLogo";
+import { ComposerSuggestionOption } from "./ComposerSuggestionOption";
+import { peopleRows, usePeopleMatches } from "./composer-people";
+import type { PeoplePicks } from "./composer-notes";
 import { ComposerEditor, type ComposerEditorHandle, type DraftChange } from "./composer-editor/ComposerEditor";
 import { SkillHoverCard, useSkillHover } from "./MarkedText";
 
@@ -32,7 +33,7 @@ interface ComposerInputProps {
   /** Enter sends its way; `otherWay` when Command or Control is held, which takes the other of send now and queue. */
   onSubmit: (otherWay: boolean) => void;
   onFiles: (files: File[]) => Promise<void>;
-  onReady?: ((why?: "focus" | "words") => void) | undefined;
+  onReady?: ((why?: "focus" | "words", message?: string) => void) | undefined;
   /** Where the draft's picked files are kept beside its attachments. */
   draftKey?: string | undefined;
   disabled: boolean;
@@ -55,6 +56,8 @@ interface ComposerInputProps {
   lists?: Ref<ComposerLists> | undefined;
   /** An ask docked onto the composer, which arrow up or Shift and Tab enter at its question. */
   ask?: { enter: () => void } | null | undefined;
+  /** Who `@` may tag, in a thread with notes. */
+  people?: PeoplePicks | undefined;
 }
 
 /** Opens the list of one kind at the caret, as typing `@` or `/` there would, showing only that kind. */
@@ -138,7 +141,8 @@ export function ComposerInput(props: ComposerInputProps) {
   const root = useRef<HTMLDivElement>(null);
   const listId = useId();
   const picked = usePickedFiles(props.draftKey, value);
-  const sources = useMemo(() => ({ commands, connectors, members: mentions, files: picked.files }), [commands, connectors, mentions, picked.files]);
+  const named = props.people?.named;
+  const sources = useMemo(() => ({ commands, connectors, members: mentions, files: picked.files, people: named }), [commands, connectors, mentions, picked.files, named]);
   const token = useMemo(() => tokenAtCaret(value, caret), [value, caret]);
   const scope = useListKind(props.lists, { token, caret, value, editor, onOpen: () => setSuggestionsActive(true) });
   const memberQuery = useMemo(() => (mentions?.length && (scope === null || scope === "orcling") ? mentionQueryAt(value, caret) : null), [mentions, value, caret, scope]);
@@ -146,6 +150,7 @@ export function ComposerInput(props: ComposerInputProps) {
   const atQuery = token?.token.startsWith("@") ? token.token.slice(1) : null;
   const mentionQuery = fileSearch ? atQuery : null;
   const connectorMatches = useMemo(() => matchingConnectors(connectors, atQuery), [connectors, atQuery]);
+  const personMatches = usePeopleMatches(props.people, atQuery);
   const asideMatches = useMemo(() => asideMatching(props.connectorsAside, atQuery), [props.connectorsAside, atQuery]);
   useConnectorWord(token, atQuery, onConnectorsWanted);
   const commandPrefix = token?.token[0];
@@ -159,11 +164,34 @@ export function ComposerInput(props: ComposerInputProps) {
     const members = memberQuery ? memberRows(memberMatches, { start: memberQuery.start, caret, value, write }) : [];
     if (atQuery !== null) {
       const draft = { token, caret, value, write, onFile: picked.pick };
-      return [...members, ...mentionRows({ usable: connectorMatches, aside: asideMatches, files: mentionQuery !== null ? (files.data ?? []) : [] }, draft), ...hostedFileSuggestion(fileReason)];
+      return [
+        ...members,
+        ...peopleRows(personMatches, props.people, draft),
+        ...mentionRows({ usable: connectorMatches, aside: asideMatches, files: mentionQuery !== null ? (files.data ?? []) : [] }, draft),
+        ...hostedFileSuggestion(fileReason),
+      ];
     }
     if (members.length) return members;
     return cloudCommandRows(fileReason, commandMatches, { query: commandQuery, token, caret, value, write }, token);
-  }, [memberQuery, memberMatches, atQuery, connectorMatches, asideMatches, mentionQuery, files.data, commandMatches, commandQuery, token, caret, value, write, picked.pick, fileReason]);
+  }, [
+    memberQuery,
+    memberMatches,
+    atQuery,
+    personMatches,
+    props.people,
+    connectorMatches,
+    asideMatches,
+    mentionQuery,
+    files.data,
+    commandMatches,
+    commandQuery,
+    token,
+    caret,
+    value,
+    write,
+    picked.pick,
+    fileReason,
+  ]);
   const suggestions = useMemo(() => (scope ? all.filter((row) => ofKind(row, scope)) : all), [all, scope]);
   // The skill under the pointer says what it is for.
   const skillHover = useSkillHover(root);
@@ -203,32 +231,7 @@ export function ComposerInput(props: ComposerInputProps) {
                       {suggestion.group}
                     </div>
                   ) : null}
-                  <button
-                    id={`${listId}-${index}`}
-                    tabIndex={-1}
-                    role="option"
-                    aria-selected={index === cursor}
-                    aria-disabled={suggestion.unavailable ? true : undefined}
-                    data-tip={suggestion.unavailable}
-                    data-agent-mention={suggestion.mention}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      suggestion.pick();
-                    }}
-                    // A move, not an enter: a row scrolling under a still pointer must not take the selection from the arrow keys.
-                    onMouseMove={() => setCursor(index)}
-                    className="composer-suggestion"
-                  >
-                    {/* The label is the thing being inserted, so the hint gives way first. A
-                    skill's description runs to a paragraph and would otherwise squeeze the
-                    name it belongs to down to nothing. Half the row is the ceiling, so a
-                    long file path still truncates rather than crowding out its own hint. */}
-                    <span className={cn("composer-suggestion-label", (suggestion.insert || suggestion.logo) && "skill-token")} data-mono={suggestion.mention ? undefined : true}>
-                      {suggestion.logo ? <ConnectorLogo title={suggestion.logo.title} logo={suggestion.logo.logo} size={16} /> : null}
-                      {suggestion.label}
-                    </span>
-                    {suggestion.hint ? <span className="composer-suggestion-hint">{suggestion.hint}</span> : null}
-                  </button>
+                  <ComposerSuggestionOption row={suggestion} id={`${listId}-${index}`} selected={index === cursor} onPoint={() => setCursor(index)} />
                 </Fragment>
               ),
             )}

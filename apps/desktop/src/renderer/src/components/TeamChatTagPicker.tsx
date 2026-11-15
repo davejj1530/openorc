@@ -49,7 +49,7 @@ export function TeamChatTagPicker({
 }
 
 /** Who matches the `@` word: by the start of any part of their name. */
-export function matchingPeople(people: readonly TeamChatPerson[], query: string): TeamChatPerson[] {
+export function matchingPeople<T extends { name: string }>(people: readonly T[], query: string): T[] {
   const needle = query.toLocaleLowerCase();
   return people
     .filter(

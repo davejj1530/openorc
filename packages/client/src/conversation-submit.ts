@@ -133,15 +133,29 @@ const TURN_TAKES_NOTHING = "This turn can’t take a message now.";
  * names that it starts the task). While a turn runs and something is typed, the ink pill carries the word of what Enter
  * does and a quiet word beside it is the other way; Stop steps aside as a white key. While an ask waits on the person
  * the ink is the ask's: with nothing typed Stop stands alone as a white key, and a message typed meanwhile queues, with
- * Send now dimmed for the ask's reason.
+ * Send now dimmed for the ask's reason. A draft that tags a person is a note, which posts to the thread and never reaches
+ * the agent: the pill says Post note through every state, with Stop beside it while something runs.
  */
 export type SendCluster =
-  { kind: "stop" } | { kind: "asked" } | { kind: "send"; stop: boolean; startsTask: boolean } | { kind: "turn"; stop: boolean; enter: SendWay; other: { way: SendWay; blocked: string | null } };
+  | { kind: "stop" }
+  | { kind: "asked" }
+  | { kind: "send"; stop: boolean; startsTask: boolean }
+  | { kind: "turn"; stop: boolean; enter: SendWay; other: { way: SendWay; blocked: string | null } }
+  | { kind: "note"; stop: boolean };
 
 export function sendCluster(
-  input: ComposerActionsInput & { readOnly?: boolean; steerReason?: string | null | undefined; startsTask?: boolean; asked?: string | null | undefined; queueBlocked?: string | null | undefined },
+  input: ComposerActionsInput & {
+    readOnly?: boolean;
+    steerReason?: string | null | undefined;
+    startsTask?: boolean;
+    asked?: string | null | undefined;
+    queueBlocked?: string | null | undefined;
+    /** The draft tags a person, so it posts as a note. */
+    note?: boolean;
+  },
 ): SendCluster {
   if (input.readOnly) return { kind: "send", stop: false, startsTask: false };
+  if (input.note && input.hasDraft) return { kind: "note", stop: input.canStop };
   if (input.asked) return askedCluster({ ...input, asked: input.asked });
   if (input.canStop && !input.hasDraft) return { kind: "stop" };
   if (!input.queueing) return { kind: "send", stop: input.canStop, startsTask: Boolean(input.startsTask && !input.hasDraft) };

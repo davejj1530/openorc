@@ -11,7 +11,7 @@ import { Conversation } from "./Conversation";
 vi.hoisted(() => void ((window as unknown as { openorc?: object }).openorc ??= { platform: "darwin" }));
 const queries = vi.hoisted(() => new Map<string, unknown>());
 const refetched = vi.hoisted(() => ({ count: 0 }));
-const composer = vi.hoisted(() => ({ props: null as ComposerProps | null }));
+const composer = vi.hoisted(() => ({ props: null as ComposerProps | null, handle: { append: () => {}, tag: (_person: unknown) => {} } }));
 vi.mock("../lib/rpc", () => ({
   core: new Proxy({ call: vi.fn() } as Record<string, unknown>, { get: (target, key: string) => (key in target ? target[key] : () => () => undefined) }),
 }));
@@ -27,6 +27,7 @@ vi.mock("./Composer", async (original) => ({
   ...(await original<object>()),
   Composer: (props: ComposerProps) => {
     composer.props = props;
+    if (props.handle && typeof props.handle === "object") (props.handle as { current: unknown }).current = composer.handle;
     return props.notices;
   },
 }));
@@ -283,8 +284,27 @@ it("draws a teammate's note in the thread with the person it tags, and Reply put
   const note = screen.getByRole("article", { name: "Note from Mara Okafor" });
   expect(note.textContent).toContain("Note");
   expect(note.querySelector(".person-token")?.textContent).toBe("@Theo Laurent");
+  const tag = vi.spyOn(composer.handle, "tag");
   fireEvent.click(within(note).getByRole("button", { name: "Reply" }));
-  expect(composer.props!.value).toBe("@[user:u-mara] ");
+  expect(tag).toHaveBeenCalledWith(MARA);
+});
+
+it("posts a tagged draft as the reader's note, the same note again after a lost answer, and offers none until the server lets them", async () => {
+  await open(marasThread(together(THEO, { canWrite: true, send: "now" })));
+  expect(composer.props!.notes).toBeNull();
+  cleanup();
+  await open(marasThread(together(THEO, { canWrite: true, send: "now", canPostNote: true })));
+  expect(composer.props!.notes).toMatchObject({ threadId: "cloud", viewerId: THEO.id });
+  const note = { text: "@Mara Okafor The columns match.", mentions: [{ userId: MARA.id, start: 0, end: 12 }] };
+  vi.mocked(core.call).mockImplementationOnce((async () => Promise.reject(new Error("The server could not be reached."))) as never);
+  await expect(act(() => composer.props!.notes!.post(note))).rejects.toThrow("The server could not be reached.");
+  await act(() => composer.props!.notes!.post(note));
+  const posts = vi
+    .mocked(core.call)
+    .mock.calls.filter(([method]) => method === "threads.postNote")
+    .map(([, params]) => params as { id: string });
+  expect(posts).toEqual([expect.objectContaining({ threadId: "cloud", ...note }), expect.objectContaining({ threadId: "cloud", ...note })]);
+  expect(posts[0]!.id).toBe(posts[1]!.id);
 });
 
 const handoff = { code: "handoff_unavailable" as const, message: "Only Mara can run the agent in this cloud thread for now.", responsible: MARA, commandIds: [], retrySave: false };

@@ -1,9 +1,10 @@
-import { personName, personTag, placeNotes, type Block } from "@openorc/client";
+import { personName, placeNotes, type Block } from "@openorc/client";
 import type { ThreadNote, ThreadPerson, ThreadSummary } from "@openorc/protocol";
-import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode } from "react";
-import { useRpc } from "../lib/client";
+import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode, type RefObject } from "react";
+import { useRpc, useRpcMutation } from "../lib/client";
 import "../styles/together.css";
 import { AccountFace } from "./AccountFace";
+import type { ComposerHandle, ComposerNotes } from "./Composer";
 
 /**
  * A cloud thread's notes where the conversation draws them: those before every loaded block, those after each block,
@@ -25,21 +26,13 @@ const NOTES_PER_READ = 200;
 /**
  * A cloud thread's notes placed among its blocks, read once the thread has any. The value stays the same object while
  * the notes stand where they stood, which streaming never changes (a new block comes after every note's place), so the
- * transcript's turns do not draw again for it. Reply puts the author's tag before the draft.
+ * transcript's turns do not draw again for it. Reply puts the author's tag before the composer's draft.
  */
-export function useThreadNotes(thread: ThreadSummary | null, blocks: readonly Block[] | undefined, prompt: string, setPrompt: (text: string) => void): ThreadNotesValue {
+export function useThreadNotes(thread: ThreadSummary | null, blocks: readonly Block[] | undefined, composer: RefObject<ComposerHandle | null>): ThreadNotesValue {
   const head = thread?.owner?.brain === "hosted" ? (thread.owner.collaboration?.noteHead ?? 0) : 0;
   const read = useRpc("threads.notes", { threadId: thread?.id ?? "", limit: NOTES_PER_READ }, { enabled: Boolean(thread) && head > 0 });
   const notes = read.data?.notes;
-  const draft = useRef(prompt);
-  draft.current = prompt;
-  const onReply = useCallback(
-    (author: ThreadPerson) => {
-      const tag = `${personTag(author.id)} `;
-      setPrompt(draft.current.trim() ? `${tag}${draft.current}` : tag);
-    },
-    [setPrompt],
-  );
+  const onReply = useCallback((author: ThreadPerson) => composer.current?.tag(author), [composer]);
   const last = useRef<{ key: string; value: ThreadNotesValue } | null>(null);
   return useMemo(() => {
     if (!notes?.length) return NONE;
@@ -50,6 +43,28 @@ export function useThreadNotes(thread: ThreadSummary | null, blocks: readonly Bl
     last.current = { key, value };
     return value;
   }, [notes, blocks, onReply]);
+}
+
+/**
+ * Where the composer posts notes, while the server lets the reader post them in this cloud thread. A note keeps its id
+ * while its words and tags stay the same, so posting it again after a lost answer is the same note.
+ */
+export function useComposerNotes(thread: ThreadSummary | null): ComposerNotes | null {
+  const collaboration = thread?.owner?.brain === "hosted" ? thread.owner.collaboration : undefined;
+  const threadId = collaboration?.canPostNote ? (thread?.id ?? null) : null;
+  const viewerId = collaboration?.viewer?.id ?? null;
+  const { mutateAsync } = useRpcMutation("threads.postNote");
+  const pending = useRef<{ key: string; id: string } | null>(null);
+  return useMemo(() => {
+    if (!threadId) return null;
+    const post: ComposerNotes["post"] = async (note) => {
+      const key = JSON.stringify(note);
+      if (pending.current?.key !== key) pending.current = { key, id: crypto.randomUUID() };
+      await mutateAsync({ threadId, id: pending.current.id, ...note });
+      pending.current = null;
+    };
+    return { threadId, viewerId, post };
+  }, [threadId, viewerId, mutateAsync]);
 }
 
 /** The notes that follow any of these blocks, in the order their blocks stand. */
@@ -79,7 +94,7 @@ function NoteView({ note }: { note: ThreadNote }) {
       <header className="note-author">
         {note.author ? <AccountFace name={name} image={note.author.image} /> : null}
         <span className="prompt-author-name">{name}</span>
-        <span className="shrink-0 text-ink-3">Note</span>
+        <span className="shrink-0 text-ink-4">Note</span>
       </header>
       <p className="mt-2 text-prose text-ink whitespace-pre-wrap wrap-anywhere">{noteWords(note)}</p>
       {onReply && note.author ? (

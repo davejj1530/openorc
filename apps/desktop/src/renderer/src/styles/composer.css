@@ -760,6 +760,14 @@
   margin-right: 8px;
   vertical-align: -3px;
 }
+/* A person under People: their face, then their name. */
+.composer-suggestion-label > .account-face {
+  width: 24px;
+  height: 24px;
+  margin-right: 10px;
+  font-size: 10px;
+  vertical-align: middle;
+}
 .composer-suggestion-label:only-child {
   grid-column: 1 / -1;
   max-width: 100%;

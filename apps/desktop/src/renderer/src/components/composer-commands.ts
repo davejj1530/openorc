@@ -15,6 +15,8 @@ export interface SuggestionRow {
   complete?: boolean;
   /** A connector's image, drawn before its name. */
   logo?: { title: string; logo: string | null };
+  /** A person's face, drawn before their name. */
+  face?: { name: string; image: string | null };
   /** The heading over the run of rows this one starts or continues. */
   group?: string;
   /** Why the row is listed but cannot be picked, said over its run and on hover. */

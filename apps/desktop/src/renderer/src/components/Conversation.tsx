@@ -50,7 +50,7 @@ import { useConnectorMentions } from "../lib/connector-mentions";
 import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { ThreadVoicesContext, useThreadVoices } from "../lib/thread-authors";
-import { ThreadNotesContext, useThreadNotes, type ThreadNotesValue } from "./ThreadNotes";
+import { ThreadNotesContext, useComposerNotes, useThreadNotes, type ThreadNotesValue } from "./ThreadNotes";
 import { VoicesFailed } from "./ThreadVoice";
 import { useTurnFooters } from "../lib/turn-footers";
 import { AnswersBlocked, AsksDocked } from "./ask-answer";
@@ -286,7 +286,8 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const answersBlocked = asksBlocked(thread);
   const placeholder = composerPlaceholder(choice?.agent, thread);
   const heard = optimistic.run ? heardTranscript(optimistic.run, thread) : null;
-  const notes = useThreadNotes(thread, heard?.blocks, prompt, setPrompt);
+  const notes = useThreadNotes(thread, heard?.blocks, controls.composer);
+  const composerNotes = useComposerNotes(thread);
 
   function renderTranscript() {
     if (heard && heard.blocks.length > 0)
@@ -323,6 +324,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
               onChange={setPrompt}
               onSubmit={submit}
               onReady={taskDraft.prepared ? undefined : cloud.onReady}
+              notes={composerNotes}
               onInsertTask={taskDraft.insert}
               placeholder={orclings.placeholder ?? placeholder}
               mentions={orclings.mentions}

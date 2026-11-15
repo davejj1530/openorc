@@ -488,9 +488,12 @@ export class StandInThreads {
       if (message.author === who) message.state = "cancelled";
       else message.paused = true;
     }
-    const sender = this.collaboration.personOf(thread.turn)?.name.split(" ")[0] ?? "the previous sender";
-    const stopper = this.collaboration.personOf(who)?.name.split(" ")[0] ?? "Someone";
-    this.append(thread.id, [{ type: "message.completed", ts: Date.now(), messageId: randomUUID(), role: "system", text: `${stopper} stopped ${sender}'s turn.` }], { by: userOf(who) });
+    // Stopping another person's turn says so once; stopping one's own says nothing, as the server does.
+    if (thread.turn !== who) {
+      const sender = this.collaboration.personOf(thread.turn)?.name.split(" ")[0] ?? "the previous sender";
+      const stopper = this.collaboration.personOf(who)?.name.split(" ")[0] ?? "Someone";
+      this.append(thread.id, [{ type: "message.completed", ts: Date.now(), messageId: randomUUID(), role: "system", text: `${stopper} stopped ${sender}'s turn.` }], { by: userOf(who) });
+    }
     this.endTurn(thread.id, "cancelled");
     return { status: 204, body: null };
   }

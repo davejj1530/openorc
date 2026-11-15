@@ -108,6 +108,22 @@ describe("sending, queueing and Stop in a shared thread", () => {
     await live(bob, thread, "Ada");
   });
 
+  it("says once who stopped another person's turn, and nothing when a sender stops their own", async () => {
+    const lines = async (hosted: Hosted) =>
+      (await hosted.threads.call("events.page", { runId, fromTurn: 0 })).events.flatMap((event) => (event.type === "message.completed" && event.role === "system" ? [event.text] : []));
+    const { thread, ada, bob, runId } = await shared(true);
+    await ada.threads.call("runs.send", { runId, text: "Start", messageId: id(1) });
+    await live(bob, thread, "Ada");
+    await bob.threads.call("runs.interrupt", { runId });
+    await live(ada, thread, null);
+    expect(await lines(ada)).toEqual(["Bob stopped Ada's turn."]);
+    await ada.threads.call("runs.send", { runId, text: "Again", messageId: id(2) });
+    await live(ada, thread, "Ada");
+    await ada.threads.call("runs.interrupt", { runId });
+    await live(ada, thread, null);
+    expect(await lines(ada)).toEqual(["Bob stopped Ada's turn."]);
+  });
+
   it("refuses a Stop aimed at a turn that has changed, in the server's words", async () => {
     // Bob's list stops moving, so his window still shows the first turn when Ada's next one runs.
     let frozen: string | null = null;

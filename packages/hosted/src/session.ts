@@ -18,6 +18,7 @@
 import { ACCOUNT_PROTOCOL_HEADER, ACCOUNT_PROTOCOL_VERSION, type AccountReach } from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedDeps, LiveSocket } from "./index.js";
+import { outgoing } from "./raw-body.js";
 import { ROUTES, wireRefusal, type Route } from "./wire.js";
 
 /** The server cannot be reached now. Its message is the words a window shows. */
@@ -300,23 +301,19 @@ export class Session {
     const headers: Record<string, string> = { [ACCOUNT_PROTOCOL_HEADER]: String(ACCOUNT_PROTOCOL_VERSION) };
     if (token) headers["authorization"] = `Bearer ${token}`;
     if (space) headers[SPACE_HEADER] = space;
-    if (body !== undefined) headers["content-type"] = "application/json";
-    const headerTimeout = signal ? new AbortController() : null;
-    const timer = headerTimeout ? setTimeout(() => headerTimeout.abort(), REQUEST_TIMEOUT_MS) : null;
+    const sending = outgoing(body, signal, REQUEST_TIMEOUT_MS);
+    if (sending.contentType) headers["content-type"] = sending.contentType;
     try {
-      return await this.deps.fetch(new URL(route.path, this.deps.server), {
-        method: route.method,
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: signal && headerTimeout ? AbortSignal.any([signal, headerTimeout.signal]) : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        redirect: signal ? "error" : "follow",
-      });
+      return await this.deps.fetch(new URL(route.path, this.deps.server), { method: route.method, headers, ...sending.init, redirect: signal ? "error" : "follow" });
     } catch {
       signal?.throwIfAborted();
+      // What the bytes' own source said, such as a file that changed while it was read, is the reason to give.
+      const failure = sending.failure();
+      if (failure instanceof Error) throw failure;
       this.#reconnectSoon();
       throw new OutOfReach();
     } finally {
-      if (timer) clearTimeout(timer);
+      sending.done();
     }
   }
 

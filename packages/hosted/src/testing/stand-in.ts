@@ -24,6 +24,7 @@ import { StandInSpaces } from "./stand-in-spaces.js";
 import { StandInTasks } from "./stand-in-tasks.js";
 import { StandInSeats } from "./stand-in-seats.js";
 import { StandInUploads } from "./stand-in-uploads.js";
+import { StandInSkills } from "./stand-in-skills.js";
 import type { StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInOrganizations } from "./stand-in-organizations.js";
 import { StandInChat, socketAnswers } from "./stand-in-chat.js";
@@ -34,6 +35,8 @@ import type { StandInCollaboration } from "./stand-in-collaboration.js";
 export interface StandIn {
   seats: StandInSeats;
   uploads: StandInUploads;
+  /** A person's own skills as the server keeps them, behind the `skills` capability of `threadFiles`. */
+  skills: StandInSkills;
   tasks: StandInTasks;
   chat: StandInChat;
   /** Its origin, for `HostedDeps.server` or `OpenOrcOptions.accountServer`. */
@@ -288,12 +291,13 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const uploads = new StandInUploads({ spaces, chat, origin: () => `http://127.0.0.1:${port}` });
   chat.attachFiles = (input) => uploads.attachChat(input);
   hosted.files.uploads = uploads;
+  const skills = new StandInSkills({ spaces, available: () => hosted.files.capabilities?.["skills"]?.available === true });
   const answerSocket = socketAnswers(hosted, chat);
 
   const server = transportServer({ connections, requests, holder, sockets, answerSocket, answer });
 
   async function answer(request: IncomingMessage, response: ServerResponse): Promise<void> {
-    if (await uploads.raw(request, response, holder)) return;
+    if ((await uploads.raw(request, response, holder)) || (await skills.answer(request, response, holder))) return;
     const { method, path, query, body, token, space } = await asked(request);
     const who = holder(token);
     requests.push({ method, path, authorized: who !== null });
@@ -313,11 +317,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
       return /^\/(account|spaces|organization|invitations|projects|hosted|chat|tasks|uploads|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
     };
     const old = tooOld(request.headers["x-openorc-protocol"]) ? { status: 426, body: { statusCode: 426, message: APP_TOO_OLD } } : null;
-    const reply: Reply = old ??
-      (route ? route(body, token) : (appSignIns.route(method, path, body) ?? (await signedInRoute()))) ?? {
-        status: 404,
-        body: { message: `Cannot ${method} ${path}`, error: "Not Found", statusCode: 404 },
-      };
+    const reply: Reply = old ?? (route ? route(body, token) : (appSignIns.route(method, path, body) ?? (await signedInRoute()))) ?? notFound(method, path);
     response.writeHead(reply.status, { "content-type": "application/json" });
     response.end(reply.body === null && reply.status !== 200 ? undefined : JSON.stringify(reply.body));
   }
@@ -334,6 +334,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     tasks,
     chat,
     uploads,
+    skills,
     signInPage: (url, email) => appSignIns.signInPage(url, email.toLowerCase()),
     appSignIns,
     ...paymentsFace(billing, payments),
@@ -516,6 +517,10 @@ function tooOld(named: string | string[] | undefined): boolean {
 
 function codeRefused(status: number, code: keyof typeof CODE_REFUSALS): Reply {
   return { status, body: { code, message: CODE_REFUSALS[code] } };
+}
+
+function notFound(method: string, path: string): Reply {
+  return { status: 404, body: { message: `Cannot ${method} ${path}`, error: "Not Found", statusCode: 404 } };
 }
 
 function unauthorized(): Reply {

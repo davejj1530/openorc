@@ -35,6 +35,7 @@ import { AccountCache } from "./account-cache.js";
 import { keptThreadNames, ThreadNames } from "./thread-names.js";
 import { askNotice, endNotice, noticed } from "./notices.js";
 import * as sends from "./sends.js";
+import type { Skills } from "./skills.js";
 import { Refused, type Requests, type Session, type SessionChange } from "./session.js";
 import { CLOUD_PROJECT, githubRepoOf, listRows, projectPairs, resolvedCount, runsNow, starterOf, toAppEvent, toRuns, toSummary } from "./translate.js";
 import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, type WireThread } from "./wire.js";
@@ -74,7 +75,7 @@ const keptThreads = z.object({
 });
 type Heard = z.infer<typeof keptThreads>;
 
-type ThreadsDeps = { session: Session; spaces: Spaces; follower: Follower; account: Pick<Account, "status" | "refused"> } & Pick<
+type ThreadsDeps = { session: Session; spaces: Spaces; follower: Follower; account: Pick<Account, "status" | "refused">; skills: Pick<Skills, "bring"> } & Pick<
   HostedDeps,
   "server" | "kept" | "projects" | "push" | "notify" | "nameThread" | "now" | "log"
 >;
@@ -111,6 +112,7 @@ export class Threads implements HostedThreads {
       refresh: () => this.refresh(),
       account: () => deps.account.status(),
       refused: (refusal, settings) => deps.account.refused(refusal, settings),
+      bring: (threadId, agent) => deps.skills.bring(this.row(threadId).space, agent),
       now: deps.now,
     };
     deps.session.onChange((change) => this.#changed(change));
@@ -246,6 +248,8 @@ export class Threads implements HostedThreads {
     if (!isHostedAgent(settings.agent)) throw new Refused(`${harnessShortName(settings.agent)} doesn't run on OpenOrc Cloud.`);
     const project = this.#projectFor(params.projectId, params.spaceId);
     if (!project) throw new Refused(params.spaceId ? "This project isn't available in this space." : "Add this project to OpenOrc Cloud in Settings first.");
+    // The person's own skills are the server's before the thread's first turn: a failure starts no thread.
+    await this.deps.skills.bring(project.space, settings.agent);
     const generation = this.deps.session.generation;
     const body = { projectId: project.id, ...(params.title && { title: params.title }), settings, ...(await firstMessage(this.deps.session.in(project.space), params)), ready: true };
     const reply = await this.deps.session.in(project.space).request(ROUTES.start, body);

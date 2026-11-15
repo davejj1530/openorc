@@ -39,6 +39,8 @@ export interface Calls {
   account(): AccountStatus;
   /** The server refused a turn for this reason: the account is read again, and a dead sign-in remembered. */
   refused(refusal: HostedRefusal, settings: { agent: string; model: string | null }): void;
+  /** Makes the person's own skills for `agent` the server's (skills.ts). It rejects in words when they could not be sent. */
+  bring(threadId: string, agent: string): Promise<void>;
   now(): number;
 }
 
@@ -67,6 +69,8 @@ async function post(
   const row = calls.row(threadId);
   const fileIds = await messageFileIds(calls.on(threadId), message.attachments);
   if (message.settings?.agent && !isHostedAgent(message.settings.agent)) throw new Refused(`${message.settings.agent} doesn't run on OpenOrc Cloud.`);
+  // A turn this message starts finds the sender's own skills: one that could not be sent keeps the message here.
+  await calls.bring(threadId, turnSettings(row, message.settings).agent);
   const id = wireMessageId(message.id) ?? crypto.randomUUID();
   // Send now joins the turn the window saw live; a server that finds another, or none, keeps it as the author's queue.
   const live = message.after ? null : (row.collaboration?.live?.id ?? null);
@@ -155,6 +159,8 @@ export async function answer(calls: Calls, params: RpcParams<"approvals.resolve"
   // Words instead of a parked ask of someone else's turn go with the answer, as one continuation of the answerer's own.
   const note = params.note && params.decision === "deny" ? params.note : null;
   const together = Boolean(asked && asked.state === "parked" && asked.sender?.id !== row.collaboration?.viewer?.id);
+  // A parked ask's answer starts a turn of the answerer's own, which finds their skills as a message's would.
+  if (asked?.state === "parked") await calls.bring(threadId, row.settings.agent);
   const body = { decision: params.decision, ...(params.answers && { answers: params.answers }), ...bound, ...(together && note && { message: note }) };
   const reply = await calls
     .on(threadId)
@@ -181,5 +187,7 @@ export async function ready(calls: Calls, readied: Map<string, number>, { id, se
   if (row.status === "working" || calls.readOnly(id) || hostedSendBlock(calls.account(), turnSettings(row, settings as TurnSettings | undefined), false)) return;
   if (calls.now() - (readied.get(id) ?? Number.NEGATIVE_INFINITY) < READY_AGAIN_MS) return;
   readied.set(id, calls.now());
+  // The process that waits is started with the person's skills. A failure here is the send's to say.
+  await calls.bring(id, turnSettings(row, settings as TurnSettings | undefined).agent).catch(() => undefined);
   await calls.on(id).request(ROUTES.ready(id), settings ? { settings } : {});
 }

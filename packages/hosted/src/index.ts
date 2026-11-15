@@ -30,6 +30,7 @@ export type { OrganizationSeatAdministration } from "./organization-seat-adminis
 import { TeamChat } from "./chat.js";
 import { Follower } from "./follow.js";
 import { Files } from "./files.js";
+import { Skills, type OwnSkills } from "./skills.js";
 import type { HostedNotice } from "./notices.js";
 import { Session } from "./session.js";
 import { Threads } from "./threads.js";
@@ -40,6 +41,7 @@ export { OnlineTasks } from "./tasks.js";
 export type { CloudFileScope, CloudFileReference, FileDestination } from "./files.js";
 export type { FileByteSource } from "./file-transfer.js";
 export type { UploadPlan, UploadedFile } from "./wire-files.js";
+export type { OwnSkill, OwnSkills } from "./skills.js";
 
 /** The server's push socket, as little of it as the package uses. The desktop core builds one from `socket.io-client`. */
 export interface LiveSocket {
@@ -93,6 +95,11 @@ export interface HostedDeps {
   };
   /** What the sign-in page calls this device, such as "OpenOrc on this Mac". */
   deviceName: string;
+  /**
+   * The person's own skills for an agent on this device, which their cloud turns get where the server serves skills.
+   * Absent where the device has none to give. It rejects in words when they cannot be read.
+   */
+  skills?: OwnSkills;
   now(): number;
   log: { info(message: string): void; warn(message: string): void };
 }
@@ -237,6 +244,7 @@ export function createHosted(deps: HostedDeps): Hosted {
   const chat = new TeamChat({ session, spaces, push: deps.push });
   const tasks = new OnlineTasks({ session, spaces, push: deps.push, prepared: () => threads.refresh() });
   const files = new Files({ session, spaces, fetch: deps.fetch, push: deps.push });
+  const skills = new Skills({ session, own: deps.skills, now: deps.now });
   // The account says which of this Mac's projects are on OpenOrc Cloud, from the projects the thread rows were read with.
   const cloud = {
     repos: () => threads.cloudRepos(),
@@ -271,6 +279,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     spaces,
     follower,
     account,
+    skills,
     server: deps.server,
     kept: deps.kept,
     projects: deps.projects,

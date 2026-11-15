@@ -1,4 +1,5 @@
-import { cleanup } from "@testing-library/react";
+import { act, cleanup } from "@testing-library/react";
+import { getNearestEditorFromDOMNode } from "lexical";
 import { afterEach, describe, expect, it } from "vitest";
 import { markPieces, type Mark, type MarkSources, type Piece } from "../../lib/message-marks";
 import { holdAtCaret, unitsOf } from "./draft";
@@ -68,6 +69,21 @@ describe("the message and the draft", () => {
     expect(drawn(field)).toEqual([["skill", "code-review"]]);
     placeCaret(field, "please /code-review".length);
     expect(drawn(field)).toEqual([["skill", "code-review"]]);
+  });
+
+  it("reports no edit when the box is put back on its element, as a render that replaces the element does", () => {
+    const { field, changes } = mountEditor({ sources });
+    type(field, "sent words");
+    // Typing into a box nothing has touched yet is still an edit.
+    expect(changes.filter((change) => change.edited).map((change) => change.text)).toEqual(["sent words"]);
+    const editor = getNearestEditorFromDOMNode(field)!;
+    const before = changes.length;
+    act(() => {
+      editor.setRootElement(null);
+      editor.setRootElement(field);
+    });
+    expect(changes.slice(before).filter((change) => change.edited)).toEqual([]);
+    expect(messageOf(field)).toBe("sent words");
   });
 
   it("takes a mark whole when an edit cuts into it, and reads the words left as they now read", () => {

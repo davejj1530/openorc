@@ -47,7 +47,10 @@ export function DraftPlugin({ value, onChange }: { value: string; onChange: (cha
           const { text, caret } = editorState.read($readDraft);
           said.current = text;
           const before = prevEditorState.read(() => $getRoot().getTextContent());
-          report.current({ text, caret: hasFocus(editor) ? caret : null, edited: text !== before && !tags.has(EXTERNAL) });
+          // Put on an element again, as a render that replaces the box does, the editor commits its words over a state
+          // it made empty itself: the same words, not an edit, so a sent message is not saved again as the draft.
+          const edited = text !== before && !tags.has(EXTERNAL) && !prevEditorState.isEmpty();
+          report.current({ text, caret: hasFocus(editor) ? caret : null, edited });
         }),
         // The page's selection settling where the draft's caret already was, which no update reports, as a text
         // field's select event does: a click that focuses the draft at its kept caret.

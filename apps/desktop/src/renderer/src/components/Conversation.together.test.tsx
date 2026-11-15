@@ -7,6 +7,7 @@ import { core } from "../lib/rpc";
 import type { ComposerProps } from "./Composer";
 import { Conversation } from "./Conversation";
 import { useMentionReveal } from "./ThreadNotes";
+import { spaceNavigation } from "../lib/space-navigation";
 
 // Window chrome some transcript cards import reads the preload's platform as the module loads.
 vi.hoisted(() => void ((window as unknown as { openorc?: object }).openorc ??= { platform: "darwin" }));
@@ -162,7 +163,10 @@ beforeEach(() => {
   vi.mocked(core.call).mockReset();
   vi.mocked(core.call).mockImplementation((async (method: string) => (method === "events.page" ? { events: structuredClone(events), fromTurn: 0, live: false } : undefined)) as never);
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  spaceNavigation.setState({ inventory: [] });
+});
 
 it("blocks a teammate's composer in the designed words on today's server, on the card and on demand", async () => {
   await open(marasThread(together(THEO, { live: { id: "t1", sender: MARA, startedAt: 0, stopping: false } }), { activity: "running" }));
@@ -230,6 +234,14 @@ it("changes nothing in the reader's own cloud thread while the server keeps shar
   expect(composer.props!.disabledReason).toBeNull();
   expect(screen.queryByRole("status", { name: "OpenOrc Cloud" })).toBeNull();
   expect(document.querySelector(".turn-head-sender, .prompt-author")).toBeNull();
+});
+
+it("names the reader's own sender and author in an organization's thread, which its project's members read", async () => {
+  const thread = ownThread(together(THEO));
+  spaceNavigation.setState({ inventory: [{ id: "altalogy", personal: false, projects: [], threads: [{ id: thread.id, projectId: thread.projectId }], taskIds: [] }] });
+  await open(thread, { viewer: THEO, turnOf: { [PROMPT]: "t1", "reply-1": "t1" }, senders: { t1: THEO }, authors: { [PROMPT]: THEO } });
+  expect([...document.querySelectorAll(".turn-head-sender")].map((each) => each.getAttribute("data-tip"))).toEqual(["Theo Laurent"]);
+  expect([...document.querySelectorAll(".prompt-author")].map((each) => each.textContent)).toEqual(["TLTheo Laurent"]);
 });
 
 it("names each turn's sender beside its agent and each message's author above it", async () => {

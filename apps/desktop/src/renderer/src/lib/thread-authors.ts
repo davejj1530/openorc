@@ -2,11 +2,13 @@ import { threadTogether, withOthers } from "@openorc/client";
 import type { ThreadAuthors, ThreadPerson, ThreadSummary } from "@openorc/protocol";
 import { createContext, useContext, useMemo } from "react";
 import { useRpc } from "./client";
+import { useSpaceNavigation } from "./space-navigation";
 
 /** Who sent each turn and wrote each message, and whether anyone besides the reader is in the thread at all. */
 export interface ThreadVoices {
   authors: ThreadAuthors;
-  /** Names show only then: a thread nobody else is in reads as it always did. */
+  /** Names show only then: in an organization's thread, which its project's members read, and in any thread someone else
+   * is in. A Personal thread nobody else is in reads as it always did. */
   shared: boolean;
   /** Who sends the turn that runs now, as the server says it before any of the turn's events do. */
   live?: ThreadPerson | null | undefined;
@@ -23,13 +25,15 @@ export function useThreadVoices(thread: ThreadSummary | null): { voices: ThreadV
   const read = useRpc("threads.authors", { threadId: thread?.id ?? "" }, { enabled: together });
   const authors = read.data;
   const others = withOthers(thread);
+  const id = thread?.id;
+  const organization = useSpaceNavigation((state) => state.inventory.some((space) => !space.personal && space.threads.some((each) => each.id === id)));
   const live = threadTogether(thread)?.live?.sender;
   const voices = useMemo(() => {
     if (!together || !authors) return null;
     const viewer = authors.viewer?.id;
     const people = [...Object.values(authors.senders), ...Object.values(authors.authors)];
-    return { authors, shared: others || people.some((person) => person?.id !== viewer), live };
-  }, [together, authors, others, live]);
+    return { authors, shared: organization || others || people.some((person) => person?.id !== viewer), live };
+  }, [together, authors, organization, others, live]);
   return { voices, failed: together && read.error ? read.error.message : null, retry: () => void read.refetch() };
 }
 

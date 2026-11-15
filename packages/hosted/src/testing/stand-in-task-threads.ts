@@ -51,7 +51,7 @@ export class StandInTaskThreads {
         task: taskFixtureWire(task),
         threadId: receipt.threadId,
         created: receipt.created,
-        draft: [`Work on "${task.title}" in this thread.`, ...(task.spec?.trim() ? [task.spec] : [])].join("\n\n"),
+        draft: `Work on "${task.title}" in this thread.`,
       },
     };
   }

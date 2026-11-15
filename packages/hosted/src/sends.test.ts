@@ -62,6 +62,20 @@ describe("sending to an OpenOrc Cloud thread", () => {
     expect(await said(hosted, run)).toEqual([`${id}: Find why the first message waits`]);
   });
 
+  it("makes the settings a turn starts with the thread's, as the server does, so the thread names what it ran", async () => {
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    const thread = stand.addThread(ADA, { projectId: project, title: "Export activity log", agent: "codex" });
+    const { deps, browser } = hostDeps(stand, device);
+    const hosted = createHosted(deps);
+    hosts.push(hosted);
+    await hosted.start();
+    await signInAs(hosted, browser, ADA);
+    await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(true));
+    await hosted.threads.call("runs.start", { threadId: thread, agent: "claude", model: "claude-sonnet-5", mode: "act", permissionMode: "review", prompt: "Work on the export" });
+    expect(await row(hosted, thread)).toMatchObject({ agent: "claude", model: "claude-sonnet-5" });
+    expect((await hosted.threads.call("runs.listForThread", { threadId: thread })).map((each) => each.agent)).toEqual(["claude"]);
+  });
+
   it("steers a running turn without asking for the sender's hours, which the turn's starter pays", async () => {
     const { hosted, run } = await withThread({ status: "working" });
     stand.setBilling(ADA, { pro: false });

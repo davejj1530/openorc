@@ -78,6 +78,8 @@ export interface Message {
   pause?: { kind: string; message: string } | null;
   /** The task context it was sent with. */
   task?: { id: string; ifRevision: number } | null;
+  /** The settings it was sent with; the turn it starts saves them as the thread's. */
+  settings?: Partial<Thread["settings"]> & { agent?: string };
 }
 
 interface Ask {
@@ -383,6 +385,7 @@ export class StandInThreads {
       createdAt: new Date().toISOString(),
       files,
       paused: place.paused,
+      ...(typeof body["settings"] === "object" && body["settings"] !== null ? { settings: body["settings"] as Message["settings"] } : {}),
       ...heldWith(place.paused, body),
       ...("stoppedBy" in place && typeof place.stoppedBy === "string" ? { pause: this.#stopPause(place.stoppedBy) } : {}),
     };
@@ -532,6 +535,12 @@ export class StandInThreads {
     message.refusal = null;
     const starts = !thread.turn;
     if (starts) this.#startTurn(thread, message.author);
+    // As the server does: a turn a message starts with other settings saves them as the thread's; a join saves nothing.
+    if (starts && message.settings) {
+      const { agent, ...rest } = message.settings;
+      if (agent) thread.agent = agent;
+      thread.settings = { ...thread.settings, ...rest };
+    }
     thread.status = "working";
     const attachments = message.files.map(attachedPath);
     this.append(thread.id, [{ type: "message.completed", runId: message.id, ts: Date.now(), messageId: message.id, role: "user", text: message.text, ...(attachments.length && { attachments }) }], {

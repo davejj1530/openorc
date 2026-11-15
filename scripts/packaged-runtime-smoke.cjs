@@ -153,9 +153,8 @@ async function launch(empty = true) {
     assert.equal(harness.state, "check_failed", "Provider fixture cannot authenticate or run an agent");
   }
   if (empty) assert.deepEqual(await session.rpc("projects.list"), []);
-  assert.equal((await session.rpc("cloud.offer")).offered, true, "A packaged app offers cloud threads");
-  // "unavailable" is a package without the brain it installs in a person's cloud; "none" is one with it, not set up.
-  assert.equal((await session.rpc("cloud.brain.status")).state, "none", "The package carries the cloud brain");
+  // The one answer phone builds from before the own cloud went still ask a Mac for.
+  assert.deepEqual(await session.rpc("cloud.offer"), { offered: false, provider: null }, "A packaged app offers no cloud of the person's own");
   console.log(`PASS packaged renderer/preload/core startup (Electron ${runtime.electron}, Node ${runtime.node}, ${runtime.arch})`);
   return session;
 }

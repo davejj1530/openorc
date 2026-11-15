@@ -36,10 +36,7 @@ export class StandInFrozenGate {
     const member = space ? this.spaces.member(space, who) : undefined;
     if (access?.state !== "frozen" || !space || !this.spaces.teams.has(space) || !member) return null;
     const admin = member.role === "admin";
-    // A frozen admin may invite only with a seat; sending one again keeps whatever it already holds.
-    if (invited ? !admin || invited.seat || invited.resend : !CONTENT.test(request.path)) return null;
-    const kept = RECOVERY.find((route) => route.path.test(request.path) && (!route.methods || route.methods.includes(request.method)));
-    if (kept && (kept.who === "anyone" || admin)) return null;
+    if (invited ? invitationOpen(invited, admin) : routeOpen(request, admin)) return null;
     const message = admin ? ADMIN : MEMBER;
     return { status: 403, body: { statusCode: 403, code: "organization_frozen", message, access: { ...access, message: this.words(space, who) } } };
   }
@@ -50,6 +47,15 @@ export class StandInFrozenGate {
     if (access?.state !== "frozen") return null;
     return access.reason === "no_pro" && this.spaces.member(spaceId, who)?.role === "admin" ? ADMIN : access.message;
   }
+}
+
+/** A frozen admin may invite only with a seat; sending one again keeps whatever it already holds. A member's request meets the admin check, not this gate. */
+const invitationOpen = (invited: { seat: boolean; resend: boolean }, admin: boolean): boolean => !admin || invited.seat || invited.resend;
+
+function routeOpen(request: Request, admin: boolean): boolean {
+  if (!CONTENT.test(request.path)) return true;
+  const kept = RECOVERY.find((route) => route.path.test(request.path) && (!route.methods || route.methods.includes(request.method)));
+  return Boolean(kept && (kept.who === "anyone" || admin));
 }
 
 function invitation(body: unknown): { organizationId: string; seat: boolean; resend: boolean } | null {

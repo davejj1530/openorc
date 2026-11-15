@@ -9,18 +9,41 @@ import { Text } from "../ui/Text";
 const pullWords = { open: "PR open", merged: "PR merged", closed: "PR closed" } as const;
 
 /**
- * The header's faint line: where the thread lives, its pull request, when a snooze ends and what it is doing when that
- * is worth saying. While the phone is not connected, the connection's state takes the line instead. An OpenOrc Cloud
- * thread says so after its project, and whose turn or ask it is when a teammate is in it, as the Mac's header does.
+ * The header's faint line, in two parts: where the thread lives (its project, its pull request, when a snooze ends) and
+ * what it is doing when that is worth saying, which is never cut short. An OpenOrc Cloud thread says whose turn or ask
+ * it is when a teammate is in it, as the Mac's header does; it names OpenOrc Cloud only while it says no state.
  */
-export function statusLine(thread: ThreadSummary, project: string | undefined, now = Date.now()): string {
+export function statusParts(thread: ThreadSummary, project: string | undefined, now = Date.now()): { where: string; state: string | null } {
   const mark = threadMark(thread);
   const doing = mark && (mark.kind === "running" || mark.kind === "waiting" || mark.kind === "waiting-other" || mark.kind === "failed") ? mark.label : null;
   const pull = thread.prUrl ? pullWords[thread.prState ?? "open"] : null;
   const snoozed = thread.snoozedUntil && thread.snoozedUntil > now ? `Snoozed until ${snoozeWakeLabel(thread.snoozedUntil)}` : null;
   const place = placeOf(thread);
-  if (place.elsewhere) return [project ?? thread.owner?.project?.name, place.mark, pull, togetherActivity(thread)?.text ?? doing].filter(Boolean).join(" · ");
-  return [thread.projectId === WORKSPACE_ID ? "Workspace" : project, pull, snoozed, doing].filter(Boolean).join(" · ");
+  if (place.elsewhere) {
+    const state = togetherActivity(thread)?.text ?? doing;
+    return { where: [project ?? thread.owner?.project?.name, state ? null : place.mark, pull].filter(Boolean).join(" · "), state };
+  }
+  return { where: [thread.projectId === WORKSPACE_ID ? "Workspace" : project, pull, snoozed].filter(Boolean).join(" · "), state: doing };
+}
+
+/** The header's faint line as one string, for VoiceOver. */
+export function statusLine(thread: ThreadSummary, project: string | undefined, now = Date.now()): string {
+  const { where, state } = statusParts(thread, project, now);
+  return [where, state].filter(Boolean).join(" · ");
+}
+
+/** Where on the left, shortened first; the state after it, always whole. */
+function StatusParts({ where, state }: { where: string; state: string | null }) {
+  return (
+    <View className="flex-row">
+      {where ? (
+        <Text numberOfLines={1} className="shrink text-xs leading-4 text-ink-4">
+          {state ? `${where} · ` : where}
+        </Text>
+      ) : null}
+      {state ? <Text className="shrink-0 text-xs leading-4 text-ink-4">{state}</Text> : null}
+    </View>
+  );
 }
 
 /** The thread's title over a faint line of where it lives and what it is doing, or how the link is. Tapping the title renames it. */
@@ -31,8 +54,10 @@ export function ThreadTitle({ thread, onRename }: { thread: ThreadSummary | null
   const link = useLinkWords(useLinkState());
   const project = projects.data?.find((item) => item.id === thread?.projectId)?.name;
   if (!thread) return null;
+  const parts = statusParts(thread, project);
   const place = parentId ? parent.data?.title : statusLine(thread, project);
-  const line = link.tone !== "ok" && link.status ? link.status : place;
+  const linkLine = link.tone !== "ok" && link.status ? link.status : null;
+  const line = linkLine ?? place;
   // A cloud thread's title is everyone's in its project; a phone does not change it yet.
   const rename = isSubagentThread(thread) || placeOf(thread).elsewhere ? undefined : onRename;
   const open = parentId ? () => router.push({ pathname: "/thread/[id]", params: { id: parentId } }) : rename;
@@ -42,11 +67,13 @@ export function ThreadTitle({ thread, onRename }: { thread: ThreadSummary | null
       <Text numberOfLines={1} className="text-md leading-5">
         {thread.title}
       </Text>
-      {line ? (
+      {linkLine || parentId ? (
         <Text numberOfLines={1} className="text-xs leading-4 text-ink-4">
           {line}
         </Text>
-      ) : null}
+      ) : (
+        <StatusParts {...parts} />
+      )}
     </>
   );
   // With nothing to do on a tap it is a plain heading, as a panel's title is.

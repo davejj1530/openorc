@@ -1,7 +1,7 @@
 import type { ThreadSummary } from "@openorc/protocol";
 import { expect, it, vi } from "vitest";
 import { fixtureThreads } from "../home/test-fixtures/threads";
-import { statusLine } from "./ThreadHeader";
+import { statusLine, statusParts } from "./ThreadHeader";
 
 vi.mock("../client", () => ({}));
 vi.mock("expo-router", () => ({ router: {} }));
@@ -15,9 +15,38 @@ it("names the starter when a shared thread waits on an answer", () => {
   expect(statusLine({ ...thread, owner: undefined }, "Project")).toContain("Needs you");
 });
 
-it("says a cloud thread is on OpenOrc Cloud after its project, the Mac's own name for it or the server's", () => {
+it("says a cloud thread is on OpenOrc Cloud after its project while it says no state, the Mac's own name for it or the server's", () => {
   const cloud: ThreadSummary = { ...base, activity: "idle", owner: { brain: "hosted", reach: "live", heardAt: 1 } };
   expect(statusLine(cloud, "canvas")).toBe("canvas · OpenOrc Cloud");
   expect(statusLine({ ...cloud, owner: { ...cloud.owner!, project: { name: "billing-service" } } }, undefined)).toBe("billing-service · OpenOrc Cloud");
   expect(statusLine({ ...cloud, owner: undefined }, "canvas")).toBe("canvas");
+});
+
+it("keeps a cloud thread's state whole by leaving OpenOrc Cloud out while it says one", () => {
+  const mara = { id: "u-mara", name: "Mara Okafor", image: null };
+  const waiting: ThreadSummary = {
+    ...base,
+    activity: "waiting",
+    owner: {
+      brain: "hosted",
+      reach: "live",
+      heardAt: 1,
+      startedBy: { name: "Mara Okafor", image: null },
+      collaboration: {
+        viewer: { id: "u-riley", name: "Riley Chen", image: null },
+        canWrite: true,
+        live: null,
+        send: "now",
+        handoff: null,
+        canPostNote: true,
+        canStop: true,
+        ask: { id: "ask", turnId: "turn", state: "parked", sender: mara, answer: "start", canDecline: true, reason: null },
+        queue: [],
+        mentions: { unread: false, firstUnreadNoteId: null },
+        noteHead: 0,
+      },
+    },
+  };
+  expect(statusParts(waiting, "canvas")).toEqual({ where: "canvas", state: "Waiting for an answer" });
+  expect(statusLine(waiting, "canvas")).toBe("canvas · Waiting for an answer");
 });

@@ -3,8 +3,8 @@ import { AccountFace } from "../AccountFace";
 import { Cloud } from "../icons";
 import "./tasks.css";
 
-/** Optional facts consume only their own width in the existing metadata strip. */
-export function TaskFacts({ task }: { task: OnlineTask }) {
+/** Optional facts consume only their own width in the existing metadata strip. The cloud mark is left out when the row's project already draws one. */
+export function TaskFacts({ task, cloud = true }: { task: OnlineTask; cloud?: boolean }) {
   return (
     <span className="task-row-meta inline-flex shrink-0 items-center gap-1.5">
       {task.assignee ? (
@@ -18,10 +18,12 @@ export function TaskFacts({ task }: { task: OnlineTask }) {
           <span className="sr-only">New assignment. </span>
         </span>
       ) : null}
-      <span data-tip="OpenOrc Cloud">
-        <Cloud size={12} />
-        <span className="sr-only">OpenOrc Cloud</span>
-      </span>
+      {cloud ? (
+        <span data-tip="OpenOrc Cloud">
+          <Cloud size={12} />
+          <span className="sr-only">OpenOrc Cloud</span>
+        </span>
+      ) : null}
     </span>
   );
 }

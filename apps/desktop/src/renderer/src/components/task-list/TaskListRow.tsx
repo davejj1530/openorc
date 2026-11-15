@@ -125,7 +125,7 @@ export function TaskListRow({
             <span className="truncate">{task.labels[0]}</span>
           </span>
         ) : null}
-        {record.kind === "local" ? null : <TaskFacts task={record.task} />}
+        {record.kind === "local" ? null : <TaskFacts task={record.task} cloud={!(showProject && project && !project.rootPath && "cloud" in project && project.cloud)} />}
         {showProject ? <TaskProject project={project} /> : null}
         <span className={cn(metaSlot, "task-row-meta task-row-time")}>{relativeTime(task.updatedAt)}</span>
       </button>

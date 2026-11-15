@@ -92,5 +92,6 @@ describe("resolvePalette", () => {
     expect(light).not.toHaveProperty("current-row-fill");
     expect(light).not.toHaveProperty("hairline");
     expect(light).not.toHaveProperty("surface-gradient");
+    expect(light).not.toHaveProperty("well-ring");
   });
 });

@@ -2,7 +2,7 @@ import { harnessCatalog, openCodeProviderName, SIGN_IN_WAYS, type AccountSignIn,
 import { useState } from "react";
 import { Button, Input, Select, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
-import { COMMON, ProviderChoice, TYPED, useProviders } from "./settings-cloud-opencode";
+import { COMMON, ProviderChoice, TYPED, useProviders } from "./settings-cloud-openorc-providers";
 import { Failure, TokenField } from "./settings-secret-field";
 import { Field, SettingRow, Status } from "./settings-shared";
 

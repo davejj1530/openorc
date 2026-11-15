@@ -48,7 +48,7 @@ function PairedPhones({ active, enabled, devices }: { active: boolean; enabled: 
   return (
     <div className="motion-collapse" hidden={!enabled && devices.length === 0}>
       <Section title="Paired phones" actions={active ? <PairPhone /> : undefined}>
-        {devices.length ? devices.map((device) => <MacPhone key={device.id} device={device} />) : <p className="flex min-h-13 items-center text-ink-3">No paired phones yet.</p>}
+        {devices.length ? devices.map((device) => <PhoneRow key={device.id} device={device} />) : <p className="flex min-h-13 items-center text-ink-3">No paired phones yet.</p>}
       </Section>
     </div>
   );
@@ -81,21 +81,15 @@ function Addresses({ routes }: { routes: Route[] }) {
   );
 }
 
-function MacPhone({ device }: { device: RemoteDevice }) {
-  return <PhoneRow device={device} remove={useRpcMutation("remote.devices.remove")} />;
-}
-
-/** Unpairs a phone, from this Mac or from the cloud brain. */
-type RemovePhone = { mutate: (params: { id: string }) => void; isPending: boolean; error: Error | null };
-
 /** A paired phone: its name, when it was last seen, and Remove. */
-export function PhoneRow({ device, remove, disabled = false }: { device: RemoteDevice; remove: RemovePhone; disabled?: boolean }) {
+function PhoneRow({ device }: { device: RemoteDevice }) {
+  const remove = useRpcMutation("remote.devices.remove");
   return (
     <div className="settings-field">
       <span className="truncate">{device.name}</span>
       <div className="flex items-center gap-4">
         <Status ok={device.connected}>{presence(device)}</Status>
-        <Button size="sm" aria-label={`Remove ${device.name}`} disabled={disabled || remove.isPending} onClick={() => remove.mutate({ id: device.id })}>
+        <Button size="sm" aria-label={`Remove ${device.name}`} disabled={remove.isPending} onClick={() => remove.mutate({ id: device.id })}>
           Remove
         </Button>
       </div>
@@ -113,7 +107,7 @@ function presence(device: RemoteDevice): string {
   return device.lastSeenAt === null ? `Paired ${relativeTime(device.createdAt)}` : `Last seen ${relativeTime(device.lastSeenAt)}`;
 }
 
-/** What a pairing code shows, from this Mac or from the cloud brain. */
+/** What a pairing code shows of its offer. */
 type PairingCodeOffer = Pick<PairingOfferView, "url" | "expiresAt">;
 
 /** Where the pairing sheet is: waiting for its code, showing it, or past it. */
@@ -125,19 +119,7 @@ export type PairingSheet<O extends PairingCodeOffer = PairingOfferView> =
   /** The status listed the offer and dropped it before it expired: a phone spent it, or another window replaced it. */
   | { kind: "spent"; offer: O };
 
-export function pairingSheet<O extends PairingCodeOffer>({
-  offer,
-  error,
-  seen,
-  listed,
-  now,
-}: {
-  offer: O | undefined;
-  error: Error | null;
-  seen: boolean;
-  listed: boolean;
-  now: number;
-}): PairingSheet<O> {
+function pairingSheet<O extends PairingCodeOffer>({ offer, error, seen, listed, now }: { offer: O | undefined; error: Error | null; seen: boolean; listed: boolean; now: number }): PairingSheet<O> {
   if (error) return { kind: "failed", reason: error.message };
   if (!offer) return { kind: "starting" };
   if (now >= offer.expiresAt) return { kind: "expired", offer };
@@ -204,7 +186,7 @@ function usePairing(listedOfferId: string | undefined) {
 }
 
 /** Renders once a second while active, for a countdown read from the clock. */
-export function useTicker(active: boolean) {
+function useTicker(active: boolean) {
   const [, setTick] = useState(0);
   useEffect(() => {
     if (!active) return;

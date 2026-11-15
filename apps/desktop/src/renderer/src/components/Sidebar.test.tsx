@@ -11,6 +11,7 @@ const fixture: {
   threads: (Pick<ThreadSummary, "id" | "title" | "projectId" | "agent" | "activity" | "unread" | "session" | "pinnedAt" | "snoozedUntil" | "lastActivityAt"> &
     Partial<Pick<ThreadSummary, "createdAt" | "archivedAt" | "parentThreadId" | "parentRelation" | "subagent" | "prUrl" | "prState" | "workspaceMode" | "branch" | "owner">>)[];
   tasks?: { status: string; approval?: string }[];
+  account?: { state: "signed-in"; email: string; name: string; image: null; plan: { pro: boolean } };
 } = vi.hoisted(() => ({ projects: [], threads: [] }));
 
 /** The core's answer to a thread list, as the fixture's threads read. */
@@ -32,6 +33,7 @@ vi.mock("../lib/client", async (original) => {
     if (method === "threads.get" && !params.id) return null;
     if (method === "projects.list") return fixture.projects;
     if (method === "tasks.list") return fixture.tasks;
+    if (method === "account.status") return fixture.account;
     if (method === "orclings.list") return [{ id: "rini", name: "Rini", threadId: "rini-home", look: defaultOrclingLook }];
     if (method === "threads.get")
       return (
@@ -96,6 +98,7 @@ beforeEach(() => {
   fixture.projects = [];
   fixture.threads = [];
   fixture.tasks = undefined;
+  fixture.account = undefined;
   localStorage.clear();
   useWindow.setState({ fullscreen: false });
   useLayout.setState({ collapsed: [], workspace: ALL_WORKSPACES, sidebarOpen: true, pinnedOnly: false, hiddenWorkspaces: [] });
@@ -474,6 +477,19 @@ it("folds Workspaces as a whole, counting what waits inside only while folded, a
   await screen.findByRole("button", { name: /Other notes/ });
 });
 
+it("lists Cloud among Settings' sections for a Pro person only, whose OpenOrc Cloud it sets up", () => {
+  useRouter.setState({ route: { view: "settings" }, history: [] });
+  const cloud = () => within(screen.getByRole("navigation", { name: "Settings" })).queryByRole("button", { name: "Cloud" });
+  const signedIn = { state: "signed-in", email: "sam@example.com", name: "Sam Reed", image: null } as const;
+  fixture.account = { ...signedIn, plan: { pro: false } };
+  const free = mountSidebar();
+  expect(cloud()).toBeNull();
+  free.unmount();
+  fixture.account = { ...signedIn, plan: { pro: true } };
+  mountSidebar();
+  expect(cloud()).not.toBeNull();
+});
+
 it("goes back to All projects when the chosen project is no longer listed", async () => {
   projectThreads();
   useLayout.setState({ workspace: "gone" });
@@ -489,7 +505,7 @@ it("lists Settings' sections in place of the screens and threads, then goes back
     within(sections)
       .getAllByRole("button")
       .map((row) => row.textContent),
-  ).toEqual(["Usage", "Connections", "Account", "Cloud", "Slack", "Phone", "Skills", "Connectors", "Devices", "Appearance", "General", "Memory & models", "Data"]);
+  ).toEqual(["Usage", "Connections", "Account", "Slack", "Phone", "Skills", "Connectors", "Devices", "Appearance", "General", "Memory & models", "Data"]);
   expect(within(sections).getByRole("button", { name: "Slack" }).getAttribute("aria-current")).toBe("page");
   expect(screen.queryByRole("navigation", { name: "Screens" })).toBeNull();
   expect(screen.getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBe("page");

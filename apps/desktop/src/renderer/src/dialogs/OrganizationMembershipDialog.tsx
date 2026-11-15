@@ -79,7 +79,7 @@ export function OrganizationMembershipDialog({ action, onClose, onDone, onManage
           </div>
         ) : null}
         {!completed.current ? <p className="organization-membership-detail">{words.detail}</p> : null}
-        {action.kind === "delete" ? (
+        {action.kind === "delete" && !held ? (
           <label className="organization-label">
             Type {action.organization.name} to confirm
             <Input

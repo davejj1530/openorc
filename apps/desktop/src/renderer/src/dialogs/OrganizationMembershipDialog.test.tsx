@@ -72,6 +72,8 @@ it.each([
   fireEvent.click(screen.getByRole("button", { name: "Delete organization" }));
   expect((await screen.findByRole("alert")).textContent).toBe(refusal);
   expect(screen.queryByRole("button", { name: "Delete organization" })).toBeNull();
+  // Nothing is left to confirm once the seats refuse it.
+  expect(screen.queryByRole("textbox")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Manage seats" }));
   expect(seats).toHaveBeenCalledOnce();
   expect(mock.call.mock.calls.filter(([name]) => name === "organization.delete")).toHaveLength(1);

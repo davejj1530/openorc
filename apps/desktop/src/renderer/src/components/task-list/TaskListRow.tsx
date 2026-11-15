@@ -1,7 +1,7 @@
 import { useId } from "react";
 import { Menu } from "@base-ui/react/menu";
 import type { Project, Task } from "@openorc/protocol";
-import { ownerMark, relativeTime } from "@openorc/client";
+import { relativeTime } from "@openorc/client";
 import { CoversPreview } from "../../lib/browser-preview";
 import { cn } from "../../lib/cn";
 import { useRpcMutation } from "../../lib/client";
@@ -9,7 +9,7 @@ import { openTask } from "../../lib/router";
 import { openTaskRecord } from "../../lib/task-open";
 import { taskNeedsYou, type TaskRecord } from "../../lib/task-records";
 import { floatingGround } from "../../lib/use-anchor-ground";
-import { Check, Cloud } from "../icons";
+import { Check } from "../icons";
 import { ProjectLogo } from "../ProjectIconPicker";
 import { StatusIcon, statusLabel, statusOrder } from "../status";
 import { TaskStart } from "../TaskStart";
@@ -96,18 +96,6 @@ function TaskMove({ task }: { task: Task }) {
   );
 }
 
-/** Where a task the Mac lists from its cloud brain lives, as thread rows say it. */
-function TaskOwnerMark({ task }: { task: Task }) {
-  const mark = ownerMark({ owner: task.owner, moving: undefined });
-  if (!mark) return null;
-  return (
-    <span className={cn("task-row-meta inline-flex shrink-0 items-center gap-1", mark.dim && "opacity-60")}>
-      <Cloud size={12} />
-      {mark.label}
-    </span>
-  );
-}
-
 export function TaskListRow({
   record,
   project,
@@ -137,7 +125,7 @@ export function TaskListRow({
             <span className="truncate">{task.labels[0]}</span>
           </span>
         ) : null}
-        {record.kind === "local" ? <TaskOwnerMark task={record.task} /> : <TaskFacts task={record.task} />}
+        {record.kind === "local" ? null : <TaskFacts task={record.task} />}
         {showProject ? <TaskProject project={project} /> : null}
         <span className={cn(metaSlot, "task-row-meta task-row-time")}>{relativeTime(task.updatedAt)}</span>
       </button>

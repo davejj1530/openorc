@@ -124,7 +124,8 @@ export function billingState(state: StandInBilling) {
     ...(state.allowanceSource !== undefined && { allowanceSource: state.allowanceSource }),
   };
   const packs = billingPacks(state);
-  if (!state.pro) return { pro: { status: "free" }, period: null, monthly: null, packs, leftSeconds: leftSeconds(state), ...privateFacts };
+  // As the server answers: once the person is frozen out, their Pro is over, whatever their subscription row still says.
+  if (!state.pro || state.organizationAccess?.state === "frozen") return { pro: { status: "free" }, period: null, monthly: null, packs, leftSeconds: leftSeconds(state), ...privateFacts };
   const end = Date.parse(state.at);
   const paidBy = state.paidBy ?? (state.allowanceSource?.kind === "organization" ? { kind: "organization", organizationId: state.allowanceSource.organizationId } : { kind: "self" });
   const pro = state.standing === "live" ? { status: "pro", standing: "live", renewsAt: state.at, paidBy } : { status: "pro", standing: state.standing, until: state.at, paidBy };

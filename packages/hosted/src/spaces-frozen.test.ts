@@ -112,3 +112,11 @@ it("waits for a grace deadline weeks away, past the longest timer the clock keep
   }
   expect(overflows).toEqual([]);
 });
+
+it("reads a frozen person as Free, as the server answers once their paid time and day of grace are over", async () => {
+  const lapsed = { state: "frozen", reason: "payment_failed", until: null, message: "Payment for your Pro wasn't completed within a day." } as const;
+  stand.setBilling(MEMBER, { pro: true, standing: "live", at: new Date(Date.now() - 2 * 86_400_000).toISOString(), monthlyLeftSeconds: 0, packsLeftSeconds: 0, organizationAccess: lapsed });
+  const { hosted } = await person();
+  await vi.waitFor(() => expect(hosted.account.status()).toMatchObject({ state: "signed-in", organizationAccess: { state: "frozen" } }));
+  expect(hosted.account.status()).toMatchObject({ plan: { pro: false } });
+});

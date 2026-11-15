@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { normalizeModelSettings, type AgentKind, type PermissionPreset, type Run, type RunMode, type ThreadSummary } from "@openorc/protocol";
-import { defaultChoice, type ModelChoice } from "./model-picker-selection.js";
+import { normalizeModelSettings, placeOf, type AgentKind, type PermissionPreset, type Run, type RunMode, type ThreadSummary } from "@openorc/protocol";
+import { agentDefaultChoice, defaultChoice, type ModelChoice } from "./model-picker-selection.js";
 import type { PermissionDefault } from "./permission-default.js";
 import type { ClientQueries } from "./query.js";
 
-export type SavedThreadSettings = Pick<ThreadSummary, "id" | "agent" | "model" | "effort" | "fastMode" | "mode" | "permissionMode">;
+export type SavedThreadSettings = Pick<ThreadSummary, "id" | "agent" | "model" | "effort" | "fastMode" | "mode" | "permissionMode" | "owner">;
 
 type SettingsPatch = { mode?: RunMode; permissionMode?: PermissionPreset; agent?: AgentKind; model?: string; effort?: string | null; fastMode?: boolean };
 
@@ -35,10 +35,11 @@ export function useConversationSettingsWith(queries: ClientQueries, permissions:
     }
   }, [storedKey, stored]);
   useEffect(() => {
-    if (!models.data) return;
+    if (!models.data || choice) return;
     const prefer = thread ? thread.agent : (activeRun?.agent ?? null);
-    // Keep saved execution settings visible even while the catalog is stale or unavailable.
-    if (!choice) setChoice(stored ?? defaultChoice(models.data, prefer));
+    // Keep saved execution settings visible even while the catalog is stale or unavailable. A cloud thread keeps its own
+    // agent: what this Mac runs by default has no say in it.
+    setChoice(stored ?? (thread && placeOf(thread).elsewhere ? agentDefaultChoice(models.data, thread.agent) : defaultChoice(models.data, prefer)));
   }, [choice, models.data, stored, thread, activeRun?.agent]);
   const [mode, setMode] = useState<RunMode>(thread ? thread.mode : (activeRun?.mode ?? "act"));
   const savedMode = thread?.mode ?? activeRun?.mode;

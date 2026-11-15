@@ -118,3 +118,17 @@ it("saves the model the composer shows after the thread's saved model changes el
   });
   expect(updates().slice(failed)).toEqual([{ agent: "codex", model: "gpt-6-luna", effort: "medium", fastMode: false }]);
 });
+
+it("gives a cloud thread with no saved model its own agent's default, even where this Mac runs another agent by default", async () => {
+  const models = [
+    { id: "gpt-6-sol", label: "GPT-6 Sol", agent: "codex", isDefault: true, efforts: ["medium"], defaultEffort: "medium" },
+    { id: "claude-sonnet-5-5", label: "Sonnet 5.5", agent: "claude", isDefault: false, efforts: ["high"], defaultEffort: "high", unavailable: "Sign in to Claude" },
+    { id: "claude-opus-5-5", label: "Opus 5.5", agent: "claude", isDefault: true, efforts: ["high"], defaultEffort: "high", unavailable: "Sign in to Claude" },
+  ];
+  call.mockImplementation((method) => Promise.resolve(method === "agents.models" ? models : {}));
+  const cloud: SavedThreadSettings = { ...thread, agent: "claude", model: null, effort: null, owner: { brain: "hosted", reach: "live", heardAt: 0 } };
+  const { result } = renderHook(() => client.useConversationSettings({ thread: cloud, activeRun: undefined }), { wrapper });
+  await waitFor(() => expect(result.current.choice).toEqual({ agent: "claude", model: "claude-opus-5-5", effort: "high" }));
+  // The composer shows it without saving it: a teammate's thread is not the person's to write settings to.
+  expect(updates()).toEqual([]);
+});

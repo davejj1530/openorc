@@ -88,6 +88,16 @@ export function defaultChoice(list: ModelOption[], prefer: AgentKind | null): Mo
   return pick ? { agent: pick.agent, model: pick.id, effort: pick.defaultEffort } : null;
 }
 
+/**
+ * The default model of a thread's own agent, for a thread that runs elsewhere. This Mac's sign-ins and versions do not
+ * decide what an OpenOrc Cloud thread can run, so a model this Mac cannot run still counts, and another agent never does.
+ */
+export function agentDefaultChoice(list: ModelOption[], agent: AgentKind): ModelChoice | null {
+  const own = list.filter((model) => model.agent === agent && !model.legacy);
+  const pick = own.find((model) => model.isDefault) ?? own[0];
+  return pick ? { agent, model: pick.id, effort: pick.defaultEffort } : null;
+}
+
 /** What a provider's tab selects: the agent's earlier choice while it still runs, else the agent's own default. */
 export function providerChoice(list: ModelOption[], agent: AgentKind, earlier: ModelChoice | undefined): ModelChoice | null {
   const model = catalogModel(list, earlier ?? null);

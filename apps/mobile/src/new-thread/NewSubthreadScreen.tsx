@@ -1,12 +1,10 @@
 import { composerActivity, workspaceLabel } from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import { useContext } from "react";
 import { View } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpc } from "../client";
-import { HostContext } from "../connection/host-context";
 import { ComposerPlane } from "../composer/ComposerPlane";
 import { SendButton } from "../composer/SendButton";
 import { useShareSettings } from "../composer/settings-bridge";
@@ -35,7 +33,6 @@ function ParentPlace({ parent }: { parent: ThreadSummary }) {
 function SubthreadForm({ parent }: { parent: ThreadSummary }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const host = useContext(HostContext);
   const composerId = `new-subthread:${parent.id}`;
   const form = useNewSubthread(parent);
   useShareSettings(composerId, form.settings);
@@ -44,7 +41,7 @@ function SubthreadForm({ parent }: { parent: ThreadSummary }) {
     const threadId = await form.submit();
     // Left, or covered by another screen, while the Mac set the thread up: the person has moved on, so stay put.
     if (!threadId || !navigation.isFocused()) return;
-    router.replace({ pathname: "/thread/[id]", params: host ? { id: threadId, host } : { id: threadId } });
+    router.replace({ pathname: "/thread/[id]", params: { id: threadId } });
   };
   return (
     <View className="flex-1 justify-end bg-bg">

@@ -6,8 +6,8 @@ import { MacSection } from "../settings/MacSection";
 import { Text } from "../ui/Text";
 
 /**
- * Which Mac or cloud brain Home shows and how this phone reaches it, from the header's connection button: the same
- * rows as Settings' first section, to switch hosts, try again or pair another.
+ * Which Mac Home shows and how this phone reaches it, from the header's connection button: the same rows as Settings'
+ * first section, to switch Macs, try again or pair another.
  */
 export function ConnectionSheet() {
   const insets = useSafeAreaInsets();

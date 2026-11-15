@@ -1,6 +1,6 @@
 import type { BoardTask, TaskBoard } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { boardSections, taskThread, type BoardHost } from "./board";
+import { boardSection, taskThread, type BoardMac } from "./board";
 
 const task = (id: string, extra: Partial<BoardTask> = {}): BoardTask => ({
   id,
@@ -14,38 +14,25 @@ const task = (id: string, extra: Partial<BoardTask> = {}): BoardTask => ({
   ...extra,
 });
 const board = (tasks: BoardTask[], mac: TaskBoard["mac"] = null): TaskBoard => ({ tasks, mac });
-const mac = (live: boolean, answer?: TaskBoard, heardAt = 0): BoardHost => ({ host: null, kind: "mac", name: "Studio", live, board: answer, heardAt });
-const brain = (answer?: TaskBoard): BoardHost => ({ host: "brain-key", kind: "brain", name: "Cloud", live: true, board: answer, heardAt: 0 });
+const mac = (live: boolean, answer?: TaskBoard, heardAt = 0): BoardMac => ({ name: "Studio", live, board: answer, heardAt });
 
 describe("the phone's task list", () => {
-  it("lists the Mac's own tasks while it answers, then the brain's, and leaves the brain's copy aside", () => {
-    const sections = boardSections([mac(true, board([task("on-mac")])), brain(board([task("in-cloud")], { at: 5, tasks: [task("stale-copy")] }))]);
-    expect(sections.map((section) => [section.title, section.host, section.tasks.map((each) => each.id), section.copy])).toEqual([
-      ["Studio", null, ["on-mac"], null],
-      ["Cloud", "brain-key", ["in-cloud"], null],
-    ]);
+  it("lists the Mac's own tasks while it answers", () => {
+    expect(boardSection(mac(true, board([task("on-mac")]), 4))).toEqual({ key: "mac", title: "Studio", tasks: [task("on-mac")], copiedAt: null });
   });
 
-  it("shows the brain's copy of the Mac's list, read-only with its age and its projects in the cloud only, while the Mac sleeps", () => {
-    const sections = boardSections([mac(false, board([task("old-answer")]), 4), brain(board([task("in-cloud")], { at: 5, tasks: [task("copied")] }))]);
-    expect(sections.map((section) => [section.title, section.namesOn, section.tasks.map((each) => each.id), section.copy])).toEqual([
-      ["Studio", "brain-key", ["copied"], { at: 5, cloudOnly: true }],
-      ["Cloud", "brain-key", ["in-cloud"], null],
-    ]);
+  it("shows the list the phone last heard from the Mac, read-only with its age, while the Mac is out of reach", () => {
+    expect(boardSection(mac(false, board([task("heard")]), 9))).toEqual({ key: "mac-copy", title: "Studio", tasks: [task("heard")], copiedAt: 9 });
   });
 
-  it("shows the list the phone last heard from the Mac itself while it is newer than the brain's copy, every project in it", () => {
-    const sections = boardSections([mac(false, board([task("heard")]), 9), brain(board([], { at: 5, tasks: [task("copied")] }))]);
-    expect(sections.map((section) => [section.key, section.namesOn, section.tasks.map((each) => each.id), section.copy])).toEqual([
-      ["mac-copy", null, ["heard"], { at: 9, cloudOnly: false }],
-      ["brain:brain-key", "brain-key", [], null],
-    ]);
-    // No brain at all: the Mac's last list still shows, dimmed with its age.
-    expect(boardSections([mac(false, board([task("heard")]), 9)]).map((section) => section.copy)).toEqual([{ at: 9, cloudOnly: false }]);
+  it("shows only the Mac's own tasks from an older Mac whose answer carries another list beside them", () => {
+    expect(boardSection(mac(true, board([task("on-mac")], { at: 5, tasks: [task("another-list")] })))?.tasks.map((each) => each.id)).toEqual(["on-mac"]);
   });
 
-  it("adds nothing for a host that never answered, as one from before task lists", () => {
-    expect(boardSections([mac(true), brain()])).toEqual([]);
+  it("has none for no Mac, or a Mac that never answered, as one from before task lists", () => {
+    expect(boardSection(mac(true))).toBeNull();
+    expect(boardSection(mac(false))).toBeNull();
+    expect(boardSection(null)).toBeNull();
   });
 
   it("opens the conversation doing a task's work, else the one that made it", () => {

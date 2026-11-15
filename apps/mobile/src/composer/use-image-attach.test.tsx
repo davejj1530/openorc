@@ -1,18 +1,16 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import * as ImagePicker from "expo-image-picker";
-import type { ReactNode } from "react";
 import { ActionSheetIOS } from "react-native";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { LinkState } from "../connection/manager";
-import { HostContext } from "../connection/host-context";
 import { useImageAttach } from "./use-image-attach";
 
-/** The link state shown, and each host's answer to saving an image: the cloud brain is the partner host. */
-const phone = vi.hoisted(() => ({ state: null as LinkState | null, macSave: vi.fn(), brainSave: vi.fn() }));
+/** The link state shown, and the Mac's answer to saving an image. */
+const phone = vi.hoisted(() => ({ state: null as LinkState | null, macSave: vi.fn() }));
 vi.mock("../client", () => ({
   useLinkState: () => phone.state,
-  hostLink: (host: string | null) => ({ connection: { call: host === "brain" ? phone.brainSave : phone.macSave } }),
+  link: { connection: { call: phone.macSave } },
 }));
 vi.mock("expo-image-manipulator", () => ({
   ImageManipulator: { manipulate: () => ({ resize: () => undefined, renderAsync: async () => ({ saveAsync: async () => ({ uri: "file:///small.jpg", base64: "AAAA" }) }) }) },
@@ -56,18 +54,4 @@ it("opens the library at once in the demo, and never asks iOS for the camera", a
   await waitFor(() => expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalledOnce());
   expect(offered).toEqual([]);
   expect(ImagePicker.requestCameraPermissionsAsync).not.toHaveBeenCalled();
-});
-
-it("saves a photo for a cloud thread on the brain that holds it, which names the path the message carries", async () => {
-  phone.state = studio;
-  phone.brainSave.mockResolvedValue({ path: "/vercel/sandbox/openorc-brain/data/attachments/photo.jpg" });
-  vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValueOnce({ canceled: false, assets: [{ uri: "file:///photo.heic", width: 100, height: 80, fileName: "photo.heic" }] } as never);
-  vi.mocked(ActionSheetIOS.showActionSheetWithOptions).mockImplementation((options, choose) => choose(options.options.indexOf("Photo Library")));
-  const images: unknown[] = [];
-  const wrapper = ({ children }: { children: ReactNode }) => <HostContext.Provider value="brain">{children}</HostContext.Provider>;
-  const { result } = renderHook(() => useImageAttach({ onImage: (image) => images.push(image), onError: () => undefined }), { wrapper });
-  act(() => result.current.chooseImages());
-  await waitFor(() => expect(images).toEqual([{ path: "/vercel/sandbox/openorc-brain/data/attachments/photo.jpg", preview: "file:///small.jpg" }]));
-  expect(phone.brainSave).toHaveBeenCalledWith("attachments.save", { name: "photo.jpg", mime: "image/jpeg", dataBase64: "AAAA" });
-  expect(phone.macSave).not.toHaveBeenCalled();
 });

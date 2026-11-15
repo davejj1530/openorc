@@ -4,7 +4,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { HostContext } from "../connection/host-context";
 import type { FakeMac } from "../test-fixtures/fake-mac";
 import { nativeProps } from "../test-fixtures/react-native";
 
@@ -90,21 +89,6 @@ it("asks what to work on under the parent and where, and starts there on the par
     attachments: [],
     claudeAccountId: "work",
   });
-});
-
-it("opens a subthread started on the cloud brain there", async () => {
-  render(
-    <HostContext.Provider value="brain-1">
-      <NewSubthreadScreen />
-    </HostContext.Provider>,
-    { wrapper: mac.phone!.wrapper },
-  );
-  await screen.findByLabelText("Message");
-  write("Try it in the cloud");
-  await waitFor(() => expect(start().getAttribute("aria-disabled")).toBe("false"));
-  mac.start.mockResolvedValue({ thread: { id: "child-2" } });
-  await act(async () => fireEvent.click(start()));
-  await waitFor(() => expect(router.replace).toHaveBeenCalledWith({ pathname: "/thread/[id]", params: { id: "child-2", host: "brain-1" } }));
 });
 
 it("keeps the prompt and says why when the Mac refuses the start", async () => {

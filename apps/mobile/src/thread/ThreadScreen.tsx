@@ -6,11 +6,10 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from "react";
 import { Pressable, View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
-import { useHostClient, useLinkState, useRpc } from "../client";
+import { client, useLinkState, useRpc } from "../client";
 import { useThreadClaudeAccount } from "../composer/claude-account";
 import { Composer } from "../composer/Composer";
 import { useShareSettings } from "../composer/settings-bridge";
-import { useHeaderScope } from "../connection/HostScope";
 import { linkReason } from "../connection/link-reason";
 import type { LinkState } from "../connection/manager";
 import { useCoverHome } from "../home/home-cover";
@@ -63,7 +62,7 @@ interface PaneProps {
   followKey: number;
 }
 
-/** Why the composer cannot send now: the link to the thread's host first, then the conversation's own state. */
+/** Why the composer cannot send now: the link to the Mac first, then the conversation's own state. */
 function sendBlocked(link: LinkState, settings: { permissionReady: boolean; choice: unknown }, runs: { isLoading: boolean; error: unknown }, thread: ThreadSummary | null): string | null {
   return (
     linkReason(link) ??
@@ -94,7 +93,7 @@ function LoadFailed({ retry }: { retry: () => void }) {
  * composer hear only when the conversation starts or stops being busy.
  */
 function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActivity, composerInset, listRef, followKey }: PaneProps) {
-  const { merged, liveTranscript, hasOlder, loadOlder, shown } = useHostClient().useConversationTranscript({ runs, threadId });
+  const { merged, liveTranscript, hasOlder, loadOlder, shown } = client.useConversationTranscript({ runs, threadId });
   const waiting = useWaitingApprovals(threadId, shown);
   const { live, working, generatingImage } = conversationActivity({ thread, activeRun: runs.at(-1), liveTranscript, compacting: false });
   useEffect(() => onActivity({ live, working, generatingImage }), [live, working, generatingImage, onActivity]);
@@ -155,7 +154,7 @@ export function ThreadScreen() {
   const runsQuery = useRpc("runs.listForThread", { threadId: id });
   const runs = thread ? (runsQuery.data ?? NO_RUNS) : NO_RUNS;
   const activeRun = runs.at(-1);
-  const settings = { ...useHostClient().useConversationSettings({ thread, activeRun }), claudeAccountId: thread?.claudeAccountId ?? undefined, claudeAccount: useThreadClaudeAccount(thread) };
+  const settings = { ...client.useConversationSettings({ thread, activeRun }), claudeAccountId: thread?.claudeAccountId ?? undefined, claudeAccount: useThreadClaudeAccount(thread) };
   useShareSettings(id, settings);
   useMarkSeen(thread);
   useCoverHome();
@@ -166,7 +165,6 @@ export function ThreadScreen() {
   const now = useSnoozeClock();
   const menu = useThreadHeaderMenu(thread, now, actions.run);
   const linkState = useLinkState();
-  const inScope = useHeaderScope();
   const chat = chatFor(useOrclingChats().chats, id);
   useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
 
@@ -196,7 +194,7 @@ export function ThreadScreen() {
 
   return (
     <View className="flex-1 bg-bg">
-      <ConversationHeader chat={chat} title={() => inScope(<ThreadTitle thread={thread} onRename={actions.rename} />)} menu={menu} />
+      <ConversationHeader chat={chat} title={() => <ThreadTitle thread={thread} onRename={actions.rename} />} menu={menu} />
       <DisclosureContext.Provider value={disclosure}>
         <VoicesContext.Provider value={voices}>
           {thread ? (

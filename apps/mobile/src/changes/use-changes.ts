@@ -1,10 +1,9 @@
 import type { ChangeComparison } from "@openorc/protocol";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
-import { hostLink, useLinkState, useRpc } from "../client";
-import { HostContext } from "../connection/host-context";
+import { link, useLinkState, useRpc } from "../client";
 
 /** The Commits section shows this many of the branch's newest commits. */
 const LOG_LIMIT = 10;
@@ -50,7 +49,6 @@ export function useChangesReads(threadId: string, comparison: ChangeComparison) 
   const reads = [thread, changes, uncommitted, log, push];
   useReadOnReturn(live, reads);
   const linkState = useLinkState();
-  const scoped = hostLink(useContext(HostContext));
   return {
     thread,
     project,
@@ -60,7 +58,7 @@ export function useChangesReads(threadId: string, comparison: ChangeComparison) 
     push,
     gh,
     /** Pull to refresh: everything again, or the connection now. */
-    refresh: (): Promise<unknown> => (linkState.kind === "connected" ? Promise.all(reads.map((query) => query.refetch())) : scoped.retry()),
+    refresh: (): Promise<unknown> => (linkState.kind === "connected" ? Promise.all(reads.map((query) => query.refetch())) : link.retry()),
   };
 }
 

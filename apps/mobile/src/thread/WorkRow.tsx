@@ -26,7 +26,7 @@ import type { IconProps } from "../ui/icon";
 import { arrive } from "../ui/motion";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
-import { useHostClient } from "../client";
+import { client } from "../client";
 import { useRunRead } from "../run-read";
 import { useOpen } from "./disclosure";
 import { Markdown } from "./Markdown";
@@ -180,7 +180,7 @@ function Section({ section, live, runId }: { section: WorkSection; live: boolean
 
 /** A phase's words; the live phase reads them from the run as they arrive (see `phaseDetail`). */
 function PhaseDetail({ phase, live, runId }: { phase: WorkPhase; live: boolean; runId: string }) {
-  const detail = useRunRead(useHostClient().runs, (runs) => (live ? phaseDetail(runs, runId, phase) : phase.detail), live);
+  const detail = useRunRead(client.runs, (runs) => (live ? phaseDetail(runs, runId, phase) : phase.detail), live);
   return detail ? (
     <Text prose className="text-ink-3">
       {detail}

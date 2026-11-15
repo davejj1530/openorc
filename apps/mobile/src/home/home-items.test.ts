@@ -1,8 +1,7 @@
 import { sidebarDayList, sidebarThreadPage, THREAD_PAGE, type SidebarFilter } from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { homeItems, owned, ownRows, shownApartFromBrain, type HomeItem, type HomeList, type HomeOptions } from "./home-items";
-import { newThreadRoute } from "./out-of-reach";
+import { homeItems, type HomeItem, type HomeList, type HomeOptions } from "./home-items";
 import { fixtureProjects, fixtureThreads } from "./test-fixtures/threads";
 
 const outline = (items: HomeItem[]) =>
@@ -217,46 +216,4 @@ it("lists the waiting child itself in Needs you even when its parent and its day
   const child: ThreadSummary = { ...parent, id: "child", parentThreadId: parent.id, parentRelation: "started", activity: "waiting" };
   const listed = homeItems(list([]), options({ waiting: [child, parent], collapsed: ["day-closed:today", "thread-closed:parent"] }));
   expect(listed.filter((item) => item.kind === "thread").map((item) => [item.thread.id, item.tree.depth])).toEqual([["child", 0]]);
-});
-
-describe("owned", () => {
-  it("marks every thread row of the shown host as out of reach while it cannot be reached, and leaves headings alone", () => {
-    const away = { brain: "mac", reach: "offline", heardAt: 1 } as const;
-    const items = owned(homeItems(list(), options()), away);
-    expect(items.filter((item) => item.kind === "thread").every((item) => item.kind === "thread" && item.thread.owner === away)).toBe(true);
-    expect(items.some((item) => item.kind === "heading")).toBe(true);
-  });
-});
-
-describe("newThreadRoute", () => {
-  it("opens New thread on the cloud brain while the shown Mac is out of reach, else on the shown host", () => {
-    expect(newThreadRoute({ brain: "mac", reach: "offline", heardAt: 1 }, "brain-1")).toEqual({ pathname: "/new", params: { host: "brain-1" } });
-    expect(newThreadRoute(null, "brain-1")).toBe("/new");
-    expect(newThreadRoute({ brain: "cloud", reach: "asleep", heardAt: 1 }, "mac-1")).toBe("/new");
-    expect(newThreadRoute({ brain: "mac", reach: "offline", heardAt: 1 }, null)).toBe("/new");
-  });
-});
-
-describe("a Mac listed beside its cloud brain", () => {
-  const kinds = new Map<string, "mac" | "brain">([
-    ["mac", "mac"],
-    ["brain", "brain"],
-    ["other-mac", "mac"],
-  ]);
-
-  it("keeps to its own threads, whichever of the two is shown, and only beside a brain", () => {
-    expect(shownApartFromBrain(null, { primary: "mac", partner: "brain" }, kinds)).toBe(true);
-    expect(shownApartFromBrain("mac", { primary: "brain", partner: "mac" }, kinds)).toBe(true);
-    expect(shownApartFromBrain(null, { primary: "brain", partner: "mac" }, kinds)).toBe(false);
-    expect(shownApartFromBrain(null, { primary: "mac", partner: null }, kinds)).toBe(false);
-    expect(shownApartFromBrain(null, { primary: "mac", partner: "other-mac" }, kinds)).toBe(false);
-  });
-
-  it("drops the rows it relays from its brain, which the brain's own section lists, and keeps them when it is alone", () => {
-    const [own, relayed] = fixtureThreads;
-    const rows = [own!, { ...relayed!, owner: { brain: "cloud" as const, reach: "live" as const, heardAt: 1 } }];
-    expect(ownRows(rows, true).map((row) => row.id)).toEqual([own!.id]);
-    expect(ownRows(rows, false)).toBe(rows);
-    expect(ownRows(undefined, true)).toBeUndefined();
-  });
 });

@@ -1,9 +1,8 @@
 import { startedWorkFromTool, taskIdFromTool, threadActivity, type Block } from "@openorc/client";
 import { router } from "expo-router";
-import { useContext, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { useRpc } from "../client";
-import { HostContext } from "../connection/host-context";
 import { ArrowUpRight, ListTodo, MessageSquare } from "../generated/icons";
 import { boardStatus } from "../tasks/board";
 import { cn } from "../ui/cn";
@@ -37,7 +36,6 @@ function WorkCard({ icon, title, line, waiting, onPress }: { icon: ReactNode; ti
 
 /** A task the agent saved or started: its title and status, opening the task. A Mac that cannot open tasks keeps the call's row. */
 function TaskCard({ taskId, block, runId }: { taskId: string; block: ToolBlock; runId: string }) {
-  const host = useContext(HostContext);
   const task = useRpc("tasks.get", { id: taskId });
   if (!task.data) return task.isLoading ? <View className="h-16 rounded-3xl bg-surface" /> : <ToolRow block={block} runId={runId} />;
   const { title, status } = task.data;
@@ -47,14 +45,13 @@ function TaskCard({ taskId, block, runId }: { taskId: string; block: ToolBlock; 
       title={title}
       line={`Task · ${boardStatus[status]}`}
       waiting={false}
-      onPress={() => router.push({ pathname: "/task/[id]", params: host ? { id: taskId, host } : { id: taskId } })}
+      onPress={() => router.push({ pathname: "/task/[id]", params: { id: taskId } })}
     />
   );
 }
 
 /** A thread the agent started, as a subthread of this one: its title and what it is doing, opening it. */
 function StartedThreadCard({ threadId, block, runId }: { threadId: string; block: ToolBlock; runId: string }) {
-  const host = useContext(HostContext);
   const thread = useRpc("threads.get", { id: threadId });
   if (!thread.data) return thread.isLoading ? <View className="h-16 rounded-3xl bg-surface" /> : <ToolRow block={block} runId={runId} />;
   const { title } = thread.data;
@@ -65,7 +62,7 @@ function StartedThreadCard({ threadId, block, runId }: { threadId: string; block
       title={title}
       line={`Subthread · ${activity?.text ?? "Idle"}`}
       waiting={activity?.tone === "attention"}
-      onPress={() => router.push({ pathname: "/thread/[id]", params: host ? { id: threadId, host } : { id: threadId } })}
+      onPress={() => router.push({ pathname: "/thread/[id]", params: { id: threadId } })}
     />
   );
 }

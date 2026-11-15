@@ -1,7 +1,7 @@
 import { commandWordAt, insertSkill, rankCommands, skillNames, skillSegments, useCommandWord, type SkillCommand, type SkillListNotice, type SkillSegment } from "@openorc/client";
 import type { AgentKind, FileScope } from "@openorc/protocol";
 import { useMemo, useState } from "react";
-import { useHostClient } from "../client";
+import { client } from "../client";
 
 export interface SkillPicker {
   /** The message in runs, those that name a skill marked, for the prompt to draw. */
@@ -33,7 +33,7 @@ export function useSkillPicker({
   text: string;
   onText: (text: string) => void;
 }): SkillPicker {
-  const skills = useHostClient().useSkillCommands(scope, agent, claudeAccountId);
+  const skills = client.useSkillCommands(scope, agent, claudeAccountId);
   const [caret, setCaret] = useState(text.length);
   const [selection, setSelection] = useState<{ start: number; end: number }>();
   const word = commandWordAt(text, caret);

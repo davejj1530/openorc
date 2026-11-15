@@ -4,7 +4,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { HostContext } from "../connection/host-context";
 import type { FakeMac } from "../test-fixtures/fake-mac";
 import { nativeProps } from "../test-fixtures/react-native";
 
@@ -68,21 +67,16 @@ it("saves a titled task in the backlog at the chosen priority and project, in a 
   await waitFor(() => expect(router.replace).toHaveBeenCalledWith({ pathname: "/task/[id]", params: { id: "task-9" } }));
 });
 
-it.each(["no_commits", "unreadable"])("works in the checkout of a project whose git is %s, and opens a task saved on the cloud brain there", async (git) => {
+it.each(["no_commits", "unreadable"])("works in the checkout of a project whose git is %s", async (git) => {
   mac.git = git;
-  render(
-    <HostContext.Provider value="brain-1">
-      <NewTaskScreen />
-    </HostContext.Provider>,
-    { wrapper: mac.phone!.wrapper },
-  );
+  render(<NewTaskScreen />, { wrapper: mac.phone!.wrapper });
   await screen.findByRole("button", { name: "Project, Website" });
   type("Task title", "Write the notes");
   await waitFor(() => expect(create().getAttribute("aria-disabled")).toBe("false"));
   mac.create.mockResolvedValue({ id: "task-10" });
   await act(async () => fireEvent.click(create()));
   expect(mac.create).toHaveBeenCalledWith({ projectId: "site", title: "Write the notes", priority: "none", useWorktree: false });
-  await waitFor(() => expect(router.replace).toHaveBeenCalledWith({ pathname: "/task/[id]", params: { id: "task-10", host: "brain-1" } }));
+  await waitFor(() => expect(router.replace).toHaveBeenCalledWith({ pathname: "/task/[id]", params: { id: "task-10" } }));
 });
 
 it("keeps what was written and says why when the Mac refuses, and asks for a title before saving", async () => {

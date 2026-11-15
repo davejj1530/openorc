@@ -4,7 +4,7 @@ import Animated, { useReducedMotion } from "react-native-reanimated";
 import { FileText, WorkMessage } from "../generated/icons";
 import { Text } from "../ui/Text";
 import { attachmentRef, ImageTile, isImagePath } from "./images";
-import { useHostClient } from "../client";
+import { client } from "../client";
 import { runBlock, useRunRead } from "../run-read";
 import { useOpen } from "./disclosure";
 import { messagePieces } from "./markdown-chunks";
@@ -113,7 +113,7 @@ function Pending() {
  */
 function usePieceText({ runId, blockId, index }: PieceSource, text: string, streaming: boolean): string {
   return useRunRead(
-    useHostClient().runs,
+    client.runs,
     (runs) => {
       if (!streaming) return text;
       const block = runBlock(runs, runId, blockId);

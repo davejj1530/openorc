@@ -17,7 +17,7 @@ vi.mock("@legendapp/list/keyboard", () => ({
 }));
 vi.mock("react-native-keyboard-controller", () => ({ useReanimatedKeyboardAnimation: () => ({ height: { value: 0 } }) }));
 vi.mock("expo-router", () => ({ router: { push: () => undefined } }));
-vi.mock("../client", () => ({ useHostClient: () => null, hostClient: () => null, useRpc: () => ({ data: undefined }), useRpcMutation: () => ({ mutate: () => undefined }) }));
+vi.mock("../client", () => ({ client: null, useRpc: () => ({ data: undefined }), useRpcMutation: () => ({ mutate: () => undefined }) }));
 vi.mock("./use-reactions", () => ({
   reactionKey: (runId: string | undefined, messageId: string, part: number) => `${runId ?? ""}|${messageId}|${part}`,
   useReactions: () => ({ person: () => null, orcling: () => null, choose: () => undefined }),

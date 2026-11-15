@@ -1,9 +1,8 @@
 import type { AssetRef } from "@openorc/protocol";
-import { useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Image, Keyboard, Pressable, View } from "react-native";
 import { assetUri, useLinkRead } from "../client";
 import { OLDER_MAC_IMAGE } from "../connection/link-connection";
-import { HostContext } from "../connection/host-context";
 import { Text } from "../ui/Text";
 import { ImageViewer } from "./ImageViewer";
 
@@ -13,11 +12,8 @@ export const attachmentRef = (path: string): AssetRef => ({ kind: "attachment", 
 const IMAGE_PATH = /\.(png|jpe?g|gif|webp|heic|avif)$/i;
 export const isImagePath = (path: string) => IMAGE_PATH.test(path);
 
-/** An image the transcript names, fetched from its host once and kept on the phone; `key` names the host and the ref. */
-const readAsset = (key: string) => {
-  const [host, ref] = JSON.parse(key) as [string | null, AssetRef];
-  return assetUri(ref, host);
-};
+/** An image the transcript names, fetched from the Mac once and kept on the phone; `key` is the ref. */
+const readAsset = (key: string) => assetUri(JSON.parse(key) as AssetRef);
 
 /** Tall screenshots stop at 3:4 and wide ones at 21:9, so one image never fills the screen or shrinks to a strip. */
 const ASPECT = { tallest: 3 / 4, widest: 21 / 9 };
@@ -45,7 +41,7 @@ function useAspect(uri: string | null): number | null {
  * agent's image takes the column's width.
  */
 export function ImageTile({ asset, label, compact = false }: { asset: AssetRef; label: string; compact?: boolean }) {
-  const loaded = useLinkRead(JSON.stringify([useContext(HostContext), asset]), readAsset);
+  const loaded = useLinkRead(JSON.stringify(asset), readAsset);
   const [open, setOpen] = useState(false);
   const aspect = useAspect(loaded.state === "ready" ? loaded.value : null);
   // A prompt's thumbnail is a 72 pt square; an agent's image takes the column at its own shape, within reason.

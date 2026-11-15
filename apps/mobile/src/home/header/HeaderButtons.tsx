@@ -1,8 +1,8 @@
 import { Link } from "expo-router";
 import { Pressable, View } from "react-native";
-import { endDemo, useSavedMacs } from "../../client";
+import { endDemo } from "../../client";
 import { showsDemo, type LinkState } from "../../connection/manager";
-import { Cloud, Funnel, Laptop, Pin, Settings } from "../../generated/icons";
+import { Funnel, Laptop, Pin, Settings } from "../../generated/icons";
 import { LinkDot } from "../../ui/LinkDot";
 import { Text } from "../../ui/Text";
 import { useMacLine } from "./MacLine";
@@ -34,17 +34,15 @@ export function FilterButton() {
 type Paired = Exclude<LinkState, { kind: "unpaired" }>;
 
 /**
- * The host Home shows, as a circle like the others: a laptop for a Mac or a cloud for a cloud brain, and the link's ring
- * in its corner while the phone is not connected. It opens the connection sheet, to switch hosts, try again or pair.
+ * The Mac Home shows, as a circle like the others: a laptop, and the link's ring in its corner while the phone is not
+ * connected. It opens the connection sheet, to switch Macs, try again or pair.
  */
 export function ConnectionButton({ state }: { state: Paired }) {
   const line = useMacLine(state);
-  const brain = useSavedMacs().find((host) => host.id === state.mac.id)?.kind === "brain";
-  const Mark = brain ? Cloud : Laptop;
   return (
     <Link href="/connection" asChild>
       <Pressable accessibilityRole="button" accessibilityLabel={line.label} hitSlop={reach} className={circle}>
-        <Mark size={20} className="text-ink-3" />
+        <Laptop size={20} className="text-ink-3" />
         {line.trouble ? (
           <View className="absolute right-1.5 top-1.5">
             <LinkDot tone={line.tone} />

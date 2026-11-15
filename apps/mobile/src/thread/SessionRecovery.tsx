@@ -2,7 +2,7 @@ import { accountsToContinueWith, canContinueWithAnother, CONTINUE_PROMPT, RESTAR
 import { DEFAULT_CLAUDE_ACCOUNT, harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
-import { useHostClient, useRpc } from "../client";
+import { client, useRpc } from "../client";
 import { failureMessage } from "../failure";
 import { UsageRing } from "../settings/UsageRing";
 import { cn } from "../ui/cn";
@@ -66,7 +66,7 @@ function Stopped({ thread, request, disabled, onSent }: RecoveryProps) {
   // A second tap can land before the first start renders, as on Send.
   const inFlight = useRef(false);
   const [failure, setFailure] = useState<string | null>(null);
-  const submitter = useHostClient().useSubmit();
+  const submitter = client.useSubmit();
   const offered = canContinueWithAnother(thread) && request.choice?.agent === "claude";
   const list = useRpc("claude.accounts.list", {}, { enabled: canContinueWithAnother(thread) });
   // From the cached list: a project that uses only some accounts goes on with one of those.

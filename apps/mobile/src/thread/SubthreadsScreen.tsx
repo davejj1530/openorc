@@ -1,13 +1,10 @@
 import { relativeTime, threadMark } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useContext } from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpc } from "../client";
 import { PanelTitle } from "../changes/PanelTitle";
-import { HostContext } from "../connection/host-context";
-import { useHeaderScope } from "../connection/HostScope";
 import { ACTION_RESERVE, MARGIN, ROW_INSET } from "../home/grid";
 import { ThreadStatusMark } from "../home/ThreadStatusMark";
 import { ListPressable } from "../ui/ListPressable";
@@ -45,15 +42,13 @@ function SubthreadRow({ thread, open }: { thread: ThreadSummary; open: (id: stri
 /** The threads started from one thread, by the person or its agent, newest first; each opens as its own thread. */
 export function SubthreadsScreen() {
   const { threadId } = useLocalSearchParams<{ threadId: string }>();
-  const host = useContext(HostContext);
   const insets = useSafeAreaInsets();
-  const inScope = useHeaderScope();
   const parent = useRpc("threads.get", { id: threadId }).data ?? null;
   const { subthreads, loading } = useSubthreads(parent);
-  const open = (id: string) => router.push({ pathname: "/thread/[id]", params: host ? { id, host } : { id } });
+  const open = (id: string) => router.push({ pathname: "/thread/[id]", params: { id } });
   return (
     <View className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => inScope(<PanelTitle title="Subthreads" line={parent?.title ?? null} />) }} />
+      <Stack.Screen options={{ headerTitle: () => <PanelTitle title="Subthreads" line={parent?.title ?? null} /> }} />
       {subthreads.length ? (
         <ScrollView contentContainerClassName="pt-2" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
           {subthreads.map((thread) => (

@@ -1,8 +1,6 @@
 import type { OrclingChatSummary } from "@openorc/protocol";
 import { router } from "expo-router";
-import { useContext } from "react";
 import { ScrollView, View } from "react-native";
-import { HostContext } from "../connection/host-context";
 import { cn } from "../ui/cn";
 import { ListPressable } from "../ui/ListPressable";
 import { MARGIN } from "../home/grid";
@@ -25,8 +23,7 @@ const DOT_AT = { x: 0.86, y: 0.16 };
 
 /** An Orcling's own conversation, opened as a thread is. */
 export function useOpenChat(): (chat: OrclingChatSummary) => void {
-  const host = useContext(HostContext);
-  return (chat) => router.push({ pathname: "/thread/[id]", params: host ? { id: chat.threadId, host } : { id: chat.threadId } });
+  return (chat) => router.push({ pathname: "/thread/[id]", params: { id: chat.threadId } });
 }
 
 /** A dot on the face while its Orcling wants the person: the attention tone, or the bad one when its turn failed, cut out of the ground. */

@@ -1,8 +1,7 @@
 import { newThreadChoice, newThreadStartInput, newThreadWorkspaceMode, projectGitView, targetModel } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
-import { useContext, useEffect, useRef, useState } from "react";
-import { hostLink, useRpc, useRpcMutation } from "../client";
-import { HostContext } from "../connection/host-context";
+import { useEffect, useRef, useState } from "react";
+import { link, useRpc, useRpcMutation } from "../client";
 import { composerControls } from "../composer/composer-state";
 import { useDimReason } from "../composer/dim-reason";
 import { useNewThreadClaudeAccount } from "../composer/claude-account";
@@ -40,7 +39,6 @@ export function useNewThread(projectId: string) {
   const { uploading, chooseImages } = useImageAttach({ onImage: (image) => setDraft((current) => ({ ...current, images: [...current.images, image] })), onError: setError });
 
   const claudeAccountId = useNewThreadClaudeAccount(projectId, draft.claudeAccountId);
-  const host = useContext(HostContext);
   const settings: ComposerSettings = {
     choice: targetModel(draft.target),
     mode: draft.mode,
@@ -78,7 +76,7 @@ export function useNewThread(projectId: string) {
     field.emptied();
     setError(null);
     try {
-      const workspaceMode = newThreadWorkspaceMode({ canBranch: await canBranch(host, projectId), chosen: null, preferred: appSettings?.defaultWorkspaceMode });
+      const workspaceMode = newThreadWorkspaceMode({ canBranch: await canBranch(projectId), chosen: null, preferred: appSettings?.defaultWorkspaceMode });
       const { thread } = await start.mutateAsync(newThreadStartInput({ ...draft, claudeAccountId }, { workspaceMode, permissionMode: permission.permission, ...sent }));
       haptic.confirm();
       return thread.id;
@@ -128,8 +126,8 @@ export function useDefaultChoice(draft: SheetDraft, setDraft: ReturnType<typeof 
 
 /**
  * Whether a worktree can branch here, as the desktop's New thread decides it. The phone shows no workspace, so it asks
- * the host's git at every Start: a first commit made since the last read, or a repository removed since, counts.
+ * the Mac's git at every Start: a first commit made since the last read, or a repository removed since, counts.
  */
-async function canBranch(host: string | null, projectId: string): Promise<boolean> {
-  return projectId !== WORKSPACE_ID && !projectGitView(await hostLink(host).connection.call("projects.git", { id: projectId })).cannotBranch;
+async function canBranch(projectId: string): Promise<boolean> {
+  return projectId !== WORKSPACE_ID && !projectGitView(await link.connection.call("projects.git", { id: projectId })).cannotBranch;
 }

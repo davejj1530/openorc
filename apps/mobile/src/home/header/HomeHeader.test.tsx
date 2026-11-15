@@ -8,19 +8,17 @@ import { HomeBar } from "./HomeBar";
 import { LostLine } from "./MacLine";
 
 vi.mock("expo-router", () => ({ Link: ({ children }: { children: ReactNode }) => <>{children}</> }));
-const demo = vi.hoisted(() => ({ ended: 0, saved: [] as { id: string; kind?: "brain" }[] }));
+const demo = vi.hoisted(() => ({ ended: 0 }));
 vi.mock("../../client", async () => {
   const { ScratchStore } = await import("../../scratch-store");
   return {
     storage: new ScratchStore({ getString: () => undefined, set: () => undefined, remove: () => undefined }),
     endDemo: () => void demo.ended++,
-    useSavedMacs: () => demo.saved,
   };
 });
 vi.mock("../../generated/icons", async (original) => ({
   ...(await original<object>()),
   Laptop: () => <span data-testid="laptop" />,
-  Cloud: () => <span data-testid="cloud" />,
 }));
 
 afterEach(cleanup);
@@ -36,23 +34,15 @@ const bar = (state: LinkState, tab?: "threads" | "orclings" | "tasks") => render
 /** The bar's buttons by the names VoiceOver reads, left to right. */
 const circles = () => screen.getAllByRole("button").map((button) => button.getAttribute("aria-label") ?? button.textContent);
 
-it("puts the connection first among the circles, a laptop for a Mac and a cloud for a cloud brain", () => {
-  demo.saved = [{ id: "studio" }];
+it("puts the connection first among the circles, as a laptop", () => {
   bar(connected);
   expect(screen.getByRole("header", { name: "OpenOrc" })).toBeTruthy();
   expect(circles()).toEqual(["Studio, Connected over Wi-Fi", "Show", "Settings"]);
   expect(screen.getByTestId("laptop")).toBeTruthy();
   expect(screen.queryByTestId("link-dot")).toBeNull();
-  cleanup();
-  demo.saved = [{ id: "cloud", kind: "brain" }];
-  const cloud: LinkState = { kind: "connected", mac: { id: "cloud", name: "Cloud" }, route: { kind: "public", host: "cloud.example", port: 1 }, serial: 1 };
-  bar(cloud);
-  expect(screen.getByRole("button", { name: "Cloud, Connected over Internet" })).toBeTruthy();
-  expect(screen.getByTestId("cloud")).toBeTruthy();
 });
 
 it("rings the connection and says what is wrong after the wordmark while the phone is not connected", () => {
-  demo.saved = [{ id: "studio" }];
   bar(tailnet);
   expect(screen.getAllByRole("button", { name: "Studio, Not reachable over Tailscale" })).toHaveLength(2);
   expect(screen.getByText("Check Tailscale")).toBeTruthy();
@@ -89,7 +79,6 @@ const demoMac: LinkState = { kind: "connected", mac: { id: "demo", name: "Demo M
 
 it("puts Skip where Settings sits while the demo shows, and Skip leaves the demo", () => {
   demo.ended = 0;
-  demo.saved = [];
   bar(demoMac);
   expect(circles()).toEqual(["Demo Mac, On this iPhone", "Show", "Skip"]);
   screen.getByRole("button", { name: "Skip" }).click();
@@ -97,7 +86,6 @@ it("puts Skip where Settings sits while the demo shows, and Skip leaves the demo
 });
 
 it("keeps the filter for Threads alone; over the Orclings and Tasks tabs the connection and Settings stay", () => {
-  demo.saved = [{ id: "studio" }];
   for (const tab of ["orclings", "tasks"] as const) {
     cleanup();
     bar(connected, tab);

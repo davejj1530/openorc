@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ThreadAction } from "../thread/thread-actions";
 import { fixtureThreads } from "./test-fixtures/threads";
-import { MAC_ASLEEP } from "./out-of-reach";
 import { ThreadRow } from "./ThreadRow";
 
 const menus = vi.hoisted(() => ({ built: [] as ThreadAction[][][] }));
@@ -45,24 +44,6 @@ it("rebuilds a row's menu on the shared snooze clock, so it stops offering This 
   expect(snoozeLabels(menus.built.at(-1))).not.toContain("This evening");
 });
 
-it("shows a row of a Mac out of reach from its last list: it opens nothing, has no swipes or menu, and says why when pressed", () => {
-  const paging = fixtureThreads.find((thread) => thread.id === "t-paging")!;
-  const view = render(<ThreadRow thread={{ ...paging, owner: { brain: "mac", reach: "offline", heardAt: 1 } }} project={null} arriving={false} />);
-  expect(view.queryByTestId("opens-thread")).toBeNull();
-  expect(view.queryByTestId("swipes")).toBeNull();
-  expect(menus.built).toEqual([]);
-  // Whose it is, not what it was doing when the Mac last answered.
-  expect(view.getByText("worktree · Mac asleep")).toBeTruthy();
-  expect(view.queryByText(MAC_ASLEEP)).toBeNull();
-  fireEvent.click(view.getByRole("button"));
-  expect(view.getByText(MAC_ASLEEP)).toBeTruthy();
-  cleanup();
-  const live = render(<ThreadRow thread={{ ...paging, owner: { brain: "mac", reach: "live", heardAt: 1 } }} project={null} arriving={false} />);
-  expect(live.getByTestId("opens-thread")).toBeTruthy();
-  expect(live.getByTestId("swipes")).toBeTruthy();
-  expect(menus.built.length).toBeGreaterThan(0);
-});
-
 it("marks missing subagent updates with a neutral dashed circle", () => {
   const thread = { ...fixtureThreads[0]!, subagent: { status: "no_updates" as const, agentType: null, toolCallId: null, startedAt: 1, endedAt: 2, stoppable: false } };
   const view = render(<ThreadRow thread={thread} project="openorc" arriving={false} />);
@@ -97,15 +78,12 @@ it("names a root row's project under its title, with its pull request's state an
   expect(view.getByRole("button").getAttribute("aria-label")).toContain("Pull request #93, closed");
 });
 
-it("says after a root row's project where its thread works: the checkout's branch, a worktree, or the cloud, named once", () => {
+it("says after a root row's project where its thread works: the checkout's branch or a worktree", () => {
   const notes = fixtureThreads.find((thread) => thread.id === "t-notes")!;
   const tokens = fixtureThreads.find((thread) => thread.id === "t-tokens")!;
   expect(render(<ThreadRow thread={{ ...notes, branch: "main" }} project="openorc" arriving={false} />).getByText("openorc · main")).toBeTruthy();
   cleanup();
   expect(render(<ThreadRow thread={tokens} project="immaculate" arriving={false} />).getByText("immaculate · worktree")).toBeTruthy();
-  cleanup();
-  const cloud = render(<ThreadRow thread={{ ...tokens, owner: { brain: "cloud", reach: "live", heardAt: 1 } }} project="immaculate" arriving={false} />);
-  expect(cloud.getByText("immaculate · cloud")).toBeTruthy();
 });
 
 it("keeps a parent's disclosure on its own row, beside the link that opens the thread, and asks for the opposite fold", () => {

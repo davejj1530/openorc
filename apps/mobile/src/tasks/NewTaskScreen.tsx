@@ -1,13 +1,12 @@
 import { projectGitView } from "@openorc/client";
 import type { Project } from "@openorc/protocol";
 import { router, useNavigation } from "expo-router";
-import { useContext, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ScrollView, TextInput, View, type TextInputInstance } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { hostLink, useRpc, useRpcMutation } from "../client";
+import { link, useRpc, useRpcMutation } from "../client";
 import { SheetPill } from "../changes/SheetParts";
-import { HostContext } from "../connection/host-context";
 import { OLDER_MAC_TASK_CREATES } from "../connection/link-connection";
 import { useShares } from "../connection/use-shares";
 import { failureMessage } from "../failure";
@@ -66,7 +65,6 @@ function NewTaskProperties({
 export function NewTaskScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const host = useContext(HostContext);
   const [draft, change, clear] = useTaskDraft();
   const projects = useRpc("projects.list", {}).data;
   const settings = useRpc("app.settings.get", {}).data;
@@ -88,17 +86,15 @@ export function NewTaskScreen() {
     setSaid(null);
     try {
       // A project whose git cannot be read cannot branch either: the task works in its checkout.
-      const canBranch = await hostLink(host)
-        .connection.call("projects.git", { id: projectId })
-        .then(
-          (git) => !projectGitView(git).cannotBranch,
-          () => false,
-        );
+      const canBranch = await link.connection.call("projects.git", { id: projectId }).then(
+        (git) => !projectGitView(git).cannotBranch,
+        () => false,
+      );
       const task = await create.mutateAsync(newTaskInput(draft, projectId, { canBranch, preferred: settings?.defaultWorkspaceMode }));
       clear();
       haptic.confirm();
       // Left while the Mac saved it: the person has moved on, so stay put.
-      if (navigation.isFocused()) router.replace({ pathname: "/task/[id]", params: host ? { id: task.id, host } : { id: task.id } });
+      if (navigation.isFocused()) router.replace({ pathname: "/task/[id]", params: { id: task.id } });
     } catch (failure) {
       haptic.fail();
       setSaid(failureMessage(failure));

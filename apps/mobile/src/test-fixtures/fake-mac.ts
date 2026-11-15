@@ -9,7 +9,7 @@ const connected: LinkState = { kind: "connected", mac: { id: "mac-1", name: "Stu
 
 /**
  * The phone's `../client` over a Mac a test answers, shown as `mac-1` connected over Wi-Fi: the real query cache,
- * mutations and permission default, every call (through the hooks or a link's `connection`) going to `answer`, and a map
+ * mutations and permission default, every call (through the hooks or the link's `connection`) going to `answer`, and a map
  * standing in for the phone's MMKV. `wrapper` gives rendered hooks the cache.
  */
 export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<unknown>) {
@@ -37,16 +37,12 @@ export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<
     wrapper,
     module: {
       client,
-      hostClient: () => client,
-      useHostClient: () => client,
       link,
-      hostLink: () => link,
       queryClient: client.queryClient,
       storage,
       shownMacId: () => "mac-1",
       useLinkState: () => connected,
       useSession: () => 1,
-      useHostGroup: () => ({ primary: "mac-1", partner: null }),
       useSavedMacs: () => [],
       useRpc: client.useRpc,
       useRpcs: client.useRpcs,

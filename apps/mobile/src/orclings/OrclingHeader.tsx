@@ -1,9 +1,6 @@
 import type { OrclingChatSummary } from "@openorc/protocol";
 import { router, Stack } from "expo-router";
-import { useContext } from "react";
 import { Pressable } from "react-native";
-import { HostContext } from "../connection/host-context";
-import { useHeaderScope } from "../connection/HostScope";
 import { Text } from "../ui/Text";
 import { OrclingFace } from "./OrclingFace";
 
@@ -31,15 +28,13 @@ function Pill({ chat, onPress }: { chat: OrclingChatSummary; onPress: () => void
  * which opens the Orcling. No title in the middle and no More menu, since nothing in it organizes a chat with an Orcling.
  */
 export function OrclingHeader({ chat }: { chat: OrclingChatSummary }) {
-  const inScope = useHeaderScope();
-  const host = useContext(HostContext);
-  const open = () => router.push({ pathname: "/orcling", params: host ? { id: chat.id, host } : { id: chat.id } });
+  const open = () => router.push({ pathname: "/orcling", params: { id: chat.id } });
   return (
     <>
       {/* A custom item on the left replaces the back button unless the bar is told to keep it beside the item. */}
       <Stack.Screen options={{ headerTitle: "", headerBackVisible: true }} />
       <Stack.Toolbar placement="left">
-        <Stack.Toolbar.View>{inScope(<Pill chat={chat} onPress={open} />)}</Stack.Toolbar.View>
+        <Stack.Toolbar.View>{<Pill chat={chat} onPress={open} />}</Stack.Toolbar.View>
       </Stack.Toolbar>
     </>
   );

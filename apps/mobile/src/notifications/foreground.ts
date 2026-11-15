@@ -23,10 +23,7 @@ export function presentationFor(data: unknown, link: LinkState, threadOnScreen: 
   return noticeVisible({ threadId: route.threadId, taskId: null }, { focused, threadIds: threadOnScreen ? [threadOnScreen] : [], taskId: null }) ? HIDDEN : SHOWN;
 }
 
-/**
- * One banner per notice for a phone paired with a Mac and its cloud brain: the same notice heard from both, or twice
- * from one, shows once.
- */
+/** One banner per notice: the same notice heard twice shows once. */
 export function oncePerNotice(present: (data: unknown) => Presentation, remember = 200): (data: unknown) => Presentation {
   const seen: string[] = [];
   return (data) => {

@@ -1,9 +1,8 @@
 import { hasUnpushed, type PullRequestStep } from "@openorc/client";
 import { router } from "expo-router";
-import { useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { HostContext } from "../connection/host-context";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { Text } from "../ui/Text";
@@ -81,7 +80,6 @@ function openPullRequestStep(threadId: string, step: PullRequestStep | null): vo
  */
 export function PublishBar({ threadId, reads, publish }: { threadId: string; reads: ChangesReads; publish: ReturnType<typeof usePublish> }) {
   const insets = useSafeAreaInsets();
-  const host = useContext(HostContext);
   const { view, publishing, mac } = publish;
   const files = reads.uncommitted.data?.totals.files ?? 0;
   const team = Boolean(reads.thread.data?.teamInstanceId);
@@ -100,7 +98,7 @@ export function PublishBar({ threadId, reads, publish }: { threadId: string; rea
     }
     publishStore.clear(threadId);
     if (pill.action === "commit") router.push({ pathname: "/commit", params: { threadId } });
-    else if (pill.action === "push") void pushThread(host, threadId);
+    else if (pill.action === "push") void pushThread(threadId);
     else openPullRequestStep(threadId, view?.pullRequest ?? null);
   };
   return (

@@ -1,6 +1,6 @@
 import type { RunTranscript } from "@openorc/client";
 import { useEffect } from "react";
-import { useHostClient } from "../client";
+import { client } from "../client";
 import { useRunRead } from "../run-read";
 import { useHomeCovered } from "./home-cover";
 
@@ -12,8 +12,7 @@ import { useHomeCovered } from "./home-cover";
  */
 export function useRowRun(runId: string | undefined): RunTranscript | undefined {
   const shown = !useHomeCovered();
-  // A partner row's run lives in the partner host's store.
-  const { runs: store } = useHostClient();
+  const { runs: store } = client;
   useEffect(() => (runId ? store.retain([runId]) : undefined), [store, runId]);
   return useRunRead(store, (runs) => (runId ? runs.get(runId) : undefined), shown);
 }

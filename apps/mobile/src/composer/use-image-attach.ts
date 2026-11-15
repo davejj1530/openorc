@@ -1,7 +1,6 @@
-import { useContext, useState } from "react";
+import { useState } from "react";
 import { ActionSheetIOS } from "react-native";
 import { useLinkState } from "../client";
-import { HostContext } from "../connection/host-context";
 import { showsDemo } from "../connection/manager";
 import { failureMessage } from "../failure";
 import { attachImage, pickImages, type ImageSource } from "./attachments";
@@ -16,7 +15,6 @@ import type { DraftImage } from "./drafts";
 export function useImageAttach({ onImage, onError }: { onImage: (image: DraftImage) => void; onError: (message: string | null) => void }) {
   const [uploading, setUploading] = useState(0);
   const demo = showsDemo(useLinkState());
-  const host = useContext(HostContext);
   const attach = async (source: ImageSource) => {
     const assets = await pickImages(source);
     if (!assets.length) return;
@@ -24,7 +22,7 @@ export function useImageAttach({ onImage, onError }: { onImage: (image: DraftIma
     onError(null);
     await Promise.all(
       assets.map((asset) =>
-        attachImage(asset, host)
+        attachImage(asset)
           .then(onImage)
           .catch((failure: unknown) => onError(failureMessage(failure)))
           .finally(() => setUploading((count) => count - 1)),

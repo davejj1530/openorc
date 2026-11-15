@@ -5,7 +5,6 @@ import { useMemo, type ReactElement } from "react";
 import { View } from "react-native";
 import { PreviewPage } from "./PreviewPage";
 import { useLinkState, useRpc } from "../client";
-import { useHeaderScope } from "../connection/HostScope";
 import { perfEnabled } from "../thread/perf-probe";
 import { PanelTitle } from "../changes/PanelTitle";
 import { haptic } from "../ui/haptics";
@@ -107,8 +106,7 @@ export function PreviewScreen() {
   const line = input.notice ?? previewLine(view, state, read.data);
   const page = state?.open ? pageLabel({ url: state.address, title: state.title }) : panelToolLabels.browser;
   // Frames arrive twice a second; the header changes only with its words.
-  const inScope = useHeaderScope();
-  const options = useMemo(() => ({ headerTitle: () => inScope(<PanelTitle title={panelToolLabels.browser} line={line} />) }), [line, inScope]);
+  const options = useMemo(() => ({ headerTitle: () => <PanelTitle title={panelToolLabels.browser} line={line} /> }), [line]);
   const address = state?.open ? state.address : null;
   const safari = safariAddress(state);
   const menu = useMemo(() => (address === null ? null : pageMenu(address, safari)), [address, safari]);

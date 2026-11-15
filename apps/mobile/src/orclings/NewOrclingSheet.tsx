@@ -1,12 +1,11 @@
 import { newThreadChoice, type ModelChoice } from "@openorc/client";
 import { defaultOrclingLook, defaultOrclingPermission, isHarnessId, type ModelExecutionSettings, type OrclingLook, type OrclingLookPart, type OrclingPermission } from "@openorc/protocol";
 import { router, Stack } from "expo-router";
-import { useContext, useState } from "react";
+import { useState } from "react";
 import { Alert, TextInput, View } from "react-native";
 import { useRpc, useRpcMutation } from "../client";
 import { SheetPill } from "../changes/SheetParts";
 import { useShareSettings } from "../composer/settings-bridge";
-import { HostContext } from "../connection/host-context";
 import { Pencil } from "../generated/icons";
 import { Card, Divider, rowClass } from "../settings/parts";
 import { haptic } from "../ui/haptics";
@@ -101,7 +100,6 @@ function Identity({
  * before it acts. Made, it opens its chat.
  */
 export function NewOrclingSheet() {
-  const host = useContext(HostContext);
   const [name, setName] = useState("");
   const [look, setLook] = useState<OrclingLook>(defaultOrclingLook);
   const [part, setPart] = useState<OrclingLookPart>("shape");
@@ -134,7 +132,7 @@ export function NewOrclingSheet() {
         onSuccess: (orcling) => {
           haptic.confirm();
           back();
-          router.push({ pathname: "/thread/[id]", params: host ? { id: orcling.threadId, host } : { id: orcling.threadId } });
+          router.push({ pathname: "/thread/[id]", params: { id: orcling.threadId } });
         },
         onError: () => haptic.warn(),
       },

@@ -9,7 +9,7 @@ export interface SavedMac {
   routes: Route[];
   /** The route the last session used. It goes first while it suits the network. */
   lastRoute: Route | null;
-  /** A cloud brain or a Mac, as it answers host.kind; hosts saved before read as Macs. */
+  /** Set by an earlier build, which also paired a Mac's cloud brain: `brain` marks one, which this build never shows. */
   kind?: "mac" | "brain";
   /** The cloud brain this Mac named as its own, by the brain's id here; null once it names none. */
   brain?: string | null;

@@ -42,12 +42,3 @@ it("forgets a Mac's folds with the Mac", () => {
   forgetFolds({ remove: (key) => phone.saved.delete(key) }, "studio");
   expect(savedFolds()).toEqual([]);
 });
-
-it("keeps the partner host's folds under its own id, apart from the shown Mac's", () => {
-  toggleFold("day-open:yesterday", "brain");
-  expect(savedFolds("brain")).toEqual(["day-open:yesterday"]);
-  expect(savedFolds()).toEqual([]);
-  expect(savedFolds("brain")).toBe(savedFolds("brain"));
-  toggleFold("day-closed:today");
-  expect([savedFolds(), savedFolds("brain")]).toEqual([["day-closed:today"], ["day-open:yesterday"]]);
-});

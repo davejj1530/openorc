@@ -10,22 +10,7 @@ import {
   type SidebarDayList,
   type ThreadTreeRow,
 } from "@openorc/client";
-import type { ThreadOwner, ThreadSummary } from "@openorc/protocol";
-
-/**
- * A Mac lists its cloud brain's threads among its own, marked as the cloud's. Once the phone pairs that brain too, the
- * switch shows one host at a time, so the Mac keeps only its own threads and the brain's show when it is chosen.
- */
-export function shownApartFromBrain(host: string | null, group: { primary: string | null; partner: string | null }, kinds: ReadonlyMap<string, "mac" | "brain">): boolean {
-  const shown = host ?? group.primary;
-  const beside = shown === group.primary ? group.partner : group.primary;
-  return shown !== null && beside !== null && kinds.get(shown) !== "brain" && kinds.get(beside) === "brain";
-}
-
-/** A Mac's rows without those it relays from its cloud brain. */
-export function ownRows<T extends readonly ThreadSummary[] | undefined>(rows: T, apart: boolean): T {
-  return (apart && rows ? rows.filter((row) => row.owner?.brain !== "cloud") : rows) as T;
-}
+import type { ThreadSummary } from "@openorc/protocol";
 
 /** What Home read from a host: its threads as the sidebar lists them, and every project's name. */
 export interface HomeList {
@@ -45,7 +30,7 @@ export interface HomeList {
 
 /** One row of Home's list. Headings and threads share one flat list so the virtualizer can recycle by kind. */
 export type HomeItem =
-  /** Needs you's heading: what waits on you across projects and hosts. It never folds. */
+  /** Needs you's heading: what waits on you across projects. It never folds. */
   | { kind: "heading"; key: string; title: string; count: number }
   /** A part of the list that folds under its label: Pinned, a day, Snoozed or Resolved. `count` where it is the part's whole. */
   | { kind: "section"; key: string; label: string; count?: number; open: boolean }
@@ -82,11 +67,6 @@ export interface Waiting {
 }
 
 const newestFirst = (a: ThreadSummary, b: ThreadSummary) => b.lastActivityAt - a.lastActivityAt;
-
-/** The shown host's rows marked as another host's: as out of reach while it cannot be reached. */
-export function owned(items: HomeItem[], owner: ThreadOwner): HomeItem[] {
-  return items.map((item) => (item.kind === "thread" ? { ...item, thread: { ...item.thread, owner } } : item));
-}
 
 /**
  * This host's threads waiting on you, once each, newest first: from every thread the lists read and from the inbox,

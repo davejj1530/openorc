@@ -1,5 +1,4 @@
 import {
-  ownerMark,
   pullRequestMark,
   pullRequestNumber,
   relativeTime,
@@ -15,9 +14,8 @@ import {
 } from "@openorc/client";
 import { harnessShortName, isHarnessId, isSubagentThread, WORKSPACE_ID, type PrState, type ThreadSummary } from "@openorc/protocol";
 import { Link } from "expo-router";
-import { memo, useContext, useMemo, useState, type ComponentType, type ReactNode } from "react";
-import { View, type ViewStyle } from "react-native";
-import { HostContext } from "../connection/host-context";
+import { memo, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { View } from "react-native";
 import { Folder, GitMerge, GitPullRequest, GitPullRequestClosed, Globe } from "../generated/icons";
 import { cn } from "../ui/cn";
 import type { IconProps } from "../ui/icon";
@@ -31,7 +29,6 @@ import { rowMenu } from "../thread/ThreadMenu";
 import { useSnoozeClock } from "../thread/snooze-clock";
 import { useThreadActions } from "../thread/use-thread-actions";
 import { useRowRun } from "./row-run";
-import { macAsleep, MAC_ASLEEP } from "./out-of-reach";
 import { STILL, type RowMotion } from "./fold-motion";
 import { ACTION_INSET, ACTION_RESERVE, ROW_INSET } from "./grid";
 import { ThreadTreeFrame, treeIndent, TreeToggle } from "./ThreadBranch";
@@ -88,7 +85,6 @@ function HeadlineLine({ headline, trailing }: { headline: ThreadHeadline | null;
 function RootLines({
   thread,
   project,
-  host,
   headline,
   mark,
   working,
@@ -96,7 +92,6 @@ function RootLines({
 }: {
   thread: ThreadSummary;
   project: string | null;
-  host: string | null;
   headline: ThreadHeadline | null;
   mark: ThreadMark | null;
   working: boolean;
@@ -107,24 +102,24 @@ function RootLines({
     <>
       <ThreadRowHeading thread={thread} compact={false} mark={null} working={working} />
       <HeadlineLine headline={headline} trailing={trailing} />
-      <ProjectLine thread={thread} project={project} host={host} trailing={headline ? null : trailing} onNode={onNode} />
+      <ProjectLine thread={thread} project={project} trailing={headline ? null : trailing} onNode={onNode} />
     </>
   );
 }
 
 /** What a row says of its thread's state: a root row's pull request has its own place on the project line. */
-function rowMarks(thread: ThreadSummary, compact: boolean, asleep: boolean) {
+function rowMarks(thread: ThreadSummary, compact: boolean) {
   const status = threadStatus(thread);
-  const working = !compact && !asleep && status?.kind === "running";
+  const working = !compact && status?.kind === "running";
   return { status, working, mark: compact ? threadMark(thread) : status };
 }
 
 /**
  * A root row's last line: its project's glyph at the margin, where the tree's line leaves for its sub threads, the
- * project's name, where in it the thread works (and its host's state, while that is another), then its pull request
+ * project's name, where in it the thread works, then its pull request
  * at the end, in the state's own glyph and tone, with its number; the row's mark follows when no headline holds it.
  */
-function ProjectLine({ thread, project, host, trailing, onNode }: { thread: ThreadSummary; project: string | null; host: string | null; trailing: ReactNode; onNode: (mid: number) => void }) {
+function ProjectLine({ thread, project, trailing, onNode }: { thread: ThreadSummary; project: string | null; trailing: ReactNode; onNode: (mid: number) => void }) {
   const pull = pullRequestMark(thread);
   const Glyph = thread.projectId === WORKSPACE_ID ? Globe : Folder;
   const PullIcon = pull ? pullIcons[pull.state] : null;
@@ -132,8 +127,7 @@ function ProjectLine({ thread, project, host, trailing, onNode }: { thread: Thre
     <View className="flex-row items-center gap-1.5" onLayout={(event) => onNode(event.nativeEvent.layout.y + event.nativeEvent.layout.height / 2)}>
       <Glyph size={16} className="text-ink-4" />
       <Text numberOfLines={1} className="flex-1 text-detail text-ink-4">
-        {/* The cloud is named as where it works; the host's other states follow it. */}
-        {[project, workspaceLabel(thread), host === "Cloud" ? null : host].filter(Boolean).join(" · ")}
+        {[project, workspaceLabel(thread)].filter(Boolean).join(" · ")}
       </Text>
       {pull && PullIcon ? (
         <View accessibilityLabel={pull.label} className="ml-auto flex-row items-center gap-1 pl-2">
@@ -146,24 +140,11 @@ function ProjectLine({ thread, project, host, trailing, onNode }: { thread: Thre
   );
 }
 
-/** A row of a Mac out of reach: dimmed, and a tap says why it does nothing. */
-function AsleepRow({ label, className, style, indent, children }: { label: string; className: string; style: ViewStyle; indent: boolean; children: ReactNode }) {
-  const [explained, setExplained] = useState(false);
-  return (
-    <ListPressable accessibilityRole="button" accessibilityLabel={label} onPress={() => setExplained((shown) => !shown)} className={className} style={style}>
-      <View className="gap-1 opacity-60">{children}</View>
-      {explained ? <Text className={cn("mt-1 text-detail text-ink-3", indent && "ml-10")}>{MAC_ASLEEP}</Text> : null}
-    </ListPressable>
-  );
-}
-
 /**
  * The desktop sidebar's thread row at touch size: the status lead, the title in ink, and a faint second line. That line is the
  * live headline while there is something to say (the step the agent is on, what it waits for, what a finished turn
  * came to), and otherwise where the thread works. The row holds the thread's live run, so the run's frames arrive.
  * Tapping it pushes the thread; holding it opens the thread's menu; swiping marks it read or unread, or archives it.
- * A row of a Mac the phone cannot reach shows from the last list, dimmed, with where it works: a tap says why it does
- * nothing, and it has no swipes or menu, since nothing would reach the Mac.
  */
 /** How a row sits in its project's tree: its padding and height, its disclosure's state and how it moves. */
 function treePlace(tree: ThreadTreeRow | undefined, motion: RowMotion, arriving: boolean) {
@@ -210,20 +191,15 @@ export const ThreadRow = memo(
     onFold?: (id: string, open: boolean) => void;
   }) {
     const run = useRowRun(thread.liveRunId ?? undefined);
-    const asleep = macAsleep(thread.owner);
-    const live = useMemo(() => threadHeadline(thread, run), [thread, run]);
-    // What it was doing when the Mac last answered is no longer happening.
-    const headline = asleep ? null : live;
+    const headline = useMemo(() => threadHeadline(thread, run), [thread, run]);
     const actions = useThreadActions(thread);
     const now = useSnoozeClock();
     const { compact, rowClass, rowStyle, open, moves } = treePlace(tree, motion, arriving);
     const child = thread.subagent;
-    const { status, working, mark } = rowMarks(thread, compact, asleep);
+    const { status, working, mark } = rowMarks(thread, compact);
     const place = threadPlace(thread);
     const [nodeMid, setNodeMid] = useState(NODE_MID);
-    const owner = ownerMark(thread);
-    const host = useContext(HostContext);
-    const where = [project, place.label, owner?.label].filter(Boolean).join(" · ");
+    const where = [project, place.label].filter(Boolean).join(" · ");
     const facts = rowFacts(thread, where);
     const swipes = threadSwipes(thread);
     const leading: SwipeAction | undefined = isSubagentThread(thread) ? undefined : { label: swipes.leading.label, tone: "review", run: () => actions.save(swipes.leading.patch) };
@@ -235,26 +211,17 @@ export const ThreadRow = memo(
     const lines = compact ? (
       <ThreadRowHeading thread={thread} compact mark={mark} />
     ) : (
-      <RootLines thread={thread} project={project} host={owner?.label ?? null} headline={headline} mark={mark} working={working} onNode={setNodeMid} />
+      <RootLines thread={thread} project={project} headline={headline} mark={mark} working={working} onNode={setNodeMid} />
     );
     const node = compact ? undefined : { mid: nodeMid, reach: NODE_REACH };
     const toggle = <TreeToggle tree={tree} open={open} compact={compact} onFold={onFold} />;
-    if (asleep)
-      return (
-        <ThreadTreeFrame tree={tree} reach={leadReach(thread, mark)} node={node} motion={moves} compact={compact}>
-          <AsleepRow label={label} className={rowClass} style={rowStyle} indent={compact}>
-            {lines}
-          </AsleepRow>
-          {toggle}
-        </ThreadTreeFrame>
-      );
     return (
       <ThreadTreeFrame tree={tree} reach={leadReach(thread, mark)} node={node} motion={moves} compact={compact}>
         <SwipeRow id={thread.id} leading={leading} trailing={trailing}>
           <View>
-            <Link href={{ pathname: "/thread/[id]", params: host ? { id: thread.id, host } : { id: thread.id } }} push dangerouslySingular asChild onPress={() => markThreadOpening(thread.id)}>
+            <Link href={{ pathname: "/thread/[id]", params: { id: thread.id } }} push dangerouslySingular asChild onPress={() => markThreadOpening(thread.id)}>
               <Link.Trigger>
-                <ListPressable accessibilityRole="button" accessibilityLabel={label} {...swipeAccessibility([leading, trailing])} className={cn(rowClass, owner?.dim && "opacity-60")} style={rowStyle}>
+                <ListPressable accessibilityRole="button" accessibilityLabel={label} {...swipeAccessibility([leading, trailing])} className={rowClass} style={rowStyle}>
                   {lines}
                 </ListPressable>
               </Link.Trigger>

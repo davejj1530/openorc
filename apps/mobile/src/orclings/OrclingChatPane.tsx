@@ -4,7 +4,7 @@ import type { OrclingChatSummary, Run, ThreadSummary } from "@openorc/protocol";
 import { useEffect, type RefObject } from "react";
 import { View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
-import { useHostClient } from "../client";
+import { client } from "../client";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { OrclingChatList } from "./OrclingChatList";
@@ -35,7 +35,7 @@ export function OrclingChatPane({
   listRef: RefObject<LegendListRef | null>;
   followKey: number;
 }) {
-  const { merged, liveTranscript, hasOlder, loadOlder } = useHostClient().useConversationTranscript({ runs, threadId: thread.id });
+  const { merged, liveTranscript, hasOlder, loadOlder } = client.useConversationTranscript({ runs, threadId: thread.id });
   const { live, working, generatingImage } = conversationActivity({ thread, activeRun: runs.at(-1), liveTranscript, compacting: false });
   useEffect(() => onActivity({ live, working, generatingImage }), [live, working, generatingImage, onActivity]);
   const blocks = merged?.blocks;

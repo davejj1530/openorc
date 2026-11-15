@@ -16,11 +16,10 @@ import {
 } from "@openorc/client";
 import { WORKSPACE_ID, type InboxList, type ThreadSummary } from "@openorc/protocol";
 import { useQueryClient } from "@tanstack/react-query";
-import { useContext, useEffect, useState } from "react";
-import { useHostGroup, useRpc, useRpcs, useSavedMacs } from "../client";
-import { HostContext } from "../connection/host-context";
+import { useEffect, useState } from "react";
+import { useRpc, useRpcs } from "../client";
 import { projectChoices } from "../projects";
-import { homeItems, homeWaiting, ownRows, shownApartFromBrain, type HomeList, type HomeOptions } from "./home-items";
+import { homeItems, type HomeList, type HomeOptions } from "./home-items";
 import { useHomeFilter } from "./filter";
 import { pruneMissingFolds, toggleFold, toggleThreadChildren, useFolds } from "./folds";
 
@@ -59,12 +58,12 @@ function useSelectedFamily(selected: ThreadSummary | null, filter: SidebarFilter
 }
 
 /**
- * The host's threads as one list across its projects, newest work first, read a page at a time; pins come from their
+ * The Mac's threads as one list across its projects, newest work first, read a page at a time; pins come from their
  * own read so an old pin still leads, and so do the threads that need you, so a folded day can still show them, and,
  * while Resolved is open, the threads put there. The list reads on by itself until every open day is whole, and
  * Resolved pages on request.
  */
-function useThreadList(connected: boolean, selectedId: string | undefined, resolvedOpen: boolean, brainApart: boolean) {
+function useThreadList(connected: boolean, selectedId: string | undefined, resolvedOpen: boolean) {
   const projects = useRpc("projects.list", {});
   const { pinnedOnly } = useHomeFilter();
   const [limit, setLimit] = useState(THREAD_PAGE);
@@ -81,11 +80,7 @@ function useThreadList(connected: boolean, selectedId: string | undefined, resol
   const needsYou = useRpc("threads.list", { ...listed, needsYou: true, limit: NEEDS_YOU_PAGE }, besides);
   const resolved = useRpc("threads.list", { ...listed, filter: "archived", limit: resolvedLimit + 1 }, { ...besides, enabled: besides.enabled && resolvedOpen });
   const resolvedCount = useRpc("threads.resolvedCount", { projectIds, quietBefore: resolvedBefore(Date.now()) }, besides);
-  const own = <T extends readonly ThreadSummary[] | undefined>(rows: T) => ownRows(rows, brainApart);
-  const fetched = lists.map((list, index) => {
-    const read = list.data ? { rows: list.data, limit } : cachedListPage(cache, params[index]!);
-    return read && { ...read, rows: own(read.rows) };
-  });
+  const fetched = lists.map((list, index) => (list.data ? { rows: list.data, limit } : cachedListPage(cache, params[index]!)));
   const opened = useRpc("threads.get", { id: selectedId ?? "" }, { enabled: Boolean(selectedId) }).data;
   const selected = opened && projectIds.includes(opened.projectId) ? opened : null;
   const listedIds = new Set([...fetched.flatMap((page) => page?.rows ?? []), ...(resolved.data ?? [])].map((thread) => thread.id));
@@ -96,10 +91,10 @@ function useThreadList(connected: boolean, selectedId: string | undefined, resol
     sidebarThreadPage({ projectId: selected?.projectId ?? WORKSPACE_ID, fetched: withFamily(rows), selected, filter, limit: shown, now });
   const pages = fetched.map((fetchedPage) => page(fetchedPage?.rows, "active", fetchedPage?.limit ?? limit));
   const apart = (rows: ThreadSummary[] | undefined) => sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: rows, selected: null, filter: "active", limit: Number.MAX_SAFE_INTEGER, now });
-  const putRows = resolvedRows(resolvedOpen, own(resolved.data), selected);
+  const putRows = resolvedRows(resolvedOpen, resolved.data, selected);
   const resolvedPage = putRows && page(putRows, "archived", resolvedLimit);
-  const days = sidebarDayList({ pages, pins: apart(own(pins.data)), needsYou: apart(own(needsYou.data)), resolved: resolvedPage, pinnedOnly, activeId: selectedId, now });
-  const read = [...(own(pins.data) ?? []), ...(own(needsYou.data) ?? []), ...fetched.flatMap((page) => page?.rows ?? [])];
+  const days = sidebarDayList({ pages, pins: apart(pins.data), needsYou: apart(needsYou.data), resolved: resolvedPage, pinnedOnly, activeId: selectedId, now });
+  const read = [...(pins.data ?? []), ...(needsYou.data ?? []), ...fetched.flatMap((page) => page?.rows ?? [])];
   const list: HomeList = {
     days,
     read,
@@ -126,18 +121,12 @@ function useThreadList(connected: boolean, selectedId: string | undefined, resol
 }
 
 /**
- * Home's rows from the scope's host's lists, folded as the reader left them. While the phone is not `connected` a list
- * that fails keeps the threads it had and shows no retry: the header says once why. `needsYou` lists a partner host's
- * waiting threads here, or this host's under the shown one's Needs you.
+ * Home's rows from the shown Mac's lists, folded as the reader left them. While the phone is not `connected` a list
+ * that fails keeps the threads it had and shows no retry: the header says once why.
  */
-export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "selectedId"> = {}) {
-  // A partner's sections fold on their own host.
-  const host = useContext(HostContext);
-  const collapsed = useFolds(host);
-  const group = useHostGroup();
-  const saved = useSavedMacs();
-  const brainApart = shownApartFromBrain(host, group, new Map(saved.map((each) => [each.id, each.kind === "brain" ? "brain" : "mac"])));
-  const { projects, lists, list, pinnedOnly, children, pending, limit, showMore } = useThreadList(connected, needsYou.selectedId, sidebarSectionOpen(collapsed, "resolved", SIDEBAR_LIST), brainApart);
+export function useHomeItems(connected: boolean, selected: Pick<HomeOptions, "selectedId"> = {}) {
+  const collapsed = useFolds();
+  const { projects, lists, list, pinnedOnly, children, pending, limit, showMore } = useThreadList(connected, selected.selectedId, sidebarSectionOpen(collapsed, "resolved", SIDEBAR_LIST));
   const foldedIds = threadFoldIds(collapsed);
   const folded = useRpcs(
     "threads.get",
@@ -146,28 +135,26 @@ export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "se
   );
   const missingKey = JSON.stringify(foldedIds.filter((_, index) => folded[index]?.data === null));
   useEffect(() => {
-    if (connected) pruneMissingFolds(new Set(JSON.parse(missingKey) as string[]), host);
-  }, [connected, missingKey, host]);
+    if (connected) pruneMissingFolds(new Set(JSON.parse(missingKey) as string[]));
+  }, [connected, missingKey]);
   const grows = !pinnedOnly && !pending && sidebarListGrows({ end: list.days.end, hasMore: list.days.hasMore, collapsed, limit });
   useEffect(() => {
     if (grows) showMore();
   }, [grows, limit, showMore]);
   const [opened, setOpened] = useOpening();
   const inbox = useRpc("inbox.list", {}, { refetchInterval: 60_000 });
-  const waiting = ownRows(useWaitingElsewhere(inbox.data, new Set(list.read.map((thread) => thread.id))), brainApart);
-  const options: HomeOptions = { now: Date.now(), pinnedOnly, collapsed, waiting, projectsFailed: connected && projects.isError, opened, childLimits: children.limits, ...needsYou };
+  const waiting = useWaitingElsewhere(inbox.data, new Set(list.read.map((thread) => thread.id)));
+  const options: HomeOptions = { now: Date.now(), pinnedOnly, collapsed, waiting, projectsFailed: connected && projects.isError, opened, childLimits: children.limits, ...selected };
   const items = homeItems(list, options);
   return {
     items,
-    /** This host's threads waiting on you, for the shown host's Needs you when this is the partner. */
-    waiting: homeWaiting(list, options),
     showMore,
     showMoreChildren: children.showMore,
-    toggleThread: (id: string, expanded: boolean) => toggleThreadChildren(id, expanded, host),
+    toggleThread: (id: string, expanded: boolean) => toggleThreadChildren(id, expanded),
     /** Folds or opens a part of the list by its key; a part the reader opens rises its rows in. */
     toggle: (key: string) => {
       if (items.some((item) => item.kind === "section" && item.key === key && !item.open)) setOpened(key);
-      toggleFold(key, host);
+      toggleFold(key);
     },
     /** Asks the host again for a list it could not give: the projects, or the threads. */
     retry: (projectsList: boolean) => {

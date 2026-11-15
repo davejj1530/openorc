@@ -1,13 +1,11 @@
 import { relativeTime } from "@openorc/client";
 import type { Task } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLinkState, useRpc } from "../client";
-import { HostContext } from "../connection/host-context";
-import { useHeaderScope } from "../connection/HostScope";
 import { useLinkWords } from "../connection/use-link-words";
 import { ArrowUpRight, GitBranch, MessageSquare } from "../generated/icons";
 import { Markdown } from "../thread/Markdown";
@@ -21,13 +19,12 @@ import { TaskProperties } from "./TaskProperties";
 
 /** A conversation the task belongs to, one tap away: the one doing its work, or the one it came from. */
 function ThreadLink({ threadId, label }: { threadId: string; label: string }) {
-  const host = useContext(HostContext);
   const thread = useRpc("threads.get", { id: threadId }).data;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${label}${thread ? `, ${thread.title}` : ""}`}
-      onPress={() => router.push({ pathname: "/thread/[id]", params: host ? { id: threadId, host } : { id: threadId } })}
+      onPress={() => router.push({ pathname: "/thread/[id]", params: { id: threadId } })}
       className="min-h-touch-row flex-row items-center gap-3 rounded-3xl bg-surface px-4 py-3 active:bg-surface-2"
     >
       <MessageSquare size={18} className="text-ink-4" />
@@ -124,10 +121,9 @@ function TaskFacts({ task }: { task: Task }) {
 
 /** The spec as the reply's prose, under a heading with Edit, which opens it as text; one that holds a secret stays the Mac's to edit. */
 function Description({ task }: { task: Task }) {
-  const host = useContext(HostContext);
   const spec = task.spec?.trim() ? task.spec : null;
   const secret = holdsSecret(spec);
-  const edit = () => router.push({ pathname: "/task-description", params: host ? { id: task.id, host } : { id: task.id } });
+  const edit = () => router.push({ pathname: "/task-description", params: { id: task.id } });
   return (
     <View className="gap-1">
       <View className="flex-row items-center justify-between">
@@ -189,7 +185,6 @@ export function TaskScreen() {
   // `thread` is the conversation to offer if the Mac cannot open the task itself, as one from before task details.
   const { id, thread } = useLocalSearchParams<{ id: string; thread?: string }>();
   const insets = useSafeAreaInsets();
-  const inScope = useHeaderScope();
   const task = useRpc("tasks.get", { id });
   const { shown, save } = useTaskEdit(task.data);
   const projects = useRpc("projects.list", {});
@@ -197,7 +192,7 @@ export function TaskScreen() {
   const title = useTitleUnder();
   return (
     <View className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => inScope(<TaskBarTitle task={shown} project={project} shown={title.under} />) }} />
+      <Stack.Screen options={{ headerTitle: () => <TaskBarTitle task={shown} project={project} shown={title.under} /> }} />
       {shown ? (
         <ScrollView
           keyboardShouldPersistTaps="handled"

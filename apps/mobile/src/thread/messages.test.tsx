@@ -13,7 +13,7 @@ vi.mock("../client", async () => {
   const { runStore } = await import("./test-fixtures/run-store");
   probe.store = runStore();
   const client = probe.store.client;
-  return { useHostClient: () => client };
+  return { client };
 });
 vi.mock("./Markdown", () => ({
   Markdown: function Markdown({ text, streaming }: { text: string; streaming: boolean }) {

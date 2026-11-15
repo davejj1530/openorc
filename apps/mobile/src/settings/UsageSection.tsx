@@ -87,7 +87,7 @@ function ReadFailed({ retry }: { retry: () => void }) {
   );
 }
 
-/** What stands in for the cards: a read on its way, the host it waits for, or a host with no limits at all. */
+/** What stands in for the cards: a read on its way, the Mac it waits for, or a Mac with no limits at all. */
 function NoCards({ words, reading }: { words: string; reading: boolean }) {
   return (
     <Card>
@@ -104,8 +104,8 @@ function noCardsWords({ state, live, hostName }: Pick<Usage, "state" | "live" | 
 }
 
 /**
- * The account limits of the shown host's group, read only, as the desktop's Settings > Usage shows them. While
- * neither host is connected the last read stays, dimmed and held still, with the time it was read under the label.
+ * The shown Mac's account limits, read only, as the desktop's Settings > Usage shows them. While the phone is not
+ * connected the last read stays, dimmed and held still, with the time it was read under the label.
  */
 export function UsageSection() {
   const { accounts, state, live, readAt, now, hostName, retry } = useUsage();

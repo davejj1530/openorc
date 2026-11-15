@@ -3,7 +3,6 @@ import { ScrollView, View } from "react-native";
 import Animated, { LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpc } from "../client";
-import { HostScope } from "../connection/HostScope";
 import { ChevronDown } from "../generated/icons";
 import { motion } from "../generated/tokens";
 import { MARGIN, ROW_INSET } from "../home/grid";
@@ -12,7 +11,7 @@ import { ListPressable } from "../ui/ListPressable";
 import { ease, turn } from "../ui/motion";
 import { useReducedMotion } from "../ui/reduced-motion";
 import { Text } from "../ui/Text";
-import { boardGroup, boardGroups, CLOUD_ONLY, copiedMeta, type BoardSection } from "./board";
+import { boardGroup, boardGroups, copiedMeta, type BoardSection } from "./board";
 import { TaskRow } from "./TaskRow";
 import { useTaskBoard } from "./use-task-board";
 import { useTaskFolds, type TaskFold } from "./use-task-folds";
@@ -47,20 +46,13 @@ function GroupHeading({ status, count, fold, room }: { status: TaskStatus; count
   );
 }
 
-/** A host's name over its groups, with how old its list is while it is a copy; said only beside another host, or for a copy. */
-function HostHeading({ section, first, now }: { section: BoardSection; first: boolean; now: number }) {
-  const meta = section.copy ? copiedMeta(section.copy.at, now) : null;
+/** The Mac's name over its groups with how old its list is, said only while the Mac is out of reach and the list is its last. */
+function CopyHeading({ title, copiedAt, now }: { title: string; copiedAt: number; now: number }) {
+  const meta = copiedMeta(copiedAt, now);
   return (
-    <View
-      accessible
-      accessibilityRole="header"
-      accessibilityLabel={[section.title, meta].filter(Boolean).join(", ")}
-      className={cn("mx-3 mb-1", first ? "mt-2" : "mt-6")}
-      style={{ paddingLeft: LABEL_PAD }}
-    >
-      <Text className="text-xl text-ink">{section.title}</Text>
-      {meta ? <Text className="text-detail text-ink-4">{meta}</Text> : null}
-      {section.copy?.cloudOnly ? <Text className="text-detail text-ink-4">{CLOUD_ONLY}</Text> : null}
+    <View accessible accessibilityRole="header" accessibilityLabel={`${title}, ${meta}`} className="mx-3 mb-1 mt-2" style={{ paddingLeft: LABEL_PAD }}>
+      <Text className="text-xl text-ink">{title}</Text>
+      <Text className="text-detail text-ink-4">{meta}</Text>
     </View>
   );
 }
@@ -95,17 +87,17 @@ function Group({
   );
 }
 
-/** A host's tasks by status, in the desktop's group order; each group folds. */
-function Section({ section, named, first, now, folds }: { section: BoardSection; named: boolean; first: boolean; now: number; folds: (key: string) => TaskFold }) {
+/** The Mac's tasks by status, in the desktop's group order; each group folds. */
+function Section({ section, now, folds }: { section: BoardSection; now: number; folds: (key: string) => TaskFold }) {
   const projects = useRpc("projects.list", {});
   const project = (id: string) => projects.data?.find((each: Project) => each.id === id)?.name;
-  const headed = named || section.copy !== null;
+  const headed = section.copiedAt !== null;
   const groups = boardGroups(section.tasks).map((group) => ({ ...group, fold: folds(`${section.key}:${group.status}`) }));
   return (
     <View>
-      {headed ? <HostHeading section={section} first={first} now={now} /> : null}
+      {section.copiedAt === null ? null : <CopyHeading title={section.title} copiedAt={section.copiedAt} now={now} />}
       {groups.map((group, index) => {
-        let room: Room = index === 0 && first && !headed ? "first" : "after-rows";
+        let room: Room = index === 0 && !headed ? "first" : "after-rows";
         if (index === 0 && headed) room = "after-heading";
         else if (index > 0 && !groups[index - 1]!.fold.shown) room = "after-heading";
         return <Group key={group.status} section={section} status={group.status} tasks={group.tasks} fold={group.fold} room={room} project={project} />;
@@ -115,25 +107,18 @@ function Section({ section, named, first, now, folds }: { section: BoardSection;
 }
 
 /**
- * Home's Tasks tab, as the desktop's task list reads at touch size: the open tasks of the shown host and its partner
- * (the Mac's, its cloud brain's, and the brain's copy of the Mac's while it sleeps) grouped by status, each row with its
- * status mark, title, project, age and priority, under Home's bar and clear of its floating tabs.
+ * Home's Tasks tab, as the desktop's task list reads at touch size: the shown Mac's open tasks, or its last list while
+ * it is out of reach, grouped by status, each row with its status mark, title, project, age and priority, under Home's
+ * bar and clear of its floating tabs.
  */
 export function TaskList({ top, bottom }: { top: number; bottom: number }) {
   const insets = useSafeAreaInsets();
-  const { sections } = useTaskBoard();
+  const { section } = useTaskBoard();
   const folds = useTaskFolds();
-  const now = Date.now();
-  const listed = sections.filter((section) => section.tasks.length);
   return (
     <ScrollView contentContainerStyle={{ paddingTop: insets.top + top, paddingBottom: insets.bottom + bottom }} accessibilityLabel="Tasks">
-      {listed.length ? (
-        listed.map((section, index) => (
-          // A scope's reads keep the client they started on, so a copy that comes from another host starts again there.
-          <HostScope key={`${section.key}:${section.namesOn ?? ""}`} host={section.namesOn}>
-            <Section section={section} named={listed.length > 1} first={index === 0} now={now} folds={folds} />
-          </HostScope>
-        ))
+      {section?.tasks.length ? (
+        <Section section={section} now={Date.now()} folds={folds} />
       ) : (
         <View className="items-center gap-1 px-8 pt-24">
           <Text className="text-lg text-ink-2">No open tasks</Text>

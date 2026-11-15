@@ -27,7 +27,7 @@ vi.mock("../client", async () => {
   const { runStore } = await import("../thread/test-fixtures/run-store");
   home.store = runStore("interest");
   const client = home.store.client;
-  return { useHostClient: () => client };
+  return { client };
 });
 
 afterEach(() => {

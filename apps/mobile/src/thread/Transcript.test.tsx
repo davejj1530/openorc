@@ -26,7 +26,7 @@ vi.mock("../client", async () => {
   const { runStore } = await import("./test-fixtures/run-store");
   transcript.store = runStore();
   const client = transcript.store.client;
-  return { useHostClient: () => client, hostClient: () => client, useRpcMutation: client.useRpcMutation, shownMacId: () => "mac-1" };
+  return { client, useRpcMutation: client.useRpcMutation, shownMacId: () => "mac-1" };
 });
 
 beforeEach(() => vi.useFakeTimers());

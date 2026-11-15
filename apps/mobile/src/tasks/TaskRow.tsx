@@ -49,12 +49,12 @@ function TaskLines({ task, project, dim = false, note = null }: { task: BoardTas
 }
 
 /** A row's long-press menu: its conversation, when it has one, and its title to paste elsewhere. */
-function taskMenu(task: BoardTask, host: string | null, facts: string[]): ReactElement {
+function taskMenu(task: BoardTask, facts: string[]): ReactElement {
   const thread = taskThread(task);
   const items = [
     ...(thread
       ? [
-          <Link.MenuAction key="thread" icon="bubble.left" onPress={() => router.push({ pathname: "/thread/[id]", params: host ? { id: thread, host } : { id: thread } })}>
+          <Link.MenuAction key="thread" icon="bubble.left" onPress={() => router.push({ pathname: "/thread/[id]", params: { id: thread } })}>
             Open Thread
           </Link.MenuAction>,
         ]
@@ -71,21 +71,21 @@ function taskMenu(task: BoardTask, host: string | null, facts: string[]): ReactE
 }
 
 /**
- * A task's row: it opens the task on its host, which leads on to its conversation; holding it opens its menu. A row
- * from the brain's copy of the Mac's list is read-only and dimmed: a press says the Mac is needed.
+ * A task's row: it opens the task, which leads on to its conversation; holding it opens its menu. A row from the Mac's
+ * last list, while the Mac is out of reach, is read-only and dimmed: a press says the Mac is needed.
  */
 export function TaskRow({ task, section, project }: { task: BoardTask; section: BoardSection; project: string | undefined }) {
   const [explained, setExplained] = useState(false);
   const facts = taskFacts(task, project);
   const label = [task.title, ...facts].join(", ");
-  if (section.copy)
+  if (section.copiedAt !== null)
     return (
       <ListPressable accessibilityRole="button" accessibilityLabel={label} onPress={() => setExplained((shown) => !shown)} className={rowClass} style={rowStyle}>
         <TaskLines task={task} project={project} dim note={explained ? MAC_NEEDED : null} />
       </ListPressable>
     );
   const thread = taskThread(task);
-  const params = { id: task.id, ...(section.host ? { host: section.host } : {}), ...(thread ? { thread } : {}) };
+  const params = { id: task.id, ...(thread ? { thread } : {}) };
   return (
     <Link href={{ pathname: "/task/[id]", params }} push asChild>
       <Link.Trigger>
@@ -93,7 +93,7 @@ export function TaskRow({ task, section, project }: { task: BoardTask; section: 
           <TaskLines task={task} project={project} />
         </ListPressable>
       </Link.Trigger>
-      {taskMenu(task, section.host, facts)}
+      {taskMenu(task, facts)}
     </Link>
   );
 }

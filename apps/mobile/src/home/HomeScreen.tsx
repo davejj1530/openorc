@@ -1,12 +1,10 @@
 import { AnimatedLegendList } from "@legendapp/list/reanimated";
-import type { ThreadSummary } from "@openorc/protocol";
 import { router, useGlobalSearchParams, usePathname } from "expo-router";
-import { useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Pressable, RefreshControl, View } from "react-native";
 import { LinearTransition, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { link, queryClient, useHostGroup, useLinkState, useSavedMacs } from "../client";
-import { HostContext } from "../connection/host-context";
+import { link, queryClient, useLinkState } from "../client";
 import type { LinkState } from "../connection/manager";
 import { Plus } from "../generated/icons";
 import { motion } from "../generated/tokens";
@@ -24,8 +22,7 @@ import { TabLayers } from "./TabLayers";
 import { HOME_BAR_HEIGHT, HomeBar } from "./header/HomeBar";
 import type { HomeScroll } from "./header/MacLine";
 import { HomeHeading, RetryRow, SectionToggle, ShowMore, ShowMoreChildren, type HeadingRoom } from "./HomeHeading";
-import { newThreadRoute } from "./out-of-reach";
-import { owned, type HomeItem } from "./home-items";
+import type { HomeItem } from "./home-items";
 import { refreshHome } from "./refresh";
 import { ThreadRow } from "./ThreadRow";
 import { Unpaired } from "./Unpaired";
@@ -85,33 +82,20 @@ function useRefresh() {
     refreshing,
     onRefresh: () => {
       setRefreshing(true);
-      void refreshHome(link, queryClient, null).finally(() => setRefreshing(false));
+      void refreshHome(link, queryClient).finally(() => setRefreshing(false));
     },
   };
 }
 
 /** Home stays mounted under a thread; its selected branch must survive a page refresh there. */
 function useSelectedThreadId(): string | undefined {
-  const params = useGlobalSearchParams<{ id?: string; host?: string }>();
-  const path = usePathname();
-  const host = useContext(HostContext);
-  return path.startsWith("/thread/") && (params.host ?? null) === host ? params.id : undefined;
-}
-
-/** How the shown host's rows are marked while it cannot be reached and a partner's rows show beside them; null otherwise. */
-function useShownAway(state: Paired): NonNullable<ThreadSummary["owner"]> | null {
-  const group = useHostGroup();
-  const brain = useSavedMacs().find((host) => host.id === group.primary)?.kind === "brain";
-  if (!group.partner || state.kind === "connected") return null;
-  return { brain: brain ? "cloud" : "mac", reach: brain ? "asleep" : "offline", heardAt: Date.now() };
+  const params = useGlobalSearchParams<{ id?: string }>();
+  return usePathname().startsWith("/thread/") ? params.id : undefined;
 }
 
 function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; header: ReactNode }) {
   const insets = useSafeAreaInsets();
-  // One host at a time, as the switch chose it: the other's threads are its own to show.
-  const shown = useHomeItems(state.kind === "connected", { selectedId: useSelectedThreadId() });
-  const away = useShownAway(state);
-  const home = away ? { ...shown, items: owned(shown.items, away) } : shown;
+  const home = useHomeItems(state.kind === "connected", { selectedId: useSelectedThreadId() });
   const folds = useHomeFolds(home);
   const still = useReducedMotion();
   const refresh = useRefresh();
@@ -141,11 +125,7 @@ function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; heade
 /** The bar and the 8 under it, and the fade above it that rows pass into. */
 const PILL_ROOM = BOTTOM_BAR_ROOM + 32;
 
-/** New thread on the shown host, or on its cloud brain while the shown Mac cannot be reached. */
-function useNewThread(state: Paired): () => void {
-  const route = newThreadRoute(useShownAway(state), useHostGroup().partner);
-  return () => router.push(route);
-}
+const newThread = () => router.push("/new");
 
 /**
  * A paired Mac's threads by the day they last saw work on the tile ground, under the pinned bar, with New thread as the screen's
@@ -156,7 +136,6 @@ function PairedHome({ state }: { state: Paired }) {
   const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
   const scroll = useMemo(() => ({ scrollY }), [scrollY]);
-  const newThread = useNewThread(state);
   const orclings = useOrclingChats();
   const faces = useOrclingFaces();
   const tasks = useTaskBoard().available;

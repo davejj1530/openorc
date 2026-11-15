@@ -1,5 +1,6 @@
 import type { AgentSkill } from "@openorc/protocol";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
+import { withArtifactTool } from "./artifact.js";
 import { SHARED_CLAUDE_CONFIG_DIR } from "./config-dir.js";
 import { withClaudeControlSession } from "./control-session.js";
 import { sharedPluginArgs } from "./plugins.js";
@@ -26,7 +27,8 @@ const text = (value: unknown) => (typeof value === "string" ? value : "");
  */
 export async function listClaudeCommands(launch: Pick<AgentLaunchEnvironment, "binary" | "env">, folder: string, timeoutMs = 10_000): Promise<ClaudeCommand[]> {
   const args = sharedPluginArgs(launch.env[SHARED_CLAUDE_CONFIG_DIR]);
-  return withClaudeControlSession(launch, { task: "listing commands", cwd: folder, settingSources: "all", args, timeoutMs }, async (ask) => {
+  // A run outside Plan has the Artifact tool, and with it the skills that use it.
+  return withClaudeControlSession({ ...launch, env: withArtifactTool(launch.env) }, { task: "listing commands", cwd: folder, settingSources: "all", args, timeoutMs }, async (ask) => {
     const response = await ask({ subtype: "initialize", hooks: {} });
     if (!Array.isArray(response["commands"])) throw new Error("Claude did not list its commands");
     const commands: ClaudeCommand[] = [];

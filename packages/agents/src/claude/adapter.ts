@@ -11,6 +11,7 @@ import { ClaudeTranscriptFiles } from "./transcript-files.js";
 import { claudeTaskControls } from "./task-controls.js";
 import { SHARED_CLAUDE_CONFIG_DIR, claudeConfigDir } from "./config-dir.js";
 import { sharedPluginArgs } from "./plugins.js";
+import { withArtifactTool } from "./artifact.js";
 import { RunHandle, type RunControls } from "../run-handle.js";
 import { withAttachedFiles } from "../attachments.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
@@ -155,7 +156,10 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
     throw new Error("This mode requires a file-boundary hook that is not yet supported on Windows. Choose Review everything.");
   const binary = launch.binary;
   const place = launchPlace(launch.host);
-  const env: NodeJS.ProcessEnv = { ...launch.env, ...options.env };
+  // A plan writes nothing but its plan file, so it goes without Claude Code's Artifact tool.
+  const artifactTool = spec.mode !== "plan";
+  const launched: NodeJS.ProcessEnv = { ...launch.env, ...options.env };
+  const env = artifactTool ? withArtifactTool(launched) : launched;
   // Claude Code refuses to nest inside itself; the app is not a Claude session.
   delete env["CLAUDECODE"];
   const shared = env[SHARED_CLAUDE_CONFIG_DIR];
@@ -188,10 +192,11 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
       claudePermissionMode(spec),
     ];
     const restricted = spec.mode === "plan" || spec.permissionMode !== "autonomous";
-    // Restrict mutation entry points to the tools covered by our explicit rules.
+    // Restrict mutation entry points to the tools covered by our explicit rules, plus Artifact.
     // Native subagents have independent policies; use OpenOrc's inherited-policy delegation instead.
     // Skill stays: the ask and deny rules still bind a skill's allowed-tools, its !`command` lines and its forked agent.
-    if (restricted) args.push("--tools", "Read,Grep,Glob,Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,AskUserQuestion,ExitPlanMode,Skill");
+    // No rule of ours covers Artifact: Claude Code checks each action, running reads and asking through the approve tool before it publishes.
+    if (restricted) args.push("--tools", `Read,Grep,Glob,Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,AskUserQuestion,ExitPlanMode,Skill${artifactTool ? ",Artifact" : ""}`);
     const strictMcp = Boolean(connection) && (spec.strictMcp ?? options.strictMcp) === true;
     args.push(...isolationArgs(spec, restricted, strictMcp));
     args.push(...sharedPluginArgs(shared));

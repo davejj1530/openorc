@@ -523,6 +523,31 @@ it("remembers Allow for this run for the same Claude command, and asks again for
   }
 });
 
+it("asks for each Claude Artifact call in words, and never allows one for the rest of the run", async () => {
+  const thread = threads.insert(core.db, { projectId: project.id, title: "Artifact", agent: "claude", model: "fixture", mode: "act", permissionMode: "review" });
+  provider("claude");
+  const run = await core.runs.start({ scope: { thread, task: null }, project, agent: "claude", model: "fixture", mode: "act", permissionMode: "review", prompt: "Publish the report", resume: false });
+  const asked = (approvalId: string, reason: string) =>
+    vi.waitFor(() => expect(questionEvents(run.id)).toContainEqual(expect.objectContaining({ type: "approval.requested", approvalId, toolName: "Artifact", reason, onceOnly: true })));
+  try {
+    const publish = core.runs.requestApproval(run.id, "publish", "Artifact", { file_path: "/work/report.html" });
+    await asked("publish", "Publish /work/report.html to claude.ai as a new private page?");
+    // Sent anyway, as by an older client, it still covers only this call.
+    core.runs.resolveApproval(run.id, "publish", "allow_for_run");
+    expect(await publish).toMatchObject({ decision: "allow_for_run" });
+    const replace = core.runs.requestApproval(run.id, "replace", "Artifact", { file_path: "/work/report.html", url: "https://claude.ai/artifact/abc", force: true });
+    await asked("replace", "Publish /work/report.html to claude.ai, replacing the page at https://claude.ai/artifact/abc and overwriting any newer version there?");
+    core.runs.resolveApproval(run.id, "replace", "deny");
+    expect(await replace).toMatchObject({ decision: "deny" });
+    const remove = core.runs.requestApproval(run.id, "delete", "Artifact", { action: "delete", url: "https://claude.ai/artifact/abc" });
+    await asked("delete", "Allow Artifact delete on claude.ai for https://claude.ai/artifact/abc?");
+    core.runs.resolveApproval(run.id, "delete", "deny");
+    expect(await remove).toMatchObject({ decision: "deny" });
+  } finally {
+    await core.runs.closeAndWait(run.id);
+  }
+});
+
 describe("app actions follow the conversation's mode", () => {
   /** An MCP call that may fail: returns whether it failed and its text. */
   async function toolCall(url: string, name: string, args: Record<string, unknown>): Promise<{ isError: boolean; text: string }> {

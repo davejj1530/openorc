@@ -142,6 +142,19 @@ it("an inventory row keeps its specific seat and asks for a person", async () =>
   await waitFor(() => expect(mock.call).toHaveBeenCalledWith("organization.seat.preview", { spaceId: "team-a", target: { seatId: "less", memberId: "member-b" } }));
 });
 
+it("a seat held for an invitation offers only to revoke that invitation", async () => {
+  billing.billing!.seats[0]!.assignment = { kind: "invitation", invitationId: "invite-a", email: "invited@example.com", expiresAt: Date.now() + 86_400_000 };
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: "Seat actions" }));
+  expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual(["Revoke invitation…"]);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Revoke invitation…" }));
+  await screen.findByRole("dialog", { name: "Revoke invitation?" });
+  expect(screen.getByText("invited@example.com won't be able to join with this invitation.")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Revoke invitation" }));
+  await waitFor(() => expect(mock.call).toHaveBeenCalledWith("organization.invitation.revoke", { spaceId: "team-a", invitationId: "invite-a" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
 it("a structured refusal closes the preview and clears other people's private facts before a roster update", async () => {
   rows[1]!.seat = { id: "less", paysForPro: false };
   show();

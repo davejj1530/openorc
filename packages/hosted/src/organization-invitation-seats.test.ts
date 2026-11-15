@@ -34,9 +34,11 @@ afterEach(async () => {
   hosts.splice(0).forEach((host) => host.close());
   await stand.close();
 });
+let pushes: unknown[] = [];
 async function person(email = ADMIN) {
   const browser = testBrowser(stand);
-  const { deps } = hostDeps(stand, newDevice(), { browser, now: () => now });
+  const { deps, seen } = hostDeps(stand, newDevice(), { browser, now: () => now });
+  pushes = seen.pushes;
   const hosted = createHosted(deps);
   hosts.push(hosted);
   await hosted.start();
@@ -100,9 +102,12 @@ it("frees the seat when the invitation is revoked", async () => {
   const hosted = await person();
   const [result] = await invite(hosted, [GUEST], { [GUEST]: "seat-full" });
   if (result?.state !== "sent") throw new Error("The invitation was not sent.");
+  pushes.length = 0;
   await hosted.spaces.invitations.revoke({ spaceId, invitationId: result.invitationId });
   expect(held("seat-full")).toEqual({ kind: "available" });
   expect(inventory().available).toBe(2);
+  // The windows read the seats again: a seat an invitation held may be free now.
+  expect(pushes).toContainEqual({ type: "invalidate", keys: expect.arrayContaining([`organization-billing:${spaceId}`]) });
 });
 
 it("stops counting a hold at the invitation's expiry, and takes the same seat again on resend", async () => {

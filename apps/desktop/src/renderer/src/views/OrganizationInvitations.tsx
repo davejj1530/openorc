@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { OrganizationInvitation } from "@openorc/protocol";
-import { Button, Dialog, Tooltip } from "../components/ui";
+import { Button, Tooltip } from "../components/ui";
+import { RevokeInvitationDialog } from "../dialogs/RevokeInvitationDialog";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
 import { useRouter } from "../lib/router";
@@ -40,7 +41,7 @@ export function OrganizationInvitations({ spaceId }: { spaceId: string }) {
           <Button onClick={() => void read.refetch()}>Try again</Button>
         </div>
       ) : null}
-      {revoking ? <RevokeInvitation spaceId={spaceId} invitation={revoking.invitation} close={close} /> : null}
+      {revoking ? <RevokeInvitationDialog spaceId={spaceId} invitationId={revoking.invitation.id} email={revoking.invitation.email} onClose={close} /> : null}
     </section>
   );
 }
@@ -110,35 +111,6 @@ function InvitationRow({
         </p>
       ) : null}
     </div>
-  );
-}
-
-function RevokeInvitation({ invitation, spaceId, close }: { invitation: OrganizationInvitation; spaceId: string; close(): void }) {
-  const revoke = useRpcMutation("organization.invitation.revoke");
-  return (
-    <Dialog
-      open
-      title="Revoke invitation?"
-      onOpenChange={(open) => {
-        if (!open) close();
-      }}
-      width={420}
-    >
-      <div className="organization-form">
-        <p className="text-ink-3">{invitation.email} won't be able to join with this invitation.</p>
-        {revoke.error ? (
-          <p className="organization-error" role="alert">
-            {revoke.error.message}
-          </p>
-        ) : null}
-        <div className="organization-actions">
-          <Button onClick={close}>Cancel</Button>
-          <Button variant="primary" disabled={revoke.isPending} onClick={() => revoke.mutate({ spaceId, invitationId: invitation.id }, { onSuccess: close })}>
-            {revoke.isPending ? "Revoking…" : "Revoke invitation"}
-          </Button>
-        </div>
-      </div>
-    </Dialog>
   );
 }
 

@@ -93,7 +93,8 @@ export class OrganizationInvitations {
     this.#assert(generation);
     await this.deps.refresh();
     this.#assert(generation);
-    this.deps.push({ type: "invalidate", keys: [`invitations:${spaceId}`, `people:${spaceId}`, "spaces"] });
+    // An invitation can hold a seat, so the seats are read again with the invitations.
+    this.deps.push({ type: "invalidate", keys: [`invitations:${spaceId}`, `people:${spaceId}`, `organization-billing:${spaceId}`, "spaces"] });
   }
 
   #assert(generation: number): void {

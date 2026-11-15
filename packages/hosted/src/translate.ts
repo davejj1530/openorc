@@ -123,7 +123,7 @@ const ACTIVITY: Record<string, ThreadActivity> = { idle: "idle", working: "runni
 export function toAppEvent(threadId: string, wire: WireEvent): AgentEvent {
   const ids = { runId: hostedRunId(threadId), eventId: `${threadId}.${wire.seq}` };
   const parsed = AgentEvent.safeParse({ ...wire.event, ...ids });
-  if (parsed.success) return appSide(parsed.data);
+  if (parsed.success) return serverLine(parsed.data, wire) ?? appSide(parsed.data);
   const ts = typeof wire.event["ts"] === "number" ? wire.event["ts"] : 0;
   return { type: "message.completed", ...ids, ts, messageId: ids.eventId, role: "system", text: UNREADABLE };
 }
@@ -138,6 +138,15 @@ export function wireMessageId(id: string | undefined): string | null {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * A line the server says itself outside any turn, such as a refusal, why a message waits, or a folder lost: the thread's
+ * quiet notice, as a stop is, never an agent's failure. The line that ends a turn names it and stays that turn's end.
+ */
+function serverLine(event: AgentEvent, wire: WireEvent): AgentEvent | null {
+  if (event.type !== "error" || !event.fatal || wire.turnId !== null) return null;
+  return { type: "message.completed", runId: event.runId, eventId: event.eventId, ts: event.ts, messageId: event.eventId ?? `${event.runId}.${event.ts}`, role: "system", text: event.message };
+}
 
 /** An event the app reads as the server wrote it, but for a person's message id and an ask, which outlives its turn. */
 function appSide(event: AgentEvent): AgentEvent {

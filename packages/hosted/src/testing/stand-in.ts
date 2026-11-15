@@ -72,8 +72,8 @@ export interface StandIn {
   addProject(email: string, project: { name: string; fullName: string }, space?: string): string;
   /** A thread the person started, in its project's space. Answers its id. */
   addThread(email: string, seed: StandInThreadSeed): string;
-  /** Stores events in a thread's log and sends them to its watchers, unless `quiet` (a frame lost on the way). */
-  append(threadId: string, events: Record<string, unknown>[], options?: { by?: string; quiet?: boolean }): void;
+  /** Stores events in a thread's log, in its running turn or `turnId`'s, and sends them to its watchers, unless `quiet` (a frame lost on the way). */
+  append(threadId: string, events: Record<string, unknown>[], options?: { by?: string; quiet?: boolean; turnId?: string }): void;
   /** Changes what a thread's row says, and tells its reader. */
   set(threadId: string, facts: { status?: "idle" | "working" | "needs_answer"; seenSeq?: number; backgroundCommands?: { id: string; description: string }[] }): void;
   /** The background commands a person asked to stop in a thread, in order. */

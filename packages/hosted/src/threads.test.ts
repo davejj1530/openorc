@@ -174,6 +174,28 @@ describe("hosted threads", () => {
     ]);
   });
 
+  it("draws the server's own lines outside any turn as the thread's quiet notice, and keeps the line that ends a turn as its failure", async () => {
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    const thread = stand.addThread(ADA, { projectId: project, title: "Refused" });
+    const refusal = "You're out of cloud hours. Add hours to keep working.";
+    const paused = "Mara's command is still running. Stop it before starting your turn.";
+    const ended = "The agent couldn't start. Send a message to try again.";
+    stand.append(thread, [{ type: "error", ts: 1, message: refusal, fatal: true }], { by: ADA });
+    stand.append(thread, [{ type: "error", ts: 2, message: paused, fatal: true }]);
+    stand.append(thread, [{ type: "error", ts: 3, message: ended, fatal: true }], { turnId: "t1" });
+    stand.append(thread, [{ type: "error", ts: 4, message: "warning: slow disk", fatal: false }]);
+    const { hosted } = await host();
+    await signIn(hosted);
+    await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(true));
+    const page = await hosted.threads.call("events.page", { runId: `hosted:${thread}`, turns: 4 });
+    expect(page.events).toEqual([
+      { type: "message.completed", runId: `hosted:${thread}`, eventId: `${thread}.1`, ts: 1, messageId: `${thread}.1`, role: "system", text: refusal },
+      { type: "message.completed", runId: `hosted:${thread}`, eventId: `${thread}.2`, ts: 2, messageId: `${thread}.2`, role: "system", text: paused },
+      { type: "error", runId: `hosted:${thread}`, eventId: `${thread}.3`, ts: 3, message: ended, fatal: true },
+      { type: "error", runId: `hosted:${thread}`, eventId: `${thread}.4`, ts: 4, message: "warning: slow disk", fatal: false },
+    ]);
+  });
+
   it("shows nothing as running while the server can't be reached, and keeps an ask waiting", async () => {
     const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
     const working = stand.addThread(ADA, { projectId: project, title: "Working", status: "working", backgroundCommands: [{ id: "dev", description: "pnpm dev" }] });

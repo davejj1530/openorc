@@ -11,7 +11,17 @@ export type OrganizationRole = z.infer<typeof OrganizationRole>;
 
 export const Space = z.discriminatedUnion("kind", [
   z.object({ id: SpaceId, kind: z.literal("personal") }),
-  z.object({ id: SpaceId, kind: z.literal("organization"), name: z.string(), logo: z.string().nullable(), memberId: z.string(), role: OrganizationRole, memberCount: z.number().int().nonnegative() }),
+  z.object({
+    id: SpaceId,
+    kind: z.literal("organization"),
+    name: z.string(),
+    logo: z.string().nullable(),
+    memberId: z.string(),
+    role: OrganizationRole,
+    memberCount: z.number().int().nonnegative(),
+    /** This person's private words for why the organization is closed to them; null while it is open, absent from an older server. */
+    accessMessage: z.string().nullable().optional(),
+  }),
 ]);
 export type Space = z.infer<typeof Space>;
 export type OrganizationSpace = Extract<Space, { kind: "organization" }>;

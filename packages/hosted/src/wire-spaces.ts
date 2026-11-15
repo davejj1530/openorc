@@ -23,7 +23,7 @@ export const wireSpaces = z
     spaces: z.array(
       z.discriminatedUnion("kind", [
         z.object({ id, kind: z.literal("personal") }),
-        identity.extend({ kind: z.literal("organization"), memberId: id, role, memberCount: z.number().int().nonnegative() }),
+        identity.extend({ kind: z.literal("organization"), memberId: id, role, memberCount: z.number().int().nonnegative(), accessMessage: z.string().nullable().optional() }),
       ]),
     ),
     create: z.object({ allowed: z.boolean(), reason: z.string().nullable() }),

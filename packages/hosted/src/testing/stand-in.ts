@@ -268,7 +268,15 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const tell = tellOf(peers, sockets);
   const tasks = new StandInTasks({ spaces, person, tell, threads: hosted });
   const seats = new StandInSeats({ spaces, tell, now: options.now ?? Date.now, origin: () => `http://127.0.0.1:${port}` });
-  const organizations = organizationReads(options, spaces, people, billing, tell, (space) => hosted.accessChanged(space));
+  const organizations = organizationReads(
+    options,
+    spaces,
+    people,
+    billing,
+    tell,
+    (space) => hosted.accessChanged(space),
+    (space, who) => seats.frozen.words(space, who),
+  );
   seats.assignments.person = person;
   seats.assignments.paysForPro = (who) => billing.get(who)?.pro === true;
   seats.frozen.access = (who) => billing.get(who)?.organizationAccess;
@@ -566,6 +574,7 @@ function organizationReads(
   billing: Map<string, StandInBilling>,
   tell: (who: string, topics: string[], space?: string) => void,
   accessChanged: (space: string) => void,
+  accessMessage: (space: string, who: string) => string | null,
 ) {
   return new StandInOrganizations({
     spaces,
@@ -577,6 +586,7 @@ function organizationReads(
       return Boolean(state?.pro && (state.standing === "live" || Date.parse(state.at) > (options.now ?? Date.now)()));
     },
     organizationAccess: (email) => billing.get(email)?.organizationAccess,
+    accessMessage,
     tell,
     accessChanged,
     now: options.now ?? Date.now,

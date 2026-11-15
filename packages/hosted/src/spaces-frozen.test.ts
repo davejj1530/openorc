@@ -78,3 +78,21 @@ it("tells the windows when the grace deadline passes, with nothing heard from th
   await vi.waitFor(() => expect(billingReads()).toBeGreaterThan(before));
   expect(keys(await hosted.spaces.projects(team))).toEqual([]);
 });
+
+it("carries each organization's own words for why it is closed to the person, and none while it is open", async () => {
+  stand.setBilling(MEMBER, { pro: false, organizationAccess: frozen });
+  const { hosted } = await person();
+  const closed = hosted.spaces.status();
+  expect(closed.state === "ready" && closed.spaces.find((space) => space.id === team)).toMatchObject({ accessMessage: frozen.message });
+  stand.setBilling(MEMBER, {
+    pro: true,
+    standing: "live",
+    at: new Date(Date.now() + 86_400_000).toISOString(),
+    monthlyLeftSeconds: 3600,
+    packsLeftSeconds: 0,
+    organizationAccess: { state: "active", reason: null, until: null, message: null },
+  });
+  await hosted.spaces.refresh();
+  const open = hosted.spaces.status();
+  expect(open.state === "ready" && open.spaces.find((space) => space.id === team)).toMatchObject({ accessMessage: null });
+});

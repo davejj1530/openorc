@@ -14,6 +14,8 @@ interface OrganizationDeps {
   savePerson(email: string, person: { name: string; image: string | null }): void;
   pro(email: string): boolean;
   organizationAccess?(email: string): StandInBilling["organizationAccess"];
+  /** The person's private words for an organization closed to them, null while it is open; absent on a server before it. */
+  accessMessage?(spaceId: string, email: string): string | null;
   tell(who: string, topics: string[], space?: string): void;
   accessChanged(space: string): void;
   now(): number;
@@ -83,7 +85,7 @@ export class StandInOrganizations {
       const team = this.deps.spaces.teams.get(space.id);
       const member = this.deps.spaces.member(space.id, who);
       return team && member
-        ? { id: space.id, kind: "organization", name: team.name, logo: team.logo, memberId: member.id, role: member.role, memberCount: team.members.length }
+        ? { id: space.id, kind: "organization", name: team.name, logo: team.logo, memberId: member.id, role: member.role, memberCount: team.members.length, ...this.#words(space.id, who) }
         : { id: space.id, kind: "personal" };
     });
     let reason: string | null = null;
@@ -92,10 +94,14 @@ export class StandInOrganizations {
     return {
       userId: userOf(who),
       personalSpaceId: `personal-${who}`,
-      spaces: [spaces[0], ...spaces.slice(1).sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "") || a.id.localeCompare(b.id))],
+      spaces: [spaces[0], ...spaces.slice(1).sort((a, b) => nameOf(a).localeCompare(nameOf(b)) || a.id.localeCompare(b.id))],
       create: { allowed: reason === null, reason },
       ...(this.deps.organizationAccess?.(who) !== undefined && { organizationAccess: this.deps.organizationAccess?.(who) }),
     };
+  }
+
+  #words(spaceId: string, who: string): { accessMessage?: string | null } {
+    return this.deps.accessMessage && this.deps.organizationAccess?.(who) !== undefined ? { accessMessage: this.deps.accessMessage(spaceId, who) } : {};
   }
 
   inbox(who: string) {
@@ -148,3 +154,5 @@ export class StandInOrganizations {
     };
   }
 }
+
+const nameOf = (space: object): string => ("name" in space && typeof space.name === "string" ? space.name : "");

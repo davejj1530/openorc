@@ -27,7 +27,7 @@ it("refuses a frozen person every piece of an organization's content with the co
     ["GET", "/github/repositories"],
     ["PATCH", "/organization/members/m1"],
     ["DELETE", "/organization/members/m1"],
-    ["DELETE", "/settings/organization"],
+    ["PATCH", "/settings/organization"],
   ] as const)
     expect([path, f.status("admin@example.com", method, path)]).toEqual([path, 403]);
   expect(f.gate.refusal({ method: "GET", path: "/projects", space: f.space }, "member@example.com")?.body).toEqual({
@@ -36,6 +36,16 @@ it("refuses a frozen person every piece of an organization's content with the co
     message: "You need Pro to use this organization. Open Account or ask an admin for a seat.",
     access: frozen,
   });
+});
+
+it("words the refusal for an admin as their own way out, in the envelope and for the spaces read", () => {
+  const f = fixture();
+  const admin = "You need Pro to use this organization. Open Account, or give yourself a seat in Seats.";
+  expect(f.gate.refusal({ method: "GET", path: "/projects", space: f.space }, "admin@example.com")?.body).toMatchObject({ message: admin, access: { ...frozen, message: admin } });
+  expect(f.gate.words(f.space, "admin@example.com")).toBe(admin);
+  expect(f.gate.words(f.space, "member@example.com")).toBe(frozen.message);
+  f.closed.delete("member@example.com");
+  expect(f.gate.words(f.space, "member@example.com")).toBeNull();
 });
 
 it("keeps leaving for everyone, and the people, invitations, seats and billing for a frozen admin only", () => {
@@ -48,6 +58,8 @@ it("keeps leaving for everyone, and the people, invitations, seats and billing f
     ["POST", "/organization/billing/portal"],
     ["PATCH", "/organization/seats/s1"],
     ["GET", "/organization/storage"],
+    ["GET", "/settings/organization"],
+    ["DELETE", "/settings/organization"],
   ] as const) {
     expect([path, f.status("admin@example.com", method, path)]).toEqual([path, "open"]);
     expect([path, f.status("member@example.com", method, path)]).toEqual([path, 403]);

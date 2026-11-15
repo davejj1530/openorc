@@ -63,7 +63,7 @@ export class StandInSeats {
   }
 
   route(request: Request, who: string, body: unknown): Reply | null {
-    const frozen = this.frozen.refusal(request, who);
+    const frozen = this.frozen.refusal(request, who, body);
     if (frozen) return frozen;
     if (!/^\/organization\/(?:billing(?:\/|$)|seats\/|storage$)/.test(request.path)) return null;
     if (!this.enabled) return refused(404, "Not found.");

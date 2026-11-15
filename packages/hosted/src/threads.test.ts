@@ -136,6 +136,28 @@ describe("hosted threads", () => {
     expect(seen.pushes).not.toContainEqual(expect.objectContaining({ type: "gap" }));
   });
 
+  it("deletes a thread whose removal is heard before the server's reply, without calling it lost", async () => {
+    const thread = stand.addThread(ADA, { projectId: null, title: "Temporary report" });
+    let hosted: Hosted | null = null;
+    const { deps, browser } = hostDeps(stand, device, {
+      fetch: async (url, init) => {
+        const response = await fetch(url, init);
+        if (init?.method === "DELETE" && String(url).endsWith(`/hosted/threads/${thread}`)) {
+          // The server tells the thread's readers it is gone; that notice arrives first here.
+          await vi.waitFor(() => expect(hosted!.threads.holds({ thread })).toBe(false));
+        }
+        return response;
+      },
+    });
+    hosted = createHosted(deps);
+    hosts.push(hosted);
+    await hosted.start();
+    await signInAs(hosted, browser, ADA);
+    await vi.waitFor(() => expect(hosted!.threads.holds({ thread })).toBe(true));
+    await expect(hosted.threads.call("threads.delete", { id: thread })).resolves.toBeNull();
+    expect(hosted.threads.holds({ thread })).toBe(false);
+  });
+
   it("keeps its rows through a restart with the server down, offline, and lets them go on sign-out", async () => {
     const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
     const thread = stand.addThread(ADA, { projectId: project, title: "Kept" });

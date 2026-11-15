@@ -209,8 +209,9 @@ export class Threads implements HostedThreads {
   }
 
   /** threads.delete: the thread leaves OpenOrc Cloud, as its maker or a space's admin may ask; the server says who may not. */
+  /** Deletes a thread. Its removal may be heard before the server's reply; either way, it is gone once the reply comes. */
   async remove(threadId: string): Promise<null> {
-    await this.on(threadId).request(ROUTES.remove(threadId));
+    await this.deps.session.in(this.row(threadId).space).request(ROUTES.remove(threadId));
     const heard = this.#heard;
     if (heard) {
       heard.rows = heard.rows.filter((row) => row.id !== threadId);

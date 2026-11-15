@@ -12,6 +12,11 @@ const codeEditorFence = {
   ],
 };
 
+const hermesHasNoListFormat = {
+  selector: "MemberExpression[object.name='Intl'][property.name='ListFormat']",
+  message: "The phone's JavaScript engine has no Intl.ListFormat. Use listWords from @openorc/client.",
+};
+
 export default [
   {
     ignores: [
@@ -84,6 +89,13 @@ export default [
       ],
     },
   },
+  // The phone runs this package on Hermes, which lacks parts of Intl a desktop has: a module that builds one as it
+  // loads stops the phone app at launch.
+  {
+    files: ["packages/client/src/**/*.ts"],
+    ignores: ["packages/client/src/**/*.test.ts"],
+    rules: { "no-restricted-syntax": ["error", hermesHasNoListFormat] },
+  },
   // The phone takes the desktop's look through scripts/design-sync.mts, never by importing desktop code or pasting
   // its colors.
   {
@@ -95,6 +107,7 @@ export default [
         "error",
         { selector: "Literal[value=/^#[0-9a-fA-F]{3,8}$/]", message: "Use a palette role (a class like text-ink-3, or useColors())." },
         { selector: "Literal[value=/placeholder:/]", message: 'Uniwind ignores the placeholder: variant. Color a placeholder with placeholderTextColorClassName="accent-ink-4".' },
+        hermesHasNoListFormat,
       ],
     },
   },

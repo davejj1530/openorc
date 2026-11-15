@@ -1,6 +1,7 @@
 import { chatBubbles, type Visualization } from "@openorc/protocol";
 import { startedWorkFromTool, taskIdFromTool } from "./task-progress.js";
 import type { Block } from "./transcript.js";
+import { listWords } from "./list-words.js";
 import { visualizationFromTool } from "./visualization.js";
 
 type Message = Extract<Block, { kind: "message" }>;
@@ -49,7 +50,7 @@ function card(block: Block): boolean {
   }
 }
 
-const names = (list: string[]) => new Intl.ListFormat("en", { style: "long", type: "conjunction" }).format(list);
+const names = listWords;
 
 /** A message an Orcling sent another Orcling, or the words it opened a group with, as its tool call carries them. */
 function sentMessage(block: Tool): { to: string; text: string } | null {

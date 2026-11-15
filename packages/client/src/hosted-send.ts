@@ -14,6 +14,7 @@ import {
   type ThreadSummary,
 } from "@openorc/protocol";
 import { cloudTime, priceText } from "./account-words.js";
+import { listWords } from "./list-words.js";
 import { rowStarter } from "./thread-row.js";
 import { askAnswerBlock, threadTogether, threadWriteBlock, withOthers } from "./thread-collaboration.js";
 
@@ -111,7 +112,7 @@ export type StartBlock = { words: string; fix: StartFix; reason?: never } | { wo
 /** The blocks a send has too: they come first, as the server checks them first. */
 const BEFORE_PROJECT: readonly SendBlockWhy[] = ["offline", "not_pro", "no_hours", "awaiting_payment"];
 
-const RUNS = `OpenOrc Cloud runs ${new Intl.ListFormat("en", { type: "conjunction" }).format(HOSTED_AGENTS.map((agent) => harnessCatalog[agent].name))}.`;
+const RUNS = `OpenOrc Cloud runs ${listWords(HOSTED_AGENTS.map((agent) => harnessCatalog[agent].name))}.`;
 
 /** A send's block as a new thread's. An agent's own sign-in is fixed by signing that agent in. */
 function sendStartBlock(why: SendBlockWhy, agent: string): StartBlock {

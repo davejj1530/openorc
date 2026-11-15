@@ -4,10 +4,10 @@ import { unstable_batchedUpdates } from "react-dom";
 import { useRouter } from "./router";
 import { useThreadTabs } from "./thread-tabs";
 import { useLayout } from "./layout";
-import { useUi } from "./ui";
+import { closeWorkOverlays } from "./work-overlays";
 import { navigationScope } from "./navigation-scope";
 import { globalDestination } from "./global-navigation";
-import { retainUnavailable } from "./space-access";
+import { closeSpaces, retainUnavailable } from "./space-access";
 import { emptySpaceView, observeSpaceThreads, readSpaceRecord, validSpaceView, type SpaceInventory, type SpaceView } from "./space-view";
 
 interface Dependencies {
@@ -31,6 +31,8 @@ interface Navigation {
   setOwnership(ownership: "mine" | "everyone"): void;
   reconcile(inventory: SpaceInventory[]): void;
   observe(spaceId: string, rows: SpaceInventory["threads"], key: string | null): void;
+  /** Empties organizations the person is frozen out of, at once and before anything is read again. */
+  close(spaceIds: readonly string[]): void;
   end(): void;
 }
 
@@ -105,6 +107,11 @@ export function createSpaceNavigation(deps: Dependencies) {
         if (get().key !== key) return;
         const inventory = observeSpaceThreads(get().inventory, spaceId, rows);
         if (inventory !== get().inventory) set({ inventory });
+      },
+      close(spaceIds) {
+        get().remember();
+        const inventory = closeSpaces(get().inventory, get().views, get().current, spaceIds);
+        if (inventory) set({ inventory });
       },
       reconcile(inventory) {
         get().remember();
@@ -182,7 +189,7 @@ function capture(ownership: SpaceView["filter"]["ownership"]): SpaceView {
 function restore(view: SpaceView): void {
   navigationScope.active = true;
   navigationScope.restoring = true;
-  useUi.setState({ palette: false, importProject: false, importSessions: { open: false }, deleteThreadId: null, moveThreadId: null, removeWorktreeThreadId: null, newFile: null });
+  closeWorkOverlays();
   useLayout.setState({
     workspace: view.filter.project,
     pinnedOnly: view.filter.pinnedOnly,

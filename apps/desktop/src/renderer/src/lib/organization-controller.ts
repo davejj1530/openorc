@@ -9,6 +9,7 @@ import { useReceivedInvitations } from "./received-invitations";
 import { useRouter } from "./router";
 import { dismissCompactNavigation } from "./compact-navigation";
 import type { OrganizationActions, OrganizationDialog } from "./organization-context";
+import { useOrganizationAuthority } from "./organization-authority";
 
 export function useOrganizationController() {
   const read = useSpacesStatus();
@@ -58,7 +59,8 @@ export function useOrganizationController() {
       closeInvitations();
     }
   }, [current, accountKey, closeInvitations]);
-  const error = useSpaceReconciliation(status, identity);
+  const authority = useOrganizationAuthority(organization, dialog, close);
+  const error = useSpaceReconciliation(status, identity, authority.generation);
   const saved = async (result: OrganizationSaved, signal: AbortSignal) => {
     const pendingLogo = result.pendingLogo;
     if (pendingLogo) setLogos((logos) => ({ ...logos, [result.spaceId]: pendingLogo }));
@@ -81,10 +83,10 @@ export function useOrganizationController() {
       if (signedIn && data?.create.allowed) setDialog({ kind: "create" });
     },
     invite: () => {
-      if (organization?.role === "admin") setDialog({ kind: "invite", organization });
+      if (organization && authority.manages) setDialog({ kind: "invite", organization });
     },
     addProjects: () => {
-      if (organization?.role === "admin") setDialog({ kind: "projects", spaceId: organization.id });
+      if (organization && authority.manages) setDialog({ kind: "projects", spaceId: organization.id });
     },
     people: (section) => {
       if (!organization) return;
@@ -99,7 +101,8 @@ export function useOrganizationController() {
   return { actions, saved, accountKey };
 }
 
-function useSpaceReconciliation(status: ReturnType<typeof useSpacesStatus>["data"], identity: string | undefined) {
+/** `authority` is the gate's generation: a deadline that passes or access that returns changes no status, yet both read the spaces again. */
+function useSpaceReconciliation(status: ReturnType<typeof useSpacesStatus>["data"], identity: string | undefined, authority: number) {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!status || !identity) return;
@@ -115,6 +118,6 @@ function useSpaceReconciliation(status: ReturnType<typeof useSpacesStatus>["data
     return () => {
       active = false;
     };
-  }, [status, identity]);
+  }, [status, identity, authority]);
   return error;
 }

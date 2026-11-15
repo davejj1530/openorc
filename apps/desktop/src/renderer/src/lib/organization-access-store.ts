@@ -102,7 +102,7 @@ export class OrganizationAccessStore {
       this.#publish({ ...this.#snapshot, error: status.error ?? "Organization access could not be checked." });
       return;
     }
-    const identity = JSON.stringify([status.apiOrigin, status.userId]);
+    const identity = gateIdentity(status);
     const same = identity === this.#snapshot.identity;
     if (same && status.heardAt < this.#heardAt) return;
     if (!same) this.#closedAt = 0;
@@ -184,6 +184,8 @@ export class OrganizationAccessStore {
   }
 }
 
+/** The account a gate snapshot speaks for, as its `identity` names it. */
+export const gateIdentity = (status: { apiOrigin: string; userId: string }): string => JSON.stringify([status.apiOrigin, status.userId]);
 const admits = (access: OrganizationAccess | undefined): boolean => access?.state === "active" || access?.state === "grace";
 const authority = (snapshot: OrganizationGateSnapshot): string =>
   JSON.stringify([snapshot.identity, snapshot.ready, admits(snapshot.access), snapshot.spaces.map((space) => [space.id, space.kind, space.kind === "organization" ? space.role : null])]);

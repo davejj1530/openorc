@@ -1,7 +1,7 @@
 import { hostedRunId } from "@openorc/protocol";
 import type { Query } from "@tanstack/react-query";
 import { queryClient, runs } from "./client";
-import type { SpaceInventory, SpaceView } from "./space-view";
+import { closedSpace, type SpaceInventory, type SpaceView } from "./space-view";
 
 /** Only titles of already open tabs survive a project revocation, in this window's memory. */
 export function retainUnavailable(before: SpaceInventory[], after: SpaceInventory[], views: Record<string, SpaceView>, current: string | null): SpaceInventory[] {
@@ -16,8 +16,21 @@ export function retainUnavailable(before: SpaceInventory[], after: SpaceInventor
     const unavailable = [...(prior.unavailable ?? []), ...removed.map(({ id, title, projectId }) => ({ id, title: title ?? "Thread", projectId }))].filter(
       (row) => open.has(row.id) && !space.threads.some((thread) => thread.id === row.id),
     );
-    return { ...space, unavailable, detached };
+    // A frozen organization keeps which tabs were open, never what they were called.
+    return { ...space, unavailable: space.closed ? unavailable.map((row) => ({ ...row, title: "Thread" })) : unavailable, detached };
   });
+}
+
+/** The inventory with the named organizations emptied, or null when none of them held anything. */
+export function closeSpaces(inventory: SpaceInventory[], views: Record<string, SpaceView>, current: string | null, spaceIds: readonly string[]): SpaceInventory[] | null {
+  const closing = (space: SpaceInventory) => !space.personal && spaceIds.includes(space.id);
+  if (!inventory.some((space) => closing(space) && !space.closed)) return null;
+  return retainUnavailable(
+    inventory,
+    inventory.map((space) => (closing(space) ? closedSpace(space) : space)),
+    views,
+    current,
+  );
 }
 
 function openThreads(view: SpaceView): Set<string> {

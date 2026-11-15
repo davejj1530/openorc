@@ -14,12 +14,25 @@ export interface SpaceInventory {
   unavailable?: { id: string; title: string; projectId: string }[];
   detached?: { projects: SpaceProject[]; threads: SpaceInventory["threads"] };
   taskIds: string[];
+  /** The person is frozen out of this organization: its identity stays, and nothing of its content is held. */
+  closed?: boolean;
 }
+
+export const closedSpace = (space: Pick<SpaceInventory, "id" | "accountId">): SpaceInventory => ({
+  id: space.id,
+  ...(space.accountId !== undefined && { accountId: space.accountId }),
+  personal: false,
+  projects: [],
+  threads: [],
+  taskIds: [],
+  closed: true,
+});
 
 /** A successful scoped read or start can discover work before the next full catalog reconciliation. */
 export function observeSpaceThreads(inventory: SpaceInventory[], spaceId: string, rows: SpaceInventory["threads"]): SpaceInventory[] {
   let changed = false;
   const next = inventory.map((space) => {
+    if (space.closed) return space;
     const visible = rows.filter((row) => (row.owner?.brain !== "hosted" || space.id === spaceId) && hasListedProject(row.projectId, space));
     const threads = observedThreads(space.threads, visible);
     const detached = space.detached;

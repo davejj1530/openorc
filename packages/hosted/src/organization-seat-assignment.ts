@@ -1,43 +1,21 @@
 import { SeatAssignmentTarget, type OrganizationSeatPreview, type SeatAssignmentRequest, type SeatAssignmentWork } from "@openorc/protocol";
-import type { OrganizationBillingScope, OrganizationBillingStorage } from "./organization-billing-store.js";
 import { SEAT_ASSIGNMENT_ROUTES as routes, toSeatPreview } from "./organization-seat-assignment-wire.js";
-import { OrganizationSeatOperations } from "./organization-seat-operations.js";
+import { SeatChanges, type SeatChangeDeps } from "./organization-seat-changes.js";
+import { SEAT_ASSIGNMENT } from "./organization-seat-operation-store.js";
 import { Refused } from "./session.js";
-import type { Route } from "./wire.js";
 
-export interface SeatAssignmentDeps {
-  scope: OrganizationBillingScope;
-  storage: OrganizationBillingStorage;
-  current(): boolean;
-  now(): number;
-  request<T>(route: Route<T>, body?: unknown): Promise<T>;
-  refresh(): Promise<void>;
-  changed(): void;
-}
+export type SeatAssignmentDeps = SeatChangeDeps;
 
+/** Giving, moving and taking back one seat: a server review, then a journaled change. */
 export class OrganizationSeatAssignment {
-  readonly #operations: OrganizationSeatOperations;
-  #timer: ReturnType<typeof setTimeout> | null = null;
-  #closed = false;
+  readonly #changes: SeatChanges<SeatAssignmentRequest>;
   constructor(private readonly deps: SeatAssignmentDeps) {
-    this.#operations = new OrganizationSeatOperations({
-      scope: deps.scope,
-      storage: deps.storage,
-      current: () => this.#current(),
-      submit: (request) => this.#request(routes.assign(request.seatId), request.body),
-      read: (id) => this.#request(routes.operation(id)),
-      refresh: deps.refresh,
-      changed: () => {
-        this.deps.changed();
-        this.#schedule();
-      },
-    });
-    this.#schedule();
+    this.#changes = new SeatChanges(deps, SEAT_ASSIGNMENT, { submit: (request) => routes.assign(request.seatId), read: routes.operation });
   }
 
   async preview(input: SeatAssignmentTarget): Promise<OrganizationSeatPreview> {
     const target = SeatAssignmentTarget.parse(input);
-    const preview = toSeatPreview(await this.#request(routes.preview(target.seatId), { memberId: target.memberId }));
+    const preview = toSeatPreview(await this.#changes.request(routes.preview(target.seatId), { memberId: target.memberId }));
     if (preview.seat.id !== target.seatId || (preview.to?.memberId ?? null) !== target.memberId || preview.expiresAt <= this.deps.now()) {
       throw new Refused("That seat has changed. Review the change again.", 409);
     }
@@ -45,52 +23,18 @@ export class OrganizationSeatAssignment {
   }
 
   send(request: SeatAssignmentRequest): Promise<SeatAssignmentWork> {
-    return this.#operations.send(request);
+    return this.#changes.send(request);
   }
   read(id: string): Promise<SeatAssignmentWork | null> {
-    return this.#operations.read(id);
+    return this.#changes.read(id);
   }
   list(): SeatAssignmentWork[] {
-    return this.#operations.list();
+    return this.#changes.list();
   }
   reconcile(): Promise<void> {
-    return this.#operations.reconcile();
+    return this.#changes.reconcile();
   }
-
   close(): void {
-    this.#closed = true;
-    this.#clearTimer();
-    this.#operations.close();
-  }
-
-  async #request<T>(route: Route<T>, body?: unknown): Promise<T> {
-    this.#assert();
-    const answer = await this.deps.request(route, body);
-    this.#assert();
-    return answer;
-  }
-
-  #schedule(): void {
-    if (!this.#current() || !this.list().some(needsRead)) return this.#clearTimer();
-    if (this.#timer) return;
-    this.#timer = setTimeout(() => {
-      this.#timer = null;
-      if (!this.#current()) return;
-      void this.reconcile()
-        .catch(() => undefined)
-        .finally(() => this.#schedule());
-    }, 10_000);
-  }
-  #clearTimer(): void {
-    if (this.#timer) clearTimeout(this.#timer);
-    this.#timer = null;
-  }
-  #current(): boolean {
-    return !this.#closed && this.deps.current();
-  }
-  #assert(): void {
-    if (!this.#current()) throw new Refused("Your organization access changed. Try again.");
+    this.#changes.close();
   }
 }
-
-const needsRead = (work: SeatAssignmentWork) => work.operation === null || work.operation.state === "pending" || (work.operation.state === "complete" && work.error !== null);

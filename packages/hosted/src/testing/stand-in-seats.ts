@@ -5,6 +5,7 @@ import type { StandInSpaces } from "./stand-in-spaces.js";
 import { StandInFrozenGate } from "./stand-in-frozen.js";
 import { StandInSeatAssignments } from "./stand-in-seat-assignments.js";
 import { StandInSeatHolds } from "./stand-in-seat-holds.js";
+import { StandInSeatQuantity } from "./stand-in-seat-quantity.js";
 
 type Request = { method: string; path: string; query: URLSearchParams; space: string | null };
 type Reply = { status: number; body: unknown };
@@ -25,6 +26,8 @@ export class StandInSeats {
   readonly frozen: StandInFrozenGate;
   /** The seats invitations hold. */
   readonly holds: StandInSeatHolds;
+  /** Changing the number of seats. */
+  readonly quantity: StandInSeatQuantity;
   enabled = false;
   configured = true;
   readonly checkouts: Checkout[] = [];
@@ -37,6 +40,7 @@ export class StandInSeats {
       for (const who of deps.spaces.readers(spaceId)) deps.tell(who, ["billing", "members", "invitations"], spaceId);
     };
     this.holds = new StandInSeatHolds({ records: this.records, now: deps.now, changed });
+    this.quantity = new StandInSeatQuantity({ records: this.records, prices: () => this.prices, now: deps.now, changed });
     this.assignments = new StandInSeatAssignments({
       ...deps,
       records: this.records,
@@ -73,8 +77,8 @@ export class StandInSeats {
     if (typeof resolved !== "string") return resolved;
     if (!this.deps.spaces.teams.has(spaceId)) return refused(409, "Your personal space has no organization seats. Manage your own Pro in Account.");
     if (this.deps.spaces.member(spaceId, who)?.role !== "admin") return refused(403, "Only an admin can do that.");
-    const assignment = this.assignments.route(request.method, request.path, spaceId, who, body);
-    if (assignment) return assignment;
+    const change = this.quantity.route(request.method, request.path, spaceId, who, body) ?? this.assignments.route(request.method, request.path, spaceId, who, body);
+    if (change) return change;
     this.holds.sweep();
     if (request.method === "GET") return this.#get(request, spaceId);
     if (request.method === "POST" && request.path === "/organization/billing/checkout") return this.#checkout(spaceId, body);

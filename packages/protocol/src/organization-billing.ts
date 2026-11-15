@@ -64,6 +64,36 @@ export const SeatAssignmentWork = z
   .refine((value) => value.operation === null || (value.operation.kind === "assignment" && value.operation.id === value.request.body.id));
 export type SeatAssignmentWork = z.infer<typeof SeatAssignmentWork>;
 
+/** What a new number of seats would do, as the server reviewed it. Amounts are in the currency's minor units. */
+export const SeatQuantityPreview = z.object({
+  token: z.string().min(1),
+  expiresAt: time,
+  asOf: time,
+  from: count,
+  to: count,
+  /** More seats, keeping ending seats and undoing a scheduled reduction happen now; fewer seats and none at renewal. */
+  effect: z.enum(["now", "renewal"]),
+  at: time,
+  /** The price of the new number per period; null when the server could not read it. */
+  nextPrice: price,
+  /** The server's estimate of what is charged now, never a total; null when nothing is charged now or it is unknown. */
+  estimatedChargeNow: price,
+  firstGrantSecondsPerNewSeat: count,
+  firstGrantEndsAt: time.nullable(),
+});
+export type SeatQuantityPreview = z.infer<typeof SeatQuantityPreview>;
+
+export const seatQuantity = z.number().int().min(0).max(100);
+export const SeatQuantityRequest = z.object({ seats: seatQuantity, body: z.object({ id: z.uuid(), previewToken: z.string().min(1) }).strict() }).strict();
+export type SeatQuantityRequest = z.infer<typeof SeatQuantityRequest>;
+
+/** Private core journal projection of one change of the number of seats: the exact request and what became of it. */
+export const SeatQuantityWork = z
+  .object({ request: SeatQuantityRequest, operation: SeatOperation.nullable(), error: z.string().nullable() })
+  .strict()
+  .refine((value) => value.operation === null || (value.operation.kind === "quantity" && value.operation.id === value.request.body.id));
+export type SeatQuantityWork = z.infer<typeof SeatQuantityWork>;
+
 /** A structured authority loss clears private renderer state even before the roster catches up. */
 export type OrganizationSeatReply<T> = { state: "ready"; value: T } | { state: "denied"; message: string };
 
@@ -71,11 +101,17 @@ export const organizationSeatRpcParams = {
   "organization.seat.preview": z.strictObject({ spaceId: SpaceId, target: SeatAssignmentTarget }),
   "organization.seat.assign": z.strictObject({ spaceId: SpaceId, request: SeatAssignmentRequest }),
   "organization.billing.operation": z.strictObject({ spaceId: SpaceId, id: z.uuid() }),
+  "organization.billing.previewQuantity": z.strictObject({ spaceId: SpaceId, seats: seatQuantity }),
+  "organization.billing.setQuantity": z.strictObject({ spaceId: SpaceId, request: SeatQuantityRequest }),
+  "organization.billing.quantityOperation": z.strictObject({ spaceId: SpaceId, id: z.uuid() }),
 };
 export interface OrganizationSeatRpcResults {
   "organization.seat.preview": OrganizationSeatReply<OrganizationSeatPreview>;
   "organization.seat.assign": OrganizationSeatReply<SeatAssignmentWork>;
   "organization.billing.operation": OrganizationSeatReply<SeatAssignmentWork | null>;
+  "organization.billing.previewQuantity": OrganizationSeatReply<SeatQuantityPreview>;
+  "organization.billing.setQuantity": OrganizationSeatReply<SeatQuantityWork>;
+  "organization.billing.quantityOperation": OrganizationSeatReply<SeatQuantityWork | null>;
 }
 
 /** Admin-only capacity and allowance snapshots. Dates are epoch milliseconds, never computed from a plan. */
@@ -124,6 +160,8 @@ export type OrganizationPayment = {
 
 export interface OrganizationBillingStatus {
   assignments?: SeatAssignmentWork[];
+  /** Changes of the number of seats that are not settled, or settled with a read still owed. */
+  quantity?: SeatQuantityWork[];
   billing: OrganizationBilling | null;
   payment: OrganizationPayment | null;
   error: string | null;

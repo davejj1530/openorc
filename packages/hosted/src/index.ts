@@ -168,7 +168,7 @@ export interface HostedSpaces {
   people(spaceId: string, offset?: number, limit?: number): Promise<OrganizationPeople>;
 }
 
-export type KeptPart = "account" | "threads" | "spaces" | "organizationBilling" | "seatOperations";
+export type KeptPart = "account" | "threads" | "spaces" | "organizationBilling" | "seatOperations" | "seatQuantity";
 
 /** The lists every place answers its own rows of, which the asker merges. */
 export type MergedMethod = "threads.list" | "threads.resolvedCount" | "inbox.list";
@@ -232,6 +232,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     spaces,
     storage: { load: () => deps.kept.load("organizationBilling"), save: (value) => deps.kept.save("organizationBilling", value) },
     operations: { load: () => deps.kept.load("seatOperations"), save: (value) => deps.kept.save("seatOperations", value) },
+    quantityOperations: { load: () => deps.kept.load("seatQuantity"), save: (value) => deps.kept.save("seatQuantity", value) },
   });
   const chat = new TeamChat({ session, spaces, push: deps.push });
   const tasks = new OnlineTasks({ session, spaces, push: deps.push, prepared: () => threads.refresh() });

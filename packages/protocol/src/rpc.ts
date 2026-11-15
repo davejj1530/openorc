@@ -475,6 +475,7 @@ export type RpcParams<M extends RpcMethod> = z.infer<(typeof rpcParams)[M]>;
 const SECRET_PARAMS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
   "account.signIns.connect",
   "organization.seat.assign",
+  "organization.billing.setQuantity",
   "memory.settings.set",
   "remote.push.setKey",
   "providers.codex.reset",

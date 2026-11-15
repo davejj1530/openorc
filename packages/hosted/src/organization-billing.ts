@@ -6,6 +6,7 @@ import {
   type OrganizationBillingStatus,
   type OrganizationStorageRead,
   type SeatAssignmentWork,
+  SeatQuantityWork,
 } from "@openorc/protocol";
 import type { HostedDeps, HostedSpaces } from "./index.js";
 import { OrganizationBillingPayment } from "./organization-billing-payment.js";
@@ -13,8 +14,8 @@ import { OrganizationBillingStore, organizationBillingKey, type OrganizationBill
 import { ORGANIZATION_BILLING_ROUTES as routes, toOrganizationBilling } from "./organization-billing-wire.js";
 import { Refused, type Session } from "./session.js";
 import { organizationStorageRoute } from "./organization-storage.js";
-import { OrganizationSeatAdministration } from "./organization-seat-administration.js";
-import type { SeatAssignmentDeps } from "./organization-seat-assignment.js";
+import { OrganizationSeatAdministration, type SeatLease } from "./organization-seat-administration.js";
+
 import { SOCKET, wireTopics, type Route } from "./wire.js";
 
 interface Dependencies extends Pick<HostedDeps, "browser" | "now" | "push" | "server"> {
@@ -22,6 +23,8 @@ interface Dependencies extends Pick<HostedDeps, "browser" | "now" | "push" | "se
   spaces: Pick<HostedSpaces, "status" | "refresh">;
   storage: OrganizationBillingStorage;
   operations?: OrganizationBillingStorage;
+  /** Where changes of the number of seats are journaled, apart from seat moves. */
+  quantityOperations?: OrganizationBillingStorage;
 }
 interface Entry {
   scope: OrganizationBillingScope;
@@ -170,22 +173,27 @@ export class OrganizationBilling {
   #status(entry: Entry): OrganizationBillingStatus {
     entry.exposed = true;
     let assignments: SeatAssignmentWork[] = [];
+    let quantity: SeatQuantityWork[] = [];
     let error = entry.error;
     try {
-      if (this.deps.operations) assignments = this.seats.list(entry.scope.spaceId).filter((work) => work.operation?.state !== "complete" || work.error !== null);
+      if (this.deps.operations) {
+        assignments = this.seats.list(entry.scope.spaceId).filter((work) => work.operation?.state !== "complete" || work.error !== null);
+        quantity = this.seats.quantity(entry.scope.spaceId);
+      }
     } catch (failure) {
       error ??= failure instanceof Error ? failure.message : "Saved seat changes could not be read.";
     }
-    return { billing: entry.billing, payment: entry.payment.work, error, ...(assignments.length > 0 && { assignments }) };
+    return { billing: entry.billing, payment: entry.payment.work, error, ...(assignments.length > 0 && { assignments }), ...(quantity.length > 0 && { quantity }) };
   }
 
-  #seatLease(spaceId: string): SeatAssignmentDeps {
+  #seatLease(spaceId: string): SeatLease {
     const entry = this.#entry(spaceId);
     if (!this.deps.operations) throw new Error("Seat changes aren't available here.");
     entry.exposed = true;
     return {
       scope: entry.scope,
       storage: this.deps.operations,
+      quantityStorage: this.deps.quantityOperations ?? null,
       current: () => this.#current(entry),
       now: this.deps.now,
       request: (route, body) => this.#seatRequest(entry, route, body),

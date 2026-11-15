@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import type { OrganizationSeatReply, OrganizationSeatPreview, SeatAssignmentWork } from "@openorc/protocol";
+import type { OrganizationSeatReply, OrganizationSeatPreview, SeatAssignmentWork, SeatQuantityPreview, SeatQuantityWork } from "@openorc/protocol";
 import { createOrganizationSeatHandlers } from "./organization-seat-assignment.js";
 
 it("preserves an authority refusal and the exact operation identity through the desktop boundary", async () => {
@@ -8,6 +8,9 @@ it("preserves an authority refusal and the exact operation identity through the 
     preview: vi.fn(async (): Promise<OrganizationSeatReply<OrganizationSeatPreview>> => denied),
     assign: vi.fn(async (): Promise<OrganizationSeatReply<SeatAssignmentWork>> => denied),
     operation: vi.fn(async (): Promise<OrganizationSeatReply<SeatAssignmentWork | null>> => denied),
+    previewQuantity: vi.fn(async (): Promise<OrganizationSeatReply<SeatQuantityPreview>> => denied),
+    setQuantity: vi.fn(async (): Promise<OrganizationSeatReply<SeatQuantityWork>> => denied),
+    quantityOperation: vi.fn(async (): Promise<OrganizationSeatReply<SeatQuantityWork | null>> => denied),
   };
   const handlers = createOrganizationSeatHandlers(seats);
   const request = { seatId: "seat-a", body: { id: "6b556141-a9de-41be-a557-aa938a09b8b8", previewToken: "preview-a" } };
@@ -16,6 +19,13 @@ it("preserves an authority refusal and the exact operation identity through the 
   expect(await handlers["organization.billing.operation"]({ spaceId: "team-b", id: request.body.id })).toEqual(denied);
   expect(seats.assign).toHaveBeenCalledExactlyOnceWith("team-a", request);
   expect(seats.operation).toHaveBeenCalledExactlyOnceWith("team-b", request.body.id);
+  const change = { seats: 5, body: request.body };
+  expect(await handlers["organization.billing.previewQuantity"]({ spaceId: "team-a", seats: 5 })).toEqual(denied);
+  expect(await handlers["organization.billing.setQuantity"]({ spaceId: "team-a", request: change })).toEqual(denied);
+  expect(await handlers["organization.billing.quantityOperation"]({ spaceId: "team-b", id: request.body.id })).toEqual(denied);
+  expect(seats.previewQuantity).toHaveBeenCalledExactlyOnceWith("team-a", 5);
+  expect(seats.setQuantity).toHaveBeenCalledExactlyOnceWith("team-a", change);
+  expect(seats.quantityOperation).toHaveBeenCalledExactlyOnceWith("team-b", request.body.id);
 });
 
 it("keeps administration unavailable when there is no cloud service", () => {

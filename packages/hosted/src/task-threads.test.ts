@@ -42,6 +42,38 @@ it("knows a newly prepared thread in the hosted router before returning its dest
   expect(await current.hosted.threads.call("threads.get", { id: result.threadId })).toMatchObject({ id: result.threadId, owner: { brain: "hosted" } });
 });
 
+it("holds a newly prepared thread in the app's own client before returning it, when the server's notice comes during that read", async () => {
+  stand.threadFiles.capabilities = { tasks: { available: true } };
+  let opened = false;
+  // As the real server can: its change notice arrives after the reply, while the client reads its threads again.
+  const current = await taskClient(
+    stand,
+    ADMIN,
+    { organization: true, personal: false },
+    {
+      fetch: async (url, init) => {
+        if (String(url).endsWith("/open-thread")) opened = true;
+        else if (opened && new URL(String(url)).pathname === "/hosted/threads") await new Promise((resolve) => setTimeout(resolve, 600));
+        return fetch(url, init);
+      },
+      connect: (url, token) => {
+        const socket = stand.connect(url, token);
+        return {
+          onState: (listener) => socket.onState(listener),
+          on: (event, listener) => socket.on(event, event === "changed" ? (body) => void setTimeout(() => listener(body), opened ? 300 : 0) : listener),
+          ask: (event, body) => socket.ask(event, body),
+          close: () => socket.close(),
+        };
+      },
+    },
+  );
+  close.push(current.close);
+  const result = await current.hosted.tasks.openThread(input(seed()));
+  if (result.state !== "ready") throw new Error("Preparation conflicted");
+  expect(current.hosted.threads.holds({ thread: result.threadId })).toBe(true);
+  expect(await current.hosted.threads.call("threads.get", { id: result.threadId })).toMatchObject({ id: result.threadId, owner: { brain: "hosted" } });
+});
+
 it("opens one shared thread for two people without preparing or starting a paid turn", async () => {
   const a = await client(),
     b = await client(MEMBER),

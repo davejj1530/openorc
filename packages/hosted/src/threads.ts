@@ -402,11 +402,13 @@ export class Threads implements HostedThreads {
    */
   refresh(): Promise<void> {
     if (!this.#reading) {
+      const revision = this.#revision;
       const reading = this.#read().finally(() => {
         if (this.#reading === reading) this.#reading = null;
       });
       this.#reading = reading;
-      return reading;
+      // A notice of changed projects, members or spaces sets this read aside: whoever asked waits for the one after it.
+      return reading.then(() => (this.#revision === revision || this.#closed ? undefined : (this.#again ?? this.refresh())));
     }
     // A read already under way may have started before what the asker wants to see: one more follows it, for everyone.
     this.#again ??= this.#reading.then(() => {

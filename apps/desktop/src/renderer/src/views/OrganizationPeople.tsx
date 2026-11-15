@@ -86,12 +86,23 @@ function OrganizationPeopleBody({ spaceId, onInvite, onLeft }: Props) {
           </div>
         ) : null}
       </div>
-      {dialog ? <PeopleDialog action={dialog.action} close={close} refresh={people.refetch} onLeft={onLeft} /> : null}
+      {dialog ? (
+        <PeopleDialog
+          action={dialog.action}
+          close={close}
+          refresh={people.refetch}
+          onLeft={onLeft}
+          onManageSeats={() => {
+            close();
+            section.select("seats");
+          }}
+        />
+      ) : null}
     </>
   );
 }
 
-function PeopleDialog({ action, close, refresh, onLeft }: { action: Action; close(): void; refresh(): Promise<void>; onLeft(): void | Promise<void> }) {
+function PeopleDialog({ action, close, refresh, onLeft, onManageSeats }: { action: Action; close(): void; refresh(): Promise<void>; onLeft(): void | Promise<void>; onManageSeats(): void }) {
   if (action.kind === "edit")
     return (
       <OrganizationIdentityDialog
@@ -103,5 +114,5 @@ function PeopleDialog({ action, close, refresh, onLeft }: { action: Action; clos
         onSaved={refresh}
       />
     );
-  return <OrganizationMembershipDialog action={action} onClose={close} onDone={action.kind === "remove" ? refresh : onLeft} />;
+  return <OrganizationMembershipDialog action={action} onClose={close} onDone={action.kind === "remove" ? refresh : onLeft} onManageSeats={onManageSeats} />;
 }

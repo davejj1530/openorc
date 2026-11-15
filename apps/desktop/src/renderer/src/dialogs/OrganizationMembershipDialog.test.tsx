@@ -55,3 +55,38 @@ it.each(cases)("keeps $label completed while its following read is retried", asy
   await waitFor(() => expect(close).toHaveBeenCalledTimes(1));
   expect(mock.call.mock.calls.filter(([name]) => name === method)).toHaveLength(1);
 });
+
+it.each([
+  "This organization still pays for seats. Cancel the seats in billing; they will end on 2026-12-01.",
+  "This organization's seats end on 2026-12-01. You can delete the organization after they end.",
+  "This organization's billing is still being updated. Wait for it to finish before deleting the organization.",
+])("leads a deletion its seats refuse to the organization's seats, and offers no Delete again: %s", async (refusal) => {
+  mock.call.mockRejectedValue(new Error(refusal));
+  const seats = vi.fn();
+  render(
+    <QueryClientProvider client={queryClient}>
+      <OrganizationMembershipDialog action={{ kind: "delete", organization }} onClose={() => {}} onDone={() => {}} onManageSeats={seats} />
+    </QueryClientProvider>,
+  );
+  fireEvent.change(screen.getByLabelText("Type Birch Studio to confirm"), { target: { value: "Birch Studio" } });
+  fireEvent.click(screen.getByRole("button", { name: "Delete organization" }));
+  expect((await screen.findByRole("alert")).textContent).toBe(refusal);
+  expect(screen.queryByRole("button", { name: "Delete organization" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Manage seats" }));
+  expect(seats).toHaveBeenCalledOnce();
+  expect(mock.call.mock.calls.filter(([name]) => name === "organization.delete")).toHaveLength(1);
+});
+
+it("keeps Delete organization for any other refusal", async () => {
+  mock.call.mockRejectedValue(new Error("Only an admin can do that."));
+  render(
+    <QueryClientProvider client={queryClient}>
+      <OrganizationMembershipDialog action={{ kind: "delete", organization }} onClose={() => {}} onDone={() => {}} onManageSeats={() => {}} />
+    </QueryClientProvider>,
+  );
+  fireEvent.change(screen.getByLabelText("Type Birch Studio to confirm"), { target: { value: "Birch Studio" } });
+  fireEvent.click(screen.getByRole("button", { name: "Delete organization" }));
+  await screen.findByRole("alert");
+  expect(screen.getByRole("button", { name: "Delete organization" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Manage seats" })).toBeNull();
+});

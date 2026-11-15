@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { OrganizationIdentity, OrganizationPerson } from "@openorc/protocol";
 import { AccountFace } from "../components/AccountFace";
+import { OrganizationDeleteBillingRefusal, seatsHoldDeletion } from "../components/OrganizationDeleteBillingRefusal";
 import { Button, Dialog, Input } from "../components/ui";
 import { useRpcMutation } from "../lib/client";
 import "../components/Organization.css";
@@ -8,7 +9,15 @@ import "../components/Organization.css";
 export type MembershipAction = { kind: "remove"; organization: OrganizationIdentity; person: OrganizationPerson } | { kind: "leave" | "delete"; organization: OrganizationIdentity };
 export const personFirstName = (person: Pick<OrganizationPerson, "name" | "email">) => person.name.trim().split(/\s+/)[0] || person.email;
 
-export function OrganizationMembershipDialog({ action, onClose, onDone }: { action: MembershipAction; onClose(): void; onDone(): void | Promise<void> }) {
+interface Props {
+  action: MembershipAction;
+  onClose(): void;
+  onDone(): void | Promise<void>;
+  /** Where a deletion that the organization's seats refuse leads. */
+  onManageSeats?(): void;
+}
+
+export function OrganizationMembershipDialog({ action, onClose, onDone, onManageSeats }: Props) {
   const remove = useRpcMutation("organization.member.remove");
   const leave = useRpcMutation("organization.leave");
   const destroy = useRpcMutation("organization.delete");
@@ -21,6 +30,8 @@ export function OrganizationMembershipDialog({ action, onClose, onDone }: { acti
   const error = remove.error ?? leave.error ?? destroy.error;
   const words = actionWords(action);
   const submitLabel = membershipActionLabel(completed.current, pending, words);
+  const held = seatsRoute(destroy.error, onManageSeats);
+  const unconfirmed = action.kind === "delete" && confirmation.trim() !== action.organization.name;
   const submit = async () => {
     if (submitting.current) return;
     submitting.current = true;
@@ -86,13 +97,22 @@ export function OrganizationMembershipDialog({ action, onClose, onDone }: { acti
           <Button disabled={pending} onClick={onClose}>
             {completed.current ? "Close" : "Cancel"}
           </Button>
-          <Button type="submit" variant="primary" disabled={pending || (action.kind === "delete" && confirmation.trim() !== action.organization.name)}>
-            {submitLabel}
-          </Button>
+          {held ? (
+            <OrganizationDeleteBillingRefusal onManageSeats={held} />
+          ) : (
+            <Button type="submit" variant="primary" disabled={pending || unconfirmed}>
+              {submitLabel}
+            </Button>
+          )}
         </div>
       </form>
     </Dialog>
   );
+}
+
+/** Where to go when the organization's seats refuse its deletion; null for any other outcome. */
+function seatsRoute(error: Error | null, onManageSeats: (() => void) | undefined): (() => void) | null {
+  return onManageSeats && error && seatsHoldDeletion(error.message) ? onManageSeats : null;
 }
 
 function membershipActionLabel(completed: boolean, pending: boolean, words: ReturnType<typeof actionWords>) {

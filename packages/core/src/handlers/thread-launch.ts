@@ -11,11 +11,10 @@ type Dependencies = {
 
 /**
  * A start for OpenOrc Cloud reaches this Mac only signed out of it. One for the person's own cloud, which a phone build
- * from before its removal may still ask for, is refused, never started here instead.
+ * from before its removal may still ask for, never gets here: the params take no `cloud`, so it is refused as invalid.
  */
-function assertStartsHere({ cloud, hosted }: Pick<RpcParams<"threads.start">, "cloud" | "hosted">): void {
+function assertStartsHere({ hosted }: Pick<RpcParams<"threads.start">, "hosted">): void {
   if (hosted) throw new Error("Sign in to OpenOrc to start a thread on OpenOrc Cloud.");
-  if (cloud) throw new Error("This app no longer runs threads in your own cloud.");
 }
 
 /** The model a start runs on: its execution target's settings, or the separate fields older callers send. */
@@ -46,7 +45,6 @@ export function createThreadLaunchHandlers({
       mode,
       permissionMode,
       workspaceMode,
-      cloud,
       hosted,
       baseRef,
       prompt,
@@ -54,7 +52,7 @@ export function createThreadLaunchHandlers({
       title,
       parentThreadId,
     }) => {
-      assertStartsHere({ cloud, hosted });
+      assertStartsHere({ hosted });
       if (executionTarget?.kind === "orcling") {
         return orclings.startThread(executionTarget.orclingId, {
           projectId,

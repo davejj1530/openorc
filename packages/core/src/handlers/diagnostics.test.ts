@@ -43,17 +43,15 @@ function textual(schema: z.ZodType): boolean {
 
 it("keeps out of the RPC log every method whose params carry a credential", () => {
   const carrying = (Object.entries(rpcParams) as [RpcMethod, z.ZodType][]).filter(([, schema]) => secretFields(schema).length > 0).map(([method]) => method);
-  expect(carrying).toEqual(expect.arrayContaining(["cloud.vercel.connect", "cloud.claude.save", "cloud.codex.apiKey", "cloud.brain.codex.apiKey", "memory.settings.set", "remote.push.setKey"]));
+  expect(carrying).toEqual(expect.arrayContaining(["memory.settings.set", "remote.push.setKey"]));
   expect(carrying.filter((method) => !secretParams(method))).toEqual([]);
 });
 
 it("logs a sign-in's method and outcome but never its key", () => {
   const key = "sk-proj-0123456789abcdefghijklmnop";
   for (const [method, params] of [
-    ["cloud.brain.codex.apiKey", { key }],
-    ["cloud.codex.apiKey", { key }],
-    ["cloud.vercel.connect", { token: key }],
-    ["cloud.claude.save", { accountId: "work", token: key }],
+    ["memory.settings.set", { apiKey: key }],
+    ["remote.push.setKey", { keyId: "ABC123DEFG", pem: key }],
   ] as const) {
     const line = rpcLogLine(method, params, null, 3);
     expect(line).toBe(`[rpc] ${method} [private] -> null in 3 ms`);

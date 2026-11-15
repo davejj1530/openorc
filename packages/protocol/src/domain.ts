@@ -1,10 +1,9 @@
 import { z } from "zod";
 import { ClaudeAccountId } from "./claude-accounts.js";
-import { CloudThreadState } from "./cloud.js";
 import { ActivityRecovery, AgentKind, BackgroundCommand, SubagentStatus, Usage } from "./events.js";
 import { ExecutionTarget } from "./execution-target.js";
 import { HarnessId } from "./harness.js";
-import { MoveRefusal, ThreadMoving, ThreadOwner } from "./thread-owner.js";
+import { ThreadOwner } from "./thread-owner.js";
 
 /** Domain records as the renderer sees them. Columns are nullable, not optional. */
 
@@ -60,8 +59,6 @@ export const Project = z.object({
   settings: ProjectSettings,
   createdAt: z.number(),
   updatedAt: z.number(),
-  /** On the cloud brain, a project that is the Mac's copy: when it last took the Mac's branch or heard GitHub's. */
-  copy: z.object({ syncedAt: z.number() }).optional(),
 });
 export type Project = z.infer<typeof Project>;
 
@@ -103,8 +100,6 @@ export const Task = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
   completedAt: z.number().nullable(),
-  /** Set by the Mac's router on a task its cloud brain holds, as on threads. Never stored. */
-  owner: ThreadOwner.optional(),
   /** What the task's own run waits for the person to approve, while it waits; set when tasks are read, never stored. */
   approval: z.string().nullable().optional(),
 });
@@ -240,14 +235,8 @@ export const ThreadSummary = Thread.extend({
   /** Context use on the latest turn, when the agent reported it. */
   context: z.object({ used: z.number().int(), window: z.number().int().nullable() }).nullable(),
   queued: z.array(QueuedMessage),
-  /** Where a cloud thread's sandbox stands; absent for threads that run on this Mac. */
-  cloud: CloudThreadState.nullable().optional(),
-  /** Which brain owns a row another host merged in; absent when the host that answered owns it. */
+  /** Where a row another place holds lives; absent on this Mac's own. */
   owner: ThreadOwner.optional(),
-  /** Set while the thread relocates between brains; it refuses writes until then. */
-  moving: ThreadMoving.nullable().optional(),
-  /** The last move this Mac asked for, when it was refused; phones from before ignore it. */
-  moveRefused: MoveRefusal.nullable().optional(),
   /**
    * When the agent on this thread's active run last produced an event, epoch ms.
    * Null when no run is live, because a thread that is not running cannot stall.

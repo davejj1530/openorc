@@ -130,7 +130,7 @@ export function latestActivity(thread: Pick<ThreadSummary, "lastActivityAt" | "t
 }
 
 /** The quiet word a row shows for where it lives, dimmed while that place cannot be reached; null for this Mac's own. */
-export function ownerMark(thread: Pick<ThreadSummary, "owner" | "moving">): { label: string; dim: boolean } | null {
+export function ownerMark(thread: Pick<ThreadSummary, "owner">): { label: string; dim: boolean } | null {
   const { mark } = placeOf(thread);
   return mark && thread.owner ? { label: mark, dim: thread.owner.reach !== "live" } : null;
 }

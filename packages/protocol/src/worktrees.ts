@@ -7,16 +7,14 @@ export type WorktreeOwner = z.infer<typeof WorktreeOwner>;
 
 /**
  * Why a worktree cannot be removed now. `working`: a turn, an approval, a background command or a workspace operation
- * holds it. `shared`: a legacy task's saved review history or a hidden record lives in the same folder. `cloud`: the
- * folder follows a cloud sandbox.
+ * holds it. `shared`: a legacy task's saved review history or a hidden record lives in the same folder.
  */
-export type WorktreeBlock = "working" | "shared" | "cloud";
+export type WorktreeBlock = "working" | "shared";
 
 /** Why a blocked worktree stays, in the words both the refusal and the disabled row use. */
 export const WORKTREE_BLOCK_WORDS: Record<WorktreeBlock, string> = {
   working: "In use. Wait for its turn, approval or background commands to finish.",
   shared: "Other saved work uses this folder.",
-  cloud: "This folder follows a cloud sandbox.",
 };
 
 /** One worktree folder on this Mac's disk. Folders shared by forks and threads started in them are one row. */

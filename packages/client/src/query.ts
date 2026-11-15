@@ -49,8 +49,7 @@ function rpcQuery<M extends RpcMethod>(q: QueryState, method: M, params: RpcPara
   const queryKey = [method, params];
   return {
     queryKey,
-    // A read that already holds data is a poll or a refresh after a change, so the core knows no person asked for it.
-    queryFn: () => (q.client.getQueryData(queryKey) === undefined ? q.connection.call(method, params) : q.connection.call(method, params, { refresh: true })),
+    queryFn: () => q.connection.call(method, params),
     meta: { tags: tagsFor(method, params) },
     ...options,
   };

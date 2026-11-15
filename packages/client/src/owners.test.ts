@@ -1,4 +1,4 @@
-import { mergeInbox, mergeThreadPages, OWNER_SESSION_METHODS, type HostPage, type InboxList, type ThreadSummary } from "@openorc/protocol";
+import { mergeThreadPages, type HostPage, type ThreadSummary } from "@openorc/protocol";
 import { ownerMark } from "./thread-row.js";
 import { describe, expect, it } from "vitest";
 
@@ -45,25 +45,23 @@ function summary(id: string, lastActivityAt: number, extra: Partial<ThreadSummar
 }
 
 const mac = (rows: ThreadSummary[]): HostPage => ({ brain: "mac", reach: "live", heardAt: 5, rows });
-const cloud = (rows: ThreadSummary[], reach: HostPage["reach"] = "live"): HostPage => ({ brain: "cloud", reach, heardAt: 4, rows });
+const cloud = (rows: ThreadSummary[], reach: HostPage["reach"] = "live"): HostPage => ({ brain: "hosted", reach, heardAt: 4, rows });
 
 describe("mergeThreadPages", () => {
-  it("interleaves both hosts by activity and keeps the merged top of the page", () => {
+  it("interleaves both places by activity and keeps the merged top of the page", () => {
     const merged = mergeThreadPages([mac([summary("m3", 30), summary("m1", 10)]), cloud([summary("c4", 40), summary("c2", 20)])], { limit: 3 }, "mac");
     expect(merged.map((row) => row.id)).toEqual(["c4", "m3", "c2"]);
   });
 
-  it("marks only rows from another host, with how far it reaches", () => {
-    const merged = mergeThreadPages([mac([summary("m", 2)]), cloud([summary("c", 1)], "asleep")], {}, "mac");
-    expect(merged.map((row) => row.owner ?? null)).toEqual([null, { brain: "cloud", reach: "asleep", heardAt: 4 }]);
+  it("marks only rows from another place, with whether it can be reached", () => {
+    const merged = mergeThreadPages([mac([summary("m", 2)]), cloud([summary("c", 1)], "offline")], {}, "mac");
+    expect(merged.map((row) => row.owner ?? null)).toEqual([null, { brain: "hosted", reach: "offline", heardAt: 4 }]);
     expect(mergeThreadPages([mac([summary("m", 2)])], {}, null)[0]?.owner).toEqual({ brain: "mac", reach: "live", heardAt: 5 });
   });
 
-  it("lists a thread caught between hosts once, the copy that is not moving", () => {
-    const frozen = summary("t", 9, { moving: { to: "cloud", since: 1 } });
-    const taken = summary("t", 9);
-    expect(mergeThreadPages([mac([frozen]), cloud([taken])], {}, "mac")).toEqual([{ ...taken, owner: { brain: "cloud", reach: "live", heardAt: 4 } }]);
-    expect(mergeThreadPages([cloud([taken]), mac([frozen])], {}, "mac")).toHaveLength(1);
+  it("lists a thread two places name once, the first one's", () => {
+    const here = summary("t", 9, { title: "here" });
+    expect(mergeThreadPages([mac([here]), cloud([summary("t", 9, { title: "there" })])], {}, "mac")).toEqual([here]);
   });
 
   it("pages trees by their newest member and keeps each tree whole", () => {
@@ -75,29 +73,6 @@ describe("mergeThreadPages", () => {
   it("keeps the selected thread's tree beyond the page", () => {
     const merged = mergeThreadPages([mac([summary("new", 9)]), cloud([summary("old", 1)])], { limit: 1, selectedId: "old", includeChildren: true }, "mac");
     expect(merged.map((row) => row.id)).toEqual(["new", "old"]);
-  });
-});
-
-describe("mergeInbox", () => {
-  it("lists each waiting item once across hosts", () => {
-    const item = { kind: "thread" as const, thread: summary("t", 1), runId: "r", reason: "approval" as const, detail: "Approve" };
-    const inbox = (items: InboxList["items"]): { inbox: InboxList } => ({ inbox: { items } });
-    expect(mergeInbox([inbox([item]), inbox([item, { ...item, runId: "r2" }])]).items.map((each) => each.runId)).toEqual(["r", "r2"]);
-  });
-});
-
-describe("the Mac's session on the brain", () => {
-  it("admits what the router forwards and nothing it serves itself or refuses", () => {
-    expect(OWNER_SESSION_METHODS.has("events.page")).toBe(true);
-    expect(OWNER_SESSION_METHODS.has("threads.list")).toBe(true);
-    expect(OWNER_SESSION_METHODS.has("threads.fork")).toBe(false);
-    expect(OWNER_SESSION_METHODS.has("instructions.list")).toBe(false);
-    expect(OWNER_SESSION_METHODS.has("projects.list")).toBe(false);
-    // Moves are the Mac's to coordinate; only the Mac's copy of a thread asks the brain for its code.
-    expect(OWNER_SESSION_METHODS.has("cloud.bringToMac")).toBe(false);
-    expect(OWNER_SESSION_METHODS.has("threads.snapshot")).toBe(true);
-    expect(OWNER_SESSION_METHODS.has("threads.start")).toBe(true);
-    expect(OWNER_SESSION_METHODS.has("attachments.save")).toBe(true);
   });
 });
 

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { decodePairingUrl } from "@openorc/link";
-import { claudeAccounts, projects, remotePushTargets, runs, threads } from "@openorc/db";
+import { claudeAccounts, projects, remotePushTargets, runs, settings, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import { harnessIds, type AgentEvent, type CorePush, type HarnessInfo, type PushRegistration, type RemotePush, type Route } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
@@ -74,7 +74,6 @@ describe("phone access", () => {
     const phone = await pairPhone("David's iPhone");
     const list = await phone.call("threads.list", { projectId: project.id });
     expect(list.map((thread) => thread.title)).toEqual(["Seen from a phone"]);
-    expect(await phone.device("host.kind", {})).toBe("mac");
     const status = await core.remote.status();
     expect(status.listener).toMatchObject({ state: "on", routes: [{ kind: "lan", host: "127.0.0.1" }] });
     expect(status.devices).toContainEqual(expect.objectContaining({ id: phone.deviceId, name: "David's iPhone", connected: true }));
@@ -333,12 +332,13 @@ describe("phone access", () => {
     expect((await core.remote.status()).push.phones).toBe(before);
   });
 
-  it("answers what builds from before the own cloud went still ask of a Mac", async () => {
+  it("tells a phone which cloud brains this Mac removed, and refuses the questions only a brain's phone asked", async () => {
     const phone = await pairPhone();
-    expect(await phone.device("door.key", {})).toBeNull();
-    expect(await phone.device("host.kind", {})).toBe("mac");
-    expect(await phone.device("moves.refused", {})).toEqual([]);
     expect(await phone.device("brains.removed", {})).toEqual([]);
+    settings.set(core.db, "brain.removed", JSON.stringify(["removed-brain-key"]));
+    expect(await phone.device("brains.removed", {})).toEqual(["removed-brain-key"]);
+    // A build from before the own cloud went treats each refusal as "a Mac": no door, no kind, no refused move.
+    for (const method of ["host.kind", "door.key", "moves.refused"]) await expect(phone.request(method, {})).rejects.toThrow("This is not available from a phone.");
   });
 
   it("ends a removed phone's session and refuses it afterwards", async () => {

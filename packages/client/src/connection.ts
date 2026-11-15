@@ -19,8 +19,7 @@ export type ClientPush =
  * delivers every run's frames; an `interest` one delivers only the frames of the runs last named.
  */
 export interface CoreConnection {
-  /** `refresh`: the read is asked again for what a window already shows, never for a person. */
-  call<M extends RpcMethod>(method: M, params: RpcParams<M>, options?: { refresh: true }): Promise<RpcResults[M]>;
+  call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]>;
   onPush(listener: (push: ClientPush) => void): () => void;
   readonly delivery: "all" | "interest";
   setFrameInterest(runIds: ReadonlySet<string>): void;

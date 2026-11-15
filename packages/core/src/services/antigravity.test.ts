@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import { antigravityAuthenticated, agentBinary, slotFor } from "@openorc/agents";
-import { executionModeAvailable, harnessCatalog } from "@openorc/protocol";
+import { executionModeAvailable } from "@openorc/protocol";
 import { detectAgentInstallation } from "./agent-update-installation.js";
 import { pathProbe } from "./shell-environment.js";
 import { harnessProbes } from "./system.js";
@@ -28,7 +28,6 @@ it("exposes native Plan and Autonomous while refusing session transfer", () => {
   expect(executionModeAvailable("antigravity", "autonomous")).toBe(true);
   expect(executionModeAvailable("antigravity", "review")).toBe(false);
   expect(executionModeAvailable("antigravity", "trusted")).toBe(false);
-  expect(harnessCatalog.antigravity.cloud).toBe(false);
   expect(slotFor("antigravity")?.stays).toContain("stay on the computer");
 });
 

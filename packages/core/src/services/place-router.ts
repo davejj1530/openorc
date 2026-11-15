@@ -60,8 +60,7 @@ export class PlaceRouter {
     const ask = () => this.asked(place, request, method as RoutedMethod, params);
     if (route.by === "here" && heldHereCall(place, method, params)) return ask();
     switch (route.by) {
-      case "owner":
-      case "owner-only": {
+      case "owner": {
         const id = route.thread(params as never);
         return id && place.holds({ thread: id }) ? ask() : this.deps.next(request);
       }

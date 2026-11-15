@@ -164,16 +164,6 @@ it("leads with what waits on the person, counts it in amber, and ends a task rea
   fireEvent.click(within(review).getByRole("button", { name: "Review" }));
   expect(useRouter.getState().route).toEqual({ view: "task", taskId: "other", tab: "files" });
 });
-it("marks a task the cloud brain holds as the cloud's, dimmed while the brain is out of reach", async () => {
-  saved = [
-    { ...task, owner: { brain: "cloud", reach: "asleep", heardAt: 1 } },
-    { ...task, id: "here", title: "Local copy" },
-  ];
-  await show();
-  const cloudRow = screen.getByRole("button", { name: "Export rows, Backlog" });
-  expect(within(cloudRow).getByText("Cloud").closest("span")?.className).toContain("opacity-60");
-  expect(within(screen.getByRole("button", { name: "Local copy, Backlog" })).queryByText("Cloud")).toBeNull();
-});
 it("leads with the tasks whose run needs your approval and opens them on their conversation, the rest on their page", async () => {
   saved = [
     { ...task, status: "in_progress", approval: "Run pnpm install" },

@@ -189,13 +189,6 @@ export class RemoteAccess {
         this.options.invalidate(["remote"]);
         return { sandbox: this.senderState("sandbox"), production: this.senderState("production") };
       }
-      // Builds from before the own cloud went still ask these of a Mac: it has no door, is a Mac, and refused no move.
-      case "door.key":
-        return null;
-      case "host.kind":
-        return "mac";
-      case "moves.refused":
-        return [];
       // A phone that paired a cloud brain forgets it once the Mac that removed it says so.
       case "brains.removed":
         return removedBrains(this.options.db);

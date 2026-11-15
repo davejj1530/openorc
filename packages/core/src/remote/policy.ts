@@ -201,17 +201,10 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   // Takes nothing and answers the shares and plans alone, shaped by the core: no email, token, path or CLI text.
   "providers.limits": allow,
   "app.settings.get": allow,
-  // Whether the Mac offers cloud threads and where they would run; nothing about its accounts or tokens.
+  // Whether the Mac offers cloud threads, which builds from before the own cloud went still ask: it does not.
   "cloud.offer": allow,
-  // Moves the conversation's work to a sandbox of its own, as the Mac's thread menu does, after the phone's confirm.
-  "cloud.move": allow,
-  // The files a move from the checkout would take with it, for that confirm.
+  // The files a move between the checkout and a worktree would take with it.
   "threads.movePreview": allow,
-  "cloud.bringToMac": allow,
-  "cloud.keep": allow,
-  // The brain's sandboxes are for its own Mac's Settings, which the owner guards let through.
-  "cloud.sandboxes": () => NOT_FROM_PHONE,
-  "cloud.sandboxes.remove": () => NOT_FROM_PHONE,
   "threads.start": (params, context) => {
     if (params.workingDirectory !== undefined) return "Choose a folder for this conversation on your Mac.";
     // A phone never names a new thread's id.
@@ -312,12 +305,7 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "providers.limits": same,
   "app.settings.get": same,
   "cloud.offer": same,
-  "cloud.move": same,
   "threads.movePreview": same,
-  "cloud.bringToMac": same,
-  "cloud.keep": same,
-  "cloud.sandboxes": same,
-  "cloud.sandboxes.remove": same,
   "threads.start": same,
   "threads.update": same,
   "threads.switchClaudeAccount": same,

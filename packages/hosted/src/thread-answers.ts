@@ -18,7 +18,6 @@ const NOT_ASKED = { notAsked: true } as const;
 
 export const NOT_YET = refused("This isn't on OpenOrc Cloud yet.");
 const NO_FILES = refused("An OpenOrc Cloud thread's files aren't on this Mac.");
-const STAYS = refused("An OpenOrc Cloud thread stays on OpenOrc Cloud.");
 
 /**
  * What a hosted thread does with each of the app's calls that name a thread, a run or a task: answers it, refuses it in
@@ -99,13 +98,6 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "threads.movePreview": NO_FILES,
   "threads.restore": refused(HOSTED_REASONS.checkpoints),
   "threads.restorePreview": refused(HOSTED_REASONS.checkpoints),
-  "cloud.move": STAYS,
-
-  "cloud.bringToMac": refused(HOSTED_REASONS.moveToMac),
-  "cloud.keep": STAYS,
-  "cloud.openOnMac": refused(HOSTED_REASONS.macCode),
-  "cloud.closeOnMac": refused(HOSTED_REASONS.macCode),
-  "threads.snapshot": NO_FILES,
   "instructions.list": refused(HOSTED_REASONS.instructions),
   "instructions.save": refused(HOSTED_REASONS.instructions),
   "preview.state": refused(HOSTED_REASONS.previewServer),

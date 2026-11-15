@@ -75,17 +75,10 @@ export const REMOTE_METHODS = [
   "orclings.instructions.save",
   "orclings.reactions",
   "orclings.react",
-  // Whether the Mac offers cloud threads, and moving a thread to the cloud after the phone's confirm, with the files a
-  // move from the checkout would take. Starting one is `threads.start` with `cloud`.
+  // Builds from before the own cloud went ask whether the Mac offers cloud threads; it answers that it does not.
   "cloud.offer",
-  "cloud.move",
+  // The files a move between the checkout and a worktree would take.
   "threads.movePreview",
-  // The Mac coordinates every move to and from its cloud brain: a phone asks it to bring a thread home or keep one put.
-  "cloud.bringToMac",
-  "cloud.keep",
-  // The brain's own Mac lists the sandboxes the brain made for its threads and deletes one; phones are refused.
-  "cloud.sandboxes",
-  "cloud.sandboxes.remove",
 ] as const satisfies readonly RpcMethod[];
 export type RemoteMethod = (typeof REMOTE_METHODS)[number];
 

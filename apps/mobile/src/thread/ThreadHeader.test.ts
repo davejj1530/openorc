@@ -14,9 +14,3 @@ it("names the starter when a shared thread waits on an answer", () => {
   expect(statusLine(thread, "Project")).not.toContain("Needs you");
   expect(statusLine({ ...thread, owner: undefined }, "Project")).toContain("Needs you");
 });
-
-it("reads a thread an older Mac runs in a sandbox as any other thread of the project", () => {
-  const sandboxed: ThreadSummary = { ...base, cloud: { provider: "vercel", state: "ready", step: null, setup: true, error: null } };
-  expect(statusLine(sandboxed, "Site")).toBe(statusLine(base, "Site"));
-  expect(statusLine({ ...sandboxed, cloud: { ...sandboxed.cloud!, state: "removed" } }, "Site")).toBe(statusLine(base, "Site"));
-});

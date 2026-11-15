@@ -129,21 +129,7 @@ const answers: Answers = {
   "app.settings.get": () => demoSettings,
   // The demo Mac runs every thread itself, so the phone never offers the cloud.
   "cloud.offer": () => ({ offered: false, provider: null }),
-  "cloud.move": () => {
-    throw new Error("Cloud threads are not available on this Mac.");
-  },
   "threads.movePreview": () => ({ files: [], blocked: null }),
-  "cloud.bringToMac": () => {
-    throw new Error("Cloud threads are not available on this Mac.");
-  },
-  "cloud.keep": () => null,
-  // Only a brain's own Mac lists or deletes its sandboxes; a phone is refused, as by a real Mac.
-  "cloud.sandboxes": () => {
-    throw new Error("This is not available from a phone.");
-  },
-  "cloud.sandboxes.remove": () => {
-    throw new Error("This is not available from a phone.");
-  },
   "threads.start": (core, params) => {
     const id = core.id("demo-thread");
     const title = params.title ?? params.prompt.split("\n")[0]!.slice(0, 60);

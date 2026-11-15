@@ -56,14 +56,8 @@ export interface HarnessCatalogEntry {
   liveInput: boolean;
   /** Whether a new conversation can continue an independent copy of this harness's native session. */
   forks: boolean;
-  /** Whether OpenOrc can install, sign in and resume this harness in a cloud workspace. */
-  cloud: boolean;
-  /**
-   * The CLI's npm package, or null for a native-only installation, and its binary on PATH.
-   * `prebuilt` is the maker's build service, for a CLI whose npm package needs a runtime the cloud lacks: there it is
-   * installed as the maker's own checked binary instead.
-   */
-  cli: { npm: string | null; bin: string; prebuilt?: string };
+  /** The CLI's npm package, or null for a native-only installation, and its binary on PATH. */
+  cli: { npm: string | null; bin: string };
 }
 
 export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
@@ -81,7 +75,6 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     nativePlans: false,
     liveInput: true,
     forks: false,
-    cloud: false,
     cli: { npm: null, bin: "fx" },
   },
   antigravity: {
@@ -98,7 +91,6 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     nativePlans: false,
     liveInput: true,
     forks: false,
-    cloud: false,
     cli: { npm: null, bin: "agy" },
   },
   pi: {
@@ -115,7 +107,6 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     nativePlans: false,
     liveInput: true,
     forks: true,
-    cloud: false,
     cli: { npm: "@earendil-works/pi-coding-agent", bin: "pi" },
   },
   codex: {
@@ -132,7 +123,6 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     nativePlans: true,
     liveInput: true,
     forks: true,
-    cloud: true,
     cli: { npm: "@openai/codex", bin: "codex" },
   },
   claude: {
@@ -149,7 +139,6 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     nativePlans: true,
     liveInput: true,
     forks: true,
-    cloud: true,
     cli: { npm: "@anthropic-ai/claude-code", bin: "claude" },
   },
   opencode: {
@@ -167,7 +156,6 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     nativePlans: false,
     liveInput: true,
     forks: true,
-    cloud: true,
     cli: { npm: "@opencode/cli", bin: "opencode" },
   },
   omp: {
@@ -185,9 +173,7 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     nativePlans: true,
     liveInput: true,
     forks: true,
-    cloud: true,
-    // The npm package runs on Bun; the cloud installs the prebuilt binary its installer fetches.
-    cli: { npm: "@oh-my-pi/pi-coding-agent", bin: "omp", prebuilt: "https://build.stencil.so/api/products/omp" },
+    cli: { npm: "@oh-my-pi/pi-coding-agent", bin: "omp" },
   },
   cursor: {
     id: "cursor",
@@ -203,7 +189,6 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     nativePlans: true,
     liveInput: false,
     forks: false,
-    cloud: false,
     cli: { npm: null, bin: "cursor-agent" },
   },
 };

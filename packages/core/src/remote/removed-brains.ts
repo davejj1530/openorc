@@ -1,14 +1,9 @@
 import { settings, type Db } from "@openorc/db";
 
-const REMOVED = "brain.removed";
-/** More than anyone sets up and removes; the oldest goes first. */
-const KEPT = 8;
-
-/** The cloud brains this Mac removed, by the link keys phones saved them under, newest first. */
+/**
+ * The cloud brains this Mac removed while it had a cloud of the person's own, by the link keys phones saved them under,
+ * newest first. Nothing adds to the list any more; a phone that paired one of them still asks for it, to forget it.
+ */
 export function removedBrains(db: Db): string[] {
-  return JSON.parse(settings.get(db, REMOVED) ?? "[]") as string[];
-}
-
-export function rememberRemovedBrain(db: Db, linkKey: string): void {
-  settings.set(db, REMOVED, JSON.stringify([linkKey, ...removedBrains(db).filter((key) => key !== linkKey)].slice(0, KEPT)));
+  return JSON.parse(settings.get(db, "brain.removed") ?? "[]") as string[];
 }

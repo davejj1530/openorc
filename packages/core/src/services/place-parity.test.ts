@@ -38,11 +38,6 @@ describe("hosted calls normally served here", () => {
     { method: "instructions.list", params: { threadId: "cloud-thread" } },
     { method: "instructions.save", params: { threadId: "cloud-thread", path: "AGENTS.md", content: "Example", version: null } },
     { method: "preview.state", params: { threadId: "cloud-thread" } },
-    { method: "cloud.openOnMac", params: { threadId: "cloud-thread" } },
-    { method: "cloud.closeOnMac", params: { threadId: "cloud-thread" } },
-    { method: "cloud.bringToMac", params: { threadId: "cloud-thread" } },
-    { method: "cloud.keep", params: { threadId: "cloud-thread" } },
-    { method: "threads.snapshot", params: { threadId: "cloud-thread", known: [] } },
     { method: "mcpApps.open", params: { runId: "hosted:cloud-thread", toolCallId: "call-1" } },
   ])("never sends $method into the Mac for a known hosted thread", async ({ method, params }) => {
     const next = vi.fn();

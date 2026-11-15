@@ -1,5 +1,5 @@
-import type { Task, ThreadFilter, ThreadSummary } from "./domain.js";
-import type { InboxItem, InboxList, RpcMethod, RpcParams } from "./rpc.js";
+import type { ThreadFilter, ThreadSummary } from "./domain.js";
+import type { RpcMethod, RpcParams } from "./rpc.js";
 import type { Brain, OwnerReach } from "./thread-owner.js";
 
 /**
@@ -29,40 +29,25 @@ export type OwnerRoute<M extends RpcMethod> =
   | { by: "owner"; thread: (params: RpcParams<M>) => string | undefined }
   /** The owner of the run's thread answers. */
   | { by: "run"; run: (params: RpcParams<M>) => string }
-  /** Every brain answers its own rows; the asker merges them. Never waits on the brain. Asked about one thread, its owner answers. */
+  /** Every place answers its own rows; the asker merges them, never waiting on one. Asked about one thread, its owner answers. */
   | { by: "merge"; thread?: (params: RpcParams<M>) => string | undefined }
   /** The host holding the task answers: tasks move with the thread doing their work. */
   | { by: "task"; task: (params: RpcParams<M>) => string | undefined }
-  /** Served by the asked host even for another host's thread: its folder, its preview, its windows. */
+  /** Served by the asked host even for another place's thread: its folder, its preview, its windows. */
   | { by: "here" }
-  /** Refused for a thread another host owns, in these words. */
-  | { by: "owner-only"; thread: (params: RpcParams<M>) => string | undefined; words: string }
-  /** A new thread asked for the cloud starts on the brain, on its copy of the Mac project `cloud` names; any other, here. */
-  | { by: "start"; cloud: (params: RpcParams<M>) => string | undefined }
-  /**
-   * Readies the place a new cloud thread in the Mac project `cloud` names will start: the brain, woken for it, when it has
-   * a copy of the project; else here.
-   */
-  | { by: "ahead"; cloud: (params: RpcParams<M>) => string | undefined };
-
-export const BRING_FIRST = "Bring it to this Mac first.";
-/** Why a project's conversations cannot start or move in the cloud while the brain has no copy of it. */
-export const NOT_ON_BRAIN = "Add this project to the cloud brain in Settings > Cloud on the Mac first.";
-/** Why no conversation can start or move in the cloud: no cloud service is connected to run it on. */
-export const NO_CLOUD_SERVICE = "Connect Vercel or Agent37 in Settings > Cloud first.";
-const IN_CLOUD = "This conversation is already in your own cloud.";
+  /** A new thread starts on the asked host; the place router sends one asked for OpenOrc Cloud there itself. */
+  | { by: "start" };
 
 const byThreadId = { by: "owner", thread: (p: { threadId?: string | undefined }) => p.threadId } as const;
 const byId = { by: "owner", thread: (p: { id: string }) => p.id } as const;
 const byRun = { by: "run", run: (p: { runId: string }) => p.runId } as const;
 const byTask = { by: "task", task: (p: { taskId: string }) => p.taskId } as const;
 const byTaskId = { by: "task", task: (p: { id: string }) => p.id } as const;
-const ownerOnly = (words: string) => ({ by: "owner-only", thread: (p: { id: string }) => p.id, words }) as const;
 const here = { by: "here" } as const;
 
 /**
- * How a Mac window's call reaches a thread's owner. The Mac's router reads it; the brain derives the Mac's session
- * allowlist from it. Methods not listed and not RoutedMethod are host-level: the asked core answers about itself.
+ * How a Mac window's call reaches a thread's owner. The Mac's place router reads it. Methods not listed and not
+ * RoutedMethod are host-level: the asked core answers about itself.
  */
 export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Exclude<RpcMethod, RoutedMethod>]?: OwnerRoute<M> } = {
   "tasks.online.state": here,
@@ -88,8 +73,7 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "threads.people": byThreadId,
   "threads.startQueued": byThreadId,
   "threads.retrySave": byThreadId,
-  "threads.start": { by: "start", cloud: (p) => (p.cloud ? p.projectId : undefined) },
-  "cloud.warm": { by: "ahead", cloud: (p) => p.projectId },
+  "threads.start": { by: "start" },
   "threads.list": { by: "merge" },
   "threads.resolvedCount": { by: "merge" },
   "inbox.list": { by: "merge" },
@@ -163,95 +147,32 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "review.comments.add": byThreadId,
   "review.comments.remove": byThreadId,
   "review.comments.send": byThreadId,
-  // Things that change where it lives or what it is made of stay with a thread on this Mac.
-  "threads.moveWorkspace": ownerOnly(BRING_FIRST),
-  "threads.movePreview": ownerOnly(BRING_FIRST),
-  "threads.fork": ownerOnly(BRING_FIRST),
-  "threads.restore": ownerOnly(BRING_FIRST),
-  "threads.restorePreview": ownerOnly(BRING_FIRST),
-  "orclings.ask": { by: "owner-only", thread: (p) => p.threadId, words: BRING_FIRST },
-  "orclings.assign": { by: "owner-only", thread: (p) => p.threadId, words: BRING_FIRST },
+  "threads.moveWorkspace": byId,
+  "threads.movePreview": byId,
+  "threads.fork": byId,
+  "threads.restore": byId,
+  "threads.restorePreview": byId,
+  "orclings.ask": byThreadId,
+  "orclings.assign": byThreadId,
   "orclings.reactions": byThreadId,
   "orclings.react": byThreadId,
   "orclings.origins": byThreadId,
   "orclings.groups.send": byThreadId,
   "orclings.groups.delete": byThreadId,
-  "cloud.move": { by: "owner-only", thread: (p) => p.threadId, words: IN_CLOUD },
-  // This Mac coordinates every move, whichever brain holds the thread.
-  "cloud.bringToMac": here,
-  "cloud.keep": here,
-  "cloud.openOnMac": here,
-  "cloud.closeOnMac": here,
-  // Asked of the brain by the Mac's copy of a thread, never by a window.
-  "threads.snapshot": here,
-  // The Mac's own: a cloud thread's files come from its read-only copy here, its preview and app views from this Mac.
+  // The Mac's own: its instructions, its preview and its app views.
   "instructions.list": here,
   "instructions.save": here,
   "preview.state": here,
   "mcpApps.open": here,
 };
 
-/**
- * Routed methods that only read the thread, run or task they name. Every other routed method writes, and is refused
- * while that thread is frozen for a move, so a write the move's package would leave behind is never accepted.
- */
-export const ROUTED_READS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
-  "threads.list",
-  "threads.resolvedCount",
-  "inbox.list",
-  "threads.get",
-  "threads.messages",
-  "threads.lastMessage",
-  "threads.plans",
-  "threads.checkpoints",
-  "threads.turnChanges",
-  "threads.movePreview",
-  "threads.restorePreview",
-  "runs.listForThread",
-  "events.listForRun",
-  "events.page",
-  "events.toolOutput",
-  "tasks.list",
-  "tasks.get",
-  "tasks.executionThread",
-  "tasks.comments.list",
-  "runs.listForTask",
-  "memory.forTask",
-  "workspace.removalImpact",
-  "workspace.usage",
-  "review.diff",
-  "review.snapshots",
-  "review.checkoutState",
-  "git.log",
-  "review.threadChanges",
-  "review.threadFileDiff",
-  "review.threadDiff",
-  "review.threadPrTemplate",
-  "git.threadLog",
-  "git.commitRange",
-  "git.threadPushState",
-  "review.comments.list",
-]);
-
-/**
- * Methods only the Mac's own session asks the brain, besides those the router forwards: attached files go up before the
- * message naming them; memory, the Mac's open tasks and its text generation choice go while both are awake.
- */
-const OWNER_SESSION_EXTRA: readonly RpcMethod[] = ["threads.snapshot", "attachments.save", "attachments.saveFile", "brain.memory.exchange", "brain.backlog", "brain.textGeneration"];
-
-/** What the brain admits from its Mac's session: everything the router may forward to it, derived, never listed. */
-export const OWNER_SESSION_METHODS: ReadonlySet<RpcMethod> = new Set([
-  ...(Object.entries(OWNER_ROUTES) as [RpcMethod, OwnerRoute<RpcMethod>][]).filter(([, route]) => route.by !== "here" && route.by !== "owner-only").map(([method]) => method),
-  ...OWNER_SESSION_EXTRA,
-]);
-
 export function ownerRoute(method: RpcMethod): OwnerRoute<RpcMethod> | undefined {
   return (OWNER_ROUTES as Partial<Record<RpcMethod, OwnerRoute<RpcMethod>>>)[method];
 }
 
-// ── Merging two brains' answers: the Mac's router and the phone's Home both call these ──
+// ── Merging two places' answers: the Mac's place router calls this ──
 
-/** One host's answer to a list, with how far it could be reached. */
+/** One place's answer to a list, with whether it could be reached. */
 export interface HostPage {
   brain: Brain;
   reach: OwnerReach;
@@ -279,9 +200,9 @@ interface Held {
 }
 
 /**
- * One page of a list from several hosts' pages of it. Each host answered with its own top `limit` (with each parent's
- * tree when asked), so the merged top `limit` is exact. A thread two hosts list, as in a relocation's gap, appears once:
- * the copy that is not moving wins. Rows from a host other than `self` carry `owner`.
+ * One page of a list from several places' pages of it. Each place answered with its own top `limit` (with each parent's
+ * tree when asked), so the merged top `limit` is exact. A thread two places list appears once: the first one's. Rows
+ * from a place other than `self` carry `owner`.
  */
 export function mergeThreadPages(
   pages: readonly HostPage[],
@@ -291,8 +212,7 @@ export function mergeThreadPages(
   const held = new Map<string, Held>();
   for (const page of pages)
     for (const row of page.rows) {
-      const kept = held.get(row.id);
-      if (!kept || (kept.row.moving && !row.moving)) held.set(row.id, { row, page });
+      if (!held.has(row.id)) held.set(row.id, { row, page });
     }
   const parentOf = (entry: Held): Held | null => {
     const parent = list.includeChildren && entry.row.parentThreadId ? held.get(entry.row.parentThreadId) : undefined;
@@ -320,27 +240,4 @@ export function mergeThreadPages(
     .flatMap((entry) => entry.tree)
     .sort((a, b) => compare(a.row, b.row))
     .map(stamp);
-}
-
-/** Tasks from every host, each once (the first host's copy wins, as in a move's gap), the latest change first. */
-export function mergeTaskPages(pages: readonly { brain: Brain; reach: OwnerReach; heardAt: number; rows: readonly Task[] }[], self: Brain): Task[] {
-  const held = new Map<string, Task>();
-  for (const { brain, reach, heardAt, rows } of pages) for (const row of rows) if (!held.has(row.id)) held.set(row.id, brain === self ? row : { ...row, owner: { brain, reach, heardAt } });
-  return [...held.values()].sort((a, b) => b.updatedAt - a.updatedAt || Number(a.id < b.id) - Number(a.id > b.id));
-}
-
-const inboxKey = (item: InboxItem) => `${item.kind}:${item.kind === "task" ? item.task.id : item.thread.id}:${item.runId ?? ""}:${item.reason}`;
-
-/** Needs-you items from every host, each once, in the hosts' order. */
-export function mergeInbox(pages: readonly { inbox: InboxList }[]): InboxList {
-  const seen = new Set<string>();
-  const items: InboxItem[] = [];
-  for (const { inbox } of pages)
-    for (const item of inbox.items) {
-      const key = inboxKey(item);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      items.push(item);
-    }
-  return { items };
 }

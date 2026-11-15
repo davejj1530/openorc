@@ -11,10 +11,7 @@ export const THREAD_EXISTS = "That conversation already exists.";
 /** Creates the thread and starts its first turn in one step. */
 export const ThreadStartParams = z
   .object({
-    /**
-     * The thread's id, chosen by the cloud brain's own Mac so its windows show the thread before the brain has it. Only
-     * that Mac sets one; a phone's start with one is refused, and so is one naming a thread that exists.
-     */
+    /** The thread's id, when its starter chooses it. A phone's start with one is refused, and so is one naming a thread that exists. */
     id: z.string().uuid().optional(),
     claudeAccountId: ClaudeAccountId.optional(),
     projectId: z.string(),
@@ -28,8 +25,6 @@ export const ThreadStartParams = z
     mode: RunMode,
     permissionMode: PermissionPreset,
     workspaceMode: WorkspaceMode.optional(),
-    /** Runs the agent in a cloud sandbox; the thread's worktree on the Mac mirrors it. */
-    cloud: z.boolean().optional(),
     /** Starts the thread on OpenOrc Cloud, from the project's repository there; the Mac keeps no folder for it. */
     hosted: z.literal(true).optional(),
     baseRef: z.string().optional(),
@@ -43,10 +38,10 @@ export const ThreadStartParams = z
   })
   .strict()
   .superRefine((input, ctx) => {
-    if (input.parentThreadId && [input.id, input.workingDirectory, input.workspaceMode, input.cloud, input.baseRef].some((value) => value !== undefined)) {
+    if (input.parentThreadId && [input.id, input.workingDirectory, input.workspaceMode, input.baseRef].some((value) => value !== undefined)) {
       ctx.addIssue({ code: "custom", message: "A thread started under another works in its folder.", path: ["parentThreadId"] });
     }
-    if (input.hosted && [input.id, input.workingDirectory, input.workspaceMode, input.cloud, input.baseRef, input.parentThreadId].some((value) => value !== undefined)) {
+    if (input.hosted && [input.id, input.workingDirectory, input.workspaceMode, input.baseRef, input.parentThreadId].some((value) => value !== undefined)) {
       ctx.addIssue({ code: "custom", message: "A thread on OpenOrc Cloud works in its own sandbox there.", path: ["hosted"] });
     }
     if (input.hosted && input.executionTarget && input.executionTarget.kind !== "model") ctx.addIssue({ code: "custom", message: "OpenOrc Cloud runs one model.", path: ["hosted"] });

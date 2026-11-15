@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { GithubConnectChoice, type OrganizationRepositories } from "./organization-setup.js";
-import { openCodeProvider } from "./cloud-sign-ins.js";
+import { openCodeProvider } from "./opencode-providers.js";
 import { harnessShortName } from "./harness.js";
 import type { AllowanceSource, OrganizationAccess } from "./organization-access.js";
 

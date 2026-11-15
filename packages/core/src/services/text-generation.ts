@@ -1,11 +1,20 @@
 import { settings, type Db } from "@openorc/db";
 import { TextGenerator } from "@openorc/memory";
-import { TextGenerationChoice, harnessCatalog, isHarnessId, type AgentKind, type HarnessId, type ModelOption, type RpcParams, type TextGenerationSettings } from "@openorc/protocol";
+import { z } from "zod";
+import { HarnessId as HarnessIds, harnessCatalog, isHarnessId, type AgentKind, type HarnessId, type ModelOption, type RpcParams, type TextGenerationSettings } from "@openorc/protocol";
 import type { ProviderInfo } from "./memory.js";
 
 type Provider = HarnessId;
 const KEY = "textGeneration.preferences";
-type Preferences = TextGenerationChoice;
+/** Which model names conversations and writes their background text, as the setting keeps it. */
+const Preferences = z
+  .object({
+    provider: z.enum(["auto", ...HarnessIds.options, "off"]),
+    /** The model chosen for each provider that has one. */
+    models: z.partialRecord(HarnessIds, z.string().min(1).max(200)),
+  })
+  .strict();
+type Preferences = z.infer<typeof Preferences>;
 
 /** Only small models are automatic candidates. Never fall back to the conversation's flagship. */
 function defaultModel(provider: Provider, models: ModelOption[]): ModelOption | null {
@@ -48,7 +57,7 @@ export class TextGenerationService {
   private preferences(): Preferences {
     const raw = settings.get(this.db, KEY);
     try {
-      return TextGenerationChoice.parse(JSON.parse(raw ?? "null"));
+      return Preferences.parse(JSON.parse(raw ?? "null"));
     } catch {
       return { provider: "auto", models: {} };
     }

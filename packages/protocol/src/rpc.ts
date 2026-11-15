@@ -171,8 +171,6 @@ export const rpcParams = {
   "threads.messages": z.object({ id: z.string() }),
   /** The newest thing the person or an agent said in the conversation, its text clipped for a preview. */
   "threads.lastMessage": z.object({ id: z.string() }),
-  /** The brain's answer to its Mac's copy of a thread: its code now, minus the commits the Mac names. */
-  "threads.snapshot": z.object({ threadId: z.string().min(1).max(200), known: z.array(z.string().regex(/^[0-9a-f]{40,64}$/)).max(32) }).strict(),
   "threads.plans": z.object({ id: z.string() }),
   "threads.implementPlan": z.object({ id: z.string(), planId: z.string(), permissionMode: PermissionPreset }),
   "threads.exportPlan": z.object({
@@ -477,13 +475,6 @@ const SECRET_PARAMS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
   "organization.seat.assign",
   "memory.settings.set",
   "remote.push.setKey",
-  "cloud.vercel.connect",
-  "cloud.agent37.connect",
-  "cloud.claude.save",
-  "cloud.codex.apiKey",
-  "cloud.opencode.saveKey",
-  "cloud.env.set",
-  "cloud.brain.codex.apiKey",
   "providers.codex.reset",
   "connectors.save",
 ]);
@@ -750,8 +741,6 @@ export const RpcRequest = z.object({
   id: z.number().int(),
   method: z.string(),
   params: z.unknown(),
-  /** A window reading again what it already shows, on a timer or after a change, rather than for a person. */
-  refresh: z.literal(true).optional(),
 });
 export type RpcRequest = z.infer<typeof RpcRequest>;
 

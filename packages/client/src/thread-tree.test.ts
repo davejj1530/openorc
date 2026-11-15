@@ -88,11 +88,11 @@ it("continues ancestor trunks across a nested paging row without drawing the fin
   expect(threadBranchPath(row, { markX: 34, mid: 17, height: 34 })).toBe("");
 });
 
-it("preserves hidden-child activity when merging Mac and cloud root pages", () => {
+it("preserves hidden-child activity when merging this Mac's and OpenOrc Cloud's root pages", () => {
   const merged = mergeThreadPages(
     [
       { brain: "mac", reach: "live", heardAt: 1, rows: [{ ...parent, treeActivityAt: 999, pinnedAt: null }] },
-      { brain: "cloud", reach: "live", heardAt: 1, rows: [{ ...parent, id: "cloud", lastActivityAt: 500, pinnedAt: null }] },
+      { brain: "hosted", reach: "live", heardAt: 1, rows: [{ ...parent, id: "cloud", lastActivityAt: 500, pinnedAt: null }] },
     ],
     { includeChildren: true, limit: 1 },
     "mac",

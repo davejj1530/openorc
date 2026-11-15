@@ -1,4 +1,4 @@
-import { defaultHarnessId, harnessCatalog, harnessShortName, isHarnessId, MOVING_WORDS, type AgentKind, type Run, type ThreadSummary } from "@openorc/protocol";
+import { defaultHarnessId, harnessCatalog, harnessShortName, isHarnessId, type AgentKind, type Run, type ThreadSummary } from "@openorc/protocol";
 import { isImageGeneration } from "./image-activity.js";
 import { sendsBlocked } from "./hosted-send.js";
 import type { RunTranscript } from "./transcript.js";
@@ -40,10 +40,8 @@ export function conversationSendDisabledReason(input: {
   historyLoading: boolean;
   historyFailed: boolean;
   hasModel: boolean;
-  thread?: Pick<ThreadSummary, "moving" | "owner"> | null | undefined;
+  thread?: Pick<ThreadSummary, "owner"> | null | undefined;
 }): string | null {
-  const moving = input.thread?.moving;
-  if (moving) return MOVING_WORDS[moving.to];
   const blocked = sendsBlocked(input.thread ?? null);
   if (blocked) return blocked;
   if (!input.permissionReady) return CONVERSATION_REASONS.loadingPermissions;

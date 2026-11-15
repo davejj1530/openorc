@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import { agentBinary, releaseOf, slotFor } from "@openorc/agents";
-import { executionModeAvailable, harnessCatalog } from "@openorc/protocol";
+import { executionModeAvailable } from "@openorc/protocol";
 import { detectAgentInstallation, fetchAgentRelease, newerRelease, releaseVersion } from "./agent-update-installation.js";
 import { pathProbe, type EnvSnapshot } from "./shell-environment.js";
 import { harnessProbes } from "./system.js";
@@ -38,7 +38,6 @@ it("checks Cursor's structured login status and exposes only its supported execu
 });
 
 it("keeps its sessions on the computer they started on", () => {
-  expect(harnessCatalog.cursor.cloud).toBe(false);
   expect(slotFor("cursor")?.stays).toContain("stay on the computer");
 });
 

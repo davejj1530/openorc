@@ -26,11 +26,12 @@ describe("sending during a turn", () => {
   });
 });
 
-it("holds the composer while a conversation moves, in the words for where it goes", () => {
+it("lets the composer send once its settings and history are in, and holds it for a place out of reach first", () => {
   const ready = { permissionReady: true, historyLoading: false, historyFailed: false, hasModel: true };
   expect(conversationSendDisabledReason(ready)).toBeNull();
-  expect(conversationSendDisabledReason({ ...ready, thread: { moving: { to: "cloud", since: 1 } } })).toBe("This conversation is moving to your own cloud.");
-  expect(conversationSendDisabledReason({ ...ready, permissionReady: false, thread: { moving: { to: "mac", since: 1 } } })).toBe("This conversation is moving to your Mac.");
+  const away = { owner: { brain: "hosted" as const, reach: "offline" as const, heardAt: 1 } };
+  expect(conversationSendDisabledReason({ ...ready, thread: away })).toBe("OpenOrc Cloud can't be reached.");
+  expect(conversationSendDisabledReason({ ...ready, permissionReady: false, thread: away })).toBe("OpenOrc Cloud can't be reached.");
 });
 
 it("puts first task direction before active-turn placeholder states", () => {

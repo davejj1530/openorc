@@ -7,7 +7,7 @@ const elsewhere = (): never => {
 
 /**
  * Working together is an OpenOrc Cloud thread's: PlaceRouter takes these calls to the thread's owner. A thread of this
- * Mac or of the person's own cloud has no teammates in it, which a window reads as unsupported.
+ * Mac has no teammates in it, which a window reads as unsupported.
  */
 export const threadCollaborationHandlers: Pick<Handlers, keyof typeof threadCollaborationRpcParams> = {
   "threads.collaboration": () => ({ supported: false }),

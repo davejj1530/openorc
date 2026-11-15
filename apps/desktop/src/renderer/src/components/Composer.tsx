@@ -274,7 +274,8 @@ export function Composer(props: ComposerProps) {
         pickPerson(to);
         const words = `${text.slice(0, mention.start)}${personTag(to.id)}${text.slice(mention.end)}`;
         const kept = value.trim();
-        editor.current?.write(kept ? `${words}\n\n${kept}` : words, words.length);
+        // Asked again while the note is already there, it stays as it is.
+        if (!kept.includes(words)) editor.current?.write(kept ? `${words}\n\n${kept}` : words, words.length);
         editor.current?.focus();
       },
     }),
@@ -295,7 +296,8 @@ export function Composer(props: ComposerProps) {
   }, [submission, value, onChange, acknowledge]);
   const drop = useComposerDrop((dropped) => void addFiles(dropped));
   const attachmentBlock = files.pendingReason ?? (attachments.length > 0 ? files.blocked : null);
-  const canSend = note.isNote ? Boolean(note.post) && !submitting && !props.readOnlyReason : messageSends(props, { attachments: attachments.length, uploading, submitting, attachmentBlock });
+  // A note goes where the server lets the reader post notes (`notes`), whatever holds their messages.
+  const canSend = note.isNote ? Boolean(note.post) && !submitting : messageSends(props, { attachments: attachments.length, uploading, submitting, attachmentBlock });
 
   const canStop = turnStops(props);
   const asks = props.asks ?? [];
@@ -405,7 +407,7 @@ export function Composer(props: ComposerProps) {
             <ComposerSendCluster
               cluster={cluster}
               canSend={canSend}
-              block={note.isNote ? (note.block ?? props.readOnlyReason ?? null) : composerSendBlock({ disabledReason: props.readOnlyReason ?? props.disabledReason, attachmentBlock })}
+              block={note.isNote ? note.block : composerSendBlock({ disabledReason: props.readOnlyReason ?? props.disabledReason, attachmentBlock })}
               stopping={stopping}
               payer={props.sendPayer}
               onSend={submit}

@@ -83,6 +83,11 @@ describe("sendCluster", () => {
     }
   });
 
+  it("keeps Post note where a block holds the reader's messages, since a note starts nothing", () => {
+    expect(sendCluster({ ...typed, readOnly: true, note: true })).toEqual({ kind: "note", stop: false });
+    expect(sendCluster({ ...typed, readOnly: true, note: true, hasDraft: false })).toEqual({ kind: "send", stop: false, startsTask: false });
+  });
+
   it.each([
     { name: "a bare arrow with nothing running", input: typed, cluster: { kind: "send", stop: false, startsTask: false } },
     { name: "one ink Stop with nothing typed while a turn runs", input: { ...typed, queueing: true, canStop: true, hasDraft: false }, cluster: { kind: "stop" } },

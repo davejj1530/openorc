@@ -154,8 +154,9 @@ export function sendCluster(
     note?: boolean;
   },
 ): SendCluster {
-  if (input.readOnly) return { kind: "send", stop: false, startsTask: false };
+  // A note starts nothing, so a block on the reader's messages leaves Post note to them.
   if (input.note && input.hasDraft) return { kind: "note", stop: input.canStop };
+  if (input.readOnly) return { kind: "send", stop: false, startsTask: false };
   if (input.asked) return askedCluster({ ...input, asked: input.asked });
   if (input.canStop && !input.hasDraft) return { kind: "stop" };
   if (!input.queueing) return { kind: "send", stop: input.canStop, startsTask: Boolean(input.startsTask && !input.hasDraft) };

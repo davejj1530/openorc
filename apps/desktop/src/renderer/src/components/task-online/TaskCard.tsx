@@ -4,6 +4,7 @@ import type { OnlineTask, OnlineTaskRef } from "@openorc/protocol";
 import { useTaskOnlineQuery } from "../../lib/task-online-query";
 import { useTaskContentGate } from "../../lib/task-content-gate";
 import { useTaskOpenSeen } from "../../lib/task-open-seen";
+import { useShownTaskActivity } from "../../lib/task-activity-shown";
 import { openOnlineTask } from "../../lib/task-open";
 import { spaceNavigation } from "../../lib/space-navigation";
 import { cn } from "../../lib/cn";
@@ -33,10 +34,10 @@ function OnlineTaskCardRead({ reference }: { reference: OnlineTaskRef }) {
 function OnlineTaskCardBody({ reference, task }: { reference: OnlineTaskRef; task: OnlineTask }) {
   const [expanded, setExpanded] = useState(false);
   useTaskOpenSeen(reference, task, expanded);
-  const activity = task.activity;
+  const activity = useShownTaskActivity(task.activity);
   const waiting = activity?.state === "waiting" && task.viewer.attention.includes("ask");
   const failed = activity?.state === "failed";
-  const label = taskActivityLabel(task);
+  const label = taskActivityLabel(task, activity);
   const message = activity?.latestMessage;
   return (
     <div data-task-activity={task.id} className={taskCardClass(false)}>
@@ -90,8 +91,8 @@ function openCardTask(reference: OnlineTaskRef): void {
   if (navigation.current !== reference.spaceId) navigation.select(reference.spaceId);
   openOnlineTask(reference);
 }
-function taskActivityLabel(task: OnlineTask): string {
-  switch (task.activity?.state) {
+function taskActivityLabel(task: OnlineTask, activity: OnlineTask["activity"]): string {
+  switch (activity?.state) {
     case "waiting":
       return "Waiting";
     case "failed":

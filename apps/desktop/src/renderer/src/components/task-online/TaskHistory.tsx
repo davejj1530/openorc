@@ -1,5 +1,6 @@
 import { relativeTime } from "@openorc/client";
 import type { OnlineTask, OnlineTaskHistoryEntry, OnlineTaskRef } from "@openorc/protocol";
+import { useShownTaskActivity } from "../../lib/task-activity-shown";
 import { useTaskHistory } from "../../lib/task-history";
 import { AccountFace } from "../AccountFace";
 import { Button } from "../ui";
@@ -14,13 +15,14 @@ function activityWords(entry: OnlineTaskHistoryEntry): string {
 }
 export function TaskOnlineHistory({ reference, task }: { reference: OnlineTaskRef; task: OnlineTask }) {
   const history = useTaskHistory(reference);
+  const activity = useShownTaskActivity(task.activity);
   return (
     <section className="task-activity">
       <h2 className="text-base mb-4">Activity</h2>
-      {task.activity ? (
+      {activity ? (
         <div className="mb-5 text-sm text-ink-2">
-          <p>{task.activity.state === "waiting" ? (task.activity.waitingFor ?? "Waiting") : task.activity.state}</p>
-          <p className="mt-1 text-ink-3 break-words">{task.activity.latestMessage ?? task.activity.lastAction}</p>
+          <p>{activity.state === "waiting" ? (activity.waitingFor ?? "Waiting") : activity.state}</p>
+          <p className="mt-1 text-ink-3 break-words">{activity.latestMessage ?? activity.lastAction}</p>
         </div>
       ) : null}
       {history.error ? (

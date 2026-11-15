@@ -96,6 +96,15 @@ it("says a task in a space whose tasks are not delivered isn't available here, a
   expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "tasks.online.get")).toBe(false);
   expect(observed.local).toEqual([]);
 });
+it.each([
+  [2_000, "true"],
+  [60_000, "false"],
+])("keeps a turn that finished %sms ago working only while its agent may still carry on", async (ago, working) => {
+  task = { ...task, activity: { ...task.activity!, state: "completed", updatedAt: Date.now() - ago } };
+  show();
+  await screen.findByText(task.title);
+  expect(screen.getByTestId("activity").getAttribute("data-working")).toBe(working);
+});
 it("acknowledges its assignment only when the person expands the card", async () => {
   show();
   await screen.findByText(task.title);

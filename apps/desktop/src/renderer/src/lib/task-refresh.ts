@@ -1,6 +1,7 @@
 import type { OnlineTask, OnlineTaskRpcResults } from "@openorc/protocol";
+import { shownTaskActivity } from "./task-activity-shown";
 
-const active = (task: OnlineTask) => task.viewer.liveExecution || task.activity?.state === "working";
+const active = (task: OnlineTask) => task.viewer.liveExecution || shownTaskActivity(task.activity, Date.now())?.state === "working";
 
 /** Hidden windows keep the query library's default pause; visible running work refreshes between socket notices. */
 export function taskRefreshInterval(data: OnlineTaskRpcResults[keyof OnlineTaskRpcResults] | undefined): number {

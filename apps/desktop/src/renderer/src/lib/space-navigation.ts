@@ -8,6 +8,7 @@ import { closeWorkOverlays } from "./work-overlays";
 import { navigationScope } from "./navigation-scope";
 import { globalDestination } from "./global-navigation";
 import { closeSpaces, retainUnavailable } from "./space-access";
+import { HeldSpaceViews } from "./space-held-views";
 import { emptySpaceView, observeSpaceThreads, readSpaceRecord, validSpaceView, type SpaceInventory, type SpaceView } from "./space-view";
 
 interface Dependencies {
@@ -40,8 +41,12 @@ interface Navigation {
 export function createSpaceNavigation(deps: Dependencies) {
   let restoring = false;
   let localView: SpaceView | null = null;
+  const held = new HeldSpaceViews();
   const store = createStore<Navigation>((set, get) => {
-    const save = (id: string, view: SpaceView) => saveSpaceView(deps, get().key, id, view);
+    // A closed organization's saved view is left as it was: what shows meanwhile holds none of what was open.
+    const save = (id: string, view: SpaceView) => {
+      if (!get().inventory.find((space) => space.id === id)?.closed) saveSpaceView(deps, get().key, id, view);
+    };
     const restore = (id: string, view: SpaceView) => {
       restoring = true;
       unstable_batchedUpdates(() => {
@@ -65,6 +70,7 @@ export function createSpaceNavigation(deps: Dependencies) {
         localView ??= old;
         const saved = readSpaceRecord(deps.durable, key);
         if (!get().key && !saved.views[personal]) inventory = retainInitialLocal(inventory, personal, old);
+        for (const space of inventory) if (space.closed) held.hold(space.id, saved.views[space.id]);
         const views = Object.fromEntries(inventory.map((space) => [space.id, validSpaceView(saved.views[space.id] ?? (get().key ? null : old), space)]));
         let wanted = saved.last;
         try {
@@ -110,13 +116,14 @@ export function createSpaceNavigation(deps: Dependencies) {
       },
       close(spaceIds) {
         get().remember();
+        for (const id of spaceIds) held.hold(id, get().views[id]);
         const inventory = closeSpaces(get().inventory, get().views, get().current, spaceIds);
         if (inventory) set({ inventory });
       },
       reconcile(inventory) {
         get().remember();
         inventory = retainUnavailable(get().inventory, inventory, get().views, get().current);
-        const views = Object.fromEntries(inventory.map((space) => [space.id, validSpaceView(get().views[space.id], space)]));
+        const views = Object.fromEntries(inventory.map((space) => [space.id, validSpaceView(held.take(space, get().views[space.id]), space)]));
         const current = inventory.some((space) => space.id === get().current) ? get().current! : get().personal;
         set({ inventory, views });
         if (!current) return;
@@ -129,6 +136,7 @@ export function createSpaceNavigation(deps: Dependencies) {
         const view = validSpaceView(localView, localInventory(get().inventory));
         restoring = true;
         deps.restore(view);
+        held.clear();
         set({ key: null, current: null, personal: null, inventory: [], views: {}, ownership: "everyone", generation: get().generation + 1 });
         restoring = false;
       },

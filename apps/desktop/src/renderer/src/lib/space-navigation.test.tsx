@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from "vitest";
 import { createSpaceNavigation, spaceNavigation } from "./space-navigation";
-import { emptySpaceView, type SpaceInventory, type SpaceView } from "./space-view";
+import { closedSpace, emptySpaceView, type SpaceInventory, type SpaceView } from "./space-view";
 import { navigationScope } from "./navigation-scope";
 import { useRouter } from "./router";
 import { useThreadTabs } from "./thread-tabs";
@@ -292,4 +292,45 @@ it("leaves an open panel and the view as they are when the space list is read ag
   spaceNavigation.getState().initialize("key", "personal", spaces);
   expect(useLayout.getState().panelOpen).toBe(true);
   expect(useRouter.getState().route).toBe(before);
+});
+
+const open: Partial<SpaceView> = {
+  destination: { view: "newthread", projectId: "canvas" },
+  tabs: [
+    { id: "new-tab", route: { view: "newthread", projectId: "canvas" } },
+    { id: "cloud-tab", route: { view: "thread", threadId: "cloud" } },
+  ],
+  activeTab: "new-tab",
+};
+const frozen = (): SpaceInventory[] => [spaces[0]!, closedSpace({ id: "birch" })];
+
+it("gives a frozen person back what they had open in the organization, a New thread tab of a project and its filter included", () => {
+  const w = windowOf();
+  w.store.getState().initialize("key", "personal", structuredClone(spaces));
+  w.store.getState().select("birch");
+  w.edit({ ...open, filter: { ...w.get().filter, project: "canvas" } });
+  w.store.getState().close(["birch"]);
+  w.store.getState().reconcile(frozen());
+  expect(w.store.getState().inventory[1]).toMatchObject({ closed: true, projects: [], threads: [] });
+  w.store.getState().reconcile(structuredClone(spaces));
+  expect(w.get()).toMatchObject({ ...open, filter: { project: "canvas" } });
+});
+
+it("keeps a frozen organization's saved tabs through a window opened meanwhile, for when it opens again", () => {
+  const w = windowOf();
+  w.store.getState().initialize("key", "personal", structuredClone(spaces));
+  w.store.getState().select("birch");
+  w.edit(open);
+  const later = windowOf(w.durable, memory());
+  later.store.getState().initialize("key", "personal", frozen());
+  later.store.getState().select("birch");
+  later.store.getState().select("personal");
+  later.store.getState().reconcile(structuredClone(spaces));
+  later.store.getState().select("birch");
+  expect(later.get()).toMatchObject(open);
+  // Another window opened after that reads the same saved tabs.
+  const third = windowOf(w.durable, memory());
+  third.store.getState().initialize("key", "personal", structuredClone(spaces));
+  third.store.getState().select("birch");
+  expect(third.get()).toMatchObject(open);
 });

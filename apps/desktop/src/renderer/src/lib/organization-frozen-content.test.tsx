@@ -284,3 +284,17 @@ it("drops every organization's drafts when another account signs in", async () =
   await f.hear({ ...status(active, [{ id: "other-personal", kind: "personal" }]), userId: "someone-else", personalSpaceId: "other-personal" });
   expect(f.drafts()).toEqual(["openorc.draft.conversation.note", "openorc.draft.conversation.mine", "openorc.draft.newthread.canvas.execution", "openorc.draft.newthread.notes.execution"]);
 });
+
+it("removes a list that names no space but holds a closed organization's thread, and keeps one that holds only this Mac's", async () => {
+  const f = await fixture();
+  const unscoped = ["threads.list", { projectIds: ["canvas"], filter: "active" }];
+  const local = ["threads.list", { projectIds: ["notes"], filter: "active" }];
+  f.queries.setQueryData(unscoped, [
+    { id: "mine", title: "My local work" },
+    { id: "birch-thread", title: "Quarterly numbers" },
+  ]);
+  f.queries.setQueryData(local, [{ id: "note", title: "My note" }]);
+  await f.hear(status(frozen));
+  expect(f.queries.getQueryData(unscoped)).toBeUndefined();
+  expect(f.queries.getQueryData(local)).toEqual([{ id: "note", title: "My note" }]);
+});

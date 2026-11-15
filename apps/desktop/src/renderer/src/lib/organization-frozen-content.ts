@@ -34,7 +34,9 @@ export function protectOrganizationContent({ gate, queries, runs, navigation, ov
     const runIds = threads.map(hostedRunId);
     const ids = new Set([...closed, ...reopened, ...threads, ...runIds, ...affected.flatMap(cloudProjects)]);
     const kept = new Set(closed.filter((id) => admin(gate, id)));
-    const predicate = (query: Query) => names(query.queryKey[1], ids) && !(RECOVERY.has(String(query.queryKey[0])) && kept.has(spaceOf(query.queryKey[1])));
+    // A read is the organization's when it was asked by one of these names, or when what it answered holds one: the
+    // sidebar's lists name projects on this Mac and still carry the cloud threads of a project paired with them.
+    const predicate = (query: Query) => (names(query.queryKey[1], ids) || names(query.state.data, ids)) && !(RECOVERY.has(String(query.queryKey[0])) && kept.has(spaceOf(query.queryKey[1])));
     void queries.cancelQueries({ predicate });
     queries.removeQueries({ predicate });
     runs.forget(runIds);

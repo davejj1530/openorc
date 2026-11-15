@@ -1,6 +1,7 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import { ConversationVoice } from "../lib/turn-authors";
+import { ThreadVoicesContext } from "../lib/thread-authors";
 import { TurnHead } from "./TurnHead";
 
 afterEach(cleanup);
@@ -31,4 +32,19 @@ it("keeps a failed or stopped turn's outcome in the head", () => {
 
 it("gives a guest Orcling's run its byline", () => {
   expect(head("guest", { kind: "done" }).textContent).toBe("Rini");
+});
+
+it("names the live turn's sender as the server does before any of its events say whose it is, and only while it runs", () => {
+  const mara = { id: "u-mara", name: "Mara Okafor", image: null };
+  const together = (status: Parameters<typeof TurnHead>[0]["status"]) =>
+    render(
+      <ConversationVoice.Provider value={voice}>
+        <ThreadVoicesContext.Provider value={{ authors: { viewer: null, turnOf: {}, senders: {}, authors: {} }, shared: true, live: mara }}>
+          <TurnHead runId="run" status={status} blocks={[{ id: "user-prompt" }]} />
+        </ThreadVoicesContext.Provider>
+      </ConversationVoice.Provider>,
+    ).container.querySelector(".turn-head")!;
+  expect(together({ kind: "working", elapsed: 3_000 }).textContent).toBe("CodexGPT-6-Astra · working 3sMOMara");
+  cleanup();
+  expect(together({ kind: "done", elapsed: 15_000 }).textContent).toBe("CodexGPT-6-Astra · 15s");
 });

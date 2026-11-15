@@ -8,6 +8,8 @@ export interface ThreadVoices {
   authors: ThreadAuthors;
   /** Names show only then: a thread nobody else is in reads as it always did. */
   shared: boolean;
+  /** Who sends the turn that runs now, as the server says it before any of the turn's events do. */
+  live?: ThreadPerson | null | undefined;
 }
 
 export const ThreadVoicesContext = createContext<ThreadVoices | null>(null);
@@ -21,24 +23,28 @@ export function useThreadVoices(thread: ThreadSummary | null): { voices: ThreadV
   const read = useRpc("threads.authors", { threadId: thread?.id ?? "" }, { enabled: together });
   const authors = read.data;
   const others = withOthers(thread);
+  const live = threadTogether(thread)?.live?.sender;
   const voices = useMemo(() => {
     if (!together || !authors) return null;
     const viewer = authors.viewer?.id;
     const people = [...Object.values(authors.senders), ...Object.values(authors.authors)];
-    return { authors, shared: others || people.some((person) => person?.id !== viewer) };
-  }, [together, authors, others]);
+    return { authors, shared: others || people.some((person) => person?.id !== viewer), live };
+  }, [together, authors, others, live]);
   return { voices, failed: together && read.error ? read.error.message : null, retry: () => void read.refetch() };
 }
 
-/** The sender of the turn these blocks make, when the thread has others in it and its sender is known. Null: a former member. */
-export function useTurnSender(blocks: readonly { id: string }[] | undefined): ThreadPerson | null | undefined {
+/**
+ * The sender of the turn these blocks make, when the thread has others in it and its sender is known. Null: a former
+ * member. A turn that runs now (`live`) is its server-named sender's before any of its events say so.
+ */
+export function useTurnSender(blocks: readonly { id: string }[] | undefined, live = false): ThreadPerson | null | undefined {
   const voices = useContext(ThreadVoicesContext);
   if (!voices?.shared || !blocks) return undefined;
   for (const block of blocks) {
     const turn = voices.authors.turnOf[block.id];
     if (turn !== undefined && turn in voices.authors.senders) return voices.authors.senders[turn];
   }
-  return undefined;
+  return live ? voices.live : undefined;
 }
 
 /** Who wrote a person's message, when the thread has others in it and its author is known. Null: a former member. */

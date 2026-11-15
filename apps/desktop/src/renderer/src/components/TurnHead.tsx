@@ -14,7 +14,7 @@ import { TurnSender } from "./ThreadVoice";
  */
 export function TurnHead({ runId, named, status, blocks }: { runId: string; named?: string | undefined; status: TurnStatus; blocks?: readonly { id: string }[] }) {
   const author = useTurnAuthor(named, runId);
-  const sender = useTurnSender(blocks);
+  const sender = useTurnSender(blocks, status.kind === "working" || status.kind === "writing");
   const voice = useRunVoice(runId);
   const first = useRef(status.kind);
   const name = author ?? (voice ? harnessShortName(voice.agent) : "Assistant");

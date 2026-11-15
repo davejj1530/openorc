@@ -1,11 +1,29 @@
 import type { ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { projectMeta, sidebarSectionOpen, sidebarThreadPage, threadListParams, toggleSidebarFold, visibleSidebarThreadIds } from "./sidebar-thread-groups.js";
+import { needingAlone, projectMeta, sidebarSectionOpen, sidebarThreadPage, threadListParams, toggleSidebarFold, visibleSidebarThreadIds } from "./sidebar-thread-groups.js";
 import { threadTreeRows, toggleThreadTree } from "./thread-tree.js";
 
 function thread(id: string, values: Partial<ThreadSummary> = {}): ThreadSummary {
   return { id, projectId: "project", archivedAt: null, pinnedAt: null, snoozedUntil: null, ...values } as ThreadSummary;
 }
+
+describe("threads that need the person", () => {
+  const parent = thread("parent");
+  const unread = thread("unread", { parentThreadId: parent.id, parentRelation: "started" });
+  const native = thread("native", { parentThreadId: unread.id, parentRelation: "subagent" });
+  it("leaves a sub thread under the parent the list already holds, with what hangs below it", () => {
+    expect(needingAlone([unread, native, thread("other")], [parent])?.map((t) => t.id)).toEqual(["other"]);
+  });
+  it("keeps a sub thread whose parent needs the person too, and one whose parent the list does not hold", () => {
+    expect(needingAlone([parent, unread, native], [parent])?.map((t) => t.id)).toEqual(["parent", "unread", "native"]);
+    expect(needingAlone([unread, native], [])?.map((t) => t.id)).toEqual(["unread", "native"]);
+  });
+  it("draws no row of its own for an unread sub thread once its parent has been read", () => {
+    const page = sidebarThreadPage({ projectId: "project", fetched: needingAlone([unread], [parent]), selected: null, filter: "active", limit: 12, now: 100 });
+    expect(page.rest).toEqual([]);
+    expect(needingAlone(undefined, [parent])).toBeUndefined();
+  });
+});
 
 describe("sidebar thread page", () => {
   it("counts full conversations while excluding native children", () => {

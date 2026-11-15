@@ -17,6 +17,29 @@ export function threadListParams(projectId: string, filter: SidebarFilter, shown
 export type ThreadPage = { list: ThreadSummary[]; pinned: ThreadSummary[]; rest: ThreadSummary[]; snoozed: ThreadSummary[]; hasMore: boolean };
 
 /**
+ * The read of threads that need the person, without the sub threads whose parent the list already holds. Such a thread
+ * stays under its parent there, behind the parent's own page; read alone it would be drawn as a thread of its own.
+ * One whose parent needs the person too keeps its place under it, and one whose parent the list does not hold stands
+ * by itself, as it does in the list.
+ */
+export function needingAlone(needsYou: readonly ThreadSummary[] | undefined, listed: readonly ThreadSummary[]): ThreadSummary[] | undefined {
+  if (!needsYou) return undefined;
+  const held = new Set(listed.map((thread) => thread.id));
+  const kept = new Map(needsYou.map((thread) => [thread.id, thread]));
+  // A thread left under its parent takes what hangs below it along.
+  for (let left = true; left;) {
+    left = false;
+    for (const thread of kept.values()) {
+      if (!thread.parentThreadId || kept.has(thread.parentThreadId)) continue;
+      if (!held.has(thread.parentThreadId) && needsYou.every((other) => other.id !== thread.parentThreadId)) continue;
+      kept.delete(thread.id);
+      left = true;
+    }
+  }
+  return needsYou.filter((thread) => kept.has(thread.id));
+}
+
+/**
  * One project's fetched page, with the active thread kept visible even when it falls outside that page. Hidden
  * threads, such as Orclings' own conversations listed apart, are left out.
  */

@@ -14,6 +14,7 @@ import {
   listLayout,
   moreRows,
   NEEDS_YOU_PAGE,
+  needingAlone,
   pinOrder,
   projectRows,
   rootStatuses,
@@ -156,7 +157,12 @@ function useThreadList(children: ChildPages) {
     queries,
     pages,
     pinPage: apart(pins.data),
-    needsYouPage: apart(needsYou.data),
+    needsYouPage: apart(
+      needingAlone(
+        needsYou.data,
+        fetched.flatMap((each) => each?.rows ?? []),
+      ),
+    ),
     resolvedPage: putRows && page(putRows, "archived", resolvedLimit),
     activeId,
     pinnedOnly,

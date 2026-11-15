@@ -112,6 +112,7 @@ export type { RpcQueryOptions } from "./query.js";
 export type { LoadRequest, RunStore } from "./run-store.js";
 export {
   THREAD_PAGE,
+  needingAlone,
   projectMeta,
   sidebarFoldKey,
   sidebarSectionOpen,

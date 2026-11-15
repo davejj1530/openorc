@@ -5,6 +5,7 @@ import { Button } from "../components/ui";
 import { OrganizationIdentityDialog } from "../dialogs/OrganizationIdentityDialog";
 import { OrganizationMembershipDialog, type MembershipAction } from "../dialogs/OrganizationMembershipDialog";
 import { cn } from "../lib/cn";
+import { useFrozenReason } from "../lib/organization-authority";
 import { useOrganizationPeople } from "../lib/organization-people";
 import { ORGANIZATION_SEATS_ENABLED, useOrganizationSection } from "../lib/organization-section";
 import { OrganizationMoreMenu } from "./OrganizationMenus";
@@ -33,6 +34,9 @@ export function OrganizationPeople(props: Props) {
 
 function OrganizationPeopleBody({ spaceId, onInvite, onLeft }: Props) {
   const people = useOrganizationPeople(spaceId);
+  // A frozen admin keeps the people, their seats and the invitations; the reason shows on what waits for their access.
+  const frozen = useFrozenReason(spaceId);
+  const held = Boolean(people.error || frozen);
   const [dialog, setDialog] = useState<{ action: Action; trigger: HTMLButtonElement | null } | null>(null);
   const data = people.data;
   const admin = data?.viewer.role === "admin";
@@ -50,7 +54,7 @@ function OrganizationPeopleBody({ spaceId, onInvite, onLeft }: Props) {
     <OrganizationPeopleContent
       people={data}
       spaceId={spaceId}
-      editable={Boolean(admin && !people.error)}
+      editable={Boolean(admin && !held)}
       refresh={people.refetch}
       remove={(person, trigger) => open({ kind: "remove", organization: data.organization, person }, trigger)}
     />
@@ -61,13 +65,13 @@ function OrganizationPeopleBody({ spaceId, onInvite, onLeft }: Props) {
       <div className={cn("page-column list-page people-column", sections && "seats-column")}>
         {data ? (
           <>
-            <OrganizationPeopleHeading people={data}>
+            <OrganizationPeopleHeading people={data} projects={!frozen}>
               {admin && section.section === "people" ? (
-                <Button variant="primary" size="lg" disabled={Boolean(people.error)} onClick={onInvite}>
+                <Button variant="primary" size="lg" disabled={held} data-tip={frozen} onClick={onInvite}>
                   Invite people
                 </Button>
               ) : null}
-              <OrganizationMoreMenu people={data} disabled={Boolean(people.error)} onAction={(kind, trigger) => open({ kind, organization: data.organization }, trigger)} />
+              <OrganizationMoreMenu people={data} disabled={Boolean(people.error)} frozen={Boolean(frozen)} onAction={(kind, trigger) => open({ kind, organization: data.organization }, trigger)} />
             </OrganizationPeopleHeading>
             {sections ? <OrganizationSections {...section}>{section.section === "seats" ? <OrganizationSeatsPage spaceId={spaceId} /> : roster}</OrganizationSections> : roster}
           </>

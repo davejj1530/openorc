@@ -5,9 +5,10 @@ import { useRpc } from "../lib/client";
 import { OrganizationPeopleRow } from "./OrganizationPeopleRow";
 import { OrganizationInvitations } from "./OrganizationInvitations";
 
-export function OrganizationPeopleHeading({ people, children }: { people: OrganizationPeople; children: ReactNode }) {
-  const projects = useRpc("spaces.projects", { spaceId: people.organization.id });
-  const projectCount = projects.data && !projects.error ? new Set(projects.data.map((project) => project.hostedProjectId ?? project.key)).size : undefined;
+/** `projects` is false for a frozen admin, who keeps the people and is asked for and shown nothing of the projects. */
+export function OrganizationPeopleHeading({ people, projects: counted = true, children }: { people: OrganizationPeople; projects?: boolean; children: ReactNode }) {
+  const projects = useRpc("spaces.projects", { spaceId: people.organization.id }, { enabled: counted });
+  const projectCount = counted && projects.data && !projects.error ? new Set(projects.data.map((project) => project.hostedProjectId ?? project.key)).size : undefined;
   return (
     <div className="people-heading">
       <OrganizationMark name={people.organization.name} logo={people.organization.logo} size={44} />

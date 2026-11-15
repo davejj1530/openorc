@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { OrganizationPeople as People, OrganizationRole } from "@openorc/protocol";
 import { queryClient } from "../lib/client";
+import { organizationContentGate } from "../lib/organization-content-gate";
 import { OrganizationPeople } from "./OrganizationPeople";
 
 const mock = vi.hoisted(() => ({ call: vi.fn<(method: string, params: Record<string, unknown>) => Promise<unknown>>() }));
@@ -13,10 +14,30 @@ vi.mock("../components/HeaderOrcling", () => ({ HeaderOrcling: () => null }));
 const leave = vi.fn();
 let people: People;
 let failure: string | null;
+let gate: unknown;
+const frozenWords = "Your seat was taken back, and your day of grace has ended.";
+const gateStatus = (state: "active" | "frozen") => ({
+  state: "ready",
+  userId: "user-alex",
+  apiOrigin: "https://cloud.example.com",
+  personalSpaceId: "personal",
+  spaces: [
+    { kind: "personal", id: "personal" },
+    { kind: "organization", id: "birch", name: "Birch Studio", logo: null, memberId: "alex", role: "admin", memberCount: 3 },
+  ],
+  create: { allowed: true, reason: null },
+  invitations: [],
+  reach: "live",
+  heardAt: Date.now(),
+  error: null,
+  organizationAccess: state === "frozen" ? { state, reason: "seat_removed", until: null, message: frozenWords } : { state, reason: null, until: null, message: null },
+});
 beforeEach(() => {
   vi.clearAllMocks();
   queryClient.clear();
+  organizationContentGate.reset();
   failure = null;
+  gate = {};
   people = {
     organization: { id: "birch", name: "Birch Studio", logo: null },
     viewer: { memberId: "alex", role: "admin" },
@@ -36,6 +57,7 @@ afterEach(() => {
 });
 
 async function answer(method: string, params: Record<string, unknown>) {
+  if (method === "spaces.refresh") return typeof gate === "string" ? gateStatus(gate as "active" | "frozen") : gate;
   if (method === "organization.invitations") return [];
   if (method === "organization.people") return { ...people, members: people.members.slice(Number(params["offset"] ?? 0), Number(params["offset"] ?? 0) + 100) };
   if (method === "spaces.projects")
@@ -162,4 +184,34 @@ it("shows a read failure and retry instead of an empty roster", async () => {
   expect((await screen.findByRole("alert", {}, { timeout: 4000 })).textContent).toBe("OpenOrc Cloud can't be reached.");
   expect(screen.queryByRole("table", { name: "People" })).toBeNull();
   expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+});
+
+it("shows a frozen admin the people and their plans, with no project count, role change, removal, edit or delete", async () => {
+  changeRole("mira", "admin");
+  gate = "frozen";
+  show();
+  await screen.findByText("mira@example.com");
+  const invite = await screen.findByRole("button", { name: "Invite people" });
+  await waitFor(() => expect(invite.getAttribute("data-tip")).toBe(frozenWords));
+  expect(invite).toHaveProperty("disabled", true);
+  expect(screen.getByText("3 people")).toBeTruthy();
+  expect(mock.call.mock.calls.some(([method]) => method === "spaces.projects")).toBe(false);
+  expect(screen.queryByRole("button", { name: "Role for Mira Chen" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Role for Alex Rivera" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "More for Jules Park" })).toBeNull();
+  expect(screen.getAllByText("Pro")).toHaveLength(2);
+  expect(mock.call).toHaveBeenCalledWith("organization.invitations", { spaceId: "birch" });
+  fireEvent.click(screen.getByRole("button", { name: "More for Birch Studio" }));
+  expect((await screen.findByRole("menuitem", { name: "Leave organization…" })).getAttribute("aria-disabled")).toBeNull();
+  expect(screen.queryByRole("menuitem", { name: "Edit organization…" })).toBeNull();
+  expect(screen.queryByRole("menuitem", { name: "Delete organization…" })).toBeNull();
+});
+
+it("gives an admin whose access is open every control back", async () => {
+  changeRole("mira", "admin");
+  gate = "active";
+  show();
+  await screen.findByRole("button", { name: "Role for Mira Chen" });
+  expect(screen.getByRole("button", { name: "Invite people" })).toHaveProperty("disabled", false);
+  expect(await screen.findByText("3 people · 1 project")).toBeTruthy();
 });

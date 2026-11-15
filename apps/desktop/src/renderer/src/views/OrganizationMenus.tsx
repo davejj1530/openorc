@@ -11,15 +11,18 @@ import { floatingGround } from "../lib/use-anchor-ground";
 export function OrganizationMoreMenu({
   people,
   disabled,
+  frozen = false,
   onAction,
 }: {
   people: OrganizationPeople;
   disabled: boolean;
+  /** A frozen admin keeps leaving; editing and deleting the organization wait for their access. */
+  frozen?: boolean;
   onAction(action: "edit" | "leave" | "delete", trigger: HTMLButtonElement | null): void;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
-  const admin = people.viewer.role === "admin";
-  const onlyAdmin = admin && people.adminCount === 1;
+  const onlyAdmin = people.viewer.role === "admin" && people.adminCount === 1;
+  const admin = people.viewer.role === "admin" && !frozen;
   return (
     <Menu.Root>
       <Menu.Trigger ref={trigger} render={<IconButton aria-label={`More for ${people.organization.name}`} />}>

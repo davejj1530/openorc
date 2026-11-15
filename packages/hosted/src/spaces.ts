@@ -21,7 +21,7 @@ export interface SpaceCatalog {
   ids: string[];
   projects: ScopedProject[];
 }
-type SpacesDeps = { session: Session } & Pick<HostedDeps, "browser" | "server" | "kept" | "projects" | "push" | "now">;
+type SpacesDeps = { session: Session; accessChanged?(): void } & Pick<HostedDeps, "browser" | "server" | "kept" | "projects" | "push" | "now">;
 
 /** The account's membership and project authority, independent of any window's selected space. */
 export class Spaces implements HostedSpaces {
@@ -142,7 +142,10 @@ export class Spaces implements HostedSpaces {
         ),
       ]);
       if (!this.#current(generation)) return;
+      const before = this.#snapshot?.email === state.email ? this.#snapshot.index.organizationAccess : undefined;
       this.#snapshot = { apiOrigin: this.#origin, email: state.email, index, projects: projects.rows, heardAt: this.deps.now() };
+      // A deadline passing changes access with nothing pushed; the account's plan and hours are read again with it.
+      if (before !== undefined && JSON.stringify(before) !== JSON.stringify(index.organizationAccess)) this.deps.accessChanged?.();
       this.#error = projects.error ?? inbox.error;
       if (inbox.read)
         this.#invitations = inbox.read.invitations.map((invitation) => ({

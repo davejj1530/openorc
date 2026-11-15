@@ -215,7 +215,7 @@ export interface Hosted {
 
 export function createHosted(deps: HostedDeps): Hosted {
   const session = new Session(deps);
-  const spaces = new Spaces({ ...deps, session });
+  const spaces = new Spaces({ ...deps, session, accessChanged: () => void account.reread() });
   const organizationBilling = new OrganizationBilling({
     ...deps,
     session,

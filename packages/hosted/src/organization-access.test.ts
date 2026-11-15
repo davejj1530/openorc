@@ -205,3 +205,16 @@ it("does not join or forward frames from a watch answer delayed across revoked a
   stand.append(id, [{ type: "message.completed", ts: Date.now(), messageId: "new", role: "assistant", text: "Visible again" }]);
   await vi.waitFor(() => expect(seen.pushes.filter(isFrame)).toHaveLength(1));
 });
+
+it("reads the account again when a spaces read finds the person's organization access changed, as a grace day ending does", async () => {
+  project();
+  const grace = { state: "grace", reason: "seat_removed", until: new Date(Date.now() + 3_600_000).toISOString(), message: "Your seat was taken back." } as const;
+  stand.setBilling(MEMBER, { pro: true, standing: "grace", at: new Date(Date.now() + 3_600_000).toISOString(), monthlyLeftSeconds: 0, packsLeftSeconds: 0, organizationAccess: grace });
+  const { hosted } = await person(MEMBER);
+  await vi.waitFor(() => expect(hosted.account.status()).toMatchObject({ plan: { pro: true } }));
+  // The day ends on the server with nothing pushed: only the gate's next read of the spaces can notice.
+  const frozen = { state: "frozen", reason: "seat_removed", until: null, message: "Your seat was taken back, and your day of grace has ended." } as const;
+  stand.setBilling(MEMBER, { pro: false, organizationAccess: frozen });
+  await hosted.spaces.refresh();
+  await vi.waitFor(() => expect(hosted.account.status()).toMatchObject({ plan: { pro: false } }));
+});

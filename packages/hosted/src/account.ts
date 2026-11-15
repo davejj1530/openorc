@@ -97,6 +97,11 @@ export class Account implements HostedAccount {
     this.#announce();
   }
 
+  /** Reads the account again, as when the server says its billing changed. */
+  reread(): Promise<void> {
+    return this.#refresh();
+  }
+
   status(): AccountStatus {
     const state = this.deps.session.state;
     if (!state.signedIn) return { state: "signed-out", signingIn: this.#signingIn.work, ended: state.ended, error: this.#error };

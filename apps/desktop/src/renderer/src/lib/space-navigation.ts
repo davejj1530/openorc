@@ -43,10 +43,7 @@ export function createSpaceNavigation(deps: Dependencies) {
   let localView: SpaceView | null = null;
   const held = new HeldSpaceViews();
   const store = createStore<Navigation>((set, get) => {
-    // A closed organization's saved view is left as it was: what shows meanwhile holds none of what was open.
-    const save = (id: string, view: SpaceView) => {
-      if (!get().inventory.find((space) => space.id === id)?.closed) saveSpaceView(deps, get().key, id, view);
-    };
+    const save = (id: string, view: SpaceView) => void (saves(get().inventory, id) && saveSpaceView(deps, get().key, id, view));
     const restore = (id: string, view: SpaceView) => {
       restoring = true;
       unstable_batchedUpdates(() => {
@@ -72,12 +69,7 @@ export function createSpaceNavigation(deps: Dependencies) {
         if (!get().key && !saved.views[personal]) inventory = retainInitialLocal(inventory, personal, old);
         for (const space of inventory) if (space.closed) held.hold(space.id, saved.views[space.id]);
         const views = Object.fromEntries(inventory.map((space) => [space.id, validSpaceView(saved.views[space.id] ?? (get().key ? null : old), space)]));
-        let wanted = saved.last;
-        try {
-          wanted = deps.session.getItem(key) ?? wanted;
-        } catch {
-          /* Use the new-window default. */
-        }
+        const wanted = lastSpace(deps, key, saved.last);
         const id = inventory.some((space) => space.id === wanted) ? wanted! : personal;
         set({ key, personal, inventory, views });
         // Write every migrated home before legacy persistence is suspended.
@@ -143,6 +135,18 @@ export function createSpaceNavigation(deps: Dependencies) {
     };
   });
   return store;
+}
+
+/** A closed organization's saved view is left as it was: what shows meanwhile holds none of what was open. */
+const saves = (inventory: SpaceInventory[], id: string): boolean => !inventory.find((space) => space.id === id)?.closed;
+
+/** The space this window last stood in, else the one any window last saved. */
+function lastSpace(deps: Dependencies, key: string, saved: string | null): string | null {
+  try {
+    return deps.session.getItem(key) ?? saved;
+  } catch {
+    return saved;
+  }
 }
 
 function departDetachedSpace(state: Navigation, id: string, set: (value: Partial<Navigation>) => void, save: (id: string, view: SpaceView) => void): void {

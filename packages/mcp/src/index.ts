@@ -7,8 +7,8 @@ import { z } from "zod";
 import { registerBrowserTool } from "./browser.js";
 import { registerDeviceTool } from "./device.js";
 import { registerTaskContext, registerTaskTools } from "./task-tools.js";
-import type { TaskContextOptions, TaskTools } from "./task-types.js";
-export type { TaskCard, TaskTools, TaskScope, TaskContextOptions } from "./task-types.js";
+import type { OnlineTaskScopeChoice, TaskContextOptions, TaskTools } from "./task-types.js";
+export type { TaskCard, TaskTools, TaskScope, TaskContextOptions, OnlineTaskScopeChoice } from "./task-types.js";
 import { fileBoundaryAnswer } from "./file-boundary.js";
 import { orclingToolNames, registerOrclingTools, type OrclingTools } from "./orcling-tools.js";
 import { registerPullReviewTools, type PullReviewTools } from "./pull-review.js";
@@ -62,8 +62,8 @@ export interface McpHost {
   approve(request: ApprovalRequest): Promise<ApprovalResult>;
   /** Omit memory tools while recall and recording are disabled. Task context stays available. */
   memoryEnabled?(): boolean;
-  /** Whether this run's task tools may name an online task's space and project. Any other run sees the Mac's tools. */
-  onlineTasks?(runId: string): boolean;
+  /** The cloud projects this run's task tools may name. With none, the run sees the Mac's tools as they are. */
+  onlineTaskScopes?(runId: string): Promise<readonly OnlineTaskScopeChoice[]>;
   memorySearch(runId: string, query: string, limit: number): Promise<MemorySearchHit[]>;
   taskContext(runId: string, options?: TaskContextOptions): Promise<string>;
   memoryRecord(runId: string, entry: { type: string; title: string; body: string; topicKey?: string }): Promise<{ id: string }>;
@@ -137,7 +137,8 @@ export async function startMcpServer(host: McpHost, options: { port?: number; ho
       await answerFileBoundary(req, res, url.searchParams);
       return;
     }
-    const mcp = buildServer(host, runId);
+    const scopes = (await host.onlineTaskScopes?.(runId).catch(() => [])) ?? [];
+    const mcp = buildServer(host, runId, scopes);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on("close", () => {
       void transport.close();
@@ -247,7 +248,7 @@ function registerOptionalTools(mcp: McpServer, host: McpHost, runId: string): vo
   if (host.orcling?.available(runId)) registerOrclingTools(mcp, host.orcling, runId);
 }
 
-function buildServer(host: McpHost, runId: string): McpServer {
+function buildServer(host: McpHost, runId: string, scopes: readonly OnlineTaskScopeChoice[]): McpServer {
   const mcp = new McpServer({ name: "openorc", version: "0.0.0" });
   const memoryEnabled = host.memoryEnabled?.() !== false;
 
@@ -335,7 +336,7 @@ function buildServer(host: McpHost, runId: string): McpServer {
       },
     );
 
-  registerTaskContext(mcp, host, runId);
+  registerTaskContext(mcp, host, runId, scopes);
 
   if (memoryEnabled)
     mcp.registerTool(
@@ -371,7 +372,7 @@ function buildServer(host: McpHost, runId: string): McpServer {
       },
     );
 
-  registerTaskTools(mcp, host, runId);
+  registerTaskTools(mcp, host, runId, scopes);
 
   if (host.execution?.available(runId)) registerExecutionTools(mcp, host.execution, runId);
   mcp.registerTool(

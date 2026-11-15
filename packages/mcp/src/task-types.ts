@@ -3,6 +3,10 @@ import { z } from "zod";
 
 export const TaskScope = OnlineTaskRef.pick({ spaceId: true, projectId: true }).strict();
 export type TaskScope = z.infer<typeof TaskScope>;
+/** A cloud project a run's task tools may name: the run's own project on OpenOrc Cloud, where tasks are open. */
+export interface OnlineTaskScopeChoice extends TaskScope {
+  name: string;
+}
 export interface TaskContextOptions {
   scope?: TaskScope;
   taskId?: string;

@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { TaskStatus } from "@openorc/protocol";
 import { z } from "zod";
 import type { McpHost } from "./index.js";
-import { TaskScope } from "./task-types.js";
+import type { OnlineTaskScopeChoice } from "./task-types.js";
 
 const revision = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional();
 
@@ -12,27 +12,40 @@ function online<T extends z.ZodRawShape, O extends z.ZodRawShape>(on: boolean, s
   return { ...shape, ...added };
 }
 
-export function registerTaskContext(mcp: McpServer, host: McpHost, runId: string) {
+/** The run's own cloud projects, by value and by name, so the agent names one of them or none. */
+function scopeOf(scopes: readonly OnlineTaskScopeChoice[]) {
+  const each = scopes.map((choice) =>
+    z
+      .object({ spaceId: z.literal(choice.spaceId), projectId: z.literal(choice.projectId) })
+      .strict()
+      .describe(choice.name),
+  );
+  const [first, ...rest] = each;
+  const scope = first && rest.length ? z.union([first, ...rest]) : (first ?? z.never());
+  return scope.optional().describe(`This project's tasks on OpenOrc Cloud (${scopes.map((choice) => choice.name).join(", ")}). Leave it out for this Mac's tasks.`);
+}
+
+export function registerTaskContext(mcp: McpServer, host: McpHost, runId: string, scopes: readonly OnlineTaskScopeChoice[]) {
   mcp.registerTool(
     "task_context",
     {
       description: "The brief for the current task: spec, prior attempts, related decisions and lessons, commands that worked.",
-      inputSchema: online(host.onlineTasks?.(runId) === true, {}, { scope: TaskScope.optional(), taskId: z.string().min(1).optional() }),
+      inputSchema: online(scopes.length > 0, {}, { scope: scopeOf(scopes), taskId: z.string().min(1).optional() }),
     },
     async (options) => ({ content: [{ type: "text", text: await host.taskContext(runId, options) }] }),
   );
 }
 
-export function registerTaskTools(mcp: McpServer, host: McpHost, runId: string) {
-  const on = host.onlineTasks?.(runId) === true;
-  registerCreate(mcp, host, runId, on);
-  registerStart(mcp, host, runId, on);
-  registerList(mcp, host, runId, on);
-  registerGet(mcp, host, runId, on);
-  registerUpdate(mcp, host, runId, on);
+export function registerTaskTools(mcp: McpServer, host: McpHost, runId: string, scopes: readonly OnlineTaskScopeChoice[]) {
+  registerCreate(mcp, host, runId, scopes);
+  registerStart(mcp, host, runId, scopes);
+  registerList(mcp, host, runId, scopes);
+  registerGet(mcp, host, runId, scopes);
+  registerUpdate(mcp, host, runId, scopes);
 }
 
-function registerCreate(mcp: McpServer, host: McpHost, runId: string, on: boolean) {
+function registerCreate(mcp: McpServer, host: McpHost, runId: string, scopes: readonly OnlineTaskScopeChoice[]) {
+  const on = scopes.length > 0;
   mcp.registerTool(
     "task_create",
     {
@@ -58,7 +71,7 @@ function registerCreate(mcp: McpServer, host: McpHost, runId: string, on: boolea
               "Current uses the existing checkout and branch, worktree creates an isolated workspace. Omit to save the user’s default. Exclusive workspace operations can block local startup; never silently fall back to a worktree.",
             ),
         },
-        { scope: TaskScope.optional() },
+        { scope: scopeOf(scopes) },
       ),
     },
     async ({ title, spec, priority, labels, execution, workspace_mode, scope }) => {
@@ -76,7 +89,8 @@ function registerCreate(mcp: McpServer, host: McpHost, runId: string, on: boolea
   );
 }
 
-function registerStart(mcp: McpServer, host: McpHost, runId: string, on: boolean) {
+function registerStart(mcp: McpServer, host: McpHost, runId: string, scopes: readonly OnlineTaskScopeChoice[]) {
+  const on = scopes.length > 0;
   mcp.registerTool(
     "task_start",
     {
@@ -88,7 +102,7 @@ function registerStart(mcp: McpServer, host: McpHost, runId: string, on: boolean
           id: z.string().min(1),
           workspace_mode: z.enum(["current", "worktree"]).optional().describe("Tasks run in the current conversation workspace. Omit this field; a different location requires moving the thread."),
         },
-        { scope: TaskScope.optional(), ifRevision: revision },
+        { scope: scopeOf(scopes), ifRevision: revision },
       ),
     },
     async ({ id, workspace_mode, scope, ifRevision }) => ({
@@ -108,36 +122,39 @@ function registerStart(mcp: McpServer, host: McpHost, runId: string, on: boolean
   );
 }
 
-function registerList(mcp: McpServer, host: McpHost, runId: string, on: boolean) {
+function registerList(mcp: McpServer, host: McpHost, runId: string, scopes: readonly OnlineTaskScopeChoice[]) {
+  const on = scopes.length > 0;
   mcp.registerTool(
     "task_list",
     {
       description: "Tasks across all threads in this project with their status and branch. The task you are executing, if any, is marked current.",
-      inputSchema: online(on, {}, { scope: TaskScope.optional() }),
+      inputSchema: online(on, {}, { scope: scopeOf(scopes) }),
     },
     async ({ scope }) => ({ content: [{ type: "text", text: JSON.stringify(await host.tasks.list(runId, scope)) }] }),
   );
 }
 
-function registerGet(mcp: McpServer, host: McpHost, runId: string, on: boolean) {
+function registerGet(mcp: McpServer, host: McpHost, runId: string, scopes: readonly OnlineTaskScopeChoice[]) {
+  const on = scopes.length > 0;
   mcp.registerTool(
     "task_get",
     {
       description:
         "Read any task in this project by ID, regardless of its originating thread. Live progress includes: latest agent commentary, current action, permission/input wait, run outcome, and result summary. Use this when the user asks for a report; waiting means paused, not still implementing.",
-      inputSchema: online(on, { id: z.string() }, { scope: TaskScope.optional() }),
+      inputSchema: online(on, { id: z.string() }, { scope: scopeOf(scopes) }),
     },
     async ({ id, scope }) => ({ content: [{ type: "text", text: JSON.stringify(await host.tasks.get(runId, id, scope)) }] }),
   );
 }
 
-function registerUpdate(mcp: McpServer, host: McpHost, runId: string, on: boolean) {
+function registerUpdate(mcp: McpServer, host: McpHost, runId: string, scopes: readonly OnlineTaskScopeChoice[]) {
+  const on = scopes.length > 0;
   mcp.registerTool(
     "task_update",
     {
       description:
         "Update any task in this project by ID, regardless of its originating thread or assigned agent. Set its board status or refine its spec. A status move does not stop an execution or change its recorded outcome.",
-      inputSchema: online(on, { id: z.string(), status: TaskStatus.optional(), spec: z.string().optional() }, { scope: TaskScope.optional(), ifRevision: revision }),
+      inputSchema: online(on, { id: z.string(), status: TaskStatus.optional(), spec: z.string().optional() }, { scope: scopeOf(scopes), ifRevision: revision }),
     },
     async ({ id, status, spec, scope, ifRevision }) => ({
       content: [

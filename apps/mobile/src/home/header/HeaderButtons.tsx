@@ -78,14 +78,15 @@ export type BarFor = "unpaired" | "paired" | "demo";
 /**
  * The connection, the filter, then Settings outermost, as circles 8 pt apart, Settings' over the plus buttons on the
  * list's project headings. With no Mac there is nothing to connect to or filter, and over the Orclings and Tasks tabs
- * the filter goes: it is the threads'. In the demo Skip takes Settings' place.
+ * the filter goes: it is the threads'. With no list to filter (`listed` false) it goes too. In the demo Skip takes
+ * Settings' place.
  */
-export function HeaderButtons({ state, tab = "threads" }: { state: LinkState; tab?: HomeTab }) {
+export function HeaderButtons({ state, tab = "threads", listed = true }: { state: LinkState; tab?: HomeTab; listed?: boolean }) {
   const shows = barFor(state);
   return (
     <View className="flex-row gap-2">
       {state.kind === "unpaired" ? null : <ConnectionButton state={state} />}
-      {shows === "unpaired" || tab !== "threads" ? null : <FilterButton />}
+      {shows === "unpaired" || tab !== "threads" || !listed ? null : <FilterButton />}
       {shows === "demo" ? <SkipButton /> : <SettingsButton />}
     </View>
   );

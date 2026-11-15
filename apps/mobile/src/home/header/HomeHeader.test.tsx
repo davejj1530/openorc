@@ -115,3 +115,9 @@ it("titles Home with the space it shows once the Mac's person is signed in to Op
   render(<HomeBar state={connected} />);
   expect(screen.getByText("OpenOrc")).toBeTruthy();
 });
+
+it("offers no filter where Home has no list, as for a space shut to the person", () => {
+  render(<HomeBar state={connected} listed={false} />);
+  expect(screen.queryByRole("button", { name: /^Show/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
+});

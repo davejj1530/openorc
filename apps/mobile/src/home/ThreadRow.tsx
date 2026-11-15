@@ -4,6 +4,7 @@ import {
   relativeTime,
   rowStarter,
   subagentStatusLabel,
+  togetherActivity,
   threadHeadline,
   threadMark,
   threadPlace,
@@ -24,6 +25,7 @@ import { ListPressable } from "../ui/ListPressable";
 import { swipeAccessibility, type SwipeAction } from "../ui/swipe";
 import { SwipeRow } from "../ui/SwipeRow";
 import { Text } from "../ui/Text";
+import { useCloudOutOfReach } from "../spaces/cloud-reach";
 import { markThreadOpening } from "../thread/perf-probe";
 import { threadMenu, threadSwipes } from "../thread/thread-actions";
 import { rowMenu } from "../thread/ThreadMenu";
@@ -55,14 +57,14 @@ function rowFacts(thread: ThreadSummary, where: string): string[] {
  * the teammate who started it when it is not the person's own. The cloud dims while the Mac cannot reach it. Null for
  * a thread of this Mac.
  */
-function cloudPlace(thread: ThreadSummary, project: string | null): { line: string; spoken: string; offline: boolean } | null {
+function cloudPlace(thread: ThreadSummary, project: string | null, outOfReach = false): { line: string; spoken: string; offline: boolean } | null {
   if (!placeOf(thread).rowIcon) return null;
   const name = project ?? thread.owner?.project?.name ?? null;
   const starter = rowStarter(thread);
   return {
     line: [name, starter?.first].filter(Boolean).join(" · "),
     spoken: [name, "OpenOrc Cloud", starter ? `started by ${starter.name}` : null].filter(Boolean).join(", "),
-    offline: thread.owner?.reach !== "live",
+    offline: outOfReach || thread.owner?.reach !== "live",
   };
 }
 
@@ -138,7 +140,7 @@ function rowMarks(thread: ThreadSummary, compact: boolean) {
  */
 function ProjectLine({ thread, project, trailing, onNode }: { thread: ThreadSummary; project: string | null; trailing: ReactNode; onNode: (mid: number) => void }) {
   const pull = pullRequestMark(thread);
-  const cloud = cloudPlace(thread, project);
+  const cloud = cloudPlace(thread, project, useCloudOutOfReach());
   const Glyph = thread.projectId === WORKSPACE_ID ? Globe : Folder;
   const PullIcon = pull ? pullIcons[pull.state] : null;
   return (
@@ -209,7 +211,8 @@ export const ThreadRow = memo(
     onFold?: (id: string, open: boolean) => void;
   }) {
     const run = useRowRun(thread.liveRunId ?? undefined);
-    const headline = useMemo(() => threadHeadline(thread, run), [thread, run]);
+    // In a cloud thread someone else is in, whose turn or ask it is says more than "Working", as the thread's header does.
+    const headline = useMemo(() => togetherActivity(thread) ?? threadHeadline(thread, run), [thread, run]);
     const actions = useThreadActions(thread);
     const now = useSnoozeClock();
     const { compact, rowClass, rowStyle, open, moves } = treePlace(tree, motion, arriving);

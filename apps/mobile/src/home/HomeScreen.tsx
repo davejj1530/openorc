@@ -26,7 +26,8 @@ import type { HomeItem } from "./home-items";
 import { refreshHome } from "./refresh";
 import { ThreadRow } from "./ThreadRow";
 import { Unpaired } from "./Unpaired";
-import { spaceNotice } from "../spaces/cloud-words";
+import { CloudOutOfReach } from "../spaces/cloud-reach";
+import { spaceStanding } from "../spaces/cloud-words";
 import { useSpaces } from "../spaces/use-spaces";
 import { useHomeItems } from "./use-home-items";
 import { UpdateReady } from "./UpdateReady";
@@ -95,13 +96,35 @@ function useSelectedThreadId(): string | undefined {
   return usePathname().startsWith("/thread/") ? params.id : undefined;
 }
 
-/** One plain line over the list: the space it shows is closed to the person, or the Mac cannot reach OpenOrc Cloud. */
-function SpaceNotice({ state }: { state: Paired }) {
-  const notice = spaceNotice(useSpaces(), state.mac.name, Date.now());
-  if (!notice) return null;
+/** One plain line over the list while the Mac cannot reach OpenOrc Cloud: what the list shows is what it last heard. */
+function OutOfReachLine({ state }: { state: Paired }) {
+  const standing = spaceStanding(useSpaces(), state.mac.name, Date.now());
+  if (standing?.kind !== "out-of-reach") return null;
   return (
     <View className="px-5 pb-3 pt-2">
-      <Text className="text-md text-ink-3">{notice}</Text>
+      <Text className="text-md text-ink-3">{standing.words}</Text>
+    </View>
+  );
+}
+
+/** Home's foot: the tabs with their action, or, for a Mac too old for Orclings and task lists, New thread alone. */
+function HomeFoot({ tabs, tab, onTab, badge, action }: { tabs: HomeTab[]; tab: HomeTab; onTab: (tab: HomeTab) => void; badge: number; action: ReturnType<typeof useNewAction> }) {
+  if (tabs.length > 1) return <BottomBar tab={tab} tabs={tabs} onTab={onTab} badge={badge} action={action} />;
+  return (
+    <Pressable accessibilityRole="button" onPress={newThread} className="mb-2 h-12 flex-row items-center gap-2 rounded-full bg-accent pl-5 pr-6 active:opacity-80">
+      <Plus size={18} className="text-accent-fg" />
+      <Text className="text-lg text-accent-fg">New thread</Text>
+    </Pressable>
+  );
+}
+
+/** A space shut to the person: its one sentence where the list would be, and nothing to start or filter. */
+function ClosedSpace({ words }: { words: string }) {
+  return (
+    <View className="flex-1 items-center justify-center px-10" style={{ paddingTop: HOME_BAR_HEIGHT }}>
+      <Text accessibilityRole="header" className="text-center text-lg text-ink-3">
+        {words}
+      </Text>
     </View>
   );
 }
@@ -127,7 +150,7 @@ function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; heade
         ListHeaderComponent={
           <>
             {header}
-            <SpaceNotice state={state} />
+            <OutOfReachLine state={state} />
           </>
         }
         ListFooterComponent={<View className="h-24" />}
@@ -165,32 +188,33 @@ function PairedHome({ state }: { state: Paired }) {
   // A Mac too old for Orclings and task lists keeps Home as it was: threads alone, under the New thread pill.
   const tab = tabs.includes(chosen) ? chosen : "threads";
   const action = useNewAction(tab, newThread);
+  const standing = spaceStanding(account, state.mac.name, Date.now());
+  const closed = standing?.kind === "closed";
   return (
-    <View className="flex-1 bg-bg" onMagicTap={newThread} onTouchStart={swipes.touched}>
+    <View className="flex-1 bg-bg" onMagicTap={closed ? undefined : newThread} onTouchStart={swipes.touched}>
       <View pointerEvents="box-none" className="absolute inset-x-0 bottom-0 z-10 items-center" style={{ paddingBottom: insets.bottom }}>
         <FootFade height={insets.bottom + PILL_ROOM} />
         <UpdateReady />
-        {tabs.length > 1 ? (
-          <BottomBar tab={tab} tabs={tabs} onTab={setTab} badge={faces ? 0 : orclings.chats.filter(needsYou).length} action={action} />
-        ) : (
-          <Pressable accessibilityRole="button" onPress={newThread} className="mb-2 h-12 flex-row items-center gap-2 rounded-full bg-accent pl-5 pr-6 active:opacity-80">
-            <Plus size={18} className="text-accent-fg" />
-            <Text className="text-lg text-accent-fg">New thread</Text>
-          </Pressable>
-        )}
+        {closed ? null : <HomeFoot tabs={tabs} tab={tab} onTab={setTab} badge={faces ? 0 : orclings.chats.filter(needsYou).length} action={action} />}
       </View>
       {/* The bar over the status bar's room, so rows scroll under it. */}
       <View className="absolute inset-x-0 top-0 z-10 bg-bg" style={{ paddingTop: insets.top }}>
-        <HomeBar state={state} scroll={scroll} tab={tab} />
+        <HomeBar state={state} scroll={scroll} tab={tab} listed={!closed} />
       </View>
-      <TabLayers
-        tab={tab}
-        render={(each) => {
-          if (each === "orclings") return <OrclingList chats={byRecent(orclings.chats)} top={HOME_BAR_HEIGHT} bottom={PILL_ROOM} shown={tab === "orclings"} />;
-          if (each === "tasks") return <TaskList top={HOME_BAR_HEIGHT} bottom={PILL_ROOM} />;
-          return <Threads state={state} {...scroll} header={faces && own ? <OrclingFaces chats={orclings.chats} /> : null} />;
-        }}
-      />
+      {closed ? (
+        <ClosedSpace words={standing.words} />
+      ) : (
+        <CloudOutOfReach.Provider value={standing?.kind === "out-of-reach"}>
+          <TabLayers
+            tab={tab}
+            render={(each) => {
+              if (each === "orclings") return <OrclingList chats={byRecent(orclings.chats)} top={HOME_BAR_HEIGHT} bottom={PILL_ROOM} shown={tab === "orclings"} />;
+              if (each === "tasks") return <TaskList top={HOME_BAR_HEIGHT} bottom={PILL_ROOM} />;
+              return <Threads state={state} {...scroll} header={faces && own ? <OrclingFaces chats={orclings.chats} /> : null} />;
+            }}
+          />
+        </CloudOutOfReach.Provider>
+      )}
     </View>
   );
 }

@@ -5,11 +5,17 @@ import { closedToPerson, spaceName, type PhoneSpaces } from "./use-spaces";
  * none of these names a price, a plan to buy or a place to pay.
  */
 
-/** The line over Home's list when the space it shows cannot be read as usual; null while all is well. */
-export function spaceNotice(account: PhoneSpaces, macName: string, now: number): string | null {
+/**
+ * How Home stands with the space it shows, when not as usual:
+ *   closed        the space is shut to the person: Home says so in place of its list, and offers nothing to start
+ *   out-of-reach  the Mac cannot reach OpenOrc Cloud: what Home shows is what it last heard, said over the list
+ */
+export type SpaceStanding = { kind: "closed" | "out-of-reach"; words: string } | null;
+
+export function spaceStanding(account: PhoneSpaces, macName: string, now: number): SpaceStanding {
   if (account.state !== "ready") return null;
-  if (closedToPerson(account.current, account.access, now)) return `Pro is needed for ${spaceName(account.current)}.`;
-  if (account.offline) return `${macName} can't reach OpenOrc Cloud. This is what it last heard.`;
+  if (closedToPerson(account.current, account.access, now)) return { kind: "closed", words: `Pro is needed for ${spaceName(account.current)}.` };
+  if (account.offline) return { kind: "out-of-reach", words: `${macName} can't reach OpenOrc Cloud. This is what it last heard.` };
   return null;
 }
 

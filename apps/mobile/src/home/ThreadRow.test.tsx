@@ -4,13 +4,14 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ThreadAction } from "../thread/thread-actions";
 import { fixtureThreads } from "./test-fixtures/threads";
+import { CloudOutOfReach } from "../spaces/cloud-reach";
 import { ThreadRow } from "./ThreadRow";
 
 const menus = vi.hoisted(() => ({ built: [] as ThreadAction[][][] }));
 vi.mock("../generated/icons", async (original) => ({
   ...(await original<object>()),
   CircleDashed: () => <svg aria-label="Neutral status mark" />,
-  Cloud: () => <svg aria-label="Cloud glyph" />,
+  Cloud: ({ className }: { className?: string }) => <svg aria-label="Cloud glyph" className={className} />,
 }));
 
 vi.mock("expo-router", () => {
@@ -121,4 +122,39 @@ it("marks an OpenOrc Cloud thread with the cloud, its project and the teammate w
   const own = render(<ThreadRow thread={mine} project="Canvas" arriving={false} />);
   expect(own.queryByLabelText("Cloud glyph")).toBeNull();
   expect(menus.built.length).toBeGreaterThan(0);
+});
+
+it("says whose turn it is on a cloud thread someone else is in, and dims its cloud while the Mac cannot reach OpenOrc Cloud", () => {
+  const mara = { id: "u-mara", name: "Mara Okafor", image: null };
+  const working = { ...fixtureThreads.find((thread) => thread.id === "t-plan")!, branch: null, prUrl: null, activity: "running" as const };
+  const owner = {
+    brain: "hosted" as const,
+    reach: "live" as const,
+    heardAt: 1,
+    startedBy: { name: "Mara Okafor", image: null },
+    collaboration: {
+      viewer: { id: "u-riley", name: "Riley Chen", image: null },
+      canWrite: true,
+      live: { id: "turn-1", sender: mara, startedAt: 1, stopping: false },
+      send: "now" as const,
+      handoff: null,
+      canPostNote: true,
+      canStop: true,
+      ask: null,
+      queue: [],
+      mentions: { unread: false, firstUnreadNoteId: null },
+      noteHead: 0,
+    },
+  };
+  const row = render(<ThreadRow thread={{ ...working, id: "cloud", owner }} project="Canvas" arriving={false} />);
+  expect(row.getByText("Mara's turn")).toBeTruthy();
+  expect(row.queryByText("Working")).toBeNull();
+  expect(row.getByLabelText("Cloud glyph").getAttribute("class") ?? "").not.toContain("opacity-50");
+  row.unmount();
+  const away = render(
+    <CloudOutOfReach.Provider value>
+      <ThreadRow thread={{ ...working, id: "cloud", owner }} project="Canvas" arriving={false} />
+    </CloudOutOfReach.Provider>,
+  );
+  expect(away.getByLabelText("Cloud glyph").getAttribute("class") ?? "").toContain("opacity-50");
 });

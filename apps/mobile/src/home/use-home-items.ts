@@ -59,6 +59,16 @@ function useSelectedFamily(selected: ThreadSummary | null, filter: SidebarFilter
   ).data;
 }
 
+/** Whose threads Home lists: the space it shows, or the Mac alone, and whether reading that space's projects failed. */
+function useListScope() {
+  const projects = useRpc("projects.list", {});
+  const account = useSpaces();
+  const space = account.state === "ready" ? account.current : null;
+  const spaceProjects = useRpc("spaces.projects", { spaceId: space?.id ?? "" }, { enabled: space !== null });
+  const scope = space ? spaceScope(space, spaceProjects.data) : macScope(projectChoices(projects.data));
+  return { projects, scope, inSpace: "spaceId" in scope.asks ? scope.asks : {}, failed: space !== null && spaceProjects.isError };
+}
+
 /**
  * The threads of the Mac, or of the space Home shows, as one list across projects, newest work first, read a page at a time; pins come from their
  * own read so an old pin still leads, and so do the threads that need you, so a folded day can still show them, and,
@@ -66,17 +76,12 @@ function useSelectedFamily(selected: ThreadSummary | null, filter: SidebarFilter
  * Resolved pages on request.
  */
 function useThreadList(connected: boolean, selectedId: string | undefined, resolvedOpen: boolean) {
-  const projects = useRpc("projects.list", {});
-  const account = useSpaces();
-  const space = account.state === "ready" ? account.current : null;
-  const spaceProjects = useRpc("spaces.projects", { spaceId: space?.id ?? "" }, { enabled: space !== null });
+  const { projects, scope, inSpace, failed: spaceFailed } = useListScope();
   const { pinnedOnly } = useHomeFilter();
   const [limit, setLimit] = useState(THREAD_PAGE);
   const [resolvedLimit, setResolvedLimit] = useState(THREAD_PAGE);
   const children = useChildThreadPages();
   const cache = useQueryClient();
-  const scope = space ? spaceScope(space, spaceProjects.data) : macScope(projectChoices(projects.data));
-  const inSpace = "spaceId" in scope.asks ? scope.asks : {};
   const listed = { ...scope.asks, filter: "active" as const, orderBy: "activity" as const, includeChildren: true, ...children.params() };
   const params = [{ ...listed, pinnedOnly, limit: limit + 1 }];
   const lists = useRpcs("threads.list", params, { refetchInterval: 60_000 });
@@ -104,7 +109,7 @@ function useThreadList(connected: boolean, selectedId: string | undefined, resol
     days,
     read,
     names: scope.names,
-    failed: connected && (lists.some((each) => each.isError) || (space !== null && spaceProjects.isError)),
+    failed: connected && (lists.some((each) => each.isError) || spaceFailed),
     listed: fetched.every(Boolean),
     resolvedCount: resolvedCount.data,
   };

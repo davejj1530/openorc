@@ -56,14 +56,14 @@ function Title() {
  * rows pass into once they scroll under it. While the link is not healthy, the bar says so after the wordmark, which
  * never moves. With no Mac nothing scrolls, so there is no fade or status to show.
  */
-export function HomeBar({ state, scroll, tab }: { state: LinkState; scroll?: HomeScroll; tab?: HomeTab }) {
+export function HomeBar({ state, scroll, tab, listed }: { state: LinkState; scroll?: HomeScroll; tab?: HomeTab; listed?: boolean }) {
   return (
     <View className="px-5 pt-1">
       <View className="h-13 flex-row items-center">
         {state.kind === "unpaired" ? <Wordmark className="self-stretch" /> : <Title />}
         {state.kind === "unpaired" ? null : <PinnedStatus state={state} />}
         <View className="flex-1" />
-        <HeaderButtons state={state} tab={tab} />
+        <HeaderButtons state={state} tab={tab} listed={listed} />
       </View>
       {scroll ? <TopFade scrollY={scroll.scrollY} /> : null}
     </View>

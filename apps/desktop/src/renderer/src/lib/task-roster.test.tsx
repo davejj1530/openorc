@@ -16,15 +16,20 @@ afterEach(() => {
 it("hides previously read people when the roster read is refused", async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const person = { memberId: "member-a", userId: "account-a", name: "Alex", image: null, available: true };
-  vi.mocked(core.call).mockResolvedValueOnce(taskAccess("account-a", "space-a"));
+  // Each read answers by what it asks, so a slow machine's extra access read never takes the roster's answer.
+  let refused = false;
+  vi.mocked(core.call).mockImplementation((async (method: string) => {
+    if (method === "spaces.refresh") return taskAccess("account-a", "space-a");
+    if (method !== "tasks.online.assignees") throw new Error(`Unexpected RPC: ${method}`);
+    if (refused) throw new Error("Project access changed");
+    return { accessRevision: 1, people: [person], cursor: null };
+  }) as never);
   await organizationContentGate.refresh();
-  vi.mocked(core.call)
-    .mockResolvedValueOnce({ accessRevision: 1, people: [person], cursor: null })
-    .mockRejectedValueOnce(new Error("Project access changed"));
   const view = renderHook(() => useTaskRoster({ accountId: "account-a", spaceId: "space-a" }, "project-a", true, ""), {
     wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
   });
   await waitFor(() => expect(view.result.current.people).toEqual([person]));
+  refused = true;
   await act(async () => {
     await view.result.current.refetch();
   });

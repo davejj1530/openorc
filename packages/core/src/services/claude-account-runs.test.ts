@@ -320,6 +320,75 @@ it("leaves a stopped conversation alone when no account has 5-hour usage left, o
   expect([start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([1, personal]);
 });
 
+it("keeps looking when no account has anything left, says why once, and goes on with the first that does", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
+  const reports: Record<string, ProviderUsage> = { [personal]: fiveHourReport(100) };
+  const recent = vi.fn(async (_provider: string, id: string | undefined) => reports[id!] ?? signedOut());
+  const warn = vi.fn();
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: true }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: { warn },
+    lookAgain: { firstMs: 15, everyMs: 15, forMs: 10_000 },
+  });
+  turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  const ts = Date.now();
+  const handle = start.mock.results[0]!.value;
+  handle.emit("event", { type: "activity.updated", runId: run!.id, ts, activityId: "rate-limit", label: "Rate limit reached", status: "error", recovery: { kind: "usage", provider: "claude" } });
+  handle.emit("event", { type: "turn.completed", runId: run!.id, ts, turnId: "fixture", status: "error", resultText: "You've hit your 5-hour limit", durationMs: 1 });
+
+  // Nothing is free: it stays where it stopped and looks again, having said why once.
+  await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
+  expect(warn.mock.calls[0]![0]).toContain("Personal: its 5-hour limit is reached");
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  expect([start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId, warn.mock.calls.length]).toEqual([1, work, 1]);
+
+  // Personal's window resets: the next look finds it.
+  reports[personal] = fiveHourReport(0);
+  await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+  expect(start.mock.lastCall![0].prompt.split("\n")[0]).toBe("Moved to the Claude account Personal after Work reached its usage limit. Continue where you left off.");
+  expect(threads.get(db, thread.id)?.claudeAccountId).toBe(personal);
+  switcher.close();
+});
+
+it("goes on with its own account once a reading taken after the stop says its limit has reset", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
+  const reports: Record<string, ProviderUsage> = { [work]: fiveHourReport(100), [personal]: fiveHourReport(100) };
+  const recent = vi.fn(async (_provider: string, id: string | undefined) => reports[id!] ?? signedOut());
+  const warn = vi.fn();
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: true }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: { warn },
+    lookAgain: { firstMs: 15, everyMs: 15, forMs: 10_000 },
+  });
+  turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  const ts = Date.now();
+  const handle = start.mock.results[0]!.value;
+  handle.emit("event", { type: "activity.updated", runId: run!.id, ts, activityId: "rate-limit", label: "Rate limit reached", status: "error", recovery: { kind: "usage", provider: "claude" } });
+  handle.emit("event", { type: "turn.completed", runId: run!.id, ts, turnId: "fixture", status: "error", resultText: "You've hit your 5-hour limit", durationMs: 1 });
+  await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
+
+  // A reading of Work from before it stopped still says a little is left: that is not proof its limit reset.
+  reports[work] = fiveHourReport(98, 10, ts - 1000);
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  expect(start).toHaveBeenCalledTimes(1);
+
+  reports[work] = fiveHourReport(0);
+  await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+  expect(start.mock.lastCall![0].prompt.split("\n")[0]).toBe("The usage limit of the Claude account Work has reset. Continue where you left off.");
+  expect(threads.get(db, thread.id)?.claudeAccountId).toBe(work);
+  switcher.close();
+});
+
 it("goes on once on the same account when Claude starts up signed out but the account's CLI then finds its login", async () => {
   const work = accounts.add("Work").id;
   let signedIn = true;

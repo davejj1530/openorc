@@ -26,6 +26,8 @@ export class StandInSeatQuantity {
   pending = false;
   /** The provider refuses the payment for more seats. */
   refusePayment = false;
+  /** A server from before it said what a seat gets at renewal or why an operation failed. */
+  plain = false;
   readonly #reviews = new Map<string, Review>();
   readonly #operations = new Map<string, { spaceId: string; token: string; to: number; operation: SeatOperation }>();
   constructor(private readonly deps: Deps) {}
@@ -73,7 +75,15 @@ export class StandInSeatQuantity {
       at: new Date(later ? paidEnd : now).toISOString(),
       nextPrice: unit && { amount: unit.amount * seats, currency: unit.currency },
       ...this.#added(billing, subscription, seats, unit),
+      ...this.#renewal(billing, seats),
     });
+  }
+
+  /** What each seat is given when its hours next renew, and when; nothing once no seat is left. */
+  #renewal(billing: Billing, seats: number) {
+    if (this.plain) return {};
+    const endsAt = billing.seats.find((seat) => seat.period)?.period?.endsAt ?? null;
+    return seats > 0 ? { renewalGrantSecondsPerSeat: 360_000, renewalGrantAt: endsAt } : { renewalGrantSecondsPerSeat: 0, renewalGrantAt: null };
   }
 
   /** What more seats cost now and bring, by the part of the hours' month that is left; nothing for any other change. */
@@ -113,7 +123,8 @@ export class StandInSeatQuantity {
     if (refusal) return refusal;
     review.used = true;
     const state = this.#outcome(review.to > subscription.quantity);
-    const operation: SeatOperation = { id, kind: "quantity", state, message: { failed: PAYMENT, pending: "Updating seats.", complete: null }[state] };
+    const message = { failed: PAYMENT, pending: "Updating seats.", complete: null }[state];
+    const operation: SeatOperation = { id, kind: "quantity", state, message, ...(!this.plain && { code: state === "failed" ? "payment_refused" : null }) };
     this.#operations.set(id, { spaceId, token, to: review.to, operation });
     if (state === "complete") this.#apply(billing, subscription, review.to);
     this.deps.changed(spaceId);

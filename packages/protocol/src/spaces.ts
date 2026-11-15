@@ -98,6 +98,14 @@ export interface OrganizationMembership {
   joinedAt: number;
 }
 
+/**
+ * What deleting an organization answers. Its billing can refuse it while seats are paid, ending or being settled: the
+ * server's words for the person, and the instant the seats end when it named one, for the app to write as a day.
+ */
+export interface OrganizationDeleteResult {
+  refusal?: { message: string; endsAt: number | null };
+}
+
 export interface OrganizationProjectAccess {
   projectId: string;
   everyone: boolean;
@@ -130,7 +138,7 @@ export interface SpacesRpcResults extends OrganizationSetupResults, Organization
   "spaces.projects": SpaceProject[];
   "organization.people": OrganizationPeople;
   "organization.leave": Record<string, never>;
-  "organization.delete": Record<string, never>;
+  "organization.delete": OrganizationDeleteResult;
   "organization.member.setRole": OrganizationMembership;
   "organization.member.remove": Record<string, never>;
   "organization.project.access": OrganizationProjectAccess;

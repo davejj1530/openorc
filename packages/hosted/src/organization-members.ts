@@ -2,10 +2,13 @@ import type { RpcParams, RpcResults } from "@openorc/protocol";
 import type { HostedDeps } from "./index.js";
 import { Refused, type Session } from "./session.js";
 import { ROUTES, type Route } from "./wire.js";
+import { DeletionConflict } from "./wire-spaces.js";
 
 interface Dependencies extends Pick<HostedDeps, "push"> {
   session: Session;
   refresh(): Promise<void>;
+  /** Whether the space is an organization this person belongs to, as last read. */
+  organization(spaceId: string): boolean;
 }
 
 /** Membership writes use explicit targets and reconcile authority before returning success. */
@@ -27,9 +30,20 @@ export class OrganizationMembers {
     return {};
   }
 
+  /**
+   * The one conflict an organization's deletion meets is its billing: seats still paid, ending, or being settled. That
+   * is an answer the window acts on, not a failure, so it is returned with its date as a value.
+   */
   async delete({ spaceId, name }: RpcParams<"organization.delete">): Promise<RpcResults["organization.delete"]> {
-    await this.#change(spaceId, ROUTES.deleteOrganization, { name });
-    return {};
+    const organization = this.deps.organization(spaceId);
+    try {
+      await this.#change(spaceId, ROUTES.deleteOrganization, { name });
+      return {};
+    } catch (error) {
+      if (!(error instanceof DeletionConflict)) throw error;
+      if (!organization) throw new Refused(error.message, 409);
+      return { refusal: { message: error.message, endsAt: error.endsAt } };
+    }
   }
 
   async #change<T>(spaceId: string, route: Route<T>, body?: unknown): Promise<T> {

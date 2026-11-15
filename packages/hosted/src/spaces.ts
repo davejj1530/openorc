@@ -46,7 +46,7 @@ export class Spaces implements HostedSpaces {
 
   constructor(private readonly deps: SpacesDeps) {
     this.setup = new OrganizationSetup({ ...deps, refresh: () => this.refresh(), status: () => this.status() });
-    this.membership = new OrganizationMembers({ ...deps, refresh: () => this.refresh() });
+    this.membership = new OrganizationMembers({ ...deps, refresh: () => this.refresh(), organization: (id) => this.#organization(id) });
     this.access = new OrganizationAccess({ ...deps, refresh: () => this.refresh() });
     this.invitations = new OrganizationInvitations({ ...deps, refresh: () => this.refresh() });
     this.received = new ReceivedInvitations({ ...deps, refresh: () => this.refresh() });
@@ -64,6 +64,11 @@ export class Spaces implements HostedSpaces {
       if (keys.length) deps.push({ type: "invalidate", keys });
       if (topics.some((topic) => ["spaces", "projects", "members", "invitations"].includes(topic))) void this.refresh();
     });
+  }
+
+  #organization(spaceId: string): boolean {
+    const status = this.status();
+    return status.state === "ready" && status.spaces.some((space) => space.id === spaceId && space.kind === "organization");
   }
 
   status(): SpacesStatus {

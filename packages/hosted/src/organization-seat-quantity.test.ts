@@ -84,6 +84,8 @@ it("reviews more seats with the server's estimate, the part month of hours and i
     estimatedChargeNow: { amount: 2000, currency: "usd" },
     firstGrantSecondsPerNewSeat: 180_000,
     firstGrantEndsAt: Date.parse(period.endsAt),
+    renewalGrantSecondsPerSeat: 360_000,
+    renewalGrantAt: Date.parse(period.endsAt),
   });
 });
 
@@ -115,7 +117,7 @@ it("schedules fewer seats for renewal, holding back free seats and unseating nob
 it("ends the seats at the paid period's end for zero, and keeps them again for the current number", async () => {
   seats();
   const { hosted } = await admin();
-  expect(await review(hosted, 0)).toMatchObject({ to: 0, effect: "renewal", nextPrice: { amount: 0, currency: "usd" } });
+  expect(await review(hosted, 0)).toMatchObject({ to: 0, effect: "renewal", nextPrice: { amount: 0, currency: "usd" }, renewalGrantSecondsPerSeat: 0, renewalGrantAt: null });
   await confirm(hosted, await request(hosted, 0));
   expect((await hosted.organizationBilling.get(spaceId)).billing?.subscription).toMatchObject({ standing: "ending", quantity: 3, pendingQuantity: { quantity: 0 } });
   expect(await review(hosted, 3)).toMatchObject({ from: 3, to: 3, effect: "now", estimatedChargeNow: null });
@@ -140,7 +142,7 @@ it("keeps a refused payment with the change, changes nothing, and shows it until
   stand.seats.quantity.refusePayment = true;
   const { hosted } = await admin();
   const failed = await confirm(hosted, await request(hosted, 5));
-  expect(failed.operation).toMatchObject({ state: "failed", message: "The payment for these seats didn't go through. Update the payment method in billing and try again." });
+  expect(failed.operation).toMatchObject({ state: "failed", code: "payment_refused", message: "The payment for these seats didn't go through. Update the payment method in billing and try again." });
   const read = await hosted.organizationBilling.get(spaceId);
   expect(read.billing?.subscription?.quantity).toBe(3);
   expect(read.quantity).toEqual([failed]);
@@ -205,4 +207,15 @@ it("answers a member's review as denied, with the server's words", async () => {
   stand.spaces.member(spaceId, MEMBER)!.role = "admin";
   await hosted.spaces.refresh();
   expect(await hosted.organizationBilling.seats.previewQuantity(spaceId, 5)).toEqual({ state: "denied", message: expect.any(String) });
+});
+
+it("reads a review from a server that says nothing of renewal hours, and an operation with no code", async () => {
+  seats();
+  stand.seats.quantity.plain = true;
+  stand.seats.quantity.refusePayment = true;
+  const { hosted } = await admin();
+  const read = await review(hosted, 5);
+  expect(read.renewalGrantSecondsPerSeat).toBeUndefined();
+  expect(read.renewalGrantAt).toBeUndefined();
+  expect((await confirm(hosted, { seats: 5, body: { id: randomUUID(), previewToken: read.token } })).operation).toMatchObject({ state: "failed" });
 });

@@ -3,15 +3,16 @@ import { z } from "zod";
 import type { Route } from "./wire.js";
 
 const iso = z.iso.datetime();
-export const wireQuantityPreview = SeatQuantityPreview.extend({ expiresAt: iso, asOf: iso, at: iso, firstGrantEndsAt: iso.nullable() });
+export const wireQuantityPreview = SeatQuantityPreview.extend({ expiresAt: iso, asOf: iso, at: iso, firstGrantEndsAt: iso.nullable(), renewalGrantAt: iso.nullable().optional() });
 
-export function toQuantityPreview(read: z.infer<typeof wireQuantityPreview>): SeatQuantityPreview {
+export function toQuantityPreview({ renewalGrantAt, ...read }: z.infer<typeof wireQuantityPreview>): SeatQuantityPreview {
   return {
     ...read,
     expiresAt: Date.parse(read.expiresAt),
     asOf: Date.parse(read.asOf),
     at: Date.parse(read.at),
     firstGrantEndsAt: read.firstGrantEndsAt === null ? null : Date.parse(read.firstGrantEndsAt),
+    ...(renewalGrantAt !== undefined && { renewalGrantAt: renewalGrantAt === null ? null : Date.parse(renewalGrantAt) }),
   };
 }
 

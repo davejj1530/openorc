@@ -39,6 +39,8 @@ export const SeatOperation = z.object({
   kind: z.enum(["quantity", "assignment"]),
   state: z.enum(["pending", "complete", "failed"]),
   message: z.string().nullable(),
+  /** Why a failed operation failed, for the app to act on; the message is for the person. Absent from a server before codes. */
+  code: z.string().nullable().optional(),
 });
 export type SeatOperation = z.infer<typeof SeatOperation>;
 
@@ -80,6 +82,9 @@ export const SeatQuantityPreview = z.object({
   estimatedChargeNow: price,
   firstGrantSecondsPerNewSeat: count,
   firstGrantEndsAt: time.nullable(),
+  /** What each seat is given when its hours next renew, and when; nothing is given once no seat is left. Absent from a server before it said so. */
+  renewalGrantSecondsPerSeat: count.optional(),
+  renewalGrantAt: time.nullable().optional(),
 });
 export type SeatQuantityPreview = z.infer<typeof SeatQuantityPreview>;
 

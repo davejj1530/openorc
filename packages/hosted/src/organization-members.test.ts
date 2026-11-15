@@ -93,3 +93,23 @@ it("deletes only the confirmed organization and keeps the lifetime creation coun
     "Your personal space goes with your account, so it can't be deleted on its own.",
   );
 });
+
+it("answers a deletion the organization's billing refuses with the server's words and the day as a value, and keeps the organization", async () => {
+  const spaceId = stand.addTeam("Birch Studio", [ADMIN]);
+  const paidUntil = "2026-12-01T06:05:00.000Z";
+  stand.seats.enabled = true;
+  stand.seats.seed(spaceId, {
+    subscription: { id: "subscription", plan: "monthly", standing: "live", paidUntil, graceUntil: null, quantity: 1, overallocated: false, pendingQuantity: null },
+    seats: [],
+    available: 0,
+  });
+  const admin = await person(ADMIN);
+  expect(await admin.hosted.spaces.membership.delete({ spaceId, name: "Birch Studio" })).toEqual({
+    refusal: { message: "This organization still pays for seats. Cancel the seats in billing; they will end on 2026-12-01.", endsAt: Date.parse(paidUntil) },
+  });
+  stand.seats.unsettled.add(spaceId);
+  expect(await admin.hosted.spaces.membership.delete({ spaceId, name: "Birch Studio" })).toEqual({
+    refusal: { message: "This organization's billing is still being updated. Wait for it to finish before deleting the organization.", endsAt: null },
+  });
+  expect(stand.spaces.teams.has(spaceId)).toBe(true);
+});

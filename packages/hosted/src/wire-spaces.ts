@@ -112,6 +112,21 @@ const repositories = z.array(z.object({ installationId: id, repoId: z.number().i
 const route = <T>(method: Route<T>["method"], path: string, reply: z.ZodType<T>): Route<T> => ({ method, path, reply });
 const get = <T>(path: string, reply: z.ZodType<T>): Route<T> => ({ method: "GET", path, reply });
 const empty = (method: Route<null>["method"], path: string): Route<null> => ({ method, path, reply: null });
+
+/** A deletion the server would not carry out as things stand: its words, and the instant the seats end when it names one. */
+export class DeletionConflict extends Error {
+  constructor(
+    message: string,
+    readonly endsAt: number | null,
+  ) {
+    super(message);
+  }
+}
+const wireDeletionConflict = z.object({ message: z.string().min(1), endsAt: z.iso.datetime().optional() });
+function deletionConflict(status: number, body: unknown): Error | undefined {
+  const read = status === 409 ? wireDeletionConflict.safeParse(body) : null;
+  return read?.success ? new DeletionConflict(read.data.message, read.data.endsAt === undefined ? null : Date.parse(read.data.endsAt)) : undefined;
+}
 export const SPACE_ROUTES = {
   acceptInvitation: route("POST", "/api/auth/organization/accept-invitation", z.object({ invitation: wireInvitation, member: wireMembership })),
   declineInvitation: route("POST", "/api/auth/organization/reject-invitation", z.object({ invitation: wireInvitation, member: z.null() })),
@@ -121,7 +136,7 @@ export const SPACE_ROUTES = {
   projectAccess: (projectId: string) => get(`/projects/${encodeURIComponent(projectId)}/access`, projectAccess),
   setProjectAccess: (projectId: string) => route("PUT", `/projects/${encodeURIComponent(projectId)}/access`, projectAccess),
   leaveOrganization: empty("POST", "/organization/leave"),
-  deleteOrganization: empty("DELETE", "/settings/organization"),
+  deleteOrganization: { ...empty("DELETE", "/settings/organization"), refusal: deletionConflict },
   setMemberRole: (memberId: string) => route("PATCH", `/organization/members/${encodeURIComponent(memberId)}`, wireMembership),
   removeMember: (memberId: string) => empty("DELETE", `/organization/members/${encodeURIComponent(memberId)}`),
   createOrganization: route("POST", "/api/auth/organization/create", wireOrganization.extend({ members: z.array(wireMembership) })),

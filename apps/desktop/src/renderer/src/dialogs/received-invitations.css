@@ -88,7 +88,3 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.organization-invitation-pro {
-  font-size: 13px;
-  color: var(--ink-3);
-}

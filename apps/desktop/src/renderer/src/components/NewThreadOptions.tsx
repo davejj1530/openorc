@@ -47,11 +47,14 @@ function HoursLeft({ hours }: { hours: CloudHours }) {
   );
 }
 
-/** Every place, from this folder outward: the checkout, a worktree beside it, then OpenOrc Cloud. */
-function places(hosted: NewThreadHosted, local: boolean): Place[] {
+/**
+ * Every place, from this folder outward: the checkout, a worktree beside it, then OpenOrc Cloud. `worktree` is why a
+ * worktree cannot be made here, which holds that row alone: the checkout and the cloud need no commit on this Mac.
+ */
+function places(hosted: NewThreadHosted, local: boolean, worktree: string | null): Place[] {
   const all: (Place & { shown: boolean })[] = [
     { value: "current", label: "Local checkout", icon: ICONS.current, cloud: false, blocked: null, shown: true },
-    { value: "worktree", label: "Worktree", icon: ICONS.worktree, cloud: false, blocked: null, shown: true },
+    { value: "worktree", label: "Worktree", icon: ICONS.worktree, cloud: false, blocked: worktree ? { words: worktree, fix: null, reason: "Needs a commit" } : null, shown: true },
     {
       value: "hosted",
       label: "OpenOrc Cloud",
@@ -90,10 +93,10 @@ function PlaceMenu(props: {
   branch: string | null;
   hosted: NewThreadHosted;
   disabled: boolean;
-  disabledReason: string | null;
+  worktree: string | null;
   onMode: (mode: NewThreadPlace) => void;
 }) {
-  const rows = places(props.hosted, props.local);
+  const rows = places(props.hosted, props.local, props.worktree);
   const current = rows.find((row) => row.value === props.mode) ?? rows[0]!;
   const Icon = ICONS[props.mode];
   const [why, setWhy] = useState<{ anchor: HTMLElement; words: string } | null>(null);
@@ -110,12 +113,7 @@ function PlaceMenu(props: {
   };
   return (
     <Menu.Root onOpenChange={(open) => (open ? undefined : blur())}>
-      <Menu.Trigger
-        disabled={props.disabled || Boolean(props.disabledReason)}
-        aria-label={`Where the thread works: ${current.label}`}
-        data-tip={props.disabledReason ?? placeWords(props.mode, props.branch)}
-        className="composer-icon-button"
-      >
+      <Menu.Trigger disabled={props.disabled} aria-label={`Where the thread works: ${current.label}`} data-tip={placeWords(props.mode, props.branch)} className="composer-icon-button">
         <Icon size={16} />
       </Menu.Trigger>
       <Menu.Portal>
@@ -203,7 +201,7 @@ export function NewThreadOptions(props: {
       branch={props.location.branch}
       hosted={props.hosted}
       disabled={props.disabled}
-      disabledReason={props.local === false ? null : props.blocked}
+      worktree={props.local === false ? null : props.blocked}
       onMode={props.onMode}
     />
   );

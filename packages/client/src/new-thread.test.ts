@@ -423,3 +423,13 @@ describe("a draft saved with a place this app no longer has", () => {
     expect(newThreadStartInput(draft, { workspaceMode: place, permissionMode: "trusted", prompt: "Work up there" })).not.toHaveProperty("cloud");
   });
 });
+
+describe("where a new thread works in a folder that cannot branch yet", () => {
+  it("keeps an OpenOrc Cloud choice, which needs no commit on this Mac, and the folder itself for any other", () => {
+    expect(newThreadWorkspaceMode({ canBranch: false, canHosted: true, chosen: "hosted", preferred: "worktree" })).toBe("hosted");
+    expect(newThreadWorkspaceMode({ canBranch: false, canHosted: false, chosen: "hosted", preferred: undefined })).toBe("current");
+    expect(newThreadWorkspaceMode({ canBranch: false, canHosted: true, chosen: "worktree", preferred: undefined })).toBe("current");
+    expect(newThreadWorkspaceMode({ canBranch: false, canHosted: true, chosen: null, preferred: "worktree" })).toBe("current");
+    expect(newThreadWorkspaceMode({ canBranch: true, canHosted: false, chosen: "hosted", preferred: undefined })).toBe("worktree");
+  });
+});

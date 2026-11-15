@@ -102,12 +102,14 @@ export function newThreadChoice(models: ModelOption[], input: { preferred: Harne
 }
 
 /**
- * Where a new thread works. Workspace, and a project that can't branch yet, always use the folder itself. An OpenOrc
- * Cloud choice the thread can't take, because of its target or this app, works in a worktree instead.
+ * Where a new thread works. An OpenOrc Cloud choice holds wherever the thread can take it: the cloud works from the
+ * project's repository and needs no commit on this Mac. Otherwise Workspace, and a project that can't branch yet, use
+ * the folder itself, and a cloud choice the thread can't take, because of its target or this app, works in a worktree.
  */
 export function newThreadWorkspaceMode(input: { canBranch: boolean; canHosted?: boolean; chosen: NewThreadPlace | null; preferred: WorkspaceMode | undefined }): NewThreadPlace {
+  if (input.chosen === "hosted" && input.canHosted) return "hosted";
   if (!input.canBranch) return "current";
-  if (input.chosen === "hosted" && !input.canHosted) return "worktree";
+  if (input.chosen === "hosted") return "worktree";
   return input.chosen ?? input.preferred ?? "current";
 }
 

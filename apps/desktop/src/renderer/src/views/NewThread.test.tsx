@@ -23,6 +23,7 @@ const mutated: [string, unknown][] = [];
 const gitReads: Record<string, Promise<unknown>> = {};
 /** Every read the screen asked for, with its parameters; a read it holds back with `enabled: false` is not asked. */
 const reads: [string, unknown][] = [];
+let gitState = "ready";
 
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
@@ -33,7 +34,7 @@ vi.mock("../lib/client", async (original) => ({
       "projects.list": listLoading ? undefined : projects,
       "spaces.projects": spaceNavigation.getState().inventory.find((space) => space.id === params.spaceId)?.projects,
       "claude.accounts.list": accounts,
-      "projects.git": "ready",
+      "projects.git": gitState,
       "projects.checkoutBranch": branches[params.id ?? ""],
       "workspace.get": undefined,
       "system.info": system,
@@ -110,6 +111,7 @@ afterEach(() => {
   if (spaceNavigation.getState().key) spaceNavigation.getState().end();
 });
 beforeEach(() => {
+  gitState = "ready";
   localStorage.clear();
   projects = [makeProject("p1"), makeProject("p2")];
   branches = { p1: "prod", p2: "release" };
@@ -344,6 +346,22 @@ describe("NewThread", () => {
     expect(readNewThreadDraft("p1").workspace).toBe("worktree");
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", workspaceMode: "worktree", prompt: "Build in a separate checkout" })));
+  });
+
+  it("keeps the checkout and OpenOrc Cloud for a folder with no commit yet, dimming only Worktree with why", async () => {
+    gitState = "no_commits";
+    account = openOrcCloud("added");
+    saveModelDraft("p1", "Add a health check");
+    render(<NewThread projectId="p1" />);
+    const place = screen.getByRole("button", { name: /^Where the thread works/ });
+    expect(place.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(place);
+    const worktree = await screen.findByRole("menuitem", { name: /^Worktree/ });
+    expect([worktree.getAttribute("aria-disabled"), worktree.getAttribute("aria-description")]).toEqual(["true", "Worktrees need a first commit."]);
+    expect(screen.getByRole("menuitem", { name: "Local checkout" }).getAttribute("aria-disabled")).toBeNull();
+    fireEvent.click(screen.getByRole("menuitem", { name: "OpenOrc Cloud 1 h" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", hosted: true, prompt: "Add a health check" })));
   });
 
   it("starts a thread on OpenOrc Cloud for a project there, with no folder on this Mac", async () => {

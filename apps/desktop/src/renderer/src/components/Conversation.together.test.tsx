@@ -330,6 +330,16 @@ const marasNote = {
   read: false,
 };
 
+it("asks today's server for no notes, people or reading, which it says it has none of", async () => {
+  queries.set("threads.notes", { notes: [marasNote], head: 1, hasBefore: false, hasAfter: false });
+  await open(marasThread(together(THEO, { canWrite: true, send: "now" })));
+  const asked = reads.filter((read) => read.enabled && ["threads.notes", "threads.people"].includes(read.method));
+  expect(asked).toEqual([]);
+  expect(composer.props!.notes).toBeNull();
+  expect(screen.queryByRole("article")).toBeNull();
+  expect(vi.mocked(core.call).mock.calls.map(([method]) => method)).not.toContain("threads.readNotes");
+});
+
 it("opens at the reader's first unread mention, reading the notes around it, and marks it read once seen in the focused window", async () => {
   queries.set("threads.notes", { notes: [marasNote], head: 1, hasBefore: false, hasAfter: false });
   const focus = vi.spyOn(document, "hasFocus").mockReturnValue(true);

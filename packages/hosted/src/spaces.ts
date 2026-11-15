@@ -41,6 +41,8 @@ export class Spaces implements HostedSpaces {
   #closed = false;
   #expiry: ReturnType<typeof setTimeout> | null = null;
   readonly #origin: string;
+  /** The session whose server answered that it has no mentions. */
+  #noMentions: number | null = null;
 
   constructor(private readonly deps: SpacesDeps) {
     this.setup = new OrganizationSetup({ ...deps, refresh: () => this.refresh(), status: () => this.status() });
@@ -88,19 +90,23 @@ export class Spaces implements HostedSpaces {
     return spaceProjects(spaceId, heard.index.personalSpaceId, heard.projects, this.deps.projects());
   }
 
-  /** Account-wide and names no space; one this app does not hold as a usable organization is never reported. */
+  /**
+   * Account-wide and names no space; one this app does not hold as a usable organization is never reported. A server
+   * that answers 404 has no mentions: it is asked once a session, and named none after without a request.
+   */
   async mentions(): Promise<{ spaceIds: string[] }> {
     const status = this.status();
-    if (status.state !== "ready") return { spaceIds: [] };
     const generation = this.deps.session.generation;
+    if (status.state !== "ready" || this.#noMentions === generation) return { spaceIds: [] };
     try {
       const reply = await this.deps.session.request(ROUTES.mentions);
       this.#assertCurrent(generation);
       const usable = new Set(status.spaces.filter((space) => space.kind === "organization").map((space) => space.id));
       return { spaceIds: reply.spaces.map((space) => space.spaceId).filter((id) => usable.has(id)) };
     } catch (error) {
-      if (error instanceof Refused && error.status === 404) return { spaceIds: [] };
-      throw error;
+      if (!(error instanceof Refused && error.status === 404)) throw error;
+      this.#noMentions = generation;
+      return { spaceIds: [] };
     }
   }
 

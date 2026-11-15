@@ -170,7 +170,10 @@ it("asks for no readiness for a draft a reply starts, which is a note, but does 
   expect(onReady).toHaveBeenCalledWith("words");
 });
 
-it("treats words like a tag as words in a thread without notes", () => {
-  mount({ notes: null, value: "@[user:u-ada] hello" });
+it("treats words like a tag as words in a thread without notes, and asks it for no people", async () => {
+  const { field } = mount({ notes: null, value: "@[user:u-ada] hello" });
   expect(screen.queryByRole("button", { name: "Post note" })).toBeNull();
+  type(field, "@Ad");
+  await act(async () => {});
+  expect(vi.mocked(core.call).mock.calls.map(([method]) => method)).not.toContain("threads.people");
 });

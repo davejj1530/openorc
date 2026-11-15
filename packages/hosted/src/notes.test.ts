@@ -131,10 +131,24 @@ describe("reading a thread's notes", () => {
     await expect(ada.threads.call("threads.readNotes", { threadId: thread, ids: [noteId(9)] })).rejects.toThrow("That note isn't here.");
   });
 
-  it("names no space on a server that predates mentions", async () => {
+  it("asks a server that predates mentions once, and names no space, until the session is a new one", async () => {
     await shared();
     stand.threadCollaboration.mentionSpaces = false;
-    const ada = await hostAs(ADA);
+    const on = newDevice();
+    on.projects = device.projects;
+    const { deps, browser } = hostDeps(stand, on);
+    const ada = createHosted(deps);
+    hosts.push(ada);
+    await ada.start();
+    await signInAs(ada, browser, ADA);
+    const asked = () => stand.requests.filter((request) => request.path === "/hosted/mentions").length;
     expect(await ada.spaces.mentions()).toEqual({ spaceIds: [] });
+    expect(await ada.spaces.mentions()).toEqual({ spaceIds: [] });
+    expect(asked()).toBe(1);
+    await ada.account.signOut();
+    await signInAs(ada, browser, ADA);
+    await vi.waitFor(() => expect(ada.spaces.status().state).toBe("ready"));
+    await ada.spaces.mentions();
+    expect(asked()).toBe(2);
   });
 });

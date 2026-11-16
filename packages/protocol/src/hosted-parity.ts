@@ -50,6 +50,8 @@ export const HostedCapabilities = z.object({
     workKeeping: availability,
     httpsConnectors: availability,
     projectEnvironment: availability,
+    /** Personal projects from a folder of this Mac with no remote. */
+    macProjects: availability,
   }),
 });
 export type HostedCapabilities = z.infer<typeof HostedCapabilities>;

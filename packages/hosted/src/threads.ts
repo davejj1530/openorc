@@ -308,6 +308,11 @@ export class Threads implements HostedThreads {
   }
 
   /** One row, or a rejection in words when the account no longer has it. */
+  /** The threads the account has of one cloud project, as last heard. */
+  rowsOfProject(projectId: string): HeardRow[] {
+    return [...this.#rows().values()].filter((row) => row.projectId === projectId);
+  }
+
   row(threadId: string): HeardRow {
     const row = this.#rows().get(threadId);
     if (!row) throw new Error(GONE);

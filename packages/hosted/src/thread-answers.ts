@@ -115,6 +115,9 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "instructions.save": refused(HOSTED_REASONS.instructions),
   "preview.state": refused(HOSTED_REASONS.previewServer),
   "mcpApps.open": refused(HOSTED_REASONS.interactiveApp),
+  // This Mac's own: its folder takes the thread's work (core's macProjects).
+  "macProjects.bringState": NOT_ASKED,
+  "macProjects.bring": NOT_ASKED,
   "tasks.get": NOT_ASKED,
   "tasks.update": NOT_ASKED,
   "tasks.delete": NOT_ASKED,

@@ -24,6 +24,8 @@ import { ConnectorService, type ConnectorPlaces } from "./services/connectors.js
 import { accountFor } from "./services/openorc-account.js";
 import { HostedSkills } from "./services/hosted-skills.js";
 import { createHostedSkillsCloudHandlers } from "./handlers/hosted-skills-cloud.js";
+import { createMacProjectsHandlers } from "./handlers/mac-projects.js";
+import { MacProjects } from "./services/mac-projects.js";
 import { PlaceRouter } from "./services/place-router.js";
 import { rememberedConnectors } from "./services/remembered-connectors.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
@@ -658,6 +660,7 @@ export class OpenOrc {
       createClaudeAccountHandlers(this.claudeAccounts),
       createHostedHandlers(this.account, this.hostedFiles, this.db),
       createHostedSkillsCloudHandlers(() => this.hostedSkills, this.settings),
+      createMacProjectsHandlers(new MacProjects({ db: this.db, hosted: () => this.account, changed: () => this.options.transport.push({ type: "invalidate", keys: ["macProjects"] }) })),
       hostedParityHandlers,
       threadCollaborationHandlers,
       createAccountPersonHandlers(() => this.account),

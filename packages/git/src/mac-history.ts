@@ -84,32 +84,42 @@ const WAITING = "refs/openorc/bring/";
  * and the branch checked out are never touched. Answers the branch it is on and how many commits came.
  */
 export async function bringIntoFolder(folder: string, bundle: string, save: { branch: string | null; head: string; base: string }): Promise<{ branch: string; commits: number }> {
-  const quiet = { okCodes: [0, 1, 128] };
-  if ((await git(folder, ["cat-file", "-e", `${save.base}^{commit}`], quiet)).code !== 0) throw new BringRefused(NOT_THAT_FOLDER);
-  if ((await git(folder, ["bundle", "verify", "-q", bundle], quiet)).code !== 0) throw new BringRefused("The thread's saved work didn't arrive whole. Try again.");
-  const wanted = save.branch ?? `openorc/${save.head.slice(0, 7)}`;
-  // A name git could read as an option, or that is no branch's, is never passed on.
-  const checked = wanted.startsWith("-") ? "" : (await git(folder, ["check-ref-format", "--branch", wanted], quiet)).stdout.trim();
-  const base = checked && checked === wanted ? wanted : `openorc/${save.head.slice(0, 7)}`;
+  if ((await git(folder, ["cat-file", "-e", `${save.base}^{commit}`], QUIET)).code !== 0) throw new BringRefused(NOT_THAT_FOLDER);
+  if ((await git(folder, ["bundle", "verify", "-q", bundle], QUIET)).code !== 0) throw new BringRefused("The thread's saved work didn't arrive whole. Try again.");
+  const name = await branchName(folder, save);
   try {
     await git(folder, ["-c", "transfer.fsckObjects=true", "-c", "fetch.fsckObjects=true", "fetch", "-q", "--no-tags", "--no-write-fetch-head", bundle, `+refs/*:${WAITING}*`]);
-    if ((await git(folder, ["cat-file", "-e", `${save.head}^{commit}`], quiet)).code !== 0) throw new BringRefused("The thread's saved work didn't hold its newest commit. Try again.");
-    const current = (await git(folder, ["symbolic-ref", "--quiet", "HEAD"], quiet)).stdout.trim();
-    for (let at = 1; at <= 9; at++) {
-      const name = at === 1 ? base : `${base}-${at}`;
-      const ref = `refs/heads/${name}`;
-      if (ref === current) continue;
-      const had = (await git(folder, ["rev-parse", "--verify", "--quiet", ref], quiet)).stdout.trim();
-      if (had === save.head) return { branch: name, commits: 0 };
-      const forward = !had || (await git(folder, ["merge-base", "--is-ancestor", had, save.head], quiet)).code === 0;
-      if (!forward) continue;
-      await git(folder, ["update-ref", ref, save.head, had || "0".repeat(save.head.length)]);
-      const commits = Number((await git(folder, ["rev-list", "--count", save.head, `^${had || save.base}`])).stdout.trim());
-      return { branch: name, commits };
-    }
-    throw new BringRefused(`This folder already has branches named ${base} with other work. Rename one, then bring it again.`);
+    if ((await git(folder, ["cat-file", "-e", `${save.head}^{commit}`], QUIET)).code !== 0) throw new BringRefused("The thread's saved work didn't hold its newest commit. Try again.");
+    return await placeBranch(folder, name, save);
   } finally {
-    const waiting = (await git(folder, ["for-each-ref", "--format=%(refname)", WAITING], quiet)).stdout.split("\n").filter(Boolean);
-    for (const ref of waiting) await git(folder, ["update-ref", "-d", ref], quiet);
+    const waiting = (await git(folder, ["for-each-ref", "--format=%(refname)", WAITING], QUIET)).stdout.split("\n").filter(Boolean);
+    for (const ref of waiting) await git(folder, ["update-ref", "-d", ref], QUIET);
   }
+}
+
+const QUIET = { okCodes: [0, 1, 128] };
+
+/** The thread's branch name, when git takes it as a branch's and it can't be read as an option; else one of ours. */
+async function branchName(folder: string, save: { branch: string | null; head: string }): Promise<string> {
+  const ours = `openorc/${save.head.slice(0, 7)}`;
+  const wanted = save.branch ?? ours;
+  if (wanted.startsWith("-")) return ours;
+  const checked = (await git(folder, ["check-ref-format", "--branch", wanted], QUIET)).stdout.trim();
+  return checked === wanted ? wanted : ours;
+}
+
+/** Makes `name`, or moves it forward, to the thread's head; a branch with other work, or checked out, is left alone for `name-2` and on. */
+async function placeBranch(folder: string, base: string, save: { head: string; base: string }): Promise<{ branch: string; commits: number }> {
+  const current = (await git(folder, ["symbolic-ref", "--quiet", "HEAD"], QUIET)).stdout.trim();
+  for (let at = 1; at <= 9; at++) {
+    const name = at === 1 ? base : `${base}-${at}`;
+    const ref = `refs/heads/${name}`;
+    if (ref === current) continue;
+    const had = (await git(folder, ["rev-parse", "--verify", "--quiet", ref], QUIET)).stdout.trim();
+    if (had === save.head) return { branch: name, commits: 0 };
+    if (had && (await git(folder, ["merge-base", "--is-ancestor", had, save.head], QUIET)).code !== 0) continue;
+    await git(folder, ["update-ref", ref, save.head, had || "0".repeat(save.head.length)]);
+    return { branch: name, commits: Number((await git(folder, ["rev-list", "--count", save.head, `^${had || save.base}`])).stdout.trim()) };
+  }
+  throw new BringRefused(`This folder already has branches named ${base} with other work. Rename one, then bring it again.`);
 }

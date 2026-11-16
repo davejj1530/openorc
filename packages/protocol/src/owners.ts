@@ -175,6 +175,9 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "instructions.save": here,
   "preview.state": here,
   "mcpApps.open": here,
+  // A cloud thread's work brought into this Mac's own folder: only this Mac has it.
+  "macProjects.bringState": here,
+  "macProjects.bring": here,
 };
 
 export function ownerRoute(method: RpcMethod): OwnerRoute<RpcMethod> | undefined {

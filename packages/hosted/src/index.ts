@@ -38,6 +38,8 @@ export type { MacWorkUpload } from "./mac-start.js";
 import { CloudConnectors } from "./connectors.js";
 import { CloudMachines } from "./machines.js";
 import { CloudCheckRuns } from "./cloud-check.js";
+import { CloudMacProjects } from "./mac-projects.js";
+export { githubRepoOf } from "./translate.js";
 import type { HostedNotice } from "./notices.js";
 import { Session } from "./session.js";
 import { Threads } from "./threads.js";
@@ -208,6 +210,10 @@ export interface HostedThreads {
   readonly active: boolean;
   /** Whether a thread, run or project is the account's. A lookup in what the server listed; never a request. */
   holds(ref: { thread: string } | { run: string } | { project: string }): boolean;
+  /** A thread the account has, as last heard: its id, its space, and its cloud project. Rejects in words for one it lacks. */
+  row?(threadId: string): { id: string; space: string; projectId: string | null };
+  /** The threads the account has of one cloud project, as last heard. */
+  rowsOfProject?(projectId: string): { id: string; space: string; projectId: string | null }[];
   /** One of the app's calls about something it holds, in the app's shapes. Rejects with words for the person. */
   call<M extends RoutedMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]>;
   /** A project only the server has, as a window reads a project. */
@@ -236,6 +242,8 @@ export interface Hosted {
   readonly machines: CloudMachines;
   /** The person's cloud check, read and started. */
   readonly check: CloudCheckRuns;
+  /** Personal projects from a folder of this Mac with no remote, and their threads' work for the folder. */
+  readonly macProjects: CloudMacProjects;
   /** Reads the stored session and the kept answers, and connects when signed in. Never rejects: no session is signed out. */
   start(): Promise<void>;
   /** The device woke or the network came back: connect now instead of at the next retry. */
@@ -244,8 +252,14 @@ export interface Hosted {
 }
 
 /** What a cloud thread brings from this Mac and what runs for the person there, each over the session alone. */
-function parityServices(session: Session, now: HostedDeps["now"]): Pick<Hosted, "environment" | "connectors" | "machines" | "check"> {
-  return { environment: new ProjectEnvironment({ session, now }), connectors: new CloudConnectors({ session }), machines: new CloudMachines({ session }), check: new CloudCheckRuns({ session }) };
+function parityServices(session: Session, now: HostedDeps["now"]): Pick<Hosted, "environment" | "connectors" | "machines" | "check" | "macProjects"> {
+  return {
+    environment: new ProjectEnvironment({ session, now }),
+    connectors: new CloudConnectors({ session }),
+    machines: new CloudMachines({ session }),
+    check: new CloudCheckRuns({ session }),
+    macProjects: new CloudMacProjects({ session }),
+  };
 }
 
 export function createHosted(deps: HostedDeps): Hosted {

@@ -23,6 +23,7 @@ import { createConnectorHandlers } from "./handlers/connectors.js";
 import { ConnectorService, type ConnectorPlaces } from "./services/connectors.js";
 import { accountFor } from "./services/openorc-account.js";
 import { HostedSkills } from "./services/hosted-skills.js";
+import { createHostedSkillsLeftHandlers } from "./handlers/hosted-skills-left.js";
 import { PlaceRouter } from "./services/place-router.js";
 import { rememberedConnectors } from "./services/remembered-connectors.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
@@ -185,6 +186,8 @@ export class OpenOrc {
   readonly orclingWakes: OrclingWakeService;
   readonly files: FileService;
   readonly hostedFiles: HostedFiles;
+  /** The person's own skills as their cloud turns get them, once the account exists. */
+  private hostedSkills: HostedSkills | null = null;
   readonly imports: ImportService;
   readonly devices: DeviceService;
   readonly workspaceWriters = new WorkspaceWriters();
@@ -332,7 +335,10 @@ export class OpenOrc {
     const skills = new HostedSkills({
       root: this.options.dataDir,
       claudeEnv: () => this.claudeAccounts.environment(this.environment.current(), this.claudeAccounts.defaultId()).env,
+      // What a set leaves out is said in the composer; it is read again when it changes.
+      changed: () => this.options.transport.push({ type: "invalidate", keys: ["hostedSkillsLeftOut"] }),
     });
+    this.hostedSkills = skills;
     return (agent) => skills.own(agent);
   }
 
@@ -650,6 +656,7 @@ export class OpenOrc {
       createCloudHandlers(),
       createClaudeAccountHandlers(this.claudeAccounts),
       createHostedHandlers(this.account, this.hostedFiles, this.db),
+      createHostedSkillsLeftHandlers(() => this.hostedSkills),
       hostedParityHandlers,
       threadCollaborationHandlers,
       createAccountPersonHandlers(() => this.account),

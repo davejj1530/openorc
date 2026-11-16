@@ -13,7 +13,7 @@ import { lstat, open, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { listSkills } from "@openorc/agents";
 import type { OwnSkill } from "@openorc/hosted";
-import type { AgentSkill, HarnessId } from "@openorc/protocol";
+import type { AgentSkill, HarnessId, LeftOutSkill } from "@openorc/protocol";
 
 /** How long an agent's listing of its skills stands: listing may start the agent's CLI. */
 const LISTED_MS = 60_000;
@@ -23,9 +23,6 @@ const CHUNK_BYTES = 256 * 1024;
 
 /** One file of a skill as it stood when it was listed. */
 type SkillFile = { rel: string; at: string; bytes: number; modified: number; runs: boolean };
-
-/** A skill left out of the cloud's set because this Mac could not read it, and why, in plain words. */
-export type LeftOutSkill = { name: string; cause: string };
 
 /** A skill this Mac could not read, with why: its folder, a file or folder in it, or a link in it to nothing. */
 class SkillUnreadable extends Error {

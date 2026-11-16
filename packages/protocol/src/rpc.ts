@@ -3,8 +3,7 @@ import { organizationBillingRpcParams, organizationSeatRpcParams, type Organizat
 import { organizationStorageRpcParams, type OrganizationStorageRpcResults } from "./organization-storage.js";
 import { hostedFilesRpcParams, type HostedFilesRpcResults } from "./hosted-files.js";
 import { hostedEnvironmentRpcParams, type HostedEnvironmentRpcResults } from "./hosted-environment.js";
-import { hostedConnectorsRpcParams, type HostedConnectorsRpcResults } from "./hosted-connectors.js";
-import { hostedMacStartRpcParams, type HostedMacStartRpcResults } from "./hosted-mac-start.js";
+import { cloudParityRpcParams, type CloudParityRpcResults } from "./cloud-parity-rpc.js";
 import { HostedTerminalPush, hostedTerminalRpcParams, type HostedTerminalRpcResults } from "./hosted-terminals.js";
 import { teamChatRpcParams, type TeamChatRpcResults } from "./team-chat.js";
 import { onlineTaskRpcParams, type OnlineTaskRpcResults } from "./online-tasks.js";
@@ -92,8 +91,7 @@ export const rpcParams = {
   ...threadSendRpcParams,
   ...hostedFilesRpcParams,
   ...hostedEnvironmentRpcParams,
-  ...hostedConnectorsRpcParams,
-  ...hostedMacStartRpcParams,
+  ...cloudParityRpcParams,
   ...hostedTerminalRpcParams,
   ...organizationBillingRpcParams,
   ...organizationSeatRpcParams,
@@ -577,8 +575,7 @@ export interface RpcResults
   extends
     HostedFilesRpcResults,
     HostedEnvironmentRpcResults,
-    HostedConnectorsRpcResults,
-    HostedMacStartRpcResults,
+    CloudParityRpcResults,
     HostedTerminalRpcResults,
     OrganizationBillingRpcResults,
     OrganizationSeatRpcResults,

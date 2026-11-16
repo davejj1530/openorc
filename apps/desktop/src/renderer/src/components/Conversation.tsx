@@ -61,6 +61,7 @@ import { Composer, type ComposerHandle, type SlashCommand } from "./Composer";
 import { ComposerChoice } from "./ComposerChoice";
 import { GitBranch, Laptop } from "./icons";
 import { SessionRecovery } from "./SessionRecovery";
+import { SkillsLeftOut } from "./SkillsLeftOut";
 import { SubagentConversation } from "./SubagentConversation";
 import { Transcript } from "./Transcript";
 import { TurnChangesProvider, useTurnFooter } from "./TurnFooter";
@@ -359,6 +360,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
                     />
                   ) : null}
                   {cloud.notice}
+                  <SkillsLeftOut agent={thread?.agent ?? null} on={cloud.hosted} />
                   {together.failed ? <VoicesFailed onRetry={together.retry} /> : null}
                   <SwitchingNote agent={switching && choice ? choice.agent : null} />
                   <ApplyingAutonomous

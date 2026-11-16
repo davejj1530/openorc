@@ -26,17 +26,21 @@ const url = version ? service + "/versions/" + encodeURIComponent(version) + "/"
   if (typeof build.download !== "string" || !/^https:\\/\\//.test(build.download) || !/^[0-9a-f]{64}$/.test(String(sha256))) fail("The build service answered with no file to check.");
   const part = dest + ".download-" + process.pid;
   fs.mkdirSync(path.dirname(dest), { recursive: true });
+  let file = null;
   try {
     const download = await fetch(build.download, { signal: AbortSignal.timeout(120000) });
     if (!download.ok || !download.body) throw new Error("The download failed (" + download.status + ").");
     const hash = crypto.createHash("sha256");
+    file = fs.createWriteStream(part, { mode: 0o755, flags: "wx" });
     await pipeline(download.body, async function* (chunks) {
       for await (const chunk of chunks) { hash.update(chunk); yield chunk; }
-    }, fs.createWriteStream(part, { mode: 0o755, flags: "wx" }));
+    }, file);
     if (hash.digest("hex") !== sha256) throw new Error("The download does not match its checksum.");
     fs.chmodSync(part, 0o755);
     fs.renameSync(part, dest);
   } finally {
+    // A failed pipeline can settle before the file it was opening exists, which would put it back after this removes it.
+    if (file && !file.closed) await new Promise((resolve) => file.once("close", resolve).destroy());
     fs.rmSync(part, { force: true });
   }
 })().catch((error) => fail(String((error && error.message) || error)));

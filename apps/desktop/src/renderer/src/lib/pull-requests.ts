@@ -290,7 +290,8 @@ function readView(value: unknown): PullRequestView | null {
 export function readPullRequestViews(): PullRequestView[] {
   try {
     const saved: unknown = JSON.parse(localStorage.getItem(VIEWS_KEY) ?? "[]");
-    return Array.isArray(saved) ? saved.map(readView).filter((entry): entry is PullRequestView => entry !== null && !builtInViews.some((builtIn) => builtIn.id === entry.id)) : [];
+    if (!Array.isArray(saved)) return [];
+    return saved.map(readView).filter((entry): entry is PullRequestView => entry !== null && !builtInViews.some((builtIn) => builtIn.id === entry.id));
   } catch {
     return [];
   }

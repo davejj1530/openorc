@@ -15,6 +15,16 @@ it("refuses a label or milestone a search can't quote, and anything it doesn't k
   expect(asked({ labels: ["good first issue", "area:repo"], milestone: "v1.2" })).toBe(true);
   expect(asked({ labels: ['say "hi"'] })).toBe(false);
   expect(asked({ milestone: "v1\nv2" })).toBe(false);
+  // GitHub reads a backslash before the closing quote as escaping it, which would let the rest out of `repo:`.
+  expect(asked({ labels: ["x\\"], milestone: "OR repo:cli/go-gh OR label:z" })).toBe(false);
+  expect(asked({ milestone: "a\\b" })).toBe(false);
   expect(asked({ labels: [] })).toBe(false);
   expect(asked({ reviewer: "ada" })).toBe(false);
+});
+
+it("takes a project by its owner's login, a managed user's included, and number", () => {
+  expect(asked({ project: "acme/7" })).toBe(true);
+  expect(asked({ project: "jdoe_acme/12" })).toBe(true);
+  expect(asked({ project: "acme/roadmap" })).toBe(false);
+  expect(asked({ project: "_acme/7" })).toBe(false);
 });

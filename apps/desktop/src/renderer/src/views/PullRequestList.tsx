@@ -156,9 +156,9 @@ function ProjectSection({ entry, query, named }: { entry: ProjectPulls; query: s
   );
 }
 
-/** An empty list after a search or filters, with the way back to everything, or an empty state tab. */
+/** An empty list after a search or filters, with the way back to everything, or an empty state tab. An order filters nothing out. */
 function NothingFound({ list, onClear }: { list: PullRequestListState; onClear: () => void }) {
-  if (hasPullRequestFilters(list.filters) || list.query.trim() !== "")
+  if (hasPullRequestFilters({ ...list.filters, sort: "newest" }) || list.query.trim() !== "")
     return (
       <Empty title="No matching pull requests" action={<Button onClick={onClear}>Clear filters</Button>}>
         {list.query.trim() ? "Try a different search, or other filters." : "Nothing here matches these filters."}
@@ -235,15 +235,19 @@ function useListViews() {
   const changeDefault = (id: string | null) => {
     setDefaultId(id);
     writeDefaultViewId(id);
+    // With no default the page opens with the filters last set, the view's own, and so would open as it after all.
+    if (!id) writePullRequestFilters(noPullRequestFilters);
   };
+  // What a view keeps of the list: everything but the view it started as.
+  const current = { state: list.state, filters: list.filters, query: list.query };
   const saveNew = (name: string, makeDefault: boolean) => {
     const existing = saved.find((view) => view.name.toLowerCase() === name.toLowerCase());
-    const view: PullRequestView = { id: existing?.id ?? crypto.randomUUID(), name, state: list.state, filters: list.filters, query: list.query };
+    const view: PullRequestView = { id: existing?.id ?? crypto.randomUUID(), name, ...current };
     changeViews(existing ? saved.map((entry) => (entry.id === existing.id ? view : entry)) : [...saved, view]);
     if (makeDefault) changeDefault(view.id);
     change({ base: view.id });
   };
-  const saveOver = () => changeViews(saved.map((view) => (view.id === shown.id ? { ...view, state: list.state, filters: list.filters, query: list.query } : view)));
+  const saveOver = () => changeViews(saved.map((view) => (view.id === shown.id ? { ...view, ...current } : view)));
   const remove = (view: PullRequestView) => {
     changeViews(saved.filter((entry) => entry.id !== view.id));
     if (view.id === defaultId) changeDefault(null);

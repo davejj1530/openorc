@@ -75,6 +75,14 @@ describe("the filter palette", () => {
     expect(groups[1]!.items.map((item) => item.key)).toEqual(expect.arrayContaining(["label:none", "no:label"]));
   });
 
+  it("offers an app as an author but not as an assignee, which an app can't be", () => {
+    const keys = paletteGroups(target(), { ...sources, pulls: [pull("app/dependabot")] }, "dependabot")
+      .flatMap((group) => group.items)
+      .map((item) => item.key);
+    expect(keys).toContain("author:app/dependabot");
+    expect(keys).not.toContain("assignee:app/dependabot");
+  });
+
   it("adds what a row names, and doesn't offer it again", () => {
     const [, people] = paletteGroups(target(), sources, "mara");
     const added = people!.items[0]!.apply(target({ authors: ["pip"] }));

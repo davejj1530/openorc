@@ -83,7 +83,8 @@ function peopleItems(filters: PullRequestFilters, sources: PaletteSources, input
   for (const login of people(filters, sources, input)) {
     if (!authorsFull && !authors.includes(login.toLowerCase()))
       items.push({ key: `author:${login}`, facet: "Author", text: personName(login), mark: { kind: "person", login }, apply: withFilters((f) => ({ ...f, authors: [...f.authors, login] })) });
-    if (filters.assignee?.toLowerCase() !== login.toLowerCase())
+    // An app can't be assigned, so `assignee:app/…` would always find nothing.
+    if (!login.startsWith("app/") && filters.assignee?.toLowerCase() !== login.toLowerCase())
       items.push({
         key: `assignee:${login}`,
         facet: "Assignee",

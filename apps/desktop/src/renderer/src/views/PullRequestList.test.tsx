@@ -195,6 +195,31 @@ it("replaces a view saved under a name already in use, and deleting the default 
   expect(JSON.parse(localStorage.getItem("openorc.pull-views")!)).toEqual([]);
 });
 
+it("says a tab is empty when only its order differs, since an order filters nothing out", async () => {
+  const answer = vi.mocked(core.call).getMockImplementation()!;
+  vi.mocked(core.call).mockImplementation(async (method, params) => (method === "pulls.list" ? ([] as never) : answer(method, params)));
+  sessionStorage.setItem("openorc.pull-list", JSON.stringify({ state: "draft", query: "", filters: { sort: "oldest" }, base: "builtin-all" }));
+  page();
+  await screen.findByText("No drafts");
+  expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
+});
+
+it("opens with every pull request after it stops opening with a view, rather than the view's filters left behind", async () => {
+  localStorage.setItem("openorc.pull-views", JSON.stringify([{ id: "maras", name: "Mara's", state: "open", query: "", filters: { authors: ["mara"] } }]));
+  localStorage.setItem("openorc.pull-default-view", "maras");
+  localStorage.setItem("openorc.pull-filters", JSON.stringify({ authors: ["mara"] }));
+  const first = page();
+  fireEvent.click(await screen.findByRole("button", { name: "View: Mara's, default" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Stop opening with “Mara's”" }));
+  await screen.findByRole("button", { name: "View: Mara's" });
+  first.unmount();
+  // The app starts again: nothing of this window's list is left.
+  sessionStorage.clear();
+  page();
+  await screen.findByRole("button", { name: "View: All pull requests" });
+  expect(screen.queryByRole("button", { name: "Remove author filter mara" })).toBeNull();
+});
+
 it("offers to clear the filters when nothing matches them, and then says the tab is empty", async () => {
   const answer = vi.mocked(core.call).getMockImplementation()!;
   vi.mocked(core.call).mockImplementation(async (method, params) => (method === "pulls.list" ? ([] as never) : answer(method, params)));

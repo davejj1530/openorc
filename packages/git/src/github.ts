@@ -15,7 +15,7 @@ import type {
   PullRequestStateFilter,
   PullRequestSummary,
 } from "@openorc/protocol";
-import { SearchName } from "@openorc/protocol";
+import { PullRequestProjectRef, SearchName } from "@openorc/protocol";
 import { git, run, GitError } from "./exec.js";
 
 /** Runs the user's own gh in a repository and returns what it printed. A failure rejects with a GhError. */
@@ -46,6 +46,44 @@ const LABEL_LIMIT = "500";
 const DIFF_READS = 3;
 /** Pages of 100 branches a target picker reads before it stops. */
 const BRANCH_PAGES = 10;
+/**
+ * gh processes one GitHubPulls runs at once. A page of many projects asks for lists, counts and filter choices for
+ * each at the same moment; the rest wait their turn rather than all reaching GitHub, and its limits, together.
+ */
+const GH_PROCESSES = 8;
+
+/** `gh`, with at most `most` of its processes running at once and the rest started in the order they were asked for. */
+function limitedGh(gh: GhRunner, most: number): GhRunner {
+  let running = 0;
+  const waiting: (() => void)[] = [];
+  return async (cwd, args, input) => {
+    if (running >= most) await new Promise<void>((resolve) => waiting.push(resolve));
+    else running += 1;
+    try {
+      return await gh(cwd, args, input);
+    } finally {
+      const next = waiting.shift();
+      if (next) next();
+      else running -= 1;
+    }
+  };
+}
+
+/** gh's api asks github.com unless told otherwise whenever more than one host is signed in, so another host is named. */
+const hostname = (host: string): string[] => (host === "github.com" ? [] : ["--hostname", host]);
+
+/** A checkout's repository as gh resolves it: `owner/name`, and the host it is on. */
+interface Repository {
+  name: string;
+  host: string;
+}
+
+/** The repository in the URL `gh repo view` prints, such as https://github.example.com/acme/app. */
+function repositoryAt(url: string): Repository {
+  const match = /^https?:\/\/([^/]+)\/([^/]+\/[^/]+?)\/?$/.exec(url.trim());
+  if (!match) throw new Error(`gh named no repository here: ${url.trim()}`);
+  return { host: match[1]!.toLowerCase(), name: match[2]! };
+}
 
 /**
  * The repository's branches by name, a page at a time, with its default branch and, when asked, whether `prefer`
@@ -338,9 +376,12 @@ export function reviewPayload(review: ReviewSubmission): Record<string, unknown>
 /** The user's own gh, asked about one repository's pull requests. Nothing here reads credentials. */
 export class GitHubPulls {
   /** Each checkout's repository, by path. */
-  private readonly repositories = new Map<string, Promise<string>>();
+  private readonly repositories = new Map<string, Promise<Repository>>();
+  private readonly gh: GhRunner;
 
-  constructor(private readonly gh: GhRunner = runGh) {}
+  constructor(gh: GhRunner = runGh) {
+    this.gh = limitedGh(gh, GH_PROCESSES);
+  }
 
   /**
    * One list. Open, merged or every pull request with nothing else asked is gh's own list, which shows a pull request
@@ -379,14 +420,21 @@ export class GitHubPulls {
    * `{owner}` and `:owner` placeholders into typed fields wherever they appear, label and milestone names included.
    */
   private async search(cwd: string, fields: (repository: string) => string[]): Promise<string> {
-    return this.gh(cwd, ["api", "graphql", ...fields(await this.repository(cwd))]);
+    const { name, host } = await this.repository(cwd);
+    return this.gh(cwd, ["api", "graphql", ...fields(name), ...hostname(host)]);
   }
 
-  /** The repository gh works with in a checkout, as `owner/name`, read once. A failed read is tried again the next time. */
-  private repository(cwd: string): Promise<string> {
+  /** `gh api` about the checkout's repository, asked of the host the repository is on. */
+  private async api(cwd: string, args: string[]): Promise<string> {
+    const { host } = await this.repository(cwd);
+    return this.gh(cwd, ["api", ...args, ...hostname(host)]);
+  }
+
+  /** The repository gh works with in a checkout, read once. A failed read is tried again the next time. */
+  private repository(cwd: string): Promise<Repository> {
     const known = this.repositories.get(cwd);
     if (known) return known;
-    const read = this.gh(cwd, ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]).then((out) => out.trim());
+    const read = this.gh(cwd, ["repo", "view", "--json", "url", "--jq", ".url"]).then(repositoryAt);
     this.repositories.set(cwd, read);
     read.catch(() => this.repositories.delete(cwd));
     return read;
@@ -412,7 +460,7 @@ export class GitHubPulls {
 
   /** The people GitHub can assign in the repository, as its Assignee filter lists them: the first hundred, by login. */
   private async assignees(cwd: string): Promise<PullRequestChoice[]> {
-    const out = await this.gh(cwd, ["api", "repos/{owner}/{repo}/assignees?per_page=100"]).catch((error: unknown) => {
+    const out = await this.api(cwd, ["repos/{owner}/{repo}/assignees?per_page=100"]).catch((error: unknown) => {
       throw ghFailure(error, "The people GitHub can assign");
     });
     return (JSON.parse(out) as { login: string }[]).map(({ login }) => ({ value: login, name: login })).sort(byName);
@@ -420,7 +468,7 @@ export class GitHubPulls {
 
   /** Open milestones by due date, then closed ones. A title a search can't quote isn't offered. */
   private async milestones(cwd: string): Promise<PullRequestChoice[]> {
-    const out = await this.gh(cwd, ["api", "repos/{owner}/{repo}/milestones?state=all&sort=due_on&per_page=100"]).catch((error: unknown) => {
+    const out = await this.api(cwd, ["repos/{owner}/{repo}/milestones?state=all&sort=due_on&per_page=100"]).catch((error: unknown) => {
       throw ghFailure(error, "The repository's milestones");
     });
     const milestones = (JSON.parse(out) as { title: string; state: string }[]).filter((milestone) => SearchName.safeParse(milestone.title).success);
@@ -430,14 +478,15 @@ export class GitHubPulls {
   }
 
   private async projects(cwd: string): Promise<PullRequestChoice[]> {
-    const out = await this.gh(cwd, ["api", "graphql", "-F", "owner={owner}", "-F", "repo={repo}", "-f", `query=${PROJECTS_QUERY}`]).catch((error: unknown) => {
+    const out = await this.api(cwd, ["graphql", "-F", "owner={owner}", "-F", "repo={repo}", "-f", `query=${PROJECTS_QUERY}`]).catch((error: unknown) => {
       if (error instanceof GhError && /read:project/.test(error.stdout + error.stderr)) {
         throw new Error("Projects need gh's read:project scope. Run gh auth refresh -s read:project, then try again.");
       }
       throw ghFailure(error, "The repository's projects");
     });
+    // Only a project the list can be asked for: one a filter couldn't send would fail the list it was picked for.
     return (JSON.parse(out) as RawProjects).data.repository.projectsV2.nodes
-      .filter((project) => project.owner.login)
+      .filter((project) => project.owner.login && PullRequestProjectRef.safeParse(`${project.owner.login}/${project.number}`).success)
       .map((project) => ({ value: `${project.owner.login}/${project.number}`, name: project.title, detail: project.owner.login! }));
   }
 
@@ -481,7 +530,6 @@ export class GitHubPulls {
     let after: string | null = null;
     for (let page = 0; page < BRANCH_PAGES; page += 1) {
       const args = [
-        "api",
         "graphql",
         "-F",
         "owner={owner}",
@@ -494,7 +542,7 @@ export class GitHubPulls {
         "-F",
         `checkPrefer=${page === 0 && prefer !== undefined}`,
       ];
-      const out: string = await this.gh(cwd, after === null ? args : [...args, "-f", `after=${after}`]).catch((error: unknown) => {
+      const out: string = await this.api(cwd, after === null ? args : [...args, "-f", `after=${after}`]).catch((error: unknown) => {
         throw ghFailure(error, "The repository's branches");
       });
       const { repository }: RawBranchPage["data"] = (JSON.parse(out) as RawBranchPage).data;
@@ -513,7 +561,7 @@ export class GitHubPulls {
   /** Whether `branch` is a branch of the repository gh opens pull requests in. */
   async hasBranch(cwd: string, branch: string): Promise<boolean> {
     try {
-      await this.gh(cwd, ["api", `repos/{owner}/{repo}/branches/${encodeURIComponent(branch)}`, "--silent"]);
+      await this.api(cwd, [`repos/{owner}/{repo}/branches/${encodeURIComponent(branch)}`, "--silent"]);
       return true;
     } catch (error) {
       if (error instanceof GhError && /HTTP 404/.test(error.stderr)) return false;
@@ -521,10 +569,14 @@ export class GitHubPulls {
     }
   }
 
-  /** The signed-in account's login, or null when gh cannot say. */
+  /** The signed-in account's login on the checkout's host, or null when gh cannot say. Outside a checkout, gh's own host. */
   async viewer(cwd: string): Promise<string | null> {
+    const host = await this.repository(cwd).then(
+      (repository) => repository.host,
+      () => "github.com",
+    );
     try {
-      return (await this.gh(cwd, ["api", "user", "--jq", ".login"])).trim() || null;
+      return (await this.gh(cwd, ["api", "user", "--jq", ".login", ...hostname(host)])).trim() || null;
     } catch {
       return null;
     }
@@ -534,7 +586,7 @@ export class GitHubPulls {
   async submitReview(cwd: string, url: string, review: ReviewSubmission): Promise<{ url: string | null }> {
     const { host, owner, repo } = pullRequestRepository(url);
     const number = /\/pull\/(\d+)/.exec(url)![1];
-    const args = ["api", "--method", "POST", `repos/${owner}/${repo}/pulls/${number}/reviews`, "--input", "-", ...(host === "github.com" ? [] : ["--hostname", host])];
+    const args = ["api", "--method", "POST", `repos/${owner}/${repo}/pulls/${number}/reviews`, "--input", "-", ...hostname(host)];
     const out = await this.gh(cwd, args, JSON.stringify(reviewPayload(review))).catch((error: unknown) => {
       throw ghFailure(error, `Pull request #${number}`);
     });

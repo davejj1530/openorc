@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Combobox } from "@base-ui/react/combobox";
 import { Menu } from "@base-ui/react/menu";
-import type { Project, PullRequestChoiceKind, PullRequestSort, PullRequestSummary } from "@openorc/protocol";
+import type { Project, PullRequestChoice, PullRequestChoiceKind, PullRequestSort, PullRequestSummary } from "@openorc/protocol";
 import { ArrowDownUp, Check, ChevronDown, Funnel, Search, X } from "./icons";
 import { menuItem, menuPopup, menuSeparator } from "./menu";
 import { CoversPreview } from "../lib/browser-preview";
@@ -44,36 +44,46 @@ function Mark({ mark }: { mark: PaletteMark }) {
 
 const firstError = (reads: { error: Error | null }[]) => reads.find((read) => read.error)?.error ?? null;
 
+/** One `pulls.choices` read per project, for one filter's list. */
+const choiceReads = (projects: readonly Project[], kind: PullRequestChoiceKind) => projects.map((project) => ({ projectId: project.id, kind }));
+
+/** One filter's choices from every project's read, each value once. */
+const mergedReads = (reads: readonly { data?: PullRequestChoice[] | undefined }[]) => mergedChoices(reads.map((read) => read.data ?? []));
+
+/**
+ * A repository's labels, assignees, milestones and projects change seldom, and each read is a gh process per project,
+ * so the palette reads them again only after a while rather than every time it opens.
+ */
+const CHOICES_READ = { staleTime: 10 * 60_000 } as const;
+
 /**
  * A repository's projects. Reading them needs a gh scope most sign-ins lack, and asking again won't grant it, so a
  * failure isn't retried; it stands until the page is opened again.
  */
-const PROJECTS_READ = { retry: false } as const;
+const PROJECTS_READ = { ...CHOICES_READ, retry: false } as const;
 
 /** What the palette offers, read the first time it opens: each repository's lists and everyone with an open pull request. */
 function usePaletteSources(projects: Project[], enabled: boolean, pulls: readonly PullRequestSummary[]) {
-  const choices = (kind: PullRequestChoiceKind) => projects.map((project) => ({ projectId: project.id, kind }));
-  const labels = useRpcs("pulls.choices", choices("labels"), { enabled });
-  const assignees = useRpcs("pulls.choices", choices("assignees"), { enabled });
-  const milestones = useRpcs("pulls.choices", choices("milestones"), { enabled });
-  const projectLists = useRpcs("pulls.choices", choices("projects"), { enabled, ...PROJECTS_READ });
+  const labels = useRpcs("pulls.choices", choiceReads(projects, "labels"), { enabled, ...CHOICES_READ });
+  const assignees = useRpcs("pulls.choices", choiceReads(projects, "assignees"), { enabled, ...CHOICES_READ });
+  const milestones = useRpcs("pulls.choices", choiceReads(projects, "milestones"), { enabled, ...CHOICES_READ });
+  const projectLists = useRpcs("pulls.choices", choiceReads(projects, "projects"), { enabled, ...PROJECTS_READ });
   const everyone = useRpcs(
     "pulls.list",
     projects.map((project) => ({ projectId: project.id, state: "open" as const })),
     { enabled },
   );
   const reads = [...labels, ...assignees, ...milestones, ...everyone];
-  const merge = (lists: typeof labels) => mergedChoices(lists.map((read) => read.data ?? []));
+  const loading = [...reads, ...projectLists].some((read) => read.isFetching);
   let status: string | null = null;
-  if (enabled && [...reads, ...projectLists].some((read) => read.isFetching)) status = "Loading people, labels and milestones…";
-  else if (enabled) status = firstError(reads)?.message ?? null;
+  if (enabled) status = loading ? "Loading people, labels and milestones…" : (firstError(reads)?.message ?? null);
   return {
     sources: {
       pulls: [...pulls, ...everyone.flatMap((read) => read.data ?? [])],
-      labels: merge(labels),
-      assignees: merge(assignees),
-      milestones: merge(milestones),
-      projects: merge(projectLists),
+      labels: mergedReads(labels),
+      assignees: mergedReads(assignees),
+      milestones: mergedReads(milestones),
+      projects: mergedReads(projectLists),
     },
     status,
     // Projects need a scope gh may not have; that says so in the palette without hiding everything else.
@@ -326,19 +336,11 @@ export function PullRequestTokens({
   labelColors: ReadonlyMap<string, string>;
   projects: Project[];
 }) {
-  const projectLists = useRpcs(
-    "pulls.choices",
-    projects.map((project) => ({ projectId: project.id, kind: "projects" as const })),
-    { enabled: Boolean(target.filters.project), ...PROJECTS_READ },
-  );
-  const labelLists = useRpcs(
-    "pulls.choices",
-    projects.map((project) => ({ projectId: project.id, kind: "labels" as const })),
-    { enabled: target.filters.labels.length > 0 },
-  );
-  const projectNames = new Map(mergedChoices(projectLists.map((read) => read.data ?? [])).map((choice) => [choice.value, choice.name]));
+  const projectLists = useRpcs("pulls.choices", choiceReads(projects, "projects"), { enabled: Boolean(target.filters.project), ...PROJECTS_READ });
+  const labelLists = useRpcs("pulls.choices", choiceReads(projects, "labels"), { enabled: target.filters.labels.length > 0, ...CHOICES_READ });
+  const projectNames = new Map(mergedReads(projectLists).map((choice) => [choice.value, choice.name]));
   // A label no pull request on the page carries still has its repository's color.
-  const colors = new Map([...mergedChoices(labelLists.map((read) => read.data ?? [])).map((choice) => [choice.value.toLowerCase(), choice.color ?? ""] as const), ...labelColors]);
+  const colors = new Map([...mergedReads(labelLists).map((choice) => [choice.value.toLowerCase(), choice.color ?? ""] as const), ...labelColors]);
   const tokens = filterTokens(target, projectNames);
   if (tokens.length === 0) return null;
   return (

@@ -61,16 +61,20 @@ export const GitHubLogin = z
 /** A person a filter names: a GitHub login, or `@me` for the gh account. */
 const Person = z.union([GitHubLogin, z.literal("@me")]);
 
-/** A label or milestone name a search can quote: one line, and no quote of its own to end the quoting early. */
+/**
+ * A label or milestone name a search can quote: one line, with no quote of its own to end the quoting early and no
+ * backslash, which GitHub reads as escaping the closing quote and so lets what follows out of the quotes, and out of
+ * the search's `repo:`.
+ */
 export const SearchName = z
   .string()
   .trim()
   .min(1)
   .max(255)
-  .regex(/^[^\r\n"]+$/, "GitHub can't search for that name.");
+  .regex(/^[^\r\n"\\]+$/, "GitHub can't search for that name.");
 
-/** A project as GitHub's `project:` qualifier names it: its owner and number. */
-export const PullRequestProjectRef = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]*\/\d+$/, "Not a project.");
+/** A project as GitHub's `project:` qualifier names it: its owner, a login a managed user's `_` included, and number. */
+export const PullRequestProjectRef = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]*\/\d+$/, "Not a project.");
 
 /**
  * What narrows a list the way GitHub's filter bar does: any of these authors, every one of these labels, one assignee,

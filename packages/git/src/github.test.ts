@@ -25,6 +25,9 @@ const raw = {
   labels: [{ name: "bug", color: "d73a4a", description: null }],
 };
 
+/** What `gh repo view --json url --jq .url` prints in a checkout of acme/app. */
+const REPO_URL = "https://github.com/acme/app\n";
+
 /** Records each gh call and answers from a table keyed by the first two arguments. */
 function fakeGh(answers: Record<string, string | GhError>) {
   const calls: { args: string[]; input?: string }[] = [];
@@ -90,7 +93,7 @@ describe("pull request records", () => {
 
 describe("GitHubPulls", () => {
   it("reads open, merged and every pull request from gh's own list, and drafts and closed ones from a search", async () => {
-    const { gh, calls } = fakeGh({ "pr list": JSON.stringify([raw]), "repo view": "acme/app\n", "api graphql": JSON.stringify({ data: { search: { nodes: [] } } }) });
+    const { gh, calls } = fakeGh({ "pr list": JSON.stringify([raw]), "repo view": REPO_URL, "api graphql": JSON.stringify({ data: { search: { nodes: [] } } }) });
     const pulls = new GitHubPulls(gh);
     expect(await pulls.list("/repo", "open")).toHaveLength(1);
     await pulls.list("/repo", "merged");
@@ -112,7 +115,7 @@ describe("GitHubPulls", () => {
 
   it("counts every state under the same filters in one request", async () => {
     const counts = { open: { issueCount: 6 }, draft: { issueCount: 1 }, merged: { issueCount: 12 }, closed: { issueCount: 3 }, any: { issueCount: 21 } };
-    const { gh, calls } = fakeGh({ "repo view": "acme/app\n", "api graphql": JSON.stringify({ data: counts }) });
+    const { gh, calls } = fakeGh({ "repo view": REPO_URL, "api graphql": JSON.stringify({ data: counts }) });
     expect(await new GitHubPulls(gh).counts("/repo", { labels: ["area:repo"], sort: "oldest" })).toEqual({ open: 6, draft: 1, merged: 12, closed: 3, any: 21 });
     const [, request] = calls;
     expect(calls).toHaveLength(2);
@@ -130,7 +133,7 @@ describe("GitHubPulls", () => {
 
   it("asks for a filtered list as one advanced search and reads its pull requests", async () => {
     const node = { ...raw, author: { __typename: "User", login: "ada" }, labels: { nodes: [{ name: "bug", color: "d73a4a", description: "Broken" }] } };
-    const { gh, calls } = fakeGh({ "repo view": "acme/app\n", "api graphql": JSON.stringify({ data: { search: { nodes: [node, {}] } } }) });
+    const { gh, calls } = fakeGh({ "repo view": REPO_URL, "api graphql": JSON.stringify({ data: { search: { nodes: [node, {}] } } }) });
     const pulls = await new GitHubPulls(gh).list("/repo", "open", { authors: ["ada", "linus"], sort: "oldest" });
     expect(pulls).toEqual([expect.objectContaining({ number: 7, author: "ada", labels: [{ name: "bug", color: "d73a4a", description: "Broken" }] })]);
     expect(calls[1]!.args).toContain("q=repo:acme/app is:pr is:open (author:ada OR author:linus) sort:created-asc");
@@ -139,7 +142,7 @@ describe("GitHubPulls", () => {
 
   it("names an app's pull requests as gh's own list does, so its author filter finds them", async () => {
     const node = { ...raw, author: { __typename: "Bot", login: "dependabot" }, labels: { nodes: [] } };
-    const { gh } = fakeGh({ "repo view": "acme/app\n", "api graphql": JSON.stringify({ data: { search: { nodes: [node] } } }) });
+    const { gh } = fakeGh({ "repo view": REPO_URL, "api graphql": JSON.stringify({ data: { search: { nodes: [node] } } }) });
     expect((await new GitHubPulls(gh).list("/repo", "draft"))[0]!.author).toBe("app/dependabot");
   });
 
@@ -149,7 +152,7 @@ describe("GitHubPulls", () => {
       if (args[0] === "repo") {
         reads += 1;
         if (reads === 1) throw new GhError("could not resolve");
-        return "acme/app\n";
+        return REPO_URL;
       }
       return JSON.stringify({ data: { search: { nodes: [] } } });
     };
@@ -191,6 +194,7 @@ describe("GitHubPulls choices", () => {
       "label list": JSON.stringify([
         { name: "bug", color: "d73a4a", description: "Broken" },
         { name: 'say "hi"', color: "0e8a16", description: null },
+        { name: "x\\", color: "0e8a16", description: null },
         { name: "wip", color: "ededed", description: null },
       ]),
     });
@@ -203,6 +207,7 @@ describe("GitHubPulls choices", () => {
 
   it("lists assignees by login and open milestones before closed ones, leaving out titles a search can't quote", async () => {
     const { gh } = fakeGh({
+      "repo view": REPO_URL,
       "api repos/{owner}/{repo}/assignees?per_page=100": JSON.stringify([{ login: "zed" }, { login: "Ada" }]),
       "api repos/{owner}/{repo}/milestones?state=all&sort=due_on&per_page=100": JSON.stringify([
         { title: "v1", state: "closed" },
@@ -222,10 +227,19 @@ describe("GitHubPulls choices", () => {
   });
 
   it("names projects by owner and number, and says how to grant the scope they need", async () => {
-    const projects = { data: { repository: { projectsV2: { nodes: [{ number: 7, title: "Roadmap", owner: { login: "acme" } }] } } } };
-    const { gh } = fakeGh({ "api graphql": JSON.stringify(projects) });
-    expect(await new GitHubPulls(gh).choices("/repo", "projects")).toEqual([{ value: "acme/7", name: "Roadmap", detail: "acme" }]);
+    const nodes = [
+      { number: 7, title: "Roadmap", owner: { login: "acme" } },
+      { number: 3, title: "Mine", owner: { login: "jdoe_acme" } },
+      // An owner the project filter couldn't send isn't offered, so picking it can't fail the list.
+      { number: 4, title: "Odd", owner: { login: "acme.io" } },
+    ];
+    const { gh } = fakeGh({ "repo view": REPO_URL, "api graphql": JSON.stringify({ data: { repository: { projectsV2: { nodes } } } }) });
+    expect(await new GitHubPulls(gh).choices("/repo", "projects")).toEqual([
+      { value: "acme/7", name: "Roadmap", detail: "acme" },
+      { value: "jdoe_acme/3", name: "Mine", detail: "jdoe_acme" },
+    ]);
     const scopeless = fakeGh({
+      "repo view": REPO_URL,
       "api graphql": new GhError("gh: Your token has not been granted the required scopes", '{"errors":[{"type":"INSUFFICIENT_SCOPES","message":"requires read:project"}]}'),
     });
     await expect(new GitHubPulls(scopeless.gh).choices("/repo", "projects")).rejects.toThrow("gh auth refresh -s read:project");
@@ -258,6 +272,7 @@ describe("GitHubPulls choices", () => {
     const pages = [page(["alpha", "dev", "main"], "cursor-1", { preferred: { name: "dev" } }), page(["zeta"], null)];
     const calls: string[][] = [];
     const gh: GhRunner = async (_cwd, args) => {
+      if (args[0] === "repo") return REPO_URL;
       calls.push(args);
       return pages.shift()!;
     };
@@ -268,7 +283,7 @@ describe("GitHubPulls choices", () => {
   });
 
   it("tells a missing branch from a failure to check", async () => {
-    const pulls = (answer: string | GhError) => new GitHubPulls(fakeGh({ [`api repos/{owner}/{repo}/branches/${encodeURIComponent("release/2.x")}`]: answer }).gh);
+    const pulls = (answer: string | GhError) => new GitHubPulls(fakeGh({ "repo view": REPO_URL, [`api repos/{owner}/{repo}/branches/${encodeURIComponent("release/2.x")}`]: answer }).gh);
     expect(await pulls("").hasBranch("/repo", "release/2.x")).toBe(true);
     expect(await pulls(new GhError("gh: Branch not found (HTTP 404)")).hasBranch("/repo", "release/2.x")).toBe(false);
     await expect(pulls(new GhError("To get started with GitHub CLI, please run:  gh auth login")).hasBranch("/repo", "release/2.x")).rejects.toThrow("Sign in to GitHub first");
@@ -280,6 +295,52 @@ describe("GitHubPulls choices", () => {
     expect(posted.url).toBe("https://github.com/acme/app/pull/7#pullrequestreview-1");
     expect(calls[0]!.args).toEqual(["api", "--method", "POST", "repos/acme/app/pulls/7/reviews", "--input", "-"]);
     expect(JSON.parse(calls[0]!.input!)).toEqual({ commit_id: "c".repeat(40), event: "COMMENT", body: "Looks close.", comments: [] });
+  });
+
+  it("asks a GitHub Enterprise checkout's own host, and github.com's without naming it", async () => {
+    const answers = {
+      "repo view": "https://github.example.com/acme/app\n",
+      "api graphql": JSON.stringify({ data: { search: { nodes: [] } } }),
+      "api repos/{owner}/{repo}/assignees?per_page=100": "[]",
+      "api user": "ada\n",
+    };
+    const enterprise = fakeGh(answers);
+    const pulls = new GitHubPulls(enterprise.gh);
+    await pulls.list("/repo", "draft");
+    await pulls.choices("/repo", "assignees");
+    expect(await pulls.viewer("/repo")).toBe("ada");
+    const api = enterprise.calls.filter((call) => call.args[0] === "api");
+    expect(api).toHaveLength(3);
+    for (const call of api) expect(call.args.slice(-2)).toEqual(["--hostname", "github.example.com"]);
+    expect(api[0]!.args).toContain("q=repo:acme/app is:pr is:open draft:true sort:created-desc");
+    const dotcom = fakeGh({ ...answers, "repo view": REPO_URL });
+    await new GitHubPulls(dotcom.gh).list("/repo", "draft");
+    expect(dotcom.calls.flatMap((call) => call.args)).not.toContain("--hostname");
+    // Outside a checkout there is no repository to ask about; the login is gh's own host's.
+    const home = fakeGh({ "api user": "ada\n" });
+    expect(await new GitHubPulls(home.gh).viewer("/home/ada")).toBe("ada");
+    expect(home.calls.at(-1)!.args).toEqual(["api", "user", "--jq", ".login"]);
+  });
+
+  it("runs at most eight gh processes at once, starting the rest in turn", async () => {
+    let running = 0;
+    let most = 0;
+    const releases: (() => void)[] = [];
+    const gh: GhRunner = async () => {
+      running += 1;
+      most = Math.max(most, running);
+      await new Promise<void>((resolve) => releases.push(resolve));
+      running -= 1;
+      return "[]";
+    };
+    const pulls = new GitHubPulls(gh);
+    const lists = Array.from({ length: 20 }, () => pulls.list("/repo", "open"));
+    while (releases.length > 0 || running > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      releases.splice(0).forEach((release) => release());
+    }
+    expect(await Promise.all(lists)).toHaveLength(20);
+    expect(most).toBe(8);
   });
 
   it("says what to do instead of repeating gh's output", async () => {

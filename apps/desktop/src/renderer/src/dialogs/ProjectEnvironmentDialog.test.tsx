@@ -40,10 +40,23 @@ function show(local: string | null = "api") {
 const calls = (method: string) => mock.call.mock.calls.filter(([called]) => called === method).map(([, params]) => params);
 const saveButton = () => screen.getByRole("button", { name: "Save" });
 
-it("fills a project with nothing saved from this Mac's .env, and saves what it shows", async () => {
+it("opens a project with nothing saved on one empty row, reading no .env until the person asks", async () => {
   show();
-  expect(await screen.findByDisplayValue("DATABASE_URL")).toBeTruthy();
+  const name = await screen.findByLabelText("Name");
+  expect(name).toHaveProperty("value", "");
+  expect(screen.getAllByLabelText("Name")).toHaveLength(1);
   expect(screen.getByRole("dialog", { name: "Environment of api" })).toBeTruthy();
+  expect(saveButton()).toHaveProperty("disabled", true);
+  expect(calls("hostedEnvironment.fromFile")).toEqual([]);
+});
+
+it("fills from this Mac's .env on the person's press, and saves what it shows", async () => {
+  show();
+  await screen.findByLabelText("Name");
+  fireEvent.click(screen.getByRole("button", { name: "Fill from .env" }));
+  expect(await screen.findByDisplayValue("DATABASE_URL")).toBeTruthy();
+  expect(screen.getAllByLabelText("Name")).toHaveLength(1);
+  expect(calls("hostedEnvironment.fromFile")).toEqual([{ localProjectId: "api" }]);
   fireEvent.click(saveButton());
   await waitFor(() => expect(close).toHaveBeenCalledOnce());
   expect(calls("hostedEnvironment.set")).toEqual([{ spaceId: "birch", projectId: "server-api", variables: [{ name: "DATABASE_URL", value: "postgres://localhost/api" }] }]);
@@ -75,6 +88,8 @@ it("puts a refused name's sentence under its row, keeps the sheet open, and hold
   save = () => ({ state: "refused", name: "ANTHROPIC_API_KEY", message: "ANTHROPIC_ names are kept for the agents." });
   file = { files: [".env"], entries: [{ name: "ANTHROPIC_API_KEY", value: "example-key-value" }] };
   show();
+  await screen.findByLabelText("Name");
+  fireEvent.click(screen.getByRole("button", { name: "Fill from .env" }));
   await screen.findByDisplayValue("ANTHROPIC_API_KEY");
   fireEvent.click(saveButton());
   expect((await screen.findByRole("alert")).textContent).toBe("ANTHROPIC_ names are kept for the agents.");

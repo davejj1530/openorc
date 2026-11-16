@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { HostedEnvironmentVariable, SpaceProject } from "@openorc/protocol";
 import { X } from "../components/icons";
 import { Button, Dialog, IconButton, Input, TextButton } from "../components/ui";
@@ -49,8 +49,11 @@ export function ProjectEnvironmentDialog({ spaceId, project, onClose }: { spaceI
   );
 }
 
-/** What the sheet holds before it is saved: its rows, the saved names taken out, and a line about the last action. */
-function useEnvironmentDraft({ saved, canChange, project }: { saved: HostedEnvironmentVariable[]; canChange: boolean; project: Project }) {
+/**
+ * What the sheet holds before it is saved: its rows, the saved names taken out, and a line about the last action. A
+ * project with nothing saved starts with one empty row: a .env is read only when the person asks, never on opening.
+ */
+function useEnvironmentDraft({ saved, project }: { saved: HostedEnvironmentVariable[]; project: Project }) {
   const nextId = useRef(0);
   const row = (name: string, value: string, isSaved = false): Row => ({ id: nextId.current++, name, value, saved: isSaved });
   const [rows, setRows] = useState<Row[]>(() => (saved.length ? saved.map((variable) => row(variable.name, "", true)) : [row("", "")]));
@@ -70,18 +73,6 @@ function useEnvironmentDraft({ saved, canChange, project }: { saved: HostedEnvir
       return [...merged, ...entries.filter((entry) => !known.has(entry.name)).map((entry) => row(entry.name, entry.value))];
     });
   };
-
-  // A project with nothing saved starts from this Mac's .env, quietly: a folder with none starts with one empty row.
-  const filled = useRef(false);
-  useEffect(() => {
-    if (filled.current || saved.length || !canChange || !local) return;
-    filled.current = true;
-    void fromFile
-      .mutateAsync({ localProjectId: local })
-      .then((found) => fillWith(found.entries))
-      .catch(() => undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, for the sheet's first read
-  }, []);
 
   const toSet = rows.filter((each) => (each.saved ? each.value !== "" : each.name !== "" || each.value !== ""));
   return {
@@ -138,7 +129,7 @@ function EnvironmentForm({
   onPending(value: boolean): void;
 }) {
   const params = { spaceId, projectId: project.hostedProjectId };
-  const draft = useEnvironmentDraft({ saved, canChange, project });
+  const draft = useEnvironmentDraft({ saved, project });
   const set = useRpcMutation("hostedEnvironment.set");
   const remove = useRpcMutation("hostedEnvironment.remove");
   const busy = set.isPending || remove.isPending;
@@ -224,6 +215,7 @@ function VariableRow({ row, canChange, busy, onEdit, onTake }: { row: Row; canCh
           variant="sheet"
           aria-label="Name"
           className="flex-1 font-mono"
+          placeholder="Name"
           value={row.name}
           readOnly={!canChange || row.saved}
           disabled={busy}

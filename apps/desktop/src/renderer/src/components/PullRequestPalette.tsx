@@ -7,7 +7,7 @@ import { menuItem, menuPopup, menuSeparator } from "./menu";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
 import { useRpcs } from "../lib/client";
-import { filterTokens, MORE_ROWS, paletteGroups, personName, type PaletteGroup, type PaletteItem, type PaletteMark, type PaletteTarget } from "../lib/pull-request-palette";
+import { filterTokens, MORE_ROWS, paletteGroups, personInitial, type PaletteGroup, type PaletteItem, type PaletteMark, type PaletteTarget } from "../lib/pull-request-palette";
 import { mergedChoices, reactionSortOptions, sortLabel, sortOptions } from "../lib/pull-requests";
 import { floatingGround } from "../lib/use-anchor-ground";
 
@@ -15,7 +15,7 @@ import { floatingGround } from "../lib/use-anchor-ground";
 export function PersonFace({ login, size = 18 }: { login: string; size?: number }) {
   return (
     <span aria-hidden="true" className="pull-face" style={{ width: size, height: size, fontSize: Math.round(size * 0.45) }}>
-      {personName(login)[0]!.toUpperCase()}
+      {personInitial(login)}
     </span>
   );
 }

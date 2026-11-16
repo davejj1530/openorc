@@ -308,6 +308,15 @@ export function writePullRequestViews(views: readonly PullRequestView[]): void {
 
 const DEFAULT_VIEW_KEY = "openorc.pull-default-view";
 
+/** Calls `changed` when another window saves, deletes or defaults a view. Returns the way to stop. */
+export function watchPullRequestViews(changed: () => void): () => void {
+  const listener = (event: StorageEvent) => {
+    if (event.key === null || event.key === VIEWS_KEY || event.key === DEFAULT_VIEW_KEY) changed();
+  };
+  window.addEventListener("storage", listener);
+  return () => window.removeEventListener("storage", listener);
+}
+
 /** The view the page opens with when the app starts, if one was chosen. A built-in view can be the default too. */
 export function readDefaultViewId(): string | null {
   try {

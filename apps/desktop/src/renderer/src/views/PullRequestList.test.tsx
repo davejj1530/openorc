@@ -94,6 +94,41 @@ it("picks a state from tabs that count every project's pull requests", async () 
   expect(merged.getAttribute("aria-pressed")).toBe("true");
 });
 
+it("counts nothing on the tabs while a search is set, since it looks only through the pull requests loaded", async () => {
+  sessionStorage.setItem("openorc.pull-list", JSON.stringify({ state: "open", query: "welcome", filters: {}, base: "builtin-all" }));
+  page();
+  await screen.findByRole("button", { name: /Create the welcome flow/ });
+  expect(screen.queryByRole("button", { name: /Polish the picker/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Open" }).getAttribute("aria-pressed")).toBe("true");
+  expect(screen.getByRole("button", { name: "Merged" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Remove search filter welcome" }));
+  await screen.findByRole("button", { name: "Open 6" });
+});
+
+it("keeps the views another window saved, and lists them once it says so", async () => {
+  page();
+  await screen.findByRole("button", { name: /Create the welcome flow/ });
+  // Another window saves Mara's after this one read the views.
+  localStorage.setItem("openorc.pull-views", JSON.stringify([{ id: "maras", name: "Mara's", state: "open", query: "", filters: { authors: ["mara"] } }]));
+  fireEvent.click(screen.getByRole("button", { name: "Sort: newest" }));
+  fireEvent.click(await screen.findByRole("menuitemradio", { name: "Oldest" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Save as view…" }));
+  fireEvent.change(await screen.findByRole("textbox", { name: /^Name/ }), { target: { value: "Oldest first" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await screen.findByRole("button", { name: "View: Oldest first" });
+  const stored = () => JSON.parse(localStorage.getItem("openorc.pull-views")!) as { id: string; name: string }[];
+  expect(stored().map((view) => view.name)).toEqual(["Mara's", "Oldest first"]);
+
+  // Another window deletes Mara's and makes Oldest first the default.
+  const oldest = stored().filter((view) => view.name === "Oldest first");
+  localStorage.setItem("openorc.pull-views", JSON.stringify(oldest));
+  localStorage.setItem("openorc.pull-default-view", oldest[0]!.id);
+  window.dispatchEvent(new StorageEvent("storage", { key: "openorc.pull-default-view" }));
+  fireEvent.click(await screen.findByRole("button", { name: "View: Oldest first, default" }));
+  await screen.findByRole("menuitemradio", { name: /Oldest first/ });
+  expect(screen.queryByRole("menuitemradio", { name: /Mara's/ })).toBeNull();
+});
+
 it("opens the palette with /, adds what is picked as a token, and takes it off again", async () => {
   page();
   await screen.findByRole("button", { name: /Create the welcome flow/ });

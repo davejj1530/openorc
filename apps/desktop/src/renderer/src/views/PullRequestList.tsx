@@ -28,6 +28,7 @@ import {
   reviewDecisionLabel,
   startingListState,
   stateTabs,
+  watchPullRequestViews,
   writeDefaultViewId,
   writePullRequestFilters,
   writePullRequestViews,
@@ -219,6 +220,15 @@ function useListViews() {
   const [saved, setSaved] = useState<PullRequestView[]>(readPullRequestViews);
   const [defaultId, setDefaultId] = useState(readDefaultViewId);
   useEffect(() => rememberListState(list), [list]);
+  // Another window on this page saves, deletes and defaults views too.
+  useEffect(
+    () =>
+      watchPullRequestViews(() => {
+        setSaved(readPullRequestViews());
+        setDefaultId(readDefaultViewId());
+      }),
+    [],
+  );
 
   const views = [...builtInViews, ...saved];
   const active = activeView(views, list);
@@ -228,7 +238,9 @@ function useListViews() {
     setList({ ...list, base: shown.id, ...patch });
     if (patch.filters) writePullRequestFilters(patch.filters);
   };
-  const changeViews = (next: PullRequestView[]) => {
+  // A change applies to the views as stored, so it keeps what another window saved since this one last read them.
+  const changeViews = (change: (stored: PullRequestView[]) => PullRequestView[]) => {
+    const next = change(readPullRequestViews());
     setSaved(next);
     writePullRequestViews(next);
   };
@@ -241,15 +253,15 @@ function useListViews() {
   // What a view keeps of the list: everything but the view it started as.
   const current = { state: list.state, filters: list.filters, query: list.query };
   const saveNew = (name: string, makeDefault: boolean) => {
-    const existing = saved.find((view) => view.name.toLowerCase() === name.toLowerCase());
+    const existing = readPullRequestViews().find((entry) => entry.name.toLowerCase() === name.toLowerCase());
     const view: PullRequestView = { id: existing?.id ?? crypto.randomUUID(), name, ...current };
-    changeViews(existing ? saved.map((entry) => (entry.id === existing.id ? view : entry)) : [...saved, view]);
+    changeViews((stored) => (existing ? stored.map((entry) => (entry.id === existing.id ? view : entry)) : [...stored, view]));
     if (makeDefault) changeDefault(view.id);
     change({ base: view.id });
   };
-  const saveOver = () => changeViews(saved.map((view) => (view.id === shown.id ? { ...view, ...current } : view)));
+  const saveOver = () => changeViews((stored) => stored.map((view) => (view.id === shown.id ? { ...view, ...current } : view)));
   const remove = (view: PullRequestView) => {
-    changeViews(saved.filter((entry) => entry.id !== view.id));
+    changeViews((stored) => stored.filter((entry) => entry.id !== view.id));
     if (view.id === defaultId) changeDefault(null);
     change(listOf(builtInViews[0]!));
   };
@@ -290,7 +302,9 @@ export function PullRequestList() {
     scoped.map((project) => ({ projectId: project.id, ...counted })),
     { enabled: !reason },
   );
-  const counts = totalCounts(countReads);
+  // A search looks only through the pull requests loaded, which GitHub's counts know nothing of, so the tabs count
+  // nothing while there is one rather than disagree with the list.
+  const counts = list.query.trim() ? null : totalCounts(countReads);
   const entries: ProjectPulls[] = scoped.map((project, index) => {
     const result = results[index]!;
     return { project, pulls: result.data, error: result.error, loading: result.isPending, retry: () => void result.refetch() };

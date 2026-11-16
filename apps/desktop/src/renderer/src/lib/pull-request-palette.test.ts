@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PullRequestSummary } from "@openorc/protocol";
-import { filterTokens, paletteGroups, type PaletteSources, type PaletteTarget } from "./pull-request-palette";
+import { filterTokens, ME, paletteGroups, personInitial, type PaletteSources, type PaletteTarget } from "./pull-request-palette";
 import { noPullRequestFilters, type PullRequestFilters } from "./pull-requests";
 
 const pull = (author: string, labels: string[] = []) => ({ author, labels: labels.map((name) => ({ name, color: "d73a4a", description: "" })) }) as PullRequestSummary;
@@ -73,6 +73,20 @@ describe("the filter palette", () => {
     expect(groups.flatMap((group) => group.items).map((item) => item.text)).not.toContain("not a login");
     // A label named none and the row for unlabeled pull requests are told apart.
     expect(groups[1]!.items.map((item) => item.key)).toEqual(expect.arrayContaining(["label:none", "no:label"]));
+  });
+
+  it("offers a login typed with its @ even when it is part of a known one, after that one", () => {
+    const dave: PaletteSources = { ...sources, assignees: [{ value: "davejj1530", name: "davejj1530" }] };
+    const people = (input: string) => rows(paletteGroups(target(), dave, input))[1];
+    expect(people("@dave")).toEqual(["People", ["Author davejj1530", "Assignee davejj1530", "Author dave", "Assignee dave"]]);
+    // Typed bare, a partial name only finds the person.
+    expect(people("dave")).toEqual(["People", ["Author davejj1530", "Assignee davejj1530"]]);
+    // A login someone known already has, in any case, isn't offered twice.
+    expect(people("@DaveJJ1530")).toEqual(["People", ["Author davejj1530", "Assignee davejj1530"]]);
+  });
+
+  it("gives an app's face its own name's letter", () => {
+    expect(["app/dependabot", "app/renovate", "mara", ME].map(personInitial)).toEqual(["D", "R", "M", "Y"]);
   });
 
   it("offers an app as an author but not as an assignee, which an app can't be", () => {

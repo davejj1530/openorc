@@ -42,6 +42,12 @@ export const ME = "@me";
 /** A person as the list says them: you, or their login. */
 export const personName = (login: string) => (login === ME ? "you" : login);
 
+/** The letter on a person's face: for an app, its own name's rather than the `app/` gh names it with. */
+export const personInitial = (login: string) =>
+  personName(login)
+    .replace(/^app\//, "")[0]!
+    .toUpperCase();
+
 /** Whether a person is you: a row for you also answers to "me", as GitHub's @me. */
 const isMe = (login: string) => login === ME;
 
@@ -63,17 +69,20 @@ const withFilters = (patch: (filters: PullRequestFilters) => PullRequestFilters)
 const detailOf = (detail: string | undefined) => (detail ? { detail } : {});
 
 /**
- * Everyone a people row can name: you, anyone chosen, with an open pull request or GitHub can assign, and a login typed
- * when nobody known matches it, so a partial name finds the person rather than offering itself. Only logins a filter
- * can send are offered, and "me" typed means you.
+ * Everyone a people row can name: you, anyone chosen, with an open pull request or GitHub can assign, then a login typed
+ * that none of them has. Typed bare, it is offered only when no known login contains it, so a partial name finds the
+ * person rather than offering itself; typed with its @, it is offered after the known logins it is part of, as `@dave`
+ * beside `davejj1530`. Only logins a filter can send are offered, and "me" typed means you.
  */
 function people(filters: PullRequestFilters, sources: PaletteSources, input: string): string[] {
   const known = [...new Set([...authorChoices(filters.authors, sources.pulls), ...sources.assignees.map((choice) => choice.value)])].filter(
     (login) => !isMe(login) && GitHubLogin.safeParse(login).success,
   );
   const typed = typedLogin(input);
-  const unknown = typed && typed.toLowerCase() !== "me" && !known.some((login) => login.toLowerCase().includes(typed.toLowerCase()));
-  return [ME, ...known, ...(unknown ? [typed] : [])];
+  const wanted = typed?.toLowerCase() ?? "";
+  const knownAs = (match: (login: string) => boolean) => known.some((login) => match(login.toLowerCase()));
+  const offered = typed && wanted !== "me" && !knownAs((login) => login === wanted) && (input.startsWith("@") || !knownAs((login) => login.includes(wanted)));
+  return [ME, ...known, ...(offered ? [typed] : [])];
 }
 
 function peopleItems(filters: PullRequestFilters, sources: PaletteSources, input: string): PaletteItem[] {

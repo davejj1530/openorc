@@ -343,6 +343,30 @@ describe("GitHubPulls choices", () => {
     expect(most).toBe(8);
   });
 
+  it("reads a pull request without waiting behind the list page's reads", async () => {
+    const held: (() => void)[] = [];
+    const gh: GhRunner = async (_cwd, args) => {
+      if (args[0] === "pr" && args[1] === "list") {
+        await new Promise<void>((resolve) => held.push(resolve));
+        return "[]";
+      }
+      if (args[0] === "repo") return REPO_URL;
+      if (args[0] === "api") return "ada\n";
+      return JSON.stringify({ ...raw, body: null, headRefOid: "h".repeat(40), baseRefOid: "b".repeat(40) });
+    };
+    const pulls = new GitHubPulls(gh);
+    const lists = Array.from({ length: 20 }, () => pulls.list("/repo", "open"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(held).toHaveLength(8);
+    // Twelve lists still wait their turn, and the pull request comes back all the same.
+    expect(await pulls.get("/repo", 7)).toMatchObject({ number: 7, viewer: "ada" });
+    while (held.length > 0) {
+      held.splice(0).forEach((release) => release());
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    expect(await Promise.all(lists)).toHaveLength(20);
+  });
+
   it("says what to do instead of repeating gh's output", async () => {
     const signedOut = fakeGh({ "pr list": new GhError("To get started with GitHub CLI, please run:  gh auth login\nAlternatively, populate the GH_TOKEN environment variable.") });
     await expect(new GitHubPulls(signedOut.gh).list("/repo", "open")).rejects.toThrow("Sign in to GitHub first: run gh auth login in a terminal.");

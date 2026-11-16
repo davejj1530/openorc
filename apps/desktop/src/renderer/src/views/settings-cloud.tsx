@@ -27,7 +27,7 @@ function CloudProjectSections({ active }: { active: boolean }) {
   return (
     <>
       <SpaceCloudProjects spaceId={status.personalSpaceId} title="Personal projects" personal active={active} />
-      {organization?.kind === "organization" ? <SpaceCloudProjects spaceId={organization.id} title={organization.name} personal={false} active={active} /> : null}
+      {organization?.kind === "organization" ? <SpaceCloudProjects spaceId={organization.id} title={`${organization.name} projects`} personal={false} active={active} /> : null}
     </>
   );
 }

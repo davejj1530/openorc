@@ -58,7 +58,9 @@ afterEach(() => {
 });
 
 const show = (personal: boolean) =>
-  render(<QueryClientProvider client={queryClient}>{<SpaceCloudProjects spaceId="space-1" title={personal ? "Personal projects" : "Acme"} personal={personal} active />}</QueryClientProvider>);
+  render(
+    <QueryClientProvider client={queryClient}>{<SpaceCloudProjects spaceId="space-1" title={personal ? "Personal projects" : "Acme projects"} personal={personal} active />}</QueryClientProvider>,
+  );
 
 it("lists the person's own cloud projects with their environment and Remove, and adds one of this Mac's from the space's GitHub", async () => {
   show(true);
@@ -77,14 +79,15 @@ it("asks before removing a cloud project, saying its cloud threads go with it", 
   show(true);
   fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
   const sheet = await screen.findByRole("dialog");
-  expect(within(sheet).getByText(/Its cloud threads are deleted with it/)).toBeTruthy();
+  expect(within(sheet).getByText("Remove api from the cloud?")).toBeTruthy();
+  expect(within(sheet).getByText("Its cloud threads are deleted with it. The folder on this Mac stays.")).toBeTruthy();
   fireEvent.click(within(sheet).getByRole("button", { name: "Remove" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("organization.projects.remove", { spaceId: "space-1", projectId: "cloud-api" }));
 });
 
 it("shows an organization's projects as added, under its name, with no Remove", async () => {
   show(false);
-  expect(await screen.findByText("Acme")).toBeTruthy();
+  expect(await screen.findByText("Acme projects")).toBeTruthy();
   expect(await screen.findByText("Added")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
 });

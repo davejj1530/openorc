@@ -68,10 +68,8 @@ function AddProject({ spaceId, addable: { rest, repositories }, first }: { space
 function RemoveProject({ spaceId, project, onClose }: { spaceId: string; project: CloudProject; onClose: () => void }) {
   const remove = useRpcMutation("organization.projects.remove");
   return (
-    <Dialog open onOpenChange={(open) => (open || remove.isPending ? undefined : onClose())} title="Remove from the cloud?">
-      <p className="text-base text-ink-2 break-words">
-        Remove <span className="text-ink">{project.name}</span> from your cloud? Its cloud threads are deleted with it. The folder on this Mac stays.
-      </p>
+    <Dialog open onOpenChange={(open) => (open || remove.isPending ? undefined : onClose())} title={`Remove ${project.name} from the cloud?`}>
+      <p className="text-base text-ink-2 break-words">Its cloud threads are deleted with it. The folder on this Mac stays.</p>
       <Failure error={remove.error} />
       <div className="mt-5 flex justify-end gap-2">
         <Button disabled={remove.isPending} onClick={onClose}>

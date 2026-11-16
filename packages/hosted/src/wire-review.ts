@@ -1,4 +1,4 @@
-import { HostedActionAnswer, HostedFileDiff, HostedReviewState, HostedThreadChanges, HostedTurnChanges } from "@openorc/protocol";
+import { HostedActionAnswer, HostedFileDiff, HostedReviewState, HostedThreadChanges, HostedThreadCommits, HostedTurnChanges } from "@openorc/protocol";
 import type { z } from "zod";
 import type { Route } from "./wire.js";
 
@@ -11,5 +11,6 @@ export const REVIEW_ROUTES = {
   turn: (threadId: string, turnId: string) => route("GET", changes(threadId, turnId), HostedTurnChanges),
   file: (threadId: string, path: string, turnId?: string) => route("GET", `${changes(threadId, turnId)}/file?${new URLSearchParams({ path })}`, HostedFileDiff),
   state: (threadId: string) => route("GET", root(threadId), HostedReviewState),
+  commits: (threadId: string) => route("GET", `${root(threadId)}/commits`, HostedThreadCommits),
   action: (threadId: string, kind: "commit" | "push" | "pull_request") => route("POST", `${root(threadId)}/${kind === "pull_request" ? "pull-request" : kind}`, HostedActionAnswer),
 };

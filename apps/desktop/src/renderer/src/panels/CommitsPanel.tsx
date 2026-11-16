@@ -72,15 +72,18 @@ function SourcePushBar({ source, state, error }: { source: CommitSource; state: 
   return null;
 }
 
-/** The commits on one lane, newest first: a hollow dot is a commit origin lacks, a filled one is on origin. */
-function CommitList({ commits, unpushed }: { commits: Commit[]; unpushed: ReadonlySet<string> }) {
+/**
+ * The commits on one lane, newest first: a hollow dot is a commit origin lacks, a filled one is on origin. `unsent`
+ * names a hollow one where "Not pushed" isn't so, as a cloud thread's on a project with no remote.
+ */
+export function CommitList({ commits, unpushed, unsent = "Not pushed", more = 0 }: { commits: Commit[]; unpushed: ReadonlySet<string>; unsent?: string; more?: number }) {
   return (
     <ol className="commit-rows flex-1 min-h-0 overflow-y-auto" aria-label="Commits">
       {commits.map((c) => {
         const sent = !unpushed.has(c.sha);
         return (
           <li key={c.sha} className="commit-row">
-            <span className="commit-dot" data-sent={sent || undefined} role="img" aria-label={sent ? "On origin" : "Not pushed"} data-tip={sent ? "On origin" : "Not pushed"} />
+            <span className="commit-dot" data-sent={sent || undefined} role="img" aria-label={sent ? "On origin" : unsent} data-tip={sent ? "On origin" : unsent} />
             <span className="commit-subject" data-tip={c.subject}>
               {c.subject}
             </span>
@@ -94,6 +97,7 @@ function CommitList({ commits, unpushed }: { commits: Commit[]; unpushed: Readon
           </li>
         );
       })}
+      {more ? <li className="commit-row commit-more">{more === 1 ? "1 more" : `${more} more`}</li> : null}
     </ol>
   );
 }

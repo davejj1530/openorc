@@ -87,6 +87,17 @@ export const HostedTurnChanges = z.discriminatedUnion("state", [
   z.object({ state: z.literal("working"), turnId: z.string(), line: z.string() }),
 ]);
 export type HostedTurnChanges = z.infer<typeof HostedTurnChanges>;
+/**
+ * A cloud thread's commits since it started, newest first, as its last recorded turn read them: at most a hundred of
+ * `total`, each in the shape of this Mac's commits, and `pushed`, the commit it last put on GitHub, which it and the
+ * commits before it are on.
+ */
+export const HostedThreadCommits = z.object({
+  commits: z.array(z.object({ sha: z.string(), subject: z.string(), author: z.string(), at: z.iso.datetime({ offset: true }).transform((at) => Date.parse(at)) })),
+  total: z.number().int().nonnegative(),
+  pushed: z.string().nullable(),
+});
+export type HostedThreadCommits = z.output<typeof HostedThreadCommits>;
 export const HostedFileDiff = z.object({
   path: z.string(),
   oldPath: z.string().nullable(),
@@ -150,6 +161,7 @@ export const hostedParityRpcParams = {
   "hosted.review.turn": z.object({ threadId: z.string(), turnId: z.string() }).strict(),
   "hosted.review.file": z.object({ threadId: z.string(), turnId: z.string().optional(), path: z.string().min(1).max(4096) }).strict(),
   "hosted.review.state": z.object({ threadId: z.string() }).strict(),
+  "hosted.review.commits": z.object({ threadId: z.string() }).strict(),
   "hosted.review.action": z.object({ threadId: z.string(), action: HostedActionRequest }).strict(),
 };
 export interface HostedParityRpcResults {
@@ -158,5 +170,6 @@ export interface HostedParityRpcResults {
   "hosted.review.turn": HostedTurnChanges;
   "hosted.review.file": HostedFileDiff;
   "hosted.review.state": HostedReviewState;
+  "hosted.review.commits": HostedThreadCommits;
   "hosted.review.action": HostedReviewReply;
 }

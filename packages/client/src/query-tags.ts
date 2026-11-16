@@ -166,7 +166,11 @@ const idReadTags: MethodRules = {
   "threads.people": (p) => ["spaces", `thread:${String(p["threadId"])}`],
   // Notes arrive by invalidation of their thread, never as events: a thread's change reads its notes again.
   "threads.notes": (p) => ["threads", `thread:${String(p["threadId"])}`, `notes:${String(p["threadId"])}`],
-  ...each(["hosted.review.changes", "hosted.review.turn", "hosted.review.file", "hosted.review.state"], (p) => ["threads", `thread:${String(p["threadId"])}`, `threaddiff:${String(p["threadId"])}`]),
+  ...each(["hosted.review.changes", "hosted.review.turn", "hosted.review.file", "hosted.review.state", "hosted.review.commits"], (p) => [
+    "threads",
+    `thread:${String(p["threadId"])}`,
+    `threaddiff:${String(p["threadId"])}`,
+  ]),
   "threads.importable": (p) => ["threads", `importable:${String(p["projectId"])}`],
   "runs.listForThread": (p) => [`runs:thread:${String(p["threadId"])}`],
   // The phone's list and single-file reads of the same changes refresh with the full diff.

@@ -72,3 +72,9 @@
   margin-left: auto;
   color: var(--ink-4);
 }
+/* How many older commits a cloud thread's list leaves out: the lane runs on to it, with no dot. */
+.commit-more {
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--ink-3);
+}

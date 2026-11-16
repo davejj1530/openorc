@@ -1,4 +1,4 @@
-import type { HostedActionRequest, HostedReviewReply, RpcParams, RpcResults } from "@openorc/protocol";
+import type { HostedActionRequest, HostedReviewReply, HostedThreadCommits, RpcParams, RpcResults } from "@openorc/protocol";
 import type { Threads } from "./threads.js";
 import { Refused } from "./session.js";
 import { refuse } from "./sends.js";
@@ -13,6 +13,16 @@ export const turn = (threads: Threads, { threadId, turnId }: RpcParams<"hosted.r
 export const file = (threads: Threads, { threadId, path, turnId }: RpcParams<"hosted.review.file">) =>
   threads.on(threadId).request(REVIEW_ROUTES.file(threadId, path, turnId === undefined ? undefined : threads.voices.serverTurn(threadId, turnId)));
 export const state = (threads: Threads, { threadId }: RpcParams<"hosted.review.state">) => readPublishing(threads.on(threadId), threadId);
+
+/** The thread's commits, read off its machine; none from a server that keeps none. */
+export async function commits(threads: Threads, { threadId }: RpcParams<"hosted.review.commits">): Promise<HostedThreadCommits> {
+  try {
+    return await threads.on(threadId).request(REVIEW_ROUTES.commits(threadId));
+  } catch (error) {
+    if (error instanceof Refused && error.status === 404 && threads.holds({ thread: threadId })) return { commits: [], total: 0, pushed: null };
+    throw error;
+  }
+}
 
 export async function action(threads: Threads, { threadId, action: request }: RpcParams<"hosted.review.action">): Promise<HostedReviewReply> {
   const { kind, ...body } = request;

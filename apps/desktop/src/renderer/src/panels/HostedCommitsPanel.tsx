@@ -1,18 +1,33 @@
 import { useEffect } from "react";
-import { HOSTED_REASONS, type ThreadSummary } from "@openorc/protocol";
+import { HOSTED_REASONS, type HostedThreadCommits, type ThreadSummary } from "@openorc/protocol";
 import { Button, Empty } from "../components/ui";
 import { useRpc } from "../lib/client";
 import { HostedPublish } from "./HostedPublish";
 import { HostedUnavailablePanel } from "../components/HostedUnavailablePanel";
+import { CommitList } from "./CommitsPanel";
+import { useBringable } from "./HostedBring";
+
+/** The commits newer than the one the thread last pushed: all of them before any push. */
+function unpushedOf({ commits, pushed }: HostedThreadCommits): Set<string> {
+  const at = pushed === null ? -1 : commits.findIndex((commit) => commit.sha === pushed);
+  return new Set((at < 0 ? commits : commits.slice(0, at)).map((commit) => commit.sha));
+}
 
 export function HostedCommitsPanel({ thread }: { thread: ThreadSummary }) {
   const read = useRpc("hosted.review.state", { threadId: thread.id });
-  const refresh = () => void read.refetch();
+  const commits = useRpc("hosted.review.commits", { threadId: thread.id });
+  // A project from a folder of a Mac has no remote: its commits are the cloud's until brought here.
+  const mac = useBringable(thread.id).data?.mac === true;
+  const refresh = () => {
+    void read.refetch();
+    void commits.refetch();
+  };
   useEffect(() => {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   });
   if (read.error?.message === HOSTED_REASONS.publishing) return <HostedUnavailablePanel title="Commits" control="publishing" />;
+  const listed = commits.data;
   return (
     <section className="h-full flex flex-col min-h-0">
       <HostedPublish thread={thread} state={read.error ? undefined : read.data} stateError={read.error} surface="commits" heading="Commits" />
@@ -23,9 +38,10 @@ export function HostedCommitsPanel({ thread }: { thread: ThreadSummary }) {
             Retry
           </Button>
         </Empty>
-      ) : (
-        <Empty title="Commit history unavailable">Commit history isn't available in this cloud thread yet.</Empty>
-      )}
+      ) : null}
+      {!read.error && listed?.commits.length ? (
+        <CommitList commits={listed.commits} unpushed={unpushedOf(listed)} unsent={mac ? "In the cloud" : "Not pushed"} more={listed.total - listed.commits.length} />
+      ) : null}
     </section>
   );
 }

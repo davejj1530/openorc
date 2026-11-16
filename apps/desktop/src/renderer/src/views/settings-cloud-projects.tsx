@@ -41,7 +41,8 @@ function AddProject({ spaceId, addable: { rest, repositories }, folders, first }
   const open = rest.filter((project) => repositories.has(repoKey(project.repo)));
   // A folder with no remote is offered beside them, by a value of its own.
   const choices = [...open.map((project) => project.projectId), ...folders.map((folder) => `${FOLDER}${folder.localProjectId}`)];
-  const id = [picked, asked].find((each) => each && choices.includes(each)) ?? choices[0] ?? "";
+  // With nothing addable yet the picker shows the first project held with why, never an empty field.
+  const id = [picked, asked].find((each) => each && choices.includes(each)) ?? choices[0] ?? rest[0]?.projectId ?? "";
   const refused = add.data?.find((result) => result.state === "refused");
   const busy = add.isPending || addFolder.isPending;
   const submit = () => {
@@ -68,7 +69,7 @@ function AddProject({ spaceId, addable: { rest, repositories }, folders, first }
             </option>
           ))}
         </Select>
-        <Button disabled={!id || busy} onClick={submit}>
+        <Button disabled={!choices.includes(id) || busy} onClick={submit}>
           Add
         </Button>
       </SettingRow>

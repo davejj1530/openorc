@@ -92,6 +92,23 @@ it("shows an organization's projects as added, under its name, with no Remove", 
   expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
 });
 
+it("shows a project GitHub doesn't let OpenOrc read held with why, never an empty picker, and holds Add", async () => {
+  inSpace = [row("mac-api", "ana/api", "cloud-api")];
+  const answers: Record<string, unknown> = {
+    "spaces.projects": inSpace,
+    "projects.list": [{ id: "mac-docs", name: "docs" }],
+    "organization.repositories": { configured: true, installations: [], connecting: null, repositories: [] },
+    "account.status": { state: "signed-in", projects: [{ projectId: "mac-docs", repo: "ana/docs", cloud: "unreadable" }] },
+  };
+  vi.mocked(core.call).mockImplementation((async (method: string) => answers[method] ?? null) as never);
+  show(true);
+  await screen.findByRole("option", { name: "docs · GitHub doesn't let OpenOrc read it yet" });
+  const picker = screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement;
+  expect(picker.value).toBe("mac-docs");
+  expect(picker.selectedOptions[0]?.textContent).toBe("docs · GitHub doesn't let OpenOrc read it yet");
+  expect((screen.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
 it("says there are no projects when the space has none and this Mac has none to add", async () => {
   inSpace = [];
   const answers: Record<string, unknown> = {

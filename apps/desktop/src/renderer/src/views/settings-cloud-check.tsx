@@ -43,7 +43,7 @@ function Link({ link }: { link: CloudCheckLink }) {
           </span>
         ) : null}
       </span>
-      <span className="cloud-check-time">{link.state === "running" ? "" : seconds(link.ms)}</span>
+      <span className="cloud-check-time">{link.state === "ok" || link.state === "broken" ? seconds(link.ms) : ""}</span>
     </li>
   );
 }

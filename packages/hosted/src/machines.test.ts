@@ -31,6 +31,7 @@ const machine = (id: string, stop: { can: true } | { can: false; reason: string 
   seconds: 840,
   threads: [{ id: `thread-${id}`, title: "Fix the login redirect", holds: ["resting" as const] }],
   stop,
+  changing: false,
 });
 const asked = () => stand.requests.filter((request) => request.path === "/hosted/machines").length;
 
@@ -50,7 +51,7 @@ describe("a person's machines", () => {
     expect(read).toMatchObject({ state: "ready", machines: [{ id: "m1", since: Date.parse("2026-11-16T10:00:00.000Z"), seconds: 840 }, { id: "m2" }] });
     expect(await ada.machines.stop("m1")).toMatchObject({ state: "ready", machines: [{ id: "m2" }] });
     await expect(ada.machines.stop("m2")).rejects.toThrow("Someone else's work is running there.");
-    await expect(ada.machines.stop("gone")).rejects.toThrow("That machine isn't running for you.");
+    expect(await ada.machines.stop("gone"), "a machine no longer running reads the list again").toMatchObject({ state: "ready", machines: [{ id: "m2" }] });
     expect(await ada.machines.read()).toMatchObject({ state: "ready" });
   });
 });

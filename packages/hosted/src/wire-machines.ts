@@ -10,6 +10,7 @@ const machines = z.object({
       seconds: z.number().int().nonnegative(),
       threads: z.array(z.object({ id: z.string(), title: z.string().nullable(), holds: z.array(z.enum(["turn", "terminal", "background", "resting"])) })),
       stop: z.discriminatedUnion("can", [z.object({ can: z.literal(true) }), z.object({ can: z.literal(false), reason: z.string().min(1) })]),
+      changing: z.boolean().optional(),
     }),
   ),
 });

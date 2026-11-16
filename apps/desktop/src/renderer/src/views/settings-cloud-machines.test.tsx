@@ -16,6 +16,7 @@ const machine = (id: string, more: Partial<CloudMachine> = {}): CloudMachine => 
   seconds: 840,
   threads: [{ id: `t-${id}`, title: "Fix the login redirect", holds: ["resting"] }],
   stop: { can: true },
+  changing: false,
   ...more,
 });
 let machines: CloudMachines;
@@ -50,7 +51,7 @@ it("is absent where the server lists no machines", async () => {
 
 it("says nothing is running, and this month's hours", async () => {
   show();
-  expect(await screen.findByText("Nothing is running.")).toBeTruthy();
+  expect(await screen.findByText("Nothing is running")).toBeTruthy();
   expect(await screen.findByText("13 h of 100 h")).toBeTruthy();
 });
 
@@ -75,7 +76,7 @@ it("names each machine by its thread or its service, says what it used this time
   expect(screen.getByText("Awake for 14 min · On Vercel")).toBeTruthy();
   expect(screen.getByText("0.2 h used")).toBeTruthy();
   expect(screen.getByText("Your machine on Agent37")).toBeTruthy();
-  expect(screen.getByText("Awake for 14 min · On Agent37 · 2 threads")).toBeTruthy();
+  expect(screen.getByText("Awake for 14 min · 2 threads · Port the parser, Tidy the docs")).toBeTruthy();
   expect(screen.getByText("1.1 h used")).toBeTruthy();
   const [first, held] = screen.getAllByRole("button", { name: "Stop" }) as HTMLButtonElement[];
   expect(held!.disabled).toBe(true);
@@ -84,3 +85,18 @@ it("names each machine by its thread or its service, says what it used this time
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloudMachines.stop", { id: "m1" }));
   await waitFor(() => expect(screen.queryByText("Fix the login redirect")).toBeNull());
 });
+
+it("reads again within seconds while a machine it stopped is still going to sleep", async () => {
+  machines = { state: "ready", machines: [machine("m1")] };
+  vi.mocked(core.call).mockImplementation((async (method: string) => {
+    if (method === "account.status") return { state: "signed-in", hours };
+    // The answer to the stop still lists it, going to sleep, as the server does until it is asleep.
+    if (method === "cloudMachines.stop") return { state: "ready", machines: [machine("m1", { stop: { can: false, reason: "It's going to sleep." }, changing: true })] };
+    return machines;
+  }) as never);
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloudMachines.stop", { id: "m1" }));
+  machines = { state: "ready", machines: [] };
+  await waitFor(() => expect(screen.getByText("Nothing is running")).toBeTruthy(), { timeout: 6_000 });
+}, 10_000);

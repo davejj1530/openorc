@@ -14,6 +14,8 @@ export type CloudMachine = {
   seconds: number;
   threads: { id: string; title: string | null; holds: CloudMachineHold[] }[];
   stop: { can: true } | { can: false; reason: string };
+  /** Waking, going to sleep or being removed at its service now. */
+  changing: boolean;
 };
 
 /** The person's awake machines, or none where the server lists no machines. */

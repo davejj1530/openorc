@@ -47,7 +47,7 @@ const disabledFill = "disabled:bg-surface-3 disabled:text-ink-3";
 const variants: Record<Variant, string> = {
   primary: `ink-pill hover-step focus-ring bg-accent text-accent-fg ${disabledFill}`,
   secondary: `hover-step bg-control-fill text-ink ${disabledFill}`,
-  ghost: "bg-transparent text-ink-2 hover:bg-surface-2 hover:text-ink active:bg-surface-3 disabled:text-ink-4",
+  ghost: "bg-transparent text-ink-2 hover:bg-surface-2 hover:text-ink active:bg-surface-3 disabled:text-ink-4 disabled:hover:bg-transparent disabled:hover:text-ink-4",
   danger: `hover-step bg-control-fill text-bad ${disabledFill}`,
 };
 const sizes: Record<Size, string> = {

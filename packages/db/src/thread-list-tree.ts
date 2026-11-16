@@ -1,8 +1,14 @@
-import { retiredThreadIds } from "./retired-teams.js";
 import { THREAD_CHILD_PAGE, type RpcParams } from "@openorc/protocol";
 
-export function threadTreeArgs(options: Pick<RpcParams<"threads.list">, "selectedId" | "childLimits"> & { attentionIds?: readonly string[] }): string[] {
-  return [options.selectedId ?? "", JSON.stringify(options.childLimits ?? {}), JSON.stringify(options.attentionIds ?? [])];
+/**
+ * The retired threads, read from the JSON list a statement is given as `options.retired_ids`. They come in as a value
+ * rather than as the recursive query that finds them: SQLite 3.54.0 and 3.54.1 count every copy of a CTE toward one
+ * limit per statement, and the forest's CTEs copy each other, and so that query, far past it.
+ */
+const RETIRED_THREADS = "SELECT value FROM json_each((SELECT retired_ids FROM options))";
+
+export function threadTreeArgs(options: Pick<RpcParams<"threads.list">, "selectedId" | "childLimits"> & { attentionIds?: readonly string[] }, retiredIds: readonly string[]): string[] {
+  return [options.selectedId ?? "", JSON.stringify(options.childLimits ?? {}), JSON.stringify(options.attentionIds ?? []), JSON.stringify(retiredIds)];
 }
 
 /**
@@ -27,7 +33,7 @@ function forestSql(where: string): string {
       SELECT id, id, last_activity_at FROM roots
       UNION ALL SELECT f.root_id, t.id, t.last_activity_at FROM threads t INDEXED BY threads_parent JOIN forest f ON t.parent_thread_id = f.id
         WHERE t.parent_thread_id IS NOT NULL AND (t.id IN (SELECT id FROM eligible)
-          OR (t.parent_relation = 'subagent' AND t.id NOT IN (${retiredThreadIds})))
+          OR (t.parent_relation = 'subagent' AND t.id NOT IN (${RETIRED_THREADS})))
     ),
     latest AS (
       SELECT root_id, MAX(last_activity_at) AS tree_activity FROM forest GROUP BY root_id
@@ -37,7 +43,7 @@ function forestSql(where: string): string {
 /** Independent conversations obey filters; native children inherit their owner's visibility. */
 export function threadTreeSql(where: string, order: string, limit: string): string {
   return `WITH RECURSIVE
-    options AS (SELECT ? AS selected_id, ? AS child_limits, ? AS attention_ids),
+    options AS (SELECT ? AS selected_id, ? AS child_limits, ? AS attention_ids, ? AS retired_ids),
     ancestry(id, parent_thread_id) AS (
       SELECT id, parent_thread_id FROM threads WHERE id = (SELECT selected_id FROM options)
       UNION SELECT t.id, t.parent_thread_id FROM threads t JOIN ancestry a ON a.parent_thread_id = t.id
@@ -68,8 +74,8 @@ export function threadTreeSql(where: string, order: string, limit: string): stri
       WHERE threads.id IN (SELECT id FROM visible) ORDER BY ${order}`;
 }
 
-/** How many roots `where` lists whose tree matches `rootWhere`, given `latest.tree_activity`. */
+/** How many roots `where` lists whose tree matches `rootWhere`, given `latest.tree_activity`. Its first value is the retired ids. */
 export function threadRootCountSql(where: string, rootWhere: string): string {
-  return `WITH RECURSIVE ${forestSql(where)}
+  return `WITH RECURSIVE options AS (SELECT ? AS retired_ids), ${forestSql(where)}
     SELECT COUNT(*) AS n FROM roots JOIN latest ON latest.root_id = roots.id WHERE ${rootWhere}`;
 }

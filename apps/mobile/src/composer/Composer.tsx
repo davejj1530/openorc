@@ -62,6 +62,22 @@ function Queue({ thread, queued, canSteer, typing, onSent }: { thread: ThreadSum
   );
 }
 
+/** What holds the composer back, in words: a failure in red, else why its send is dimmed. */
+function ComposerNotice({ failure, dim }: { failure: string | null | undefined; dim: string | null | undefined }) {
+  if (failure) {
+    return (
+      <Text accessibilityRole="alert" className="px-1 text-sm text-bad">
+        {failure}
+      </Text>
+    );
+  }
+  return dim ? (
+    <Text accessibilityRole="alert" className="px-1 text-sm text-ink-4">
+      {dim}
+    </Text>
+  ) : null;
+}
+
 /**
  * The thread's composer, pinned above the keyboard: queued messages above it, then one r20 plane with the prompt and a
  * bar of attach, model and mode on the left, and activity, Queue, Stop and the send pill on the right. What a send does
@@ -80,16 +96,7 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
         {/* A waiting message of a cloud thread goes now from the Mac, which sees the turn it would join. */}
         <Queue thread={thread} queued={queued} canSteer={input.canSteer && !placeOf(thread).elsewhere} typing={typing} onSent={input.onSent} />
         {typing || input.working ? null : <SessionRecovery thread={thread} request={input.request} disabled={input.disabledReason !== null} onSent={input.onSent} />}
-        {failure ? (
-          <Text accessibilityRole="alert" className="px-1 text-sm text-bad">
-            {failure}
-          </Text>
-        ) : null}
-        {!failure && composer.dimReason ? (
-          <Text accessibilityRole="alert" className="px-1 text-sm text-ink-4">
-            {composer.dimReason}
-          </Text>
-        ) : null}
+        <ComposerNotice failure={failure} dim={composer.dimReason} />
         <ComposerPlane
           composerId={thread.id}
           skillScope={{ kind: "thread", id: thread.id }}

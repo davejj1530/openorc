@@ -72,6 +72,7 @@ export function CloudConnectorSheet({ connector, saved, onClose }: { connector: 
   const [rows, setRows] = useState<Row[]>(first ? first.headers.map((header) => ({ key: header.name, value: "", saved: true })) : []);
   const [agents, setAgents] = useState<HostedAgent[]>(saved.length ? saved.map((one) => one.agent) : onTheMac(connector));
   const [changed, setChanged] = useState(!first);
+  const [refused, setRefused] = useState<string | null>(null);
   const macAgent = connector.agents.find((agent) => agent.editable)?.agent ?? connector.agents[0]?.agent;
   // A new one starts at this Mac's address; its headers wait for the button.
   useEffect(() => {
@@ -86,6 +87,7 @@ export function CloudConnectorSheet({ connector, saved, onClose }: { connector: 
     (value: T) => {
       set(value);
       setChanged(true);
+      setRefused(null);
     };
   const fillFromMac = async () => {
     if (!macAgent) return;
@@ -101,6 +103,8 @@ export function CloudConnectorSheet({ connector, saved, onClose }: { connector: 
     onClose();
   };
   const submit = () => {
+    // This Mac's address of a connector may be a plain or local one, which a cloud turn could never reach.
+    if (!/^https:\/\//i.test(url.trim())) return setRefused("A connector in the cloud is reached over HTTPS.");
     const headers = rows.filter((row) => row.key.trim()).map((row) => (row.saved && !row.value ? { name: row.key.trim(), keep: true as const } : { name: row.key.trim(), value: row.value }));
     save.mutate({ name: connector.name, url: url.trim(), headers, agents }, { onSuccess: (answer) => done(answer) });
   };
@@ -124,7 +128,7 @@ export function CloudConnectorSheet({ connector, saved, onClose }: { connector: 
           <CloudAgentChoice agents={agents} onChange={change(setAgents)} />
         </fieldset>
         <SheetFooter
-          problem={save.error?.message ?? remove.error?.message ?? spec.error?.message}
+          problem={refused ?? save.error?.message ?? remove.error?.message ?? spec.error?.message}
           canSave={changed && Boolean(url.trim()) && agents.length > 0 && !save.isPending}
           saving={save.isPending}
           onRemove={first ? () => remove.mutate({ name: connector.name }, { onSuccess: (answer) => done(answer) }) : null}

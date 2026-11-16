@@ -90,6 +90,13 @@ it("sets one up from this Mac's address, reads its headers only when asked, save
   fireEvent.click(sheet.getByRole("button", { name: "Use this Mac's headers" }));
   await waitFor(() => expect((sheet.getByRole("textbox", { name: "Header 1" }) as HTMLInputElement).value).toBe("authorization"));
   expect((sheet.getByLabelText("Value 1") as HTMLInputElement).value).toBe("Bearer mac-value");
+  // This Mac's address is a plain one here: the sheet says why it can't be used before anything is sent.
+  fireEvent.change(sheet.getByRole("textbox", { name: "Server address" }), { target: { value: "http://127.0.0.1:4000/mcp" } });
+  fireEvent.click(sheet.getByRole("button", { name: "Save" }));
+  expect((await sheet.findByRole("alert")).textContent).toBe("A connector in the cloud is reached over HTTPS.");
+  expect(calls.some((call) => call.method === "hostedConnectors.save")).toBe(false);
+  fireEvent.change(sheet.getByRole("textbox", { name: "Server address" }), { target: { value: "https://mcp.tools-example.com/mcp" } });
+  expect(sheet.queryByRole("alert")).toBeNull();
   fireEvent.click(sheet.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(calls.find((call) => call.method === "hostedConnectors.save")?.params).toEqual({

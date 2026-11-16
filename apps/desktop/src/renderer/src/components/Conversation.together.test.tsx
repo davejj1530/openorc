@@ -261,7 +261,7 @@ it("offers Retry save to the person the server lets ask, without telling them th
 });
 
 it("offers one of the thread's people Stop work for the work that reports back, which starts nothing", async () => {
-  const words = "Only Mara can run the agent in this cloud thread for now.";
+  const words = "Mara's turn left work running here.";
   const handoff = { code: "handoff_unavailable" as const, message: words, responsible: MARA, commandIds: [], retrySave: false, stopWork: true, note: null };
   await open(marasThread(together(THEO, { canWrite: true, send: "blocked", handoff })));
   expect(screen.getByRole("status", { name: "OpenOrc Cloud" }).textContent).toBe(`${words}Stop work`);
@@ -451,7 +451,7 @@ it("brings the first unread mention into view once as the thread opens, not agai
 
 const handoff = {
   code: "handoff_unavailable" as const,
-  message: "Only Mara can run the agent in this cloud thread for now.",
+  message: "Mara's turn left work running here.",
   responsible: MARA,
   commandIds: [],
   retrySave: false,

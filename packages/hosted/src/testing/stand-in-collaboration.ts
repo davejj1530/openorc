@@ -151,7 +151,8 @@ export class StandInCollaboration {
     const words: Record<StandInHandoff["code"], string> = {
       handoff_command: `${first ? `${first}'s` : "The previous sender's"} command is still running. Stop it before starting your turn.`,
       handoff_save: `The thread's work could not be saved.${first ? ` ${first} can retry the save.` : ""}`,
-      handoff_unavailable: `Only ${first ?? "the previous sender"} can run the agent in this cloud thread for now.`,
+      // The stand-in's own block of this kind is work the previous sender's turn left reporting back, said beside Stop work.
+      handoff_unavailable: `${first ? `${first}'s` : "The previous sender's"} turn left work running here.`,
     };
     const message = words[block.code];
     return { code: block.code, message, responsible, commandIds: block.commandIds, retrySave: block.code === "handoff_save" && block.responsible === who, stopWork: false, note: null };

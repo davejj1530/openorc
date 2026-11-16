@@ -19,6 +19,7 @@ const SavedChangesPanel = lazy(() => import("../panels/SavedChangesPanel").then(
 const ReviewPanel = lazy(() => import("../panels/ReviewPanel").then((m) => ({ default: m.ReviewPanel })));
 const FilePanel = lazy(() => import("../panels/FilePanel").then((m) => ({ default: m.FilePanel })));
 const TerminalPanel = lazy(() => import("../panels/TerminalPanel").then((m) => ({ default: m.TerminalPanel })));
+const CloudTerminalPanel = lazy(() => import("../panels/CloudTerminalPanel").then((m) => ({ default: m.CloudTerminalPanel })));
 const InstructionsPanel = lazy(() => import("../panels/InstructionsPanel").then((m) => ({ default: m.InstructionsPanel })));
 
 function commitSource(context: PanelContext): CommitSource | null {
@@ -72,6 +73,13 @@ function ThreadContent({ context, tool }: { context: Extract<PanelContext, { kin
 
 type ContentProps = { context: PanelContext; page: PanelPage; onNavigate: (page: PanelPage) => void };
 
+/** A cloud thread's terminal is a shell on its machine; any other is a shell on this Mac. */
+function TerminalContent({ context, page }: { context: PanelContext; page: Extract<PanelPage, { kind: "tool" }> }) {
+  if (context.kind === "thread" && context.thread.owner?.brain === "hosted") return <CloudTerminalPanel key={context.thread.id} threadId={context.thread.id} />;
+  const id = terminalId(context, page);
+  return <TerminalPanel key={id} id={id} cwd={panelDirectory(context)} />;
+}
+
 export function PanelContent({ context, page, onNavigate }: ContentProps) {
   const unavailable = hostedUnavailablePanel(context, page);
   if (unavailable) return unavailable;
@@ -79,10 +87,8 @@ export function PanelContent({ context, page, onNavigate }: ContentProps) {
   if (page.kind === "changes") return <ChangesContent context={context} page={page} onNavigate={onNavigate} />;
   if (page.kind !== "tool") return null;
   switch (page.tool) {
-    case "terminal": {
-      const id = terminalId(context, page);
-      return <TerminalPanel key={id} id={id} cwd={panelDirectory(context)} />;
-    }
+    case "terminal":
+      return <TerminalContent context={context} page={page} />;
     case "commits": {
       if (context.kind === "thread" && context.thread.owner?.brain === "hosted") return <HostedCommitsPanel key={context.thread.id} thread={context.thread} />;
       const source = commitSource(context);

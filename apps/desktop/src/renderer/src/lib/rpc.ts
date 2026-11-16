@@ -2,6 +2,7 @@ import type { CorePush, RpcMethod, RpcParams, RpcResults } from "@openorc/protoc
 import type { ClientPush, CoreConnection } from "@openorc/client";
 
 export type DevicePanelPush = Extract<CorePush, { type: "device.panel" }>;
+export type HostedTerminalPush = Extract<CorePush, { type: "hosted.terminal" }>;
 
 type Listener<T> = (value: T) => void;
 
@@ -31,6 +32,7 @@ class CoreClient implements CoreConnection {
   private readonly readyListeners = new Set<Listener<{ mcpPort: number }>>();
   private readonly startupListeners = new Set<Listener<string | null>>();
   private readonly devicePanelListeners = new Set<Listener<DevicePanelPush>>();
+  private readonly terminalListeners = new Set<Listener<HostedTerminalPush>>();
   private readonly mediaListeners = new Set<Listener<MessagePort>>();
   private media: MessagePort | null = null;
   ready: { mcpPort: number } | null = null;
@@ -60,6 +62,12 @@ class CoreClient implements CoreConnection {
     if (this.media) fn(this.media);
     return () => this.mediaListeners.delete(fn);
   }
+  /** A watched cloud terminal's output and changes (`hosted.terminal.watch`). */
+  onHostedTerminal(fn: Listener<HostedTerminalPush>): () => void {
+    this.terminalListeners.add(fn);
+    return () => this.terminalListeners.delete(fn);
+  }
+
   onDevicePanel(fn: Listener<DevicePanelPush>): () => void {
     this.devicePanelListeners.add(fn);
     return () => this.devicePanelListeners.delete(fn);
@@ -144,6 +152,9 @@ class CoreClient implements CoreConnection {
         return;
       case "device.panel":
         emit(this.devicePanelListeners, msg);
+        return;
+      case "hosted.terminal":
+        emit(this.terminalListeners, msg);
         return;
       case "notify": {
         const { type: _push, ...notice } = msg;

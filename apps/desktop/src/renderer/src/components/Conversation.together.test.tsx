@@ -217,6 +217,29 @@ it("lets the next sender stop the command that holds their turn, from the card t
   ).toEqual([{ id: "cloud", commandId: "c1" }]);
 });
 
+it("names a teammate's open terminal for what it is on the card's Stop, which ends it as a command's Stop does", async () => {
+  const handoff = {
+    code: "handoff_command" as const,
+    message: "Mara's terminal is still open. Stop it before starting your turn.",
+    responsible: MARA,
+    commandIds: ["terminal-1"],
+    retrySave: false,
+    stopWork: false,
+    note: null,
+  };
+  await open(marasThread(together(THEO, { canWrite: true, send: "blocked", handoff })));
+  expect(screen.getByRole("status", { name: "OpenOrc Cloud" }).textContent).toBe(`${handoff.message}Stop terminal`);
+  vi.mocked(core.call).mockClear();
+  fireEvent.click(screen.getByRole("button", { name: "Stop terminal" }));
+  await act(async () => undefined);
+  expect(
+    vi
+      .mocked(core.call)
+      .mock.calls.filter(([method]) => method === "threads.stopCommand")
+      .map(([, params]) => params),
+  ).toEqual([{ id: "cloud", commandId: "terminal-1" }]);
+});
+
 it("offers Retry save to the person the server lets ask, without telling them they can, and only says whose it is to others", async () => {
   const words = "The thread's work could not be saved. Mara can retry the save.";
   const handoff = { code: "handoff_save" as const, message: words, responsible: MARA, commandIds: [], retrySave: true, stopWork: false, note: null };

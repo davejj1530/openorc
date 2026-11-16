@@ -174,6 +174,8 @@ function handoffLabel(action: HandoffAction): string {
   if (action.kind === "note") return `Tag ${personFirst(action.note.to)}`;
   if (action.kind === "retry-save") return "Retry save";
   if (action.kind === "stop-work") return "Stop work";
+  // A cloud thread's terminal is held in the same block as a command, and named for what it is.
+  if (action.commandIds.length > 0 && action.commandIds.every((id) => id.startsWith("terminal-"))) return action.commandIds.length > 1 ? "Stop terminals" : "Stop terminal";
   return action.commandIds.length > 1 ? "Stop commands" : "Stop command";
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal as Xterm } from "@xterm/xterm";
 import { RotateCcw, Square, Terminal } from "../components/icons";
@@ -17,7 +17,7 @@ import "@xterm/xterm/css/xterm.css";
  */
 
 /** The mode the theme store stamped on the document, read the way DiffView reads it. */
-function isDark(): boolean {
+export function isDark(): boolean {
   const stamped = document.documentElement.dataset.theme;
   if (stamped === "dark") return true;
   if (stamped === "light") return false;
@@ -35,7 +35,7 @@ const RESIZE_SETTLE_MS = 150;
 type Status = { kind: "starting" } | { kind: "running" } | { kind: "exited"; code: number | null } | { kind: "error"; message: string };
 
 /** An xterm drawn into `element` and fitted to it. */
-function openXterm(element: HTMLElement): { term: Xterm; fit: FitAddon } {
+export function openXterm(element: HTMLElement): { term: Xterm; fit: FitAddon } {
   const term = new Xterm({
     cursorBlink: true,
     // The selected face is applied after loading, so xterm never caches its fallback's metrics.
@@ -56,24 +56,44 @@ function openXterm(element: HTMLElement): { term: Xterm; fit: FitAddon } {
   return { term, fit };
 }
 
-/** The tool's bar: where the shell runs, then End and Restart. */
-function TerminalBar({ cwd, running, onStop, onRestart }: { cwd: string; running: boolean; onStop: () => void; onRestart: () => void }) {
+/** The words of a terminal's End and Restart: a shell on this Mac, or a cloud thread's terminal. */
+export type TerminalBarWords = { end: string; endTip: string; restart: string; restartTip: string };
+const SHELL_WORDS: TerminalBarWords = { end: "End shell", endTip: "End this shell and forget its output", restart: "Restart shell", restartTip: "Start a new shell here" };
+
+/** The tool's bar: where the shell runs, then End and, where the reader may start one, Restart. */
+export function TerminalBar({
+  meta,
+  running,
+  onStop,
+  onRestart,
+  words = SHELL_WORDS,
+}: {
+  meta: ReactNode;
+  running: boolean;
+  onStop: () => void;
+  onRestart: (() => void) | null;
+  words?: TerminalBarWords;
+}) {
   return (
-    <PanelBar
-      title="Terminal"
-      meta={
-        <PanelBarMeta className="font-mono" title={cwd}>
-          {shortPath(cwd)}
-        </PanelBarMeta>
-      }
-    >
-      <IconButton onClick={onStop} aria-label="End shell" disabled={!running} data-tip="End this shell and forget its output">
+    <PanelBar title="Terminal" meta={meta}>
+      <IconButton onClick={onStop} aria-label={words.end} disabled={!running} data-tip={words.endTip}>
         <Square size={14} />
       </IconButton>
-      <IconButton onClick={onRestart} aria-label="Restart shell" data-tip="Start a new shell here">
-        <RotateCcw size={14} />
-      </IconButton>
+      {onRestart ? (
+        <IconButton onClick={onRestart} aria-label={words.restart} data-tip={words.restartTip}>
+          <RotateCcw size={14} />
+        </IconButton>
+      ) : null}
     </PanelBar>
+  );
+}
+
+/** Where a shell on this Mac runs, its folder's tail, the whole path on hover. */
+function ShellPath({ cwd }: { cwd: string }) {
+  return (
+    <PanelBarMeta className="font-mono" title={cwd}>
+      {shortPath(cwd)}
+    </PanelBarMeta>
   );
 }
 
@@ -187,7 +207,7 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <TerminalBar cwd={cwd} running={status.kind === "running"} onStop={stop} onRestart={restart} />
+      <TerminalBar meta={<ShellPath cwd={cwd} />} running={status.kind === "running"} onStop={stop} onRestart={restart} />
       {status.kind === "exited" ? (
         <PanelNotice>
           The shell ended{status.code === null ? "" : ` with code ${status.code}`}.{" "}

@@ -28,6 +28,7 @@ import { StandInSkills } from "./stand-in-skills.js";
 import { StandInEnvironment } from "./stand-in-environment.js";
 import { StandInConnectors } from "./stand-in-connectors.js";
 import { StandInMachines } from "./stand-in-machines.js";
+import { StandInCheck } from "./stand-in-check.js";
 import { StandInMacWork } from "./stand-in-mac-work.js";
 import { StandInTerminals } from "./stand-in-terminals.js";
 import type { StandInThreadFiles } from "./stand-in-thread-files.js";
@@ -48,6 +49,8 @@ export interface StandIn {
   connectors: StandInConnectors;
   /** A person's awake machines and their stop; absent, as on a server from before them, until `present`. */
   machines: StandInMachines;
+  /** A person's cloud check; absent, as on a server from before it, until `present`. */
+  check: StandInCheck;
   /** Threads' first work from a Mac's folder, behind the `macCode` capability of `threadFiles`. */
   macWork: StandInMacWork;
   /** A cloud thread's terminals, with a shell that echoes, behind the `terminal` capability of `threadFiles`. */
@@ -419,6 +422,7 @@ function parityStandIns({
     environment: new StandInEnvironment({ spaces, available: on("projectEnvironment") }),
     connectors: new StandInConnectors({ available: on("httpsConnectors") }),
     machines: new StandInMachines(),
+    check: new StandInCheck(),
     macWork: new StandInMacWork({ available: on("macCode"), messages: (threadId) => hosted.sent.filter((one) => one.threadId === threadId).length }),
     terminals: new StandInTerminals({ available: on("terminal"), readers: (threadId) => hosted.readersOf(threadId), peers, person }),
   };
@@ -426,7 +430,13 @@ function parityStandIns({
 
 /** The routes of what a cloud thread brings that answer as JSON: its project's environment and its terminals. */
 function parityRoute(parity: ReturnType<typeof parityStandIns>, request: { method: string; path: string; query: URLSearchParams; space: string | null }, who: string, body: unknown) {
-  return parity.environment.route(request, who, body) ?? parity.connectors.route(request, who, body) ?? parity.machines.route(request, who) ?? parity.terminals.route(request, who, body);
+  return (
+    parity.environment.route(request, who, body) ??
+    parity.connectors.route(request, who, body) ??
+    parity.machines.route(request, who) ??
+    parity.check.route(request, who) ??
+    parity.terminals.route(request, who, body)
+  );
 }
 
 /** The socket's answers, a cloud thread's terminals first. */

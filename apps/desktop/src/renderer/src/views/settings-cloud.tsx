@@ -1,16 +1,18 @@
 import { useRpc } from "../lib/client";
 import { useSpaceNavigation } from "../lib/space-navigation";
+import { CloudCheckSection } from "./settings-cloud-check";
 import { CloudMachinesSection } from "./settings-cloud-machines";
 import { SpaceCloudProjects } from "./settings-cloud-projects";
 import { OpenOrcCloudSection, useOpenOrcCloudShown } from "./settings-cloud-openorc";
 import { CloudSkillsSection } from "./settings-cloud-skills";
 
-/** Settings > Cloud: where a Pro person's OpenOrc Cloud threads run, how their agents sign in there, what goes there, and what runs. */
+/** Settings > Cloud: where a Pro person's OpenOrc Cloud threads run, how their agents sign in there, whether it all works, what goes there, and what runs. */
 export function CloudSettings({ active }: { active: boolean }) {
   const shown = useOpenOrcCloudShown(active);
   return (
     <>
       <OpenOrcCloudSection active={active} />
+      {shown ? <CloudCheckSection active={active} /> : null}
       {shown ? <CloudProjectSections active={active} /> : null}
       {shown ? <CloudSkillsSection active={active} /> : null}
       {shown ? <CloudMachinesSection active={active} /> : null}

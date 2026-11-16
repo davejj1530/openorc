@@ -71,4 +71,5 @@ export * from "./hosted-connectors.js";
 export * from "./hosted-mac-start.js";
 export * from "./hosted-skills-cloud.js";
 export * from "./hosted-machines.js";
+export * from "./hosted-check.js";
 export * from "./hosted-terminals.js";

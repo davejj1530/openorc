@@ -206,7 +206,7 @@ export function Transcript({
   const arrivals = useArrivals(waiting, scrollKey) && (working || run.live);
 
   return (
-    <ThreadMedia scopeKey={scrollKey} {...media} mentionNames={mentionNames}>
+    <ThreadMedia scopeKey={scrollKey} {...media} codePaths mentionNames={mentionNames}>
       <div ref={parentRef} data-transcript data-arrivals={arrivals || undefined} className={cn("h-full overflow-y-auto", waiting && "invisible")}>
         <div ref={contentRef} className="max-w-chat mx-auto px-6 py-5">
           {hasOlder ? <div ref={olderRef} aria-hidden /> : null}

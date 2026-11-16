@@ -9,6 +9,7 @@ import { useLayout, type FileSelection } from "../lib/layout";
 import { citationLinks, type Block } from "@openorc/client";
 import { Button } from "./ui";
 import { RichText } from "./RichText";
+import { codePathLinks } from "../lib/code-path-links";
 import { rehypeMentionNames } from "../lib/mention-names";
 import { CoversPreview } from "../lib/browser-preview";
 
@@ -17,6 +18,7 @@ const MediaContext = createContext<{
   basePath?: string;
   fileScope?: FileSelection["scope"];
   fileLinks?: "open" | "cite";
+  codePaths?: boolean;
   mentionNames?: ReadonlyMap<string, string> | undefined;
   openImage: (image: ImageSelection) => void;
 }>({
@@ -41,10 +43,16 @@ export function ThreadMedia({
   scopeKey,
   fileScope,
   fileLinks = "open",
+  codePaths = false,
   mentionNames: ownNames,
 }: MediaScope & {
   children: ReactNode;
   scopeKey: string;
+  /**
+   * Inline code that names a file links to it. Only a transcript asks: an agent writes paths from the folder it works
+   * in, while a document's are often from somewhere else, such as the repository's root for a file under docs/.
+   */
+  codePaths?: boolean;
   mentionNames?: ReadonlyMap<string, string> | undefined;
 }) {
   const inherited = useContext(MediaContext);
@@ -63,8 +71,8 @@ export function ThreadMedia({
   const context = useMemo(() => {
     let scope: FileSelection["scope"] | undefined;
     if (scopeKind && scopeId !== undefined) scope = scopeKind === "project" ? { kind: scopeKind, id: scopeId, workingDirectory: scopeDirectory } : { kind: scopeKind, id: scopeId };
-    return { basePath, openImage, fileScope: scope, fileLinks, mentionNames };
-  }, [basePath, openImage, scopeKind, scopeId, scopeDirectory, fileLinks, mentionNames]);
+    return { basePath, openImage, fileScope: scope, fileLinks, codePaths, mentionNames };
+  }, [basePath, openImage, scopeKind, scopeId, scopeDirectory, fileLinks, codePaths, mentionNames]);
   return (
     <MediaContext.Provider value={context}>
       {children}
@@ -221,10 +229,13 @@ export const threadUrlTransform: UrlTransform = (url, key, node) => (localPath(u
 
 /** Resolve relative citations in the workspace before Markdown's URL sanitizer runs. */
 export function ThreadRichText(props: StreamdownProps) {
-  const { basePath, fileLinks, mentionNames } = useContext(MediaContext);
+  const { basePath, fileScope, fileLinks, codePaths, mentionNames } = useContext(MediaContext);
+  // A path in inline code is a link only where a link can open it: in the Files tool, or in the folder it is in.
+  const pathLinks = Boolean(codePaths) && fileLinks !== "cite" && Boolean(fileScope || basePath);
   const rehypePlugins = useMemo<NonNullable<StreamdownProps["rehypePlugins"]>>(() => {
     const plugins: NonNullable<StreamdownProps["rehypePlugins"]> = [
       defaultRehypePlugins.raw!,
+      ...(pathLinks ? [codePathLinks] : []),
       [localFileLinks, { basePath, cite: fileLinks === "cite" }],
       ...Object.entries(defaultRehypePlugins)
         .filter(([name]) => name !== "raw")
@@ -234,7 +245,7 @@ export function ThreadRichText(props: StreamdownProps) {
     // serializes as {}, which would reuse names from another conversation.
     if (mentionNames?.size) plugins.push([rehypeMentionNames, { names: [...mentionNames] }]);
     return plugins;
-  }, [basePath, fileLinks, mentionNames]);
+  }, [basePath, fileLinks, mentionNames, pathLinks]);
   const text = typeof props.children === "string" ? citationLinks(props.children) : props.children;
   return (
     <RichText {...props} components={threadMarkdownComponents} rehypePlugins={rehypePlugins} urlTransform={threadUrlTransform}>

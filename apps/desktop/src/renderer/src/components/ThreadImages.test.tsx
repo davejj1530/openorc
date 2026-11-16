@@ -41,3 +41,52 @@ it("reads a cited file as a reference when the conversation's files are elsewher
   expect(openFile).toHaveBeenCalledWith(expect.objectContaining({ path: "/mirrors/footer/src/footer.tsx", line: 12, scope: { kind: "thread", id: "t1" } }));
   vi.unstubAllGlobals();
 });
+
+it("opens a path the agent writes as inline code in the Files tool, at its line, and leaves other code alone", async () => {
+  const openFile = vi.spyOn(useLayout.getState(), "openFile").mockImplementation(() => undefined);
+  const reply = "I changed `src/cart.ts:42` and `useCart.getState()`.\n\n```\nsrc/never.ts\n```";
+  render(
+    <ThreadMedia scopeKey="here" basePath="/repo" fileScope={{ kind: "thread", id: "t1" }} codePaths>
+      <ThreadRichText>{reply}</ThreadRichText>
+    </ThreadMedia>,
+  );
+  const path = await screen.findByText("src/cart.ts:42");
+  expect(path.tagName).toBe("CODE");
+  fireEvent.click(path);
+  expect(openFile).toHaveBeenCalledWith(expect.objectContaining({ path: "/repo/src/cart.ts", line: 42, scope: { kind: "thread", id: "t1" } }));
+  expect(screen.getByText("useCart.getState()").closest("a")).toBeNull();
+  expect(screen.getByText("src/never.ts").closest("a")).toBeNull();
+  openFile.mockRestore();
+});
+
+it("leaves a path in inline code as code where the conversation's files are elsewhere", async () => {
+  render(
+    <ThreadMedia scopeKey="cloud" fileLinks="cite" codePaths>
+      <ThreadRichText>{"See `src/cart.ts`."}</ThreadRichText>
+    </ThreadMedia>,
+  );
+  expect((await screen.findByText("src/cart.ts")).closest("a, [title]")).toBeNull();
+});
+
+it("leaves a document's inline code as code, since its paths may be from another folder than its own", async () => {
+  render(
+    <ThreadMedia scopeKey="docs/guide.md" basePath="/repo/docs" fileScope={{ kind: "thread", id: "t1" }}>
+      <ThreadRichText>{"Colors live in `apps/desktop/src/theme.ts`."}</ThreadRichText>
+    </ThreadMedia>,
+  );
+  expect((await screen.findByText("apps/desktop/src/theme.ts")).closest("a")).toBeNull();
+});
+
+it("keeps a path in code that is already a link pointing where the link does", async () => {
+  const openFile = vi.spyOn(useLayout.getState(), "openFile").mockImplementation(() => undefined);
+  render(
+    <ThreadMedia scopeKey="here" basePath="/repo" fileScope={{ kind: "thread", id: "t1" }} codePaths>
+      <ThreadRichText>{"See [`src/cart.ts`](src/other.ts:3)."}</ThreadRichText>
+    </ThreadMedia>,
+  );
+  fireEvent.click(await screen.findByText("src/cart.ts"));
+  expect(screen.getAllByRole("link")).toHaveLength(1);
+  expect(openFile).toHaveBeenCalledTimes(1);
+  expect(openFile).toHaveBeenCalledWith(expect.objectContaining({ path: "/repo/src/other.ts", line: 3 }));
+  openFile.mockRestore();
+});

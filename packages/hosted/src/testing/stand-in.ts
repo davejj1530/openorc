@@ -26,6 +26,7 @@ import { StandInSeats } from "./stand-in-seats.js";
 import { StandInUploads } from "./stand-in-uploads.js";
 import { StandInSkills } from "./stand-in-skills.js";
 import { StandInEnvironment } from "./stand-in-environment.js";
+import { StandInConnectors } from "./stand-in-connectors.js";
 import { StandInTerminals } from "./stand-in-terminals.js";
 import type { StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInOrganizations } from "./stand-in-organizations.js";
@@ -41,6 +42,8 @@ export interface StandIn {
   skills: StandInSkills;
   /** Projects' own environment variables as the server keeps them, behind the `projectEnvironment` capability of `threadFiles`. */
   environment: StandInEnvironment;
+  /** People's own cloud connectors as the server keeps them, behind the `httpsConnectors` capability of `threadFiles`. */
+  connectors: StandInConnectors;
   /** A cloud thread's terminals, with a shell that echoes, behind the `terminal` capability of `threadFiles`. */
   terminals: StandInTerminals;
   tasks: StandInTasks;
@@ -408,13 +411,14 @@ function parityStandIns({
   return {
     skills: new StandInSkills({ spaces, available: on("skills") }),
     environment: new StandInEnvironment({ spaces, available: on("projectEnvironment") }),
+    connectors: new StandInConnectors({ available: on("httpsConnectors") }),
     terminals: new StandInTerminals({ available: on("terminal"), readers: (threadId) => hosted.readersOf(threadId), peers, person }),
   };
 }
 
 /** The routes of what a cloud thread brings that answer as JSON: its project's environment and its terminals. */
 function parityRoute(parity: ReturnType<typeof parityStandIns>, request: { method: string; path: string; query: URLSearchParams; space: string | null }, who: string, body: unknown) {
-  return parity.environment.route(request, who, body) ?? parity.terminals.route(request, who, body);
+  return parity.environment.route(request, who, body) ?? parity.connectors.route(request, who, body) ?? parity.terminals.route(request, who, body);
 }
 
 /** The socket's answers, a cloud thread's terminals first. */

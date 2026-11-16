@@ -33,6 +33,7 @@ import { Follower } from "./follow.js";
 import { Files } from "./files.js";
 import { Skills, type OwnSkills } from "./skills.js";
 import { ProjectEnvironment } from "./environment.js";
+import { CloudConnectors } from "./connectors.js";
 import type { HostedNotice } from "./notices.js";
 import { Session } from "./session.js";
 import { Threads } from "./threads.js";
@@ -219,6 +220,8 @@ export interface Hosted {
   readonly files: Files;
   /** A cloud project's own environment variables, read by name and set by value. */
   readonly environment: ProjectEnvironment;
+  /** The person's own connectors in their cloud turns, saved by value and read by header name. */
+  readonly connectors: CloudConnectors;
   /** Reads the stored session and the kept answers, and connects when signed in. Never rejects: no session is signed out. */
   start(): Promise<void>;
   /** The device woke or the network came back: connect now instead of at the next retry. */
@@ -302,6 +305,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     tasks,
     files,
     environment: new ProjectEnvironment({ session, now: deps.now }),
+    connectors: new CloudConnectors({ session }),
     start: async () => {
       await account.start();
       threads.start();

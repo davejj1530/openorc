@@ -3,6 +3,7 @@ import { organizationBillingRpcParams, organizationSeatRpcParams, type Organizat
 import { organizationStorageRpcParams, type OrganizationStorageRpcResults } from "./organization-storage.js";
 import { hostedFilesRpcParams, type HostedFilesRpcResults } from "./hosted-files.js";
 import { hostedEnvironmentRpcParams, type HostedEnvironmentRpcResults } from "./hosted-environment.js";
+import { hostedConnectorsRpcParams, type HostedConnectorsRpcResults } from "./hosted-connectors.js";
 import { HostedTerminalPush, hostedTerminalRpcParams, type HostedTerminalRpcResults } from "./hosted-terminals.js";
 import { teamChatRpcParams, type TeamChatRpcResults } from "./team-chat.js";
 import { onlineTaskRpcParams, type OnlineTaskRpcResults } from "./online-tasks.js";
@@ -90,6 +91,7 @@ export const rpcParams = {
   ...threadSendRpcParams,
   ...hostedFilesRpcParams,
   ...hostedEnvironmentRpcParams,
+  ...hostedConnectorsRpcParams,
   ...hostedTerminalRpcParams,
   ...organizationBillingRpcParams,
   ...organizationSeatRpcParams,
@@ -573,6 +575,7 @@ export interface RpcResults
   extends
     HostedFilesRpcResults,
     HostedEnvironmentRpcResults,
+    HostedConnectorsRpcResults,
     HostedTerminalRpcResults,
     OrganizationBillingRpcResults,
     OrganizationSeatRpcResults,

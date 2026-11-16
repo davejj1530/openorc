@@ -23,6 +23,10 @@ export const retiredTeams = {
   hasThread(db: Db, threadId: string): boolean {
     return Boolean(db.stmt("SELECT 1 FROM orchestration_team_instances WHERE thread_id = ?").get(threadId));
   },
+  /** Every retired thread's id, for a query that can't hold the search for them itself. */
+  threadIds(db: Db): (string | null)[] {
+    return (db.stmt(retiredThreadIds).all() as unknown as { id: string | null }[]).map((row) => row.id);
+  },
   isHidden(db: Db, threadId: string): boolean {
     return Boolean(db.stmt(`SELECT 1 FROM (${retiredThreadIds}) WHERE id = ?`).get(threadId));
   },

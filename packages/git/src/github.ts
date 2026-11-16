@@ -1,13 +1,21 @@
 import type {
   PullRequestBranches,
+  PullRequestCounts,
   PullRequestDetail,
-  PullRequestFilter,
+  PullRequestChoice,
+  PullRequestChoiceKind,
+  PullRequestLabel,
+  PullRequestNarrowing,
   PullRequestReviewDecision,
+  PullRequestReviewFilter,
+  PullRequestSort,
   PullRequestReviewEvent,
   PullRequestSide,
   PullRequestState,
+  PullRequestStateFilter,
   PullRequestSummary,
 } from "@openorc/protocol";
+import { PullRequestProjectRef, SearchName } from "@openorc/protocol";
 import { git, run, GitError } from "./exec.js";
 
 /** Runs the user's own gh in a repository and returns what it printed. A failure rejects with a GhError. */
@@ -32,10 +40,51 @@ const runGh: GhRunner = async (cwd, args, input) => {
 
 const SUMMARY_FIELDS = "number,title,url,author,state,isDraft,headRefName,baseRefName,createdAt,updatedAt,additions,deletions,changedFiles,reviewDecision,labels";
 const LIST_LIMIT = "50";
+/** Labels a filter offers, by name. GitHub's own picker pages; few repositories come near this. */
+const LABEL_LIMIT = "500";
 /** Reads of a diff before giving up on a pull request that keeps receiving pushes. */
 const DIFF_READS = 3;
 /** Pages of 100 branches a target picker reads before it stops. */
 const BRANCH_PAGES = 10;
+/**
+ * gh processes the list page's reads run at once in one GitHubPulls. A page of many projects asks for lists, counts and
+ * filter choices for each at the same moment; the rest wait their turn rather than all reaching GitHub, and its limits,
+ * together.
+ */
+const GH_PROCESSES = 8;
+
+/** `gh`, with at most `most` of its processes running at once and the rest started in the order they were asked for. */
+function limitedGh(gh: GhRunner, most: number): GhRunner {
+  let running = 0;
+  const waiting: (() => void)[] = [];
+  return async (cwd, args, input) => {
+    if (running >= most) await new Promise<void>((resolve) => waiting.push(resolve));
+    else running += 1;
+    try {
+      return await gh(cwd, args, input);
+    } finally {
+      const next = waiting.shift();
+      if (next) next();
+      else running -= 1;
+    }
+  };
+}
+
+/** gh's api asks github.com unless told otherwise whenever more than one host is signed in, so another host is named. */
+const hostname = (host: string): string[] => (host === "github.com" ? [] : ["--hostname", host]);
+
+/** A checkout's repository as gh resolves it: `owner/name`, and the host it is on. */
+interface Repository {
+  name: string;
+  host: string;
+}
+
+/** The repository in the URL `gh repo view` prints, such as https://github.example.com/acme/app. */
+function repositoryAt(url: string): Repository {
+  const match = /^https?:\/\/([^/]+)\/([^/]+\/[^/]+?)\/?$/.exec(url.trim());
+  if (!match) throw new Error(`gh named no repository here: ${url.trim()}`);
+  return { host: match[1]!.toLowerCase(), name: match[2]! };
+}
 
 /**
  * The repository's branches by name, a page at a time, with its default branch and, when asked, whether `prefer`
@@ -62,12 +111,139 @@ interface RawBranchPage {
   };
 }
 
-const filterArgs: Record<PullRequestFilter, string[]> = {
-  open: ["--state", "open"],
-  review_requested: ["--state", "open", "--search", "review-requested:@me"],
-  authored: ["--state", "open", "--author", "@me"],
-  closed: ["--state", "closed"],
+/**
+ * The states gh's own list shows unfiltered. Its "closed" takes merged ones in too, and it has no drafts alone, so
+ * those two are always searches.
+ */
+const plainStates: Partial<Record<PullRequestStateFilter, string>> = { open: "open", merged: "merged", any: "all" };
+
+/** Each state as search terms: drafts are open, and closed means closed without merging. */
+const stateTerms: Record<PullRequestStateFilter, string[]> = {
+  open: ["is:open"],
+  draft: ["is:open", "draft:true"],
+  merged: ["is:merged"],
+  closed: ["is:closed", "is:unmerged"],
+  any: [],
 };
+
+const STATES = Object.keys(stateTerms) as PullRequestStateFilter[];
+
+const reviewTerms: Record<PullRequestReviewFilter, string> = {
+  none: "review:none",
+  required: "review:required",
+  approved: "review:approved",
+  changes_requested: "review:changes_requested",
+  reviewed_by_you: "reviewed-by:@me",
+  not_reviewed_by_you: "-reviewed-by:@me",
+  awaiting_you: "user-review-requested:@me",
+  awaiting_you_or_team: "review-requested:@me",
+};
+
+const sortTerms: Record<PullRequestSort, string> = {
+  newest: "sort:created-desc",
+  oldest: "sort:created-asc",
+  most_commented: "sort:comments-desc",
+  least_commented: "sort:comments-asc",
+  recently_updated: "sort:updated-desc",
+  least_recently_updated: "sort:updated-asc",
+  best_match: "sort:relevance-desc",
+  reactions_thumbs_up: "sort:reactions-+1-desc",
+  reactions_thumbs_down: "sort:reactions--1-desc",
+  reactions_laugh: "sort:reactions-smile-desc",
+  reactions_hooray: "sort:reactions-tada-desc",
+  reactions_confused: "sort:reactions-thinking_face-desc",
+  reactions_heart: "sort:reactions-heart-desc",
+  reactions_rocket: "sort:reactions-rocket-desc",
+  reactions_eyes: "sort:reactions-eyes-desc",
+};
+
+/** Whether a list asks for more than its tab: any filter, or an order other than newest first. */
+export function isNarrowed(narrowing: PullRequestNarrowing): boolean {
+  return Object.entries(narrowing).some(([key, value]) => value !== undefined && !(key === "sort" && value === "newest"));
+}
+
+/** Each author once, compared as GitHub compares logins: without regard to case. */
+function distinctAuthors(authors: readonly string[]): string[] {
+  const seen = new Set<string>();
+  return authors.filter((author) => {
+    const key = author.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * A filtered list of one repository (`owner/name`) as one GitHub search, the way GitHub's filter bar writes it: the
+ * authors as alternatives, every label, one of each other filter, what must be missing, then the order. Names are
+ * quoted; the schema keeps quotes out of them.
+ */
+export function searchQuery(repository: string, state: PullRequestStateFilter, narrowing: PullRequestNarrowing): string {
+  const authors = distinctAuthors(narrowing.authors ?? []);
+  const terms = [
+    `repo:${repository}`,
+    "is:pr",
+    ...stateTerms[state],
+    authors.length > 0 ? `(${authors.map((author) => `author:${author}`).join(" OR ")})` : null,
+    ...(narrowing.labels ?? []).map((name) => `label:"${name}"`),
+    narrowing.assignee ? `assignee:${narrowing.assignee}` : null,
+    narrowing.milestone ? `milestone:"${narrowing.milestone}"` : null,
+    narrowing.project ? `project:${narrowing.project}` : null,
+    narrowing.review ? reviewTerms[narrowing.review] : null,
+    ...(narrowing.missing ?? []).map((missing) => `no:${missing}`),
+    sortTerms[narrowing.sort ?? "newest"],
+  ];
+  return terms.filter(Boolean).join(" ");
+}
+
+/**
+ * GitHub's advanced search, which takes OR and parentheses, for the fields a list shows. gh's own list can't ask for
+ * one author or another: two `author:` terms there mean both.
+ */
+const SEARCH_QUERY = `query($q: String!) {
+  search(query: $q, type: ISSUE_ADVANCED, first: ${LIST_LIMIT}) {
+    nodes {
+      ... on PullRequest {
+        number title url author { __typename login } state isDraft headRefName baseRefName createdAt updatedAt
+        additions deletions changedFiles reviewDecision labels(first: 20) { nodes { name color description } }
+      }
+    }
+  }
+}`;
+
+/** How many pull requests each state holds, every count its own search in one request. */
+const COUNTS_QUERY = `query(${STATES.map((state) => `$${state}: String!`).join(", ")}) {
+  ${STATES.map((state) => `${state}: search(query: $${state}, type: ISSUE_ADVANCED, first: 0) { issueCount }`).join("\n  ")}
+}`;
+
+/** A pull request as the search gives it: its author with their kind, its labels one page of a connection. */
+type RawSearchNode = Omit<RawPullRequest, "author" | "labels"> & { author: { __typename: string; login: string } | null; labels?: { nodes: RawLabel[] } | null };
+
+/**
+ * The search's author as gh's own list names them, so a list reads the same whichever way it was asked for: gh calls
+ * anyone but a user, such as an app, `app/<login>`, which is also how a search asks for their pull requests.
+ */
+const searchAuthor = (author: RawSearchNode["author"]) => (author && author.__typename !== "User" ? { login: `app/${author.login}` } : author);
+
+/** Anything the search finds that isn't a pull request comes back without its fields. */
+interface RawSearch {
+  data: { search: { nodes: Partial<RawSearchNode>[] } };
+}
+
+/** The projects linked to the repository, which GitHub's Projects filter offers. Reading them needs gh's read:project scope. */
+const PROJECTS_QUERY = `query($owner: String!, $repo: String!) {
+  repository(owner: $owner, name: $repo) {
+    projectsV2(first: 50, orderBy: { field: TITLE, direction: ASC }) {
+      nodes { number title owner { ... on Organization { login } ... on User { login } } }
+    }
+  }
+}`;
+
+interface RawProjects {
+  data: { repository: { projectsV2: { nodes: { number: number; title: string; owner: { login?: string } }[] } } };
+}
+
+const byName = (a: PullRequestChoice, b: PullRequestChoice) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
 
 interface RawPullRequest {
   number: number;
@@ -84,8 +260,16 @@ interface RawPullRequest {
   deletions: number;
   changedFiles: number;
   reviewDecision: string | null;
-  labels: { name: string }[] | null;
+  labels: RawLabel[] | null;
 }
+
+interface RawLabel {
+  name: string;
+  color?: string | null;
+  description?: string | null;
+}
+
+const label = (raw: RawLabel): PullRequestLabel => ({ name: raw.name, color: raw.color ?? "", description: raw.description ?? "" });
 
 interface RawPullRequestDetail extends RawPullRequest {
   body: string | null;
@@ -112,7 +296,7 @@ export function pullRequestSummary(raw: RawPullRequest): PullRequestSummary {
     deletions: raw.deletions,
     changedFiles: raw.changedFiles,
     reviewDecision: decisions[raw.reviewDecision ?? ""] ?? null,
-    labels: (raw.labels ?? []).map((label) => label.name),
+    labels: (raw.labels ?? []).map(label),
   };
 }
 
@@ -192,13 +376,129 @@ export function reviewPayload(review: ReviewSubmission): Record<string, unknown>
 
 /** The user's own gh, asked about one repository's pull requests. Nothing here reads credentials. */
 export class GitHubPulls {
-  constructor(private readonly gh: GhRunner = runGh) {}
+  /** Each checkout's repository, by path. */
+  private readonly repositories = new Map<string, Promise<Repository>>();
+  /** gh for what someone is waiting on: a pull request, its diff, a review, the branches to open one against. */
+  private readonly gh: GhRunner;
+  /**
+   * gh for the list page's reads, many projects at a time: lists, counts and filter choices. Only `GH_PROCESSES` run at
+   * once, and the rest queue among themselves, never in front of `gh`.
+   */
+  private readonly listing: GhRunner;
 
-  async list(cwd: string, filter: PullRequestFilter): Promise<PullRequestSummary[]> {
-    const out = await this.gh(cwd, ["pr", "list", ...filterArgs[filter], "--limit", LIST_LIMIT, "--json", SUMMARY_FIELDS]).catch((error: unknown) => {
+  constructor(gh: GhRunner = runGh) {
+    this.gh = gh;
+    this.listing = limitedGh(gh, GH_PROCESSES);
+  }
+
+  /**
+   * One list. Open, merged or every pull request with nothing else asked is gh's own list, which shows a pull request
+   * the moment it opens. Drafts, closed without merging, any filter or another order make it one GitHub search, which
+   * can take a few seconds to see a new one.
+   */
+  async list(cwd: string, state: PullRequestStateFilter, narrowing: PullRequestNarrowing = {}): Promise<PullRequestSummary[]> {
+    const plain = plainStates[state];
+    if (plain && !isNarrowed(narrowing)) {
+      const out = await this.listing(cwd, ["pr", "list", "--state", plain, "--limit", LIST_LIMIT, "--json", SUMMARY_FIELDS]).catch((error: unknown) => {
+        throw ghFailure(error, "Pull requests");
+      });
+      return (JSON.parse(out) as RawPullRequest[]).map(pullRequestSummary);
+    }
+    const out = await this.search(cwd, (repository) => ["-f", `q=${searchQuery(repository, state, narrowing)}`, "-f", `query=${SEARCH_QUERY}`]).catch((error: unknown) => {
       throw ghFailure(error, "Pull requests");
     });
-    return (JSON.parse(out) as RawPullRequest[]).map(pullRequestSummary);
+    return (JSON.parse(out) as RawSearch).data.search.nodes
+      .filter((node): node is RawSearchNode => typeof node.number === "number")
+      .map((node) => pullRequestSummary({ ...node, author: searchAuthor(node.author), labels: node.labels?.nodes ?? [] }));
+  }
+
+  /** How many pull requests each state holds under the same filters. The order searched for changes no count. */
+  async counts(cwd: string, narrowing: PullRequestNarrowing = {}): Promise<PullRequestCounts> {
+    const { sort: _sort, ...filters } = narrowing;
+    const queries = (repository: string) => STATES.flatMap((state) => ["-f", `${state}=${searchQuery(repository, state, filters)}`]);
+    const out = await this.search(cwd, (repository) => [...queries(repository), "-f", `query=${COUNTS_QUERY}`]).catch((error: unknown) => {
+      throw ghFailure(error, "Pull request counts");
+    });
+    const data = (JSON.parse(out) as { data: Record<PullRequestStateFilter, { issueCount: number }> }).data;
+    return Object.fromEntries(STATES.map((state) => [state, data[state].issueCount])) as PullRequestCounts;
+  }
+
+  /**
+   * One GraphQL request whose search text names the checkout's repository. The text goes as a raw field: gh fills its
+   * `{owner}` and `:owner` placeholders into typed fields wherever they appear, label and milestone names included.
+   */
+  private async search(cwd: string, fields: (repository: string) => string[]): Promise<string> {
+    const { name, host } = await this.repository(cwd, this.listing);
+    return this.listing(cwd, ["api", "graphql", ...fields(name), ...hostname(host)]);
+  }
+
+  /** `gh api` about the checkout's repository, asked of the host the repository is on, through `gh` unless told otherwise. */
+  private async api(cwd: string, args: string[], gh: GhRunner = this.gh): Promise<string> {
+    const { host } = await this.repository(cwd, gh);
+    return gh(cwd, ["api", ...args, ...hostname(host)]);
+  }
+
+  /**
+   * The repository gh works with in a checkout, read once through whichever gh asks first. A failed read is tried
+   * again the next time.
+   */
+  private repository(cwd: string, gh: GhRunner = this.gh): Promise<Repository> {
+    const known = this.repositories.get(cwd);
+    if (known) return known;
+    const read = gh(cwd, ["repo", "view", "--json", "url", "--jq", ".url"]).then(repositoryAt);
+    this.repositories.set(cwd, read);
+    read.catch(() => this.repositories.delete(cwd));
+    return read;
+  }
+
+  /** What one of GitHub's filters offers for the repository. */
+  async choices(cwd: string, kind: PullRequestChoiceKind): Promise<PullRequestChoice[]> {
+    if (kind === "labels") return this.labels(cwd);
+    if (kind === "assignees") return this.assignees(cwd);
+    if (kind === "milestones") return this.milestones(cwd);
+    return this.projects(cwd);
+  }
+
+  private async labels(cwd: string): Promise<PullRequestChoice[]> {
+    const out = await this.listing(cwd, ["label", "list", "--sort", "name", "--order", "asc", "--limit", LABEL_LIMIT, "--json", "name,color,description"]).catch((error: unknown) => {
+      throw ghFailure(error, "The repository's labels");
+    });
+    return (JSON.parse(out) as RawLabel[])
+      .filter((raw) => SearchName.safeParse(raw.name).success)
+      .map(label)
+      .map(({ name, color, description }) => ({ value: name, name, color, ...(description ? { detail: description } : {}) }));
+  }
+
+  /** The people GitHub can assign in the repository, as its Assignee filter lists them: the first hundred, by login. */
+  private async assignees(cwd: string): Promise<PullRequestChoice[]> {
+    const out = await this.api(cwd, ["repos/{owner}/{repo}/assignees?per_page=100"], this.listing).catch((error: unknown) => {
+      throw ghFailure(error, "The people GitHub can assign");
+    });
+    return (JSON.parse(out) as { login: string }[]).map(({ login }) => ({ value: login, name: login })).sort(byName);
+  }
+
+  /** Open milestones by due date, then closed ones. A title a search can't quote isn't offered. */
+  private async milestones(cwd: string): Promise<PullRequestChoice[]> {
+    const out = await this.api(cwd, ["repos/{owner}/{repo}/milestones?state=all&sort=due_on&per_page=100"], this.listing).catch((error: unknown) => {
+      throw ghFailure(error, "The repository's milestones");
+    });
+    const milestones = (JSON.parse(out) as { title: string; state: string }[]).filter((milestone) => SearchName.safeParse(milestone.title).success);
+    const open = milestones.filter((milestone) => milestone.state === "open").map(({ title }) => ({ value: title, name: title }));
+    const closed = milestones.filter((milestone) => milestone.state !== "open").map(({ title }) => ({ value: title, name: title, detail: "Closed" }));
+    return [...open, ...closed];
+  }
+
+  private async projects(cwd: string): Promise<PullRequestChoice[]> {
+    const out = await this.api(cwd, ["graphql", "-F", "owner={owner}", "-F", "repo={repo}", "-f", `query=${PROJECTS_QUERY}`], this.listing).catch((error: unknown) => {
+      if (error instanceof GhError && /read:project/.test(error.stdout + error.stderr)) {
+        throw new Error("Projects need gh's read:project scope. Run gh auth refresh -s read:project, then try again.");
+      }
+      throw ghFailure(error, "The repository's projects");
+    });
+    // Only a project the list can be asked for: one a filter couldn't send would fail the list it was picked for.
+    return (JSON.parse(out) as RawProjects).data.repository.projectsV2.nodes
+      .filter((project) => project.owner.login && PullRequestProjectRef.safeParse(`${project.owner.login}/${project.number}`).success)
+      .map((project) => ({ value: `${project.owner.login}/${project.number}`, name: project.title, detail: project.owner.login! }));
   }
 
   async get(cwd: string, number: number): Promise<PullRequestDetail> {
@@ -241,7 +541,6 @@ export class GitHubPulls {
     let after: string | null = null;
     for (let page = 0; page < BRANCH_PAGES; page += 1) {
       const args = [
-        "api",
         "graphql",
         "-F",
         "owner={owner}",
@@ -254,7 +553,7 @@ export class GitHubPulls {
         "-F",
         `checkPrefer=${page === 0 && prefer !== undefined}`,
       ];
-      const out: string = await this.gh(cwd, after === null ? args : [...args, "-f", `after=${after}`]).catch((error: unknown) => {
+      const out: string = await this.api(cwd, after === null ? args : [...args, "-f", `after=${after}`]).catch((error: unknown) => {
         throw ghFailure(error, "The repository's branches");
       });
       const { repository }: RawBranchPage["data"] = (JSON.parse(out) as RawBranchPage).data;
@@ -273,7 +572,7 @@ export class GitHubPulls {
   /** Whether `branch` is a branch of the repository gh opens pull requests in. */
   async hasBranch(cwd: string, branch: string): Promise<boolean> {
     try {
-      await this.gh(cwd, ["api", `repos/{owner}/{repo}/branches/${encodeURIComponent(branch)}`, "--silent"]);
+      await this.api(cwd, [`repos/{owner}/{repo}/branches/${encodeURIComponent(branch)}`, "--silent"]);
       return true;
     } catch (error) {
       if (error instanceof GhError && /HTTP 404/.test(error.stderr)) return false;
@@ -281,10 +580,14 @@ export class GitHubPulls {
     }
   }
 
-  /** The signed-in account's login, or null when gh cannot say. */
+  /** The signed-in account's login on the checkout's host, or null when gh cannot say. Outside a checkout, gh's own host. */
   async viewer(cwd: string): Promise<string | null> {
+    const host = await this.repository(cwd).then(
+      (repository) => repository.host,
+      () => "github.com",
+    );
     try {
-      return (await this.gh(cwd, ["api", "user", "--jq", ".login"])).trim() || null;
+      return (await this.gh(cwd, ["api", "user", "--jq", ".login", ...hostname(host)])).trim() || null;
     } catch {
       return null;
     }
@@ -294,7 +597,7 @@ export class GitHubPulls {
   async submitReview(cwd: string, url: string, review: ReviewSubmission): Promise<{ url: string | null }> {
     const { host, owner, repo } = pullRequestRepository(url);
     const number = /\/pull\/(\d+)/.exec(url)![1];
-    const args = ["api", "--method", "POST", `repos/${owner}/${repo}/pulls/${number}/reviews`, "--input", "-", ...(host === "github.com" ? [] : ["--hostname", host])];
+    const args = ["api", "--method", "POST", `repos/${owner}/${repo}/pulls/${number}/reviews`, "--input", "-", ...hostname(host)];
     const out = await this.gh(cwd, args, JSON.stringify(reviewPayload(review))).catch((error: unknown) => {
       throw ghFailure(error, `Pull request #${number}`);
     });

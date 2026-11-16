@@ -1,4 +1,4 @@
-import { personFirst, queuedBy, startBlock, threadTogether, togetherActivity, withOthers, writesAsCreator } from "@openorc/client";
+import { canStopCommands, personFirst, queuedBy, startBlock, threadTogether, togetherActivity, withOthers, writesAsCreator } from "@openorc/client";
 import { defaultHarnessId, harnessShortName, type ThreadSummary } from "@openorc/protocol";
 import type { RefObject } from "react";
 import { useRpcMutation } from "../lib/client";
@@ -48,7 +48,12 @@ export function useThreadControls(
     />
   ) : null;
   const commands = thread ? (
-    <BackgroundCommands commands={thread.backgroundCommands ?? []} pending={stopCommand.isPending} onStop={(commandId) => stopCommand.mutate({ id: thread.id, commandId })} />
+    <BackgroundCommands
+      commands={thread.backgroundCommands ?? []}
+      pending={stopCommand.isPending}
+      canStop={canStopCommands(thread)}
+      onStop={(commandId) => stopCommand.mutate({ id: thread.id, commandId })}
+    />
   ) : null;
   return { queue, commands, composer, error: sendQueued.error ?? startQueued.error ?? stopCommand.error ?? unqueue.error };
 }

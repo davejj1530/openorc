@@ -3,9 +3,14 @@ import { Terminal } from "./icons";
 import { Button } from "./ui";
 import { useComposerControl } from "./composer-read-only";
 
-/** Commands the agent left running, such as a dev server. They outlive its turns, so each has its own stop. */
-export function BackgroundCommands({ commands, pending, onStop }: { commands: BackgroundCommand[]; pending: boolean; onStop: (commandId: string) => void }) {
-  const control = useComposerControl(pending);
+/**
+ * Commands the agent left running, such as a dev server. They outlive its turns, so each has its own stop. `canStop` is
+ * the server's word on whether this reader stops them, where it has one: a handoff that holds the reader's turn does
+ * not hold the Stop it asks for. Otherwise the composer's own rule decides.
+ */
+export function BackgroundCommands({ commands, pending, canStop, onStop }: { commands: BackgroundCommand[]; pending: boolean; canStop?: boolean | undefined; onStop: (commandId: string) => void }) {
+  const composer = useComposerControl(pending);
+  const control = canStop === true ? { disabled: pending, reason: undefined } : composer;
   if (!commands.length) return null;
   return (
     <ul aria-label="Running in the background" data-plane className="m-0 list-none divide-y divide-line rounded-xl bg-surface px-3.5 text-base">

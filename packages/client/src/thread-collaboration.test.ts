@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   askAnswerBlock,
   askContinues,
+  canStopCommands,
   canStopTurn,
   handoffCard,
   mentionLeads,
@@ -131,6 +132,10 @@ describe("a teammate's cloud thread on today's server", () => {
       note: null,
     };
     expect(handoffCard(idle(command))).toEqual({ words: command.message, action: { kind: "stop-commands", commandIds: ["c1"] } });
+    // The block holds the reader's turn, never their Stop of what it names.
+    expect(canStopCommands(idle(command))).toBe(true);
+    expect(canStopCommands(row(together(THEO, { handoff: command }), "idle", mara))).toBe(false);
+    expect(canStopCommands(row(together(THEO), "idle"))).toBeUndefined();
     expect(handoffCard(idle({ ...command, commandIds: [] }))).toEqual({ words: command.message, action: null });
     const unavailable = {
       code: "handoff_unavailable" as const,

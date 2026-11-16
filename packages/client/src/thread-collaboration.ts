@@ -172,3 +172,13 @@ export function canStopTurn(thread: Row | null | undefined): boolean | undefined
   const state = threadTogether(thread);
   return state && !writesAsCreator(thread) ? state.canStop : undefined;
 }
+
+/**
+ * Whether the server lets this reader stop the commands and terminals the thread keeps running; undefined where today's
+ * rule decides. Whoever may write here stops them, even while a handoff holds their own turn: one of the thread's people
+ * stops any, and anyone else the ones the block names, which are all it keeps running.
+ */
+export function canStopCommands(thread: Row | null | undefined): boolean | undefined {
+  const state = threadTogether(thread);
+  return state && !writesAsCreator(thread) ? state.canWrite : undefined;
+}

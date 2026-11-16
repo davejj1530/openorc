@@ -1,9 +1,9 @@
 import { canStopCommands, personFirst, queuedBy, startBlock, threadTogether, togetherActivity, withOthers, writesAsCreator } from "@openorc/client";
 import { defaultHarnessId, harnessShortName, type BackgroundCommand, type ThreadSummary } from "@openorc/protocol";
-import type { RefObject } from "react";
+import { useRef, type RefObject } from "react";
 import { useRpcMutation } from "../lib/client";
 import { currentPage, usePanelSessions } from "../lib/panel-tabs";
-import { terminalNames } from "../panels/cloud-terminal-claims";
+import { terminalName, terminalNumbers } from "../panels/cloud-terminal-claims";
 import { BackgroundCommands } from "./BackgroundCommands";
 import type { ComposerHandle } from "./Composer";
 import { MessageQueue, type QueuedBy } from "./MessageQueue";
@@ -56,9 +56,13 @@ export function useThreadControls(
   return { queue, commands, composer, error: sendQueued.error ?? startQueued.error ?? stopCommand.error ?? unqueue.error };
 }
 
-/** The thread's background commands, each cloud terminal named as its Terminal tab here is, so no two read alike. */
+/**
+ * The thread's background commands, each cloud terminal named as its Terminal tab here is, so no two read alike, and
+ * one no tab shows keeping its name while it runs.
+ */
 function useNamedCommands(thread: ThreadSummary | null): BackgroundCommand[] {
   const session = usePanelSessions((state) => (thread ? state.sessions[`thread:${thread.id}`] : undefined));
+  const kept = useRef<{ threadId: string; numbers: Map<string, number> } | null>(null);
   const commands = thread?.backgroundCommands ?? [];
   const terminals = commands.flatMap((command) => (command.id.startsWith("terminal-") ? [command.id] : []));
   if (!thread || terminals.length === 0) return commands;
@@ -66,8 +70,12 @@ function useNamedCommands(thread: ThreadSummary | null): BackgroundCommand[] {
     const page = currentPage(tab);
     return page.kind === "tool" && page.tool === "terminal" ? [page.shell ?? null] : [];
   });
-  const names = terminalNames(thread.id, shells, terminals);
-  return commands.map((command) => ({ ...command, description: names.get(command.id) ?? command.description }));
+  const numbers = terminalNumbers(thread.id, shells, terminals, kept.current?.threadId === thread.id ? kept.current.numbers : undefined);
+  kept.current = { threadId: thread.id, numbers };
+  return commands.map((command) => {
+    const number = numbers.get(command.id);
+    return number === undefined ? command : { ...command, description: terminalName(number) };
+  });
 }
 
 /**

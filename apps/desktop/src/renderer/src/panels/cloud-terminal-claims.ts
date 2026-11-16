@@ -41,29 +41,36 @@ export function terminalFor(threadId: string, slot: string, terminals: readonly 
 }
 
 /**
- * What the thread's terminals are called beside its conversation: each by the name of the Terminal tab that shows it
- * here (`shells`, the shell of each, null for the first), and one no tab here shows by the next name no tab has, so no
- * two read alike.
+ * The number each of the thread's terminals goes by beside its conversation, as its name (`terminalName`): the number
+ * of the Terminal tab that shows it here (`shells`, the shell of each, null for the first); else the one it had
+ * (`kept`, the last answer), so a name stays while its terminal runs; else the lowest no tab and no other terminal
+ * has. No two read alike.
  */
-export function terminalNames(threadId: string, shells: readonly (TerminalShell | null)[], terminalIds: readonly string[]): Map<string, string> {
+export function terminalNumbers(threadId: string, shells: readonly (TerminalShell | null)[], terminalIds: readonly string[], kept: ReadonlyMap<string, number> = new Map()): Map<string, number> {
   const held = read()[threadId] ?? {};
-  const names = new Map<string, string>();
+  const numbers = new Map<string, number>();
   const taken = new Set<number>();
   for (const shell of shells) {
     const number = shell?.number ?? 1;
     taken.add(number);
     const id = held[shell?.id ?? "main"];
-    if (id && terminalIds.includes(id)) names.set(id, terminalName(number));
+    if (id && terminalIds.includes(id)) numbers.set(id, number);
+  }
+  for (const id of terminalIds) {
+    const had = kept.get(id);
+    if (numbers.has(id) || had === undefined || taken.has(had)) continue;
+    taken.add(had);
+    numbers.set(id, had);
   }
   let next = 1;
   for (const id of terminalIds) {
-    if (names.has(id)) continue;
+    if (numbers.has(id)) continue;
     while (taken.has(next)) next++;
     taken.add(next);
-    names.set(id, terminalName(next));
+    numbers.set(id, next);
   }
-  return names;
+  return numbers;
 }
 
 /** As its tab is called: the first plain, the others numbered (panel-tools.ts `tabLabel`). */
-const terminalName = (number: number) => (number === 1 ? panelToolLabels.terminal : `${panelToolLabels.terminal} ${number}`);
+export const terminalName = (number: number): string => (number === 1 ? panelToolLabels.terminal : `${panelToolLabels.terminal} ${number}`);

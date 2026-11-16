@@ -8,6 +8,7 @@ import { FolderPlus } from "../components/icons";
 import { type PickerAccounts } from "../components/ModelPickerAccounts";
 import { ComposerModelPicker, ModelPicker, type ModelChoice, type OrclingPickerChoices } from "../components/ModelPicker";
 import { NewThreadOptions } from "../components/NewThreadOptions";
+import { useMacStart } from "../components/MacStartLine";
 import { loadProjectActivity, ProjectActivity } from "../components/ProjectActivity";
 import { Panel } from "../components/Panel";
 import { NewThreadQuestion } from "../components/ProjectPicker";
@@ -217,7 +218,9 @@ function NewThreadProject({
   const usesClaude = choice?.agent === "claude";
   const pickerAccounts = orcling || cloudOnly ? undefined : newThreadAccounts(accountChoices, claudeAccountId, start.isPending, (id) => changeDraft({ claudeAccountId: id }));
   const localReason = usesClaude && !accounts.data ? (accounts.error?.message ?? "Loading Claude accounts…") : targetDisabledReason;
-  const disabledReason = onCloud ? (hosted.blocked?.words ?? (!hosted.shown ? "Checking OpenOrc Cloud…" : targetDisabledReason)) : localReason;
+  // A cloud start from this Mac's folder carries its work, said on the line above Start before anything leaves.
+  const macStart = useMacStart(cloudOnly ? null : projectId, spaceId ?? undefined, onCloud);
+  const disabledReason = onCloud ? (hosted.blocked?.words ?? macStart.refusal ?? (!hosted.shown ? "Checking OpenOrc Cloud…" : targetDisabledReason)) : localReason;
   const location = useNewThreadLocation(projectId, selected, workspaceMode, draft.workingDirectory);
   const chooseModel = (model: ModelChoice) => changeDraft({ target: { kind: "model", choice: model } });
   const retry = () => {
@@ -241,7 +244,7 @@ function NewThreadProject({
       text,
       attachments,
       files,
-      launch: (params) => startSpaceThread(params, start.mutateAsync, spaceId, key),
+      launch: (params) => startSpaceThread(macStart.macWork ? { ...params, macWork: macStart.macWork } : params, start.mutateAsync, spaceId, key),
     });
     if (mounted.current && spaceNavigation.getState().generation === generation && useRouter.getState().route.view === "newthread") openThread(threadId);
   };
@@ -277,6 +280,7 @@ function NewThreadProject({
                   <div className="new-thread-changes empty:hidden">
                     <ComposerCommitChip changes={composerChanges} />
                   </div>
+                  {macStart.line ? <div className="mb-2">{macStart.line}</div> : null}
                   <Composer
                     draftKey={files.draftKey}
                     hostedFiles={files.hostedFiles}

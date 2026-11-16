@@ -8,7 +8,8 @@ import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 import { core } from "../lib/rpc";
 import { useTheme } from "../lib/theme";
 import { followTerminalFont } from "./terminal-font";
-import { isDark, openXterm, TerminalBar } from "./TerminalPanel";
+import { TerminalBar } from "./TerminalPanel";
+import { isDark, openXterm } from "./xterm";
 import { terminalTheme } from "./terminal-theme";
 import { claimTerminal, terminalFor } from "./cloud-terminal-claims";
 

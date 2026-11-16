@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { FitAddon } from "@xterm/addon-fit";
-import { Terminal as Xterm } from "@xterm/xterm";
+import type { Terminal as Xterm } from "@xterm/xterm";
 import { RotateCcw, Square, Terminal } from "../components/icons";
 import { Button, Empty, IconButton, TextButton } from "../components/ui";
 import { PanelBar, PanelBarMeta, PanelNotice } from "../components/PanelBar";
@@ -8,6 +7,7 @@ import { typeAtPrompt } from "../lib/terminal-requests";
 import { useTheme } from "../lib/theme";
 import { terminalTheme } from "./terminal-theme";
 import { followTerminalFont } from "./terminal-font";
+import { isDark, openXterm } from "./xterm";
 import "@xterm/xterm/css/xterm.css";
 
 /**
@@ -15,14 +15,6 @@ import "@xterm/xterm/css/xterm.css";
  * and outlives this component on purpose: unmounting stops watching it, and
  * only Stop ends it, so switching tabs mid-build loses nothing.
  */
-
-/** The mode the theme store stamped on the document, read the way DiffView reads it. */
-export function isDark(): boolean {
-  const stamped = document.documentElement.dataset.theme;
-  if (stamped === "dark") return true;
-  if (stamped === "light") return false;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
 
 /**
  * The panel slides over 220ms and the observer reports every frame of it. A
@@ -33,28 +25,6 @@ export function isDark(): boolean {
 const RESIZE_SETTLE_MS = 150;
 
 type Status = { kind: "starting" } | { kind: "running" } | { kind: "exited"; code: number | null } | { kind: "error"; message: string };
-
-/** An xterm drawn into `element` and fitted to it. */
-export function openXterm(element: HTMLElement): { term: Xterm; fit: FitAddon } {
-  const term = new Xterm({
-    cursorBlink: true,
-    // The selected face is applied after loading, so xterm never caches its fallback's metrics.
-    fontFamily: "monospace",
-    fontSize: 12,
-    lineHeight: 1.35,
-    macOptionIsMeta: true,
-    // The ring in main is the replay after a re-attach; this is only what the
-    // reader can scroll back through in the view they are looking at.
-    scrollback: 5000,
-    // Read where the terminal sits: the panel card restates --bg as its own surface.
-    theme: terminalTheme(getComputedStyle(element), isDark()),
-  });
-  const fit = new FitAddon();
-  term.loadAddon(fit);
-  term.open(element);
-  fit.fit();
-  return { term, fit };
-}
 
 /** The words of a terminal's End and Restart: a shell on this Mac, or a cloud thread's terminal. */
 export type TerminalBarWords = { end: string; endTip: string; restart: string; restartTip: string };

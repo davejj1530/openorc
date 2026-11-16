@@ -202,3 +202,27 @@ it("says the server's refusal in a tab past the most a thread keeps open", async
   show("shell-5");
   expect(await screen.findByText("A thread keeps up to 4 terminals open. Close one first.")).toBeTruthy();
 });
+
+it("restarts its opener's own terminal with the most open: ended first, its end waited for, then a new one", async () => {
+  let ended = false;
+  listed = { terminals: [terminal()], canOpen: false, reason: "A thread keeps up to 4 terminals open. Close one first.", viewer: ANA.id };
+  mock.call.mockImplementation(async (method) => {
+    if (method === "hosted.terminal.list")
+      return ended
+        ? { ...listed, terminals: [terminal({ state: "ended", ended: { reason: "closed", message: "Ana ended this terminal.", exitCode: null, by: ANA } })], canOpen: true, reason: null }
+        : listed;
+    if (method === "hosted.terminal.end") {
+      setTimeout(() => (ended = true), 400);
+      return terminal();
+    }
+    if (method === "hosted.terminal.open") return terminal({ id: "terminal-2", typed: 0 });
+    if (method === "hosted.terminal.output") return { from: 0, end: 0, data: "", terminal: terminal() };
+    return null;
+  });
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: "Restart terminal" }));
+  await waitFor(() => expect(calls("hosted.terminal.open")).toHaveLength(1), { timeout: 4000 });
+  const order = mock.call.mock.calls.map(([method]) => method).filter((method) => method === "hosted.terminal.end" || method === "hosted.terminal.open");
+  expect(order).toEqual(["hosted.terminal.end", "hosted.terminal.open"]);
+  expect(ended).toBe(true);
+});

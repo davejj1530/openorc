@@ -55,12 +55,18 @@ function useCloudTerminal(threadId: string, slot: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on the first read
   }, [data]);
   const mine = Boolean(shown && data && shown.openedBy.id === data.viewer);
-  const restart = data?.canOpen
-    ? async () => {
-        if (shown && shown.state !== "ended" && mine) await end.mutateAsync({ threadId, terminalId: shown.id }).catch(() => undefined);
-        await start();
-      }
-    : null;
+  // One's own running terminal restarts even with the most open: it is ended, and its end waited for, before the next opens.
+  const running = Boolean(shown && mine && shown.state !== "ended");
+  const restart =
+    data?.canOpen || running
+      ? async () => {
+          if (shown && running) {
+            await end.mutateAsync({ threadId, terminalId: shown.id }).catch(() => undefined);
+            await endedSoon(threadId, shown.id);
+          }
+          await start();
+        }
+      : null;
   const stop = () => {
     if (shown) void end.mutateAsync({ threadId, terminalId: shown.id }).then(reread, () => undefined);
   };
@@ -92,6 +98,15 @@ export function CloudTerminalPanel({ threadId, slot = "main" }: { threadId: stri
       <CloudTerminalView key={shown.id} threadId={threadId} terminal={shown} typing={mine} onChanged={reread} />
     </div>
   );
+}
+
+/** Waits a little for the server to say a terminal has ended, as its host ends it after the ask. */
+async function endedSoon(threadId: string, terminalId: string): Promise<void> {
+  for (let tries = 0; tries < 30; tries++) {
+    const read = await core.call("hosted.terminal.list", { threadId }).catch(() => null);
+    if (!read || read.terminals.find((each) => each.id === terminalId)?.state === "ended") return;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
 }
 
 function TerminalEmpty({ title, words, onRetry }: { title: string; words: string; onRetry: (() => void) | null }) {

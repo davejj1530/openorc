@@ -90,7 +90,7 @@ export interface StandIn {
   /** A team of these people, the first its admin. Answers the space's id. */
   addTeam(name: string, members: string[]): string;
   /** A project for a GitHub repository `owner/name`, in the person's personal space or the space named. Answers its id. */
-  addProject(email: string, project: { name: string; fullName: string }, space?: string): string;
+  addProject(email: string, project: { name: string; fullName: string; origin?: "mac" }, space?: string): string;
   /** A thread the person started, in its project's space. Answers its id. */
   addThread(email: string, seed: StandInThreadSeed): string;
   /** Stores events in a thread's log, in its running turn or `turnId`'s, and sends them to its watchers, unless `quiet` (a frame lost on the way). */

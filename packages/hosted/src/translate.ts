@@ -21,7 +21,7 @@ import {
   type ThreadCollaboration,
   type ThreadSummary,
 } from "@openorc/protocol";
-import type { WireBilling, WireOffers, WireEvent, WireHostedSettings, WireProject, WireSignIn, WireThread } from "./wire.js";
+import type { WireBilling, WireOffers, WireEvent, WireHostedSettings, WireSignIn, WireThread } from "./wire.js";
 
 /** Keep the authoritative hours total on explicit access reads, including packs during access-only grace. */
 export function toPlan(billing: WireBilling): { plan: AccountPlan; hours: CloudHours | null } {
@@ -298,9 +298,13 @@ export function githubRepoOf(remote: string | null): string | null {
 }
 
 /** The project a server project lives under here: the Mac's with its repository, or its own when this Mac has none. */
-export function projectPairs(projects: readonly WireProject[], local: readonly { id: string; remote: string | null }[]): Map<string, { macId: string | null; name: string }> {
+export function projectPairs(
+  projects: readonly { id: string; name: string; fullName: string | null }[],
+  local: readonly { id: string; remote: string | null; cloudProjectId?: string | null }[],
+): Map<string, { macId: string | null; name: string }> {
   const byRepo = new Map(local.flatMap((project) => (githubRepoOf(project.remote) ? [[githubRepoOf(project.remote)!, project.id] as const] : [])));
-  return new Map(projects.map((project) => [project.id, { macId: byRepo.get(project.fullName.toLowerCase()) ?? null, name: project.name }]));
+  const byCloud = new Map(local.flatMap((project) => (project.cloudProjectId ? [[project.cloudProjectId, project.id] as const] : [])));
+  return new Map(projects.map((project) => [project.id, { macId: (project.fullName ? byRepo.get(project.fullName.toLowerCase()) : byCloud.get(project.id)) ?? null, name: project.name }]));
 }
 
 /** Whether a row belongs to a list across these Mac projects: its own project, or the cloud's own, which none here stands for. */

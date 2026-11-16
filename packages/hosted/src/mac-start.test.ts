@@ -86,6 +86,21 @@ describe("a cloud thread started from this Mac's folder", () => {
     expect(stand.macWork.taken).toEqual([]);
   });
 
+  it("starts a folder with no remote on the Personal project it was added as, and lists the thread under the folder", async () => {
+    const { made } = upload();
+    const sketches = stand.addProject(ADA, { name: "sketches", fullName: "", origin: "mac" });
+    device.projects.push({ id: "mac-sketches", remote: null, cloudProjectId: sketches });
+    const { hosted, macWork } = await signedIn(async () => made);
+    await vi.waitFor(async () => expect(await hosted.threads.macStartOffered?.("mac-sketches")).toBe(true));
+    const started = await hosted.threads.call("threads.start", { projectId: "mac-sketches", hosted: true, ...SETTINGS, prompt: "Carry on", attachments: [], macWork: { include: [] } });
+    expect(macWork).toHaveBeenCalledWith("mac-sketches", []);
+    expect(stand.started[0]!.body).toMatchObject({ projectId: sketches });
+    expect(started.thread.projectId).toBe("mac-sketches");
+    // A folder with no remote that was never added has no project to start on.
+    device.projects.push({ id: "mac-drafts", remote: null });
+    expect(await hosted.threads.macStartOffered?.("mac-drafts")).toBe(false);
+  });
+
   it("is not offered where the server doesn't take it", async () => {
     const { hosted } = await signedIn(async () => null);
     stand.threadFiles.capabilities = { macCode: { available: false, reason: "Code from this Mac isn't available in cloud threads yet." } };

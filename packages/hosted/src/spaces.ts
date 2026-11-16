@@ -201,7 +201,7 @@ export class Spaces implements HostedSpaces {
   }
 
   async #readProjects(ids: string[]): Promise<{ rows: ScopedProject[]; error: string | null }> {
-    const answers = await Promise.allSettled(ids.map(async (space) => (await this.deps.session.in(space).request(ROUTES.projects)).map((project) => ({ ...project, space }))));
+    const answers = await Promise.allSettled(ids.map(async (space) => (await this.deps.session.in(space).request(ROUTES.allProjects)).map((project) => ({ ...project, space }))));
     let error: string | null = null;
     const rows = answers.flatMap((answer, i) => {
       if (answer.status === "fulfilled") return answer.value;

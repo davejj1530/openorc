@@ -27,6 +27,8 @@ export interface StandInProject {
   defaultBranch: string;
   everyone: boolean;
   memberIds: string[];
+  /** A Personal project from a folder of a Mac with no remote: listed only to a reader that asks for them, with no repository. */
+  origin?: "mac";
 }
 
 type Reply = { status: number; body: unknown };
@@ -66,7 +68,7 @@ export class StandInSpaces {
   }
 
   /** A project in the person's personal space, or in a space named. Answers its id. */
-  addProject(email: string, project: { name: string; fullName: string; repoId?: number; defaultBranch?: string }, space = personal(email)): string {
+  addProject(email: string, project: { name: string; fullName: string; repoId?: number; defaultBranch?: string; origin?: "mac" }, space = personal(email)): string {
     const id = randomUUID();
     const kept: StandInProject = {
       id,
@@ -76,6 +78,7 @@ export class StandInSpaces {
       defaultBranch: project.defaultBranch ?? "main",
       everyone: true,
       memberIds: [],
+      ...(project.origin && { origin: project.origin }),
     };
     this.#projects.set(space, [...(this.#projects.get(space) ?? []), kept]);
     return id;
@@ -114,10 +117,12 @@ export class StandInSpaces {
   }
 
   /** GET /projects as the real server answers it. */
-  listed(space: string, who?: string) {
+  listed(space: string, who?: string, origins: readonly string[] = ["github"]) {
     return this.projectsIn(space)
-      .filter((project) => !who || this.canRead(space, project.id, who))
-      .map(({ everyone: _everyone, memberIds: _memberIds, ...project }) => ({ ...project, connected: true }));
+      .filter((project) => (!who || this.canRead(space, project.id, who)) && origins.includes(project.origin ?? "github"))
+      .map(({ everyone: _everyone, memberIds: _memberIds, origin, ...project }) =>
+        origin === "mac" ? { id: project.id, name: project.name, origin, defaultBranch: project.defaultBranch, sent: true } : { ...project, connected: true },
+      );
   }
 
   canRead(space: string, projectId: string, who: string): boolean {

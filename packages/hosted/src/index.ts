@@ -77,8 +77,11 @@ export interface HostedDeps {
    * Credentials remain in the separate protected session store.
    */
   kept: { load(part: KeptPart): string | null; save(part: KeptPart, json: string | null): void };
-  /** This device's projects with their git remotes. Hosted projects are matched to them by GitHub repository. */
-  projects(): readonly { id: string; name?: string; remote: string | null }[];
+  /**
+   * This device's projects with their git remotes. Hosted projects are matched to them by GitHub repository, and a
+   * folder with no remote by the Personal project it was added as (`cloudProjectId`).
+   */
+  projects(): readonly { id: string; name?: string; remote: string | null; cloudProjectId?: string | null }[];
   /**
    * A project folder's work packed for a cloud thread started from it (mac-start.ts): null when it holds nothing GitHub
    * lacks. `include` names held-back files to send after all.

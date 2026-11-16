@@ -145,6 +145,16 @@ export type WireEvents = z.infer<typeof wireEvents>;
 export const wireProject = z.object({ id: z.string(), name: z.string(), fullName: z.string(), connected: z.boolean().default(true) });
 
 /**
+ * A project as a reader that knows projects from a folder of a Mac lists them: a GitHub repository, or a Personal
+ * project from a folder of its creator's Mac, which has no repository (`fullName` null). A server from before them
+ * lists repositories alone.
+ */
+export const wireAnyProject = z.union([
+  wireProject,
+  z.object({ id: z.string(), name: z.string(), origin: z.literal("mac") }).transform(({ id, name }) => ({ id, name, fullName: null, connected: true })),
+]);
+
+/**
  * One of the person's spaces: their personal one, whose `personalOf` is their own user id, or a team they are in. Read
  * as Better Auth lists a person's organizations; the app never says the word.
  */
@@ -232,6 +242,8 @@ export const ROUTES = {
   finishDevice: route("POST", "/agent-sign-ins/codex/device/finish", wireDeviceFinish),
   spaces: route("GET", "/api/auth/organization/list", z.array(wireSpace)),
   projects: route("GET", "/projects", z.array(wireProject)),
+  /** Every project of the space, those from a folder of a Mac with them. */
+  allProjects: route("GET", "/projects?origins=github,mac", z.array(wireAnyProject)),
   /** Makes repositories projects of the session's active space, its personal one unless the person chose another. */
   addProjects: route("POST", "/projects", z.array(wireProject)),
   removeProject: (id: string) => route("DELETE", `/projects/${encodeURIComponent(id)}`, null),

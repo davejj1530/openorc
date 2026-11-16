@@ -13,7 +13,7 @@ export interface Device {
   seatOperations: string | null;
   seatQuantity: string | null;
   /** This device's projects, as the core lists them. */
-  projects: { id: string; remote: string | null }[];
+  projects: { id: string; remote: string | null; cloudProjectId?: string | null }[];
 }
 
 /** What a host did that a test reads: every log line, push and socket it opened, and every write in order. */

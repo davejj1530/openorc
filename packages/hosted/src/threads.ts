@@ -30,7 +30,7 @@ import type { HostedDeps, HostedThreads, MergedMethod, PlacePage } from "./index
 import { READ_LIMIT, type Follower } from "./follow.js";
 import type { Account } from "./account.js";
 import type { SpaceCatalog, Spaces } from "./spaces.js";
-import { spaceProjects } from "./space-projects.js";
+import { scopedProject, spaceProjects } from "./space-projects.js";
 import { AccountCache } from "./account-cache.js";
 import { keptThreadNames, ThreadNames } from "./thread-names.js";
 import { askNotice, endNotice, noticed } from "./notices.js";
@@ -39,7 +39,7 @@ import type { Skills } from "./skills.js";
 import { TerminalWatch } from "./thread-terminals.js";
 import { Refused, type Requests, type Session, type SessionChange } from "./session.js";
 import { CLOUD_PROJECT, githubRepoOf, listRows, projectPairs, resolvedCount, runsNow, starterOf, toAppEvent, toRuns, toSummary } from "./translate.js";
-import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, type WireThread } from "./wire.js";
+import { ROUTES, SOCKET, wireThread, wireTopics, type WireEvent, type WireThread } from "./wire.js";
 import type { QueuedStart } from "./shared-sends.js";
 
 import { firstMessage } from "./first-message.js";
@@ -59,7 +59,7 @@ export type KeptHere = z.infer<typeof kept>;
 
 /** A row and a project as heard, each with the space it was read in. */
 const heardRow = wireThread.extend({ space: z.string(), ...nativeRowFields });
-const heardProject = wireProject.extend({ space: z.string() });
+const heardProject = scopedProject;
 export type HeardRow = z.infer<typeof heardRow>;
 type HeardProject = z.infer<typeof heardProject>;
 
@@ -174,7 +174,7 @@ export class Threads implements HostedThreads {
       id,
       name: project.name,
       rootPath: "",
-      gitRemote: `https://github.com/${project.fullName}`,
+      gitRemote: project.fullName ? `https://github.com/${project.fullName}` : null,
       defaultBranch: null,
       settings: { setupScript: null, worktreeInclude: [], branchPrefix: "", detectedConfigs: [], claudeAccounts: null },
       createdAt: at,
@@ -286,16 +286,18 @@ export class Threads implements HostedThreads {
   #projectFor(macId: string, spaceId?: string): HeardProject | null {
     const heard = this.#heard;
     if (macId.startsWith(CLOUD_PROJECT)) return heard?.projects.find((project) => CLOUD_PROJECT + project.id === macId && (!spaceId || project.space === spaceId)) ?? null;
-    const remote = this.deps.projects().find((project) => project.id === macId)?.remote ?? null;
-    const repo = githubRepoOf(remote);
+    const local = this.deps.projects().find((project) => project.id === macId);
+    // A folder with no remote: the Personal project it was added as.
+    if (local?.cloudProjectId) return heard?.projects.find((project) => project.id === local.cloudProjectId && (!spaceId || project.space === spaceId)) ?? null;
+    const repo = githubRepoOf(local?.remote ?? null);
     if (!heard || !repo) return null;
-    const matching = heard.projects.filter((project) => project.fullName.toLowerCase() === repo && (!spaceId || project.space === spaceId));
+    const matching = heard.projects.filter((project) => project.fullName?.toLowerCase() === repo && (!spaceId || project.space === spaceId));
     return matching.find((project) => project.space === heard.personal) ?? matching[0] ?? null;
   }
 
   /** The repositories every space of the person's has as projects, owner/name in lower case. */
   cloudRepos(): ReadonlySet<string> {
-    return new Set((this.#heard?.projects ?? []).map((project) => project.fullName.toLowerCase()));
+    return new Set((this.#heard?.projects ?? []).flatMap((project) => (project.fullName ? [project.fullName.toLowerCase()] : [])));
   }
 
   /** A row the server just answered for a write, in place of the one heard, in the same space. */

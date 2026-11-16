@@ -46,8 +46,8 @@ it("opens a path the agent writes as inline code in the Files tool, at its line,
   const openFile = vi.spyOn(useLayout.getState(), "openFile").mockImplementation(() => undefined);
   const reply = "I changed `src/cart.ts:42` and `useCart.getState()`.\n\n```\nsrc/never.ts\n```";
   render(
-    <ThreadMedia scopeKey="here" basePath="/repo" fileScope={{ kind: "thread", id: "t1" }} codePaths>
-      <ThreadRichText>{reply}</ThreadRichText>
+    <ThreadMedia scopeKey="here" basePath="/repo" fileScope={{ kind: "thread", id: "t1" }}>
+      <ThreadRichText codePaths>{reply}</ThreadRichText>
     </ThreadMedia>,
   );
   const path = await screen.findByText("src/cart.ts:42");
@@ -61,8 +61,8 @@ it("opens a path the agent writes as inline code in the Files tool, at its line,
 
 it("leaves a path in inline code as code where the conversation's files are elsewhere", async () => {
   render(
-    <ThreadMedia scopeKey="cloud" fileLinks="cite" codePaths>
-      <ThreadRichText>{"See `src/cart.ts`."}</ThreadRichText>
+    <ThreadMedia scopeKey="cloud" fileLinks="cite">
+      <ThreadRichText codePaths>{"See `src/cart.ts`."}</ThreadRichText>
     </ThreadMedia>,
   );
   expect((await screen.findByText("src/cart.ts")).closest("a, [title]")).toBeNull();
@@ -80,8 +80,8 @@ it("leaves a document's inline code as code, since its paths may be from another
 it("keeps a path in code that is already a link pointing where the link does", async () => {
   const openFile = vi.spyOn(useLayout.getState(), "openFile").mockImplementation(() => undefined);
   render(
-    <ThreadMedia scopeKey="here" basePath="/repo" fileScope={{ kind: "thread", id: "t1" }} codePaths>
-      <ThreadRichText>{"See [`src/cart.ts`](src/other.ts:3)."}</ThreadRichText>
+    <ThreadMedia scopeKey="here" basePath="/repo" fileScope={{ kind: "thread", id: "t1" }}>
+      <ThreadRichText codePaths>{"See [`src/cart.ts`](src/other.ts:3)."}</ThreadRichText>
     </ThreadMedia>,
   );
   fireEvent.click(await screen.findByText("src/cart.ts"));

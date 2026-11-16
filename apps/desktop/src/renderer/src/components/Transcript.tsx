@@ -206,7 +206,7 @@ export function Transcript({
   const arrivals = useArrivals(waiting, scrollKey) && (working || run.live);
 
   return (
-    <ThreadMedia scopeKey={scrollKey} {...media} codePaths mentionNames={mentionNames}>
+    <ThreadMedia scopeKey={scrollKey} {...media} mentionNames={mentionNames}>
       <div ref={parentRef} data-transcript data-arrivals={arrivals || undefined} className={cn("h-full overflow-y-auto", waiting && "invisible")}>
         <div ref={contentRef} className="max-w-chat mx-auto px-6 py-5">
           {hasOlder ? <div ref={olderRef} aria-hidden /> : null}
@@ -609,7 +609,7 @@ function ReplyMessage({ block, actions }: { block: Extract<Block, { kind: "messa
   return (
     <div className="group journal-message journal-response">
       <div className="text-prose text-ink prose-chat">
-        <ThreadRichText mode="streaming" isAnimating={block.streaming} animated={wordFade}>
+        <ThreadRichText mode="streaming" isAnimating={block.streaming} animated={wordFade} codePaths>
           {block.text}
         </ThreadRichText>
       </div>

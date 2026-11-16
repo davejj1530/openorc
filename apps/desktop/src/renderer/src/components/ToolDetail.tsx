@@ -115,7 +115,7 @@ function OutputPart({ view, cwd }: { view: OutputView; cwd: string | null }) {
     case "markdown":
       return (
         <div className="tool-view-prose prose-chat">
-          <ThreadRichText>{view.text}</ThreadRichText>
+          <ThreadRichText codePaths={!view.fetched}>{view.text}</ThreadRichText>
         </div>
       );
     case "text":
@@ -162,7 +162,7 @@ function Prompt({ text, agent }: { text: string; agent: string | null }) {
         </span>
       ) : null}
       <div className="tool-view-prose prose-chat">
-        <ThreadRichText>{text}</ThreadRichText>
+        <ThreadRichText codePaths>{text}</ThreadRichText>
       </div>
     </div>
   );

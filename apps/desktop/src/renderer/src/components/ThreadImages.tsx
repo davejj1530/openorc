@@ -18,7 +18,6 @@ const MediaContext = createContext<{
   basePath?: string;
   fileScope?: FileSelection["scope"];
   fileLinks?: "open" | "cite";
-  codePaths?: boolean;
   mentionNames?: ReadonlyMap<string, string> | undefined;
   openImage: (image: ImageSelection) => void;
 }>({
@@ -43,16 +42,10 @@ export function ThreadMedia({
   scopeKey,
   fileScope,
   fileLinks = "open",
-  codePaths = false,
   mentionNames: ownNames,
 }: MediaScope & {
   children: ReactNode;
   scopeKey: string;
-  /**
-   * Inline code that names a file links to it. Only a transcript asks: an agent writes paths from the folder it works
-   * in, while a document's are often from somewhere else, such as the repository's root for a file under docs/.
-   */
-  codePaths?: boolean;
   mentionNames?: ReadonlyMap<string, string> | undefined;
 }) {
   const inherited = useContext(MediaContext);
@@ -71,8 +64,8 @@ export function ThreadMedia({
   const context = useMemo(() => {
     let scope: FileSelection["scope"] | undefined;
     if (scopeKind && scopeId !== undefined) scope = scopeKind === "project" ? { kind: scopeKind, id: scopeId, workingDirectory: scopeDirectory } : { kind: scopeKind, id: scopeId };
-    return { basePath, openImage, fileScope: scope, fileLinks, codePaths, mentionNames };
-  }, [basePath, openImage, scopeKind, scopeId, scopeDirectory, fileLinks, codePaths, mentionNames]);
+    return { basePath, openImage, fileScope: scope, fileLinks, mentionNames };
+  }, [basePath, openImage, scopeKind, scopeId, scopeDirectory, fileLinks, mentionNames]);
   return (
     <MediaContext.Provider value={context}>
       {children}
@@ -228,8 +221,18 @@ export const threadMarkdownComponents: Components = {
 export const threadUrlTransform: UrlTransform = (url, key, node) => (localPath(url) || imageSource(url) ? url : defaultUrlTransform(url, key, node));
 
 /** Resolve relative citations in the workspace before Markdown's URL sanitizer runs. */
-export function ThreadRichText(props: StreamdownProps) {
-  const { basePath, fileScope, fileLinks, codePaths, mentionNames } = useContext(MediaContext);
+export function ThreadRichText({
+  codePaths = false,
+  ...props
+}: StreamdownProps & {
+  /**
+   * Inline code that names a file links to it. Only an agent's own words ask: it writes paths from the folder it works
+   * in, while a document's or a fetched page's are from somewhere else, such as the repository's root for a file under
+   * docs/, or another project altogether.
+   */
+  codePaths?: boolean;
+}) {
+  const { basePath, fileScope, fileLinks, mentionNames } = useContext(MediaContext);
   // A path in inline code is a link only where a link can open it: in the Files tool, or in the folder it is in.
   const pathLinks = Boolean(codePaths) && fileLinks !== "cite" && Boolean(fileScope || basePath);
   const rehypePlugins = useMemo<NonNullable<StreamdownProps["rehypePlugins"]>>(() => {

@@ -151,6 +151,15 @@ describe("OpenOrc Cloud threads in the window's calls", () => {
     await expect(call("threads.get", { id: thread.id })).resolves.toMatchObject({ id: thread.id, owner: { brain: "hosted" } });
   });
 
+  it("answers this Mac's own Bring about a cloud thread here, never as the thread's place", async () => {
+    await open();
+    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "altalogy/openorc" });
+    const hosted = stand.addThread(EMAIL, { projectId: cloudProject, title: "Bring me" });
+    await signIn();
+    await vi.waitFor(async () => expect((await call("threads.list", { filter: "all", includeChildren: true } as never)).some((row) => row.id === hosted)).toBe(true), { timeout: 5_000 });
+    await expect(call("macProjects.bringState", { threadId: hosted })).resolves.toEqual({ mac: false });
+  });
+
   it("answers every call as before, and asks no server, with nobody signed in", async () => {
     const opened = await open();
     const project = macProject(opened);

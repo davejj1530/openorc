@@ -16,6 +16,10 @@ export function followTerminalFont(term: { options: Pick<ITerminalOptions, "font
     if (!live || current !== revision) return;
     term.options.fontFamily = family;
     fit();
+    // The new face's cells are measured as the next frame draws; fitted again then, the screen fits its box.
+    requestAnimationFrame(() => {
+      if (live && current === revision) fit();
+    });
   };
   const off = useCodeFont.subscribe(() => void update());
   void update();

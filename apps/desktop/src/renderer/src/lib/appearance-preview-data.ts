@@ -87,6 +87,7 @@ export function createAppearancePreviewRpc() {
     idleProcessMinutes: null,
     claudeUserMcpServers: false,
     claudeConnectorsOff: [],
+    cloudSkillsOff: {},
     claudeAccountAutoSwitch: false,
   };
   const threads = ["Plan the first release", "Add project search", "Review the folder structure"].map((title, index) =>

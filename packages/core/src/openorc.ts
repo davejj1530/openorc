@@ -23,7 +23,7 @@ import { createConnectorHandlers } from "./handlers/connectors.js";
 import { ConnectorService, type ConnectorPlaces } from "./services/connectors.js";
 import { accountFor } from "./services/openorc-account.js";
 import { HostedSkills } from "./services/hosted-skills.js";
-import { createHostedSkillsLeftHandlers } from "./handlers/hosted-skills-left.js";
+import { createHostedSkillsCloudHandlers } from "./handlers/hosted-skills-cloud.js";
 import { PlaceRouter } from "./services/place-router.js";
 import { rememberedConnectors } from "./services/remembered-connectors.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
@@ -337,6 +337,7 @@ export class OpenOrc {
       claudeEnv: () => this.claudeAccounts.environment(this.environment.current(), this.claudeAccounts.defaultId()).env,
       // What a set leaves out is said in the composer; it is read again when it changes.
       changed: () => this.options.transport.push({ type: "invalidate", keys: ["hostedSkillsLeftOut"] }),
+      off: (agent) => this.settings.get().cloudSkillsOff[agent] ?? [],
     });
     this.hostedSkills = skills;
     return (agent) => skills.own(agent);
@@ -656,7 +657,7 @@ export class OpenOrc {
       createCloudHandlers(),
       createClaudeAccountHandlers(this.claudeAccounts),
       createHostedHandlers(this.account, this.hostedFiles, this.db),
-      createHostedSkillsLeftHandlers(() => this.hostedSkills),
+      createHostedSkillsCloudHandlers(() => this.hostedSkills, this.settings),
       hostedParityHandlers,
       threadCollaborationHandlers,
       createAccountPersonHandlers(() => this.account),

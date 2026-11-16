@@ -6,14 +6,15 @@
  * A skill is named by the SHA-256 of its pack, and a pack is read from the disk as it is sent, never held whole. A
  * skill whose files are as they were (their paths, sizes, times and whether they run) keeps the digest it had, so an
  * unchanged skill is not read again. Nothing is left out for its size. A skill that can't be read is left out, with its
- * cause in plain words (`leftOut`), and the turn goes with the person's other skills.
+ * cause in plain words (`leftOut`), and the turn goes with the person's other skills. A skill the person keeps from the
+ * cloud (`off`) is never read for it.
  */
 import { createHash } from "node:crypto";
 import { lstat, open, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { listSkills } from "@openorc/agents";
 import type { OwnSkill } from "@openorc/hosted";
-import type { AgentSkill, HarnessId, LeftOutSkill } from "@openorc/protocol";
+import type { AgentSkill, CloudSkill, HarnessId, LeftOutSkill } from "@openorc/protocol";
 
 /** How long an agent's listing of its skills stands: listing may start the agent's CLI. */
 const LISTED_MS = 60_000;
@@ -119,6 +120,8 @@ export class HostedSkills {
       now?: () => number;
       /** Told when what an agent's set leaves out changes: a skill, or why. */
       changed?: () => void;
+      /** The agent's skills the person keeps from the cloud, by name. */
+      off?: (agent: HarnessId) => readonly string[];
     },
   ) {}
 
@@ -130,13 +133,9 @@ export class HostedSkills {
   async own(agent: HarnessId): Promise<OwnSkill[]> {
     const own: OwnSkill[] = [];
     const left: LeftOutSkill[] = [];
-    const taken = new Set<string>();
-    for (const skill of await this.list(agent)) {
-      const folder = path.dirname(skill.path);
-      const name = path.basename(folder);
-      // The agent finds one skill under a name; its first is the one it runs.
-      if (!skill.path || name.startsWith(".") || taken.has(name)) continue;
-      taken.add(name);
+    const off = new Set(this.deps.off?.(agent) ?? []);
+    for (const { name, folder } of this.named(await this.list(agent))) {
+      if (off.has(name)) continue;
       try {
         const files = await filesOf(folder);
         own.push({ name, digest: await this.digest(folder, name, files), pack: () => packOf(name, files) });
@@ -150,6 +149,39 @@ export class HostedSkills {
     this.left.set(agent, left);
     if (JSON.stringify(left) !== before) this.deps.changed?.();
     return own;
+  }
+
+  /**
+   * Every one of the agent's own skills as its cloud turns would get it: its size, or why this Mac can't read it, and
+   * whether the person sends it. Sizes are read from the disk each time; no file is opened.
+   */
+  async catalog(agent: HarnessId): Promise<CloudSkill[]> {
+    const off = new Set(this.deps.off?.(agent) ?? []);
+    const listed = await this.list(agent);
+    const described = new Map(listed.map((skill) => [skill.path, skill.shortDescription ?? skill.description]));
+    return Promise.all(
+      this.named(listed).map(async ({ name, folder, path: file }) => {
+        const base = { name, description: described.get(file) ?? "", on: !off.has(name) };
+        try {
+          return { ...base, bytes: (await filesOf(folder)).reduce((sum, one) => sum + one.bytes, 0), cause: null };
+        } catch (error) {
+          if (!(error instanceof SkillUnreadable)) throw error;
+          return { ...base, bytes: null, cause: error.why };
+        }
+      }),
+    );
+  }
+
+  /** The agent's skills by the name its folder gives each: the agent finds one skill under a name, and its first is the one it runs. */
+  private named(skills: readonly AgentSkill[]): { name: string; folder: string; path: string }[] {
+    const taken = new Set<string>();
+    return skills.flatMap((skill) => {
+      const folder = path.dirname(skill.path);
+      const name = path.basename(folder);
+      if (!skill.path || name.startsWith(".") || taken.has(name)) return [];
+      taken.add(name);
+      return [{ name, folder, path: skill.path }];
+    });
   }
 
   /** The agent's skills left out of its last set, because this Mac could not read them, with why. */

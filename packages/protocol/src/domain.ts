@@ -424,6 +424,8 @@ export const AppSettings = z.object({
   claudeConnectorsOff: z.array(z.string()),
   /** Whether a conversation stopped by its Claude account's usage limit goes on with the enabled account that has the most 5-hour usage left. */
   claudeAccountAutoSwitch: z.boolean(),
+  /** By agent, the person's own skills kept from their cloud turns: on this Mac they stay as Settings > Skills has them. */
+  cloudSkillsOff: z.partialRecord(HarnessId, z.array(z.string())).default({}),
 });
 export type AppSettings = z.infer<typeof AppSettings>;
 

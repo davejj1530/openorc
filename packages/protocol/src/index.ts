@@ -69,5 +69,5 @@ export * from "./hosted-files.js";
 export * from "./hosted-environment.js";
 export * from "./hosted-connectors.js";
 export * from "./hosted-mac-start.js";
-export * from "./hosted-skills-left.js";
+export * from "./hosted-skills-cloud.js";
 export * from "./hosted-terminals.js";

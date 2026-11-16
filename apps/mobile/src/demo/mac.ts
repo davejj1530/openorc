@@ -32,6 +32,7 @@ export const demoSettings: AppSettings = {
   claudeUserMcpServers: true,
   claudeConnectorsOff: [],
   claudeAccountAutoSwitch: false,
+  cloudSkillsOff: {},
 };
 
 const MINUTE = 60_000;

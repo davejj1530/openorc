@@ -203,6 +203,32 @@ describe("the person's own skills on this Mac, for their cloud turns", () => {
     expect((await skills.own("codex")).map((own) => own.name)).toEqual(["review"]);
   });
 
+  it("never reads or sends a skill the person keeps from the cloud, and never says it was left out", async () => {
+    const linked = await skill("user", "ux", { "SKILL.md": "Design well." });
+    await symlink(path.join(home, "deleted-folder"), path.join(home, "user/ux/data"));
+    const kept = ["ux", "notes"];
+    const list = vi.fn(async () => [await skill("user", "review"), await skill("user", "notes"), linked] as AgentSkill[]);
+    const skills = new HostedSkills({ root: home, list, off: (agent) => (agent === "claude" ? kept : []) });
+    expect((await skills.own("claude")).map((own) => own.name)).toEqual(["review"]);
+    expect(skills.leftOut("claude")).toEqual([]);
+    expect((await skills.own("codex")).map((own) => own.name)).toEqual(["review", "notes"]);
+  });
+
+  it("lists every skill with its size, whether it goes, and why one can't, without opening a file", async () => {
+    const linked = await skill("user", "ux", { "SKILL.md": "Design well." }, { description: "Long words.", shortDescription: "Design." });
+    await symlink(path.join(home, "deleted-folder"), path.join(home, "user/ux/data"));
+    const review = await skill("user", "review", { "SKILL.md": "Read the diff.", "notes/a.md": "A" }, { description: "Reviews." });
+    const notes = await skill("user", "notes", { "SKILL.md": "Notes." });
+    await chmod(path.join(home, "user/notes/SKILL.md"), 0o000);
+    const skills = new HostedSkills({ root: home, list: vi.fn(async () => [review, notes, linked] as AgentSkill[]), off: () => ["notes"] });
+    expect(await skills.catalog("claude")).toEqual([
+      { name: "review", description: "Reviews.", bytes: Buffer.byteLength("Read the diff.") + 1, on: true, cause: null },
+      { name: "notes", description: "", bytes: Buffer.byteLength("Notes."), on: false, cause: null },
+      { name: "ux", description: "Design.", bytes: null, on: true, cause: "its link data points to something that is no longer there." },
+    ]);
+    await chmod(path.join(home, "user/notes/SKILL.md"), 0o644);
+  });
+
   it("lists Claude's skills as its default account finds them", async () => {
     const list = vi.fn(async (_asked: { agent: string; env?: NodeJS.ProcessEnv }) => [] as AgentSkill[]);
     const skills = new HostedSkills({ root: home, list, claudeEnv: () => ({ CLAUDE_CONFIG_DIR: "/accounts/default" }) });

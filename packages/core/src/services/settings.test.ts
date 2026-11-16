@@ -37,6 +37,7 @@ describe("settings persistence", () => {
       claudeUserMcpServers: false,
       claudeConnectorsOff: ["paper"],
       claudeAccountAutoSwitch: true,
+      cloudSkillsOff: { claude: ["notes"] },
     };
     service.set(values);
     const reopened = new AppSettingsService(db);

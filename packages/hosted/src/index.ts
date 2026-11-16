@@ -36,6 +36,7 @@ import { ProjectEnvironment } from "./environment.js";
 import type { MacWorkUpload } from "./mac-start.js";
 export type { MacWorkUpload } from "./mac-start.js";
 import { CloudConnectors } from "./connectors.js";
+import { CloudMachines } from "./machines.js";
 import type { HostedNotice } from "./notices.js";
 import { Session } from "./session.js";
 import { Threads } from "./threads.js";
@@ -231,11 +232,18 @@ export interface Hosted {
   readonly environment: ProjectEnvironment;
   /** The person's own connectors in their cloud turns, saved by value and read by header name. */
   readonly connectors: CloudConnectors;
+  /** The person's machines awake now, and their stop. */
+  readonly machines: CloudMachines;
   /** Reads the stored session and the kept answers, and connects when signed in. Never rejects: no session is signed out. */
   start(): Promise<void>;
   /** The device woke or the network came back: connect now instead of at the next retry. */
   awoke(): void;
   close(): void;
+}
+
+/** What a cloud thread brings from this Mac and what runs for the person there, each over the session alone. */
+function parityServices(session: Session, now: HostedDeps["now"]): Pick<Hosted, "environment" | "connectors" | "machines"> {
+  return { environment: new ProjectEnvironment({ session, now }), connectors: new CloudConnectors({ session }), machines: new CloudMachines({ session }) };
 }
 
 export function createHosted(deps: HostedDeps): Hosted {
@@ -314,8 +322,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     chat,
     tasks,
     files,
-    environment: new ProjectEnvironment({ session, now: deps.now }),
-    connectors: new CloudConnectors({ session }),
+    ...parityServices(session, deps.now),
     start: async () => {
       await account.start();
       threads.start();

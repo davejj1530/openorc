@@ -9,6 +9,7 @@ export { pinObject, unpinAll } from "./refs.js";
 export { changedFiles, commitRange, defaultBranch, emptyTree, fetch, gitState, headCommit, isDirty, isGitRepo, log, originUrl, patchAgainst, repoInfo, revParse, type RepoInfo } from "./repo.js";
 export { diffStat, patchSinceTree, switchFiles, treeHash } from "./snapshot.js";
 export { applyWork, packWork, type AppliedWork, type PackedWork, type WorkSnapshot } from "./work-bundle.js";
+export { MAC_FILE_BYTES, MAC_WORK_BYTES, packMacWork, type MacWorkPack, type MacWorkPlan, type MacWorkQuery } from "./mac-start.js";
 export * as workspaceTransfer from "./workspace-transfer.js";
 export type { TreeDeltaEntry, WorkspaceMergeResult, WorkspaceTreeEntry, WorkspaceTreeSnapshot } from "./workspace-transfer.js";
 export * as worktree from "./worktree.js";

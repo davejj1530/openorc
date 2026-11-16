@@ -7,6 +7,7 @@ import { runs } from "../lib/client";
 import { core } from "../lib/rpc";
 import { AgentPresence, Transcript, WorkTranscript, groupBlocks, groupSummary } from "./Transcript";
 import { AsksDocked } from "./ask-answer";
+import { ThreadVoicesContext } from "../lib/thread-authors";
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("./ThreadImages", () => ({
   ThreadRichText: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -465,6 +466,44 @@ it("draws a turn a teammate stopped before its agent said anything under its own
   expect(head.getAttribute("data-state")).toBe("stopped");
   expect(head.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.getByText("Work on the export").compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it("draws the turn a teammate's answer to a parked ask starts under its own head, with their name", () => {
+  // Walk 9: Mara's turn parked on its question; Theo answered with Answer and continue, which ran as his own turn.
+  runs.reset();
+  const runId = "hosted:d5117dac-5c2f-4d1a-948a-5fad6b7a1176";
+  const question = { questions: [{ question: "Which color should the banner be?", options: [{ label: "Teal" }, { label: "Amber" }] }] };
+  runs.applyFrame({
+    runId,
+    seq: 1,
+    events: [
+      { type: "message.completed", runId, ts: 1794795333000, messageId: "user-mara", role: "user", text: "Ask me the banner's color" },
+      { type: "turn.started", runId, ts: 1794795333100, turnId: "c8ed9815" },
+      { type: "approval.requested", runId, ts: 1794795340000, approvalId: "ask", kind: "user_input", toolName: "AskUserQuestion", input: question, durable: true },
+      { type: "turn.completed", runId, ts: 1794795642000, turnId: "c8ed9815", status: "cancelled", parked: true, durationMs: 309_000 },
+      { type: "approval.resolved", runId, ts: 1794795877000, approvalId: "ask", decision: "allow" },
+      { type: "turn.started", runId, ts: 1794795877100, turnId: "23a42a14" },
+      { type: "message.completed", runId, ts: 1794795883000, messageId: "banner", role: "assistant", text: "banner" },
+      { type: "turn.completed", runId, ts: 1794795883100, turnId: "23a42a14", status: "success", durationMs: 6_000 },
+    ],
+  });
+  const mara = { id: "u-mara", name: "Mara Okafor", image: null };
+  const theo = { id: "u-theo", name: "Theo Laurent", image: null };
+  const authors = {
+    viewer: theo,
+    turnOf: { "user-mara": "c8ed9815", "approval-ask": "c8ed9815", "turn-c8ed9815": "c8ed9815", banner: "23a42a14", "turn-23a42a14": "23a42a14" },
+    senders: { c8ed9815: mara, "23a42a14": theo },
+    authors: { "user-mara": mara },
+  };
+  render(
+    <ThreadVoicesContext.Provider value={{ authors, shared: true }}>
+      <Transcript run={runs.get(runId)!} working={false} />
+    </ThreadVoicesContext.Provider>,
+  );
+  const heads = [...document.querySelectorAll(".turn-head")];
+  expect(heads.map((head) => head.getAttribute("data-state"))).toEqual(["done", "done"]);
+  expect(heads.map((head) => head.querySelector(".turn-sender")?.textContent ?? head.textContent)).toEqual([expect.stringContaining("Mara"), expect.stringContaining("Theo")]);
+  expect(heads[1]!.compareDocumentPosition(screen.getByText("banner")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
 it("opens the folded work that holds a message asked for, with its whole narration, and marks that message", () => {

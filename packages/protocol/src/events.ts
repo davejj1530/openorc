@@ -270,6 +270,8 @@ export const AgentEvent = z.discriminatedUnion("type", [
     resultText: z.string().optional(),
     /** A hosted child's updates ended without an observed completion or a user Stop. */
     observationEnded: z.literal(true).optional(),
+    /** A cloud turn ended waiting on an ask nobody answered in time; its answer starts the next turn. Written with status "cancelled". */
+    parked: z.literal(true).optional(),
     usage: Usage.optional(),
     durationMs: z.number().nonnegative(),
     /** For a turn that asked for Fast, whether the provider served it, with its code for why not. */

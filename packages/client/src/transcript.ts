@@ -80,7 +80,8 @@ export type Block = { at?: number; turnKey?: string; runId?: string; seq?: numbe
       notice?: boolean;
       boundary?: "turn" | "session";
       durationMs?: number;
-      outcome?: "success" | "error" | "cancelled" | "no_updates";
+      /** `parked`: a cloud turn that ended waiting on its ask, whose answer starts the next turn. */
+      outcome?: "success" | "error" | "cancelled" | "no_updates" | "parked";
     }
 );
 
@@ -317,6 +318,8 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
       tone: ev.status === "success" ? "ok" : "bad",
       text: `turn ${ev.status === "success" ? "finished" : ev.status} in ${(ev.durationMs / 1000).toFixed(1)}s${ev.usage ? `, ${ev.usage.inputTokens.toLocaleString()} in / ${ev.usage.outputTokens.toLocaleString()} out` : ""}`,
       ...(ev.observationEnded ? { tone: "muted", text: "Updates stopped" } : {}),
+      // Parked on its ask, it ended without failing: the ask stays open, and the turn its answer starts is the next one.
+      ...(ev.parked ? { outcome: "parked", tone: "muted", text: `turn parked in ${(ev.durationMs / 1000).toFixed(1)}s` } : {}),
     });
     run.turnsCompleted += 1;
   },

@@ -31,3 +31,17 @@ it("closes a durable ask once it is answered", () => {
   expect(decisionOf(run, "parked")).toMatchObject({ decision: "allow" });
   expect(run.pendingApprovals).toBe(0);
 });
+
+it("ends a turn parked on its ask quietly, keeps the ask open, and gives the turn its answer starts a key of its own", () => {
+  const run = emptyRun("run");
+  const parked: AgentEvent = { type: "turn.completed", runId: "run", ts: 2, turnId: "asker", status: "cancelled", parked: true, durationMs: 300_000 };
+  const answer: AgentEvent = { type: "approval.resolved", runId: "run", ts: 3, approvalId: "parked", decision: "allow" };
+  const reply: AgentEvent = { type: "message.completed", runId: "run", ts: 4, messageId: "reply", role: "assistant", text: "banner" };
+  applyEvents(run, [ask("parked", true), parked]);
+  expect(decisionOf(run, "parked")).not.toHaveProperty("decision");
+  expect(run.pendingApprovals).toBe(1);
+  expect(run.blocks.find((block) => block.id === "turn-asker")).toMatchObject({ kind: "status", boundary: "turn", outcome: "parked", tone: "muted" });
+  applyEvents(run, [answer, reply]);
+  const keyOf = (id: string) => run.blocks.find((block) => block.id === id)?.turnKey;
+  expect(keyOf("reply")).not.toBe(keyOf("approval-parked"));
+});

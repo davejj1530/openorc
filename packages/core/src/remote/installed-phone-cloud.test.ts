@@ -199,7 +199,11 @@ describe.each(INSTALLED_BUILDS)("$name", (build) => {
     installed.interest([mac.runId, cloudRun]);
     // The window opens the cloud thread, which makes this Mac follow it.
     await window("events.page", { runId: cloudRun });
-    stand.append(cloud.threads.teammate, [{ type: "message.completed", ts: Date.now(), messageId: `cloud-${build.name}`, role: "assistant", text: "Birch pricing page is drafted" }]);
+    // A turn parked on its ask ends with a field no installed build knows: it never reaches them, as nothing of the thread does.
+    stand.append(cloud.threads.teammate, [
+      { type: "turn.completed", ts: Date.now(), turnId: `parked-${build.name}`, status: "cancelled", parked: true, durationMs: 300_000 },
+      { type: "message.completed", ts: Date.now(), messageId: `cloud-${build.name}`, role: "assistant", text: "Birch pricing page is drafted" },
+    ]);
     stand.set(cloud.threads.teammate, { status: "needs_answer" });
     await vi.waitFor(() => expect(frames(windowPushes, cloudRun).some((event) => event.type === "message.completed" && event.messageId === `cloud-${build.name}`)).toBe(true), { timeout: 5_000 });
 
@@ -288,4 +292,13 @@ it("keeps the App Store build's own failure: an event type it does not know thro
   const run = release.emptyRun("sample");
   expect(() => release.applyEvents(run, [...everyEvent("sample"), { type: "future.event", runId: "sample", ts: 1 }])).not.toThrow();
   expect(run.blocks.length).toBeGreaterThan(5);
+});
+
+it("would take a parked turn's end in every installed transcript without throwing, though none is ever sent one", () => {
+  const parked = { type: "turn.completed", runId: "sample", ts: 2, turnId: "parked", status: "cancelled", parked: true, durationMs: 300_000 };
+  for (const build of INSTALLED_BUILDS) {
+    const run = build.transcript.emptyRun("sample");
+    expect(() => build.transcript.applyEvents(run, [parked])).not.toThrow();
+    expect(run.blocks.find((block) => block.id === "turn-parked")).toMatchObject({ boundary: "turn", outcome: "cancelled" });
+  }
 });

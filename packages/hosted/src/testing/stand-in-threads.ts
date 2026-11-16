@@ -633,9 +633,12 @@ export class StandInThreads {
     thread.stopping = false;
     thread.stoppedBy = null;
     thread.turnStartedAt = null;
+    // A turn that ends on an ask nobody answered parks, and its end says so, as the server writes it.
+    const parks = thread.asks.some((ask) => !ask.answered && !ask.parked);
     for (const ask of thread.asks) if (!ask.answered) ask.parked = true;
     thread.status = openAsk(thread) ? "needs_answer" : "idle";
-    this.append(threadId, [{ type: "turn.completed", ts: Date.now(), turnId: agentTurn(thread.turnId ?? `turn-${threadId}`), status, durationMs: 1000 }]);
+    const end = parks ? { status: "cancelled", parked: true } : { status };
+    this.append(threadId, [{ type: "turn.completed", ts: Date.now(), turnId: agentTurn(thread.turnId ?? `turn-${threadId}`), ...end, durationMs: 1000 }]);
     thread.turnId = null;
     for (const message of thread.messages) if (message.state === "pending" && !this.#reads(message.author, thread)) message.state = "cancelled";
     const next = thread.messages.find((message) => message.state === "pending" && !message.paused);

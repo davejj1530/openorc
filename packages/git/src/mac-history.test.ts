@@ -90,6 +90,23 @@ describe("a thread's work brought to the folder", () => {
     expect(await bringIntoFolder(mac, bundle, { branch: "fix-login", head, base })).toEqual({ branch: "fix-login", commits: 0 });
   });
 
+  it("counts only the commits no branch here had, as a commit the Mac sent with the thread's start", async () => {
+    const mac = folder("counted");
+    const base = git(mac, "rev-parse", "HEAD");
+    writeFileSync(path.join(mac, "mac.txt"), "sent with the start");
+    git(mac, "add", "-A");
+    git(mac, "commit", "-q", "-m", "On the Mac");
+    const cloud = path.join(root, "counted-cloud");
+    git(root, "clone", "-q", mac, cloud);
+    git(cloud, "checkout", "-q", "-B", "fix-login");
+    writeFileSync(path.join(cloud, "fix.txt"), "from the cloud");
+    git(cloud, "add", "-A");
+    git(cloud, "commit", "-q", "-m", "Fix the login");
+    const bundle = path.join(root, "counted.bundle");
+    git(cloud, "bundle", "create", "-q", bundle, "refs/heads/fix-login", `^${base}`);
+    expect(await bringIntoFolder(mac, bundle, { branch: "fix-login", head: git(cloud, "rev-parse", "HEAD"), base })).toEqual({ branch: "fix-login", commits: 1 });
+  });
+
   it("leaves a branch of that name with other work alone, and the branch checked out, and comes beside them", async () => {
     const mac = folder("beside");
     const { bundle, base, head } = cloudWork(mac, "beside", "main");

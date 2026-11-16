@@ -118,8 +118,10 @@ async function placeBranch(folder: string, base: string, save: { head: string; b
     const had = (await git(folder, ["rev-parse", "--verify", "--quiet", ref], QUIET)).stdout.trim();
     if (had === save.head) return { branch: name, commits: 0 };
     if (had && (await git(folder, ["merge-base", "--is-ancestor", had, save.head], QUIET)).code !== 0) continue;
+    // What came is what no branch here had: a commit the Mac sent with the thread's start is already on its own.
+    const commits = Number((await git(folder, ["rev-list", "--count", save.head, "--not", "--branches"])).stdout.trim());
     await git(folder, ["update-ref", ref, save.head, had || "0".repeat(save.head.length)]);
-    return { branch: name, commits: Number((await git(folder, ["rev-list", "--count", save.head, `^${had || save.base}`])).stdout.trim()) };
+    return { branch: name, commits };
   }
   throw new BringRefused(`This folder already has branches named ${base} with other work. Rename one, then bring it again.`);
 }

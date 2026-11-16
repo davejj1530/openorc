@@ -67,7 +67,10 @@ export function CloudCheckSection({ active }: { active: boolean }) {
     { enabled: active, refetchInterval: (query) => (active && query.state.data?.state === "ready" && query.state.data.check && !query.state.data.check.done ? RUNNING_MS : false) },
   );
   const start = useRpcMutation("cloudCheck.start");
-  const space = useSpaceNavigation((state) => state.current ?? state.personal);
+  // With Personal alone the space switcher has nothing to hold, so Personal is read from the account's spaces.
+  const status = useRpc("spaces.status", {}, { enabled: active });
+  const navigated = useSpaceNavigation((state) => state.current ?? state.personal);
+  const space = navigated ?? (status.data?.state === "ready" ? status.data.personalSpaceId : null);
   if (read.error) return <Failure error={read.error} />;
   if (read.data?.state !== "ready") return null;
   const { check } = read.data;

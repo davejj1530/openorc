@@ -35,6 +35,7 @@ beforeEach(() => {
   vi.mocked(core.call).mockImplementation((async (method: string) => {
     if (method === "cloudCheck.read") return state;
     if (method === "cloudCheck.start") return (state = { state: "ready", check: running() });
+    if (method === "spaces.status") return { state: "ready", personalSpaceId: "personal-only", spaces: [{ id: "personal-only", kind: "personal" }] };
     return null;
   }) as never);
 });
@@ -67,6 +68,15 @@ it("runs a check in the space the person is in, reads it as it goes, and says al
   expect(screen.getByText("No keys.")).toBeTruthy();
   const untried = screen.getByText("Your OpenCode keys").closest("li")!;
   expect(untried.querySelector(".cloud-check-time")?.textContent, "a link not tried has no time").toBe("");
+});
+
+it("runs in Personal for a person with Personal alone, whom the space switcher holds nothing for", async () => {
+  spaceNavigation.setState({ current: null, personal: null });
+  show();
+  const run = await screen.findByRole("button", { name: "Run check" });
+  await waitFor(() => expect((run as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(run);
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloudCheck.start", { spaceId: "personal-only" }));
 });
 
 it("names the broken link with why", async () => {

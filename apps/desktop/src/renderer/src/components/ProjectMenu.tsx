@@ -3,8 +3,9 @@ import { ContextMenu } from "@base-ui/react/context-menu";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpcMutation } from "../lib/client";
 import { useProjectAccess } from "../lib/project-access";
+import { useProjectEnvironment } from "../lib/project-environment";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { People, X } from "./icons";
+import { People, SlidersHorizontal, X } from "./icons";
 import { menuItem, menuPopup } from "./menu";
 import { Button, Dialog } from "./ui";
 
@@ -13,6 +14,7 @@ export const projectHeadingClassName = "flex items-center gap-1 h-8 pl-1 pr-1";
 /** Project removal lives in the heading's context menu. */
 export function ProjectMenu({ project, children }: { project: { id: string; name: string }; children: ReactNode }) {
   const access = useProjectAccess(project.id);
+  const environment = useProjectEnvironment(project.id);
   const [confirm, setConfirm] = useState(false);
   const requestRemoval = () => setConfirm(true);
   return (
@@ -39,6 +41,11 @@ export function ProjectMenu({ project, children }: { project: { id: string; name
                   <People size={13} /> Project access…
                 </ContextMenu.Item>
               ) : null}
+              {environment.open ? (
+                <ContextMenu.Item className={menuItem} onClick={environment.open}>
+                  <SlidersHorizontal size={13} /> Environment…
+                </ContextMenu.Item>
+              ) : null}
               <ContextMenu.Item className={menuItem} onClick={requestRemoval}>
                 <X size={13} /> Remove project…
               </ContextMenu.Item>
@@ -48,6 +55,7 @@ export function ProjectMenu({ project, children }: { project: { id: string; name
       </ContextMenu.Root>
       {confirm ? <RemoveProjectDialog project={project} onClose={() => setConfirm(false)} /> : null}
       {access.dialog}
+      {environment.dialog}
     </>
   );
 }

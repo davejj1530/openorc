@@ -6,6 +6,7 @@ import { core } from "../lib/rpc";
 import { queryClient } from "../lib/client";
 import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
+import { spaceNavigation } from "../lib/space-navigation";
 import { ProjectPicker } from "./ProjectPicker";
 
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
@@ -91,4 +92,30 @@ it("keeps No project permanent", async () => {
   expect(screen.queryByRole("button", { name: /Project options/ })).toBeNull();
   fireEvent.contextMenu(await screen.findByRole("button", { name: "No project" }));
   expect(screen.queryByRole("menuitem", { name: "Remove project…" })).toBeNull();
+});
+
+it("offers a cloud project's environment where the space's server keeps one, and nothing where it doesn't", async () => {
+  spaceNavigation.setState({ current: "birch" });
+  let available = true;
+  const call = vi.spyOn(core, "call").mockImplementation(async (method: string) => {
+    if (method === "hostedEnvironment.available") return available;
+    if (method === "spaces.projects") return [{ key: "repo", name: "Studio", repo: "example/studio", localProjectId: "repo", hostedProjectId: "server-studio", connected: true }];
+    if (method === "hostedEnvironment.read") return { state: "ready", variables: [{ name: "DATABASE_URL", updatedAt: 1 }], canChange: true };
+    return null;
+  });
+  show();
+  fireEvent.contextMenu(await screen.findByRole("button", { name: "Studio" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Environment…" }));
+  expect(await screen.findByRole("dialog", { name: "Environment of Studio" })).toBeTruthy();
+  expect(call).toHaveBeenCalledWith("hostedEnvironment.read", { spaceId: "birch", projectId: "server-studio" });
+  cleanup();
+  queryClient.clear();
+  available = false;
+  call.mockClear();
+  show();
+  fireEvent.contextMenu(await screen.findByRole("button", { name: "Studio" }));
+  await screen.findByRole("menuitem", { name: "Remove project…" });
+  expect(screen.queryByRole("menuitem", { name: "Environment…" })).toBeNull();
+  expect(call).not.toHaveBeenCalledWith("spaces.projects", { spaceId: "birch" });
+  spaceNavigation.setState({ current: null });
 });

@@ -1,7 +1,4 @@
-import { Tooltip } from "@base-ui/react/tooltip";
-import { CoversPreview } from "../lib/browser-preview";
 import { HOSTED_REASONS } from "@openorc/protocol";
-import { floatingGround } from "../lib/use-anchor-ground";
 import { commandRows, nextPickable, type SuggestionRow } from "./composer-commands";
 
 export function hostedCommandReason(value: string): string | null {
@@ -41,29 +38,4 @@ export function hostedFileSuggestion(reason: string | null): SuggestionRow[] {
 
 export function nextCommandSuggestion(reason: string | null, rows: SuggestionRow[], current: number, direction: 1 | -1): number {
   return reason && rows.length ? (current + direction + rows.length) % rows.length : nextPickable(rows, current, direction);
-}
-
-/** Arrow-key selection keeps focus in the editor; it still opens the selected disabled row's reason. */
-export function HostedSuggestion({ row, id, active }: { row: SuggestionRow; id: string; active: boolean }) {
-  return (
-    <Tooltip.Provider delay={400}>
-      <Tooltip.Root open={active || undefined}>
-        <Tooltip.Trigger
-          render={<button id={id} role="option" aria-disabled="true" aria-selected={active} tabIndex={-1} className="composer-suggestion" onMouseDown={(event) => event.preventDefault()} />}
-        >
-          <span className="composer-suggestion-label" data-mono>
-            {row.label}
-          </span>
-        </Tooltip.Trigger>
-        <Tooltip.Portal>
-          <CoversPreview />
-          <Tooltip.Positioner sideOffset={6}>
-            <Tooltip.Popup ref={floatingGround} className="tooltip-popup">
-              {row.unavailable}
-            </Tooltip.Popup>
-          </Tooltip.Positioner>
-        </Tooltip.Portal>
-      </Tooltip.Root>
-    </Tooltip.Provider>
-  );
 }

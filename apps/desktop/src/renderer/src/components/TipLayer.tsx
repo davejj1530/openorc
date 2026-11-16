@@ -128,12 +128,34 @@ export function TipLayer() {
       ),
     [],
   );
+  return <TipAt open={open && tip !== null} anchor={tip?.anchor ?? null} label={tip?.label} detail={tip?.detail} shown={tip?.shown} onClose={() => setOpen(false)} />;
+}
+
+/**
+ * The window's tip, open at `anchor`: the layer's, and the one a list opens for the row its arrow keys chose while the
+ * focus stays in the message, where no hover or focus can.
+ */
+export function TipAt({
+  open,
+  anchor,
+  label,
+  detail,
+  shown,
+  onClose,
+}: {
+  open: boolean;
+  anchor: Element | null;
+  label: string | undefined;
+  detail?: boolean | undefined;
+  shown?: number | undefined;
+  onClose?: () => void;
+}) {
   return (
-    <BaseTooltip.Root open={open && tip !== null} onOpenChange={(next) => (next ? undefined : setOpen(false))}>
+    <BaseTooltip.Root open={open} onOpenChange={(next) => (next ? undefined : onClose?.())}>
       <BaseTooltip.Portal>
-        <BaseTooltip.Positioner key={tip?.shown} anchor={tip?.anchor ?? null} sideOffset={6}>
-          <BaseTooltip.Popup ref={floatingGround} className={cn("tooltip-popup tooltip-popup-tip", tip?.detail && "tooltip-popup-detail")}>
-            {tip?.label}
+        <BaseTooltip.Positioner key={shown} anchor={anchor} sideOffset={6}>
+          <BaseTooltip.Popup ref={floatingGround} className={cn("tooltip-popup tooltip-popup-tip", detail && "tooltip-popup-detail")}>
+            {label}
           </BaseTooltip.Popup>
         </BaseTooltip.Positioner>
       </BaseTooltip.Portal>

@@ -1,6 +1,6 @@
 import { askKeyAct, askKeyName, commandWordAt, useCommandWord, type AskPlace, type SkillListNotice } from "@openorc/client";
 import type { FileScope, UsableConnector } from "@openorc/protocol";
-import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from "react";
+import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type Ref, type RefObject } from "react";
 import { useRpc } from "../lib/client";
 import { filterMentions, mentionQueryAt, usePickedFiles, type MentionEntry } from "../lib/composer-mentions";
 import type { SlashCommand } from "./Composer";
@@ -20,7 +20,8 @@ import {
 } from "./composer-commands";
 import { ComposerSuggestions } from "./ComposerSuggestions";
 import { useHostedControlReason } from "./HostedConversationBoundary";
-import { blockHostedCommandKey, cloudCommandRows, hostedFileSuggestion, HostedSuggestion, nextCommandSuggestion } from "./HostedComposerControls";
+import { blockHostedCommandKey, cloudCommandRows, hostedFileSuggestion, nextCommandSuggestion } from "./HostedComposerControls";
+import { TipAt } from "./TipLayer";
 import { ComposerSuggestionOption } from "./ComposerSuggestionOption";
 import { peopleRows, usePeopleMatches } from "./composer-people";
 import type { PeoplePicks } from "./composer-notes";
@@ -197,12 +198,15 @@ export function ComposerInput(props: ComposerInputProps) {
   const skillHover = useSkillHover(root);
   // Whether the arrow keys chose the row, which is what lets Enter pick one in the middle of a message.
   const [chosen, setChosen] = useState(false);
+  // Whether the row under the cursor is the keys' and not the pointer's: only then does a disabled one say why itself.
+  const [keyed, setKeyed] = useState(false);
   // The list as it now stands, for the reset below, which runs only when a new list opens.
   const rows = useRef(suggestions);
   rows.current = suggestions;
   useEffect(() => {
     setCursor(firstPickable(rows.current));
     setChosen(false);
+    setKeyed(false);
   }, [suggestions.length, memberQuery?.query, atQuery, commandQuery]);
   const memberList = suggestions.length > 0 && Boolean(suggestions[0]?.mention);
   const listOpen = suggestionsActive && suggestions.length > 0;
@@ -221,21 +225,26 @@ export function ComposerInput(props: ComposerInputProps) {
             </div>
           ) : null}
           <div id={listId} role="listbox" hidden={suggestions.length === 0} aria-label={suggestionLabel(memberList, atQuery !== null)} data-agent-mention-list={memberList || undefined}>
-            {suggestions.map((suggestion, index) =>
-              fileReason && suggestion.unavailable ? (
-                <HostedSuggestion key={suggestion.key} id={`${listId}-${index}`} row={suggestion} active={chosen && index === cursor} />
-              ) : (
-                <Fragment key={suggestion.key}>
-                  {suggestion.group && suggestion.group !== suggestions[index - 1]?.group ? (
-                    <div aria-hidden="true" className="composer-suggestion-group">
-                      {suggestion.group}
-                    </div>
-                  ) : null}
-                  <ComposerSuggestionOption row={suggestion} id={`${listId}-${index}`} selected={index === cursor} onPoint={() => setCursor(index)} />
-                </Fragment>
-              ),
-            )}
+            {suggestions.map((suggestion, index) => (
+              <Fragment key={suggestion.key}>
+                {suggestion.group && suggestion.group !== suggestions[index - 1]?.group ? (
+                  <div aria-hidden="true" className="composer-suggestion-group">
+                    {suggestion.group}
+                  </div>
+                ) : null}
+                <ComposerSuggestionOption
+                  row={suggestion}
+                  id={`${listId}-${index}`}
+                  selected={index === cursor}
+                  onPoint={() => {
+                    setCursor(index);
+                    setKeyed(false);
+                  }}
+                />
+              </Fragment>
+            ))}
           </div>
+          <ChosenRowReason id={`${listId}-${cursor}`} row={suggestions[cursor]} keyed={keyed} />
         </ComposerSuggestions>
       ) : null}
       <SkillHoverCard mark={skillHover.hovered} commands={commands} />
@@ -253,6 +262,7 @@ export function ComposerInput(props: ComposerInputProps) {
         onKeyDown={(e) => {
           if (blockHostedCommandKey(fileReason, value, e)) {
             setChosen(true);
+            setKeyed(true);
             return true;
           }
           if (askTook(e, props.ask, { listOpen: suggestionsOpen, value })) return true;
@@ -261,6 +271,7 @@ export function ComposerInput(props: ComposerInputProps) {
           if (action === "down" || action === "up") {
             e.preventDefault();
             setChosen(true);
+            setKeyed(true);
             setCursor((current) => nextCommandSuggestion(fileReason, suggestions, current, action === "down" ? 1 : -1));
             return true;
           }
@@ -289,4 +300,15 @@ export function ComposerInput(props: ComposerInputProps) {
       />
     </>
   );
+}
+
+/**
+ * Why a disabled row the arrow keys chose can't be picked, in the window's tip. The message keeps the focus while the
+ * keys move through the list, so neither hover nor focus opens the row's own tip; the pointer's rows open theirs.
+ */
+function ChosenRowReason({ id, row, keyed }: { id: string; row: SuggestionRow | undefined; keyed: boolean }) {
+  const reason = keyed ? row?.unavailable : undefined;
+  const [anchor, setAnchor] = useState<Element | null>(null);
+  useLayoutEffect(() => setAnchor(reason ? document.getElementById(id) : null), [id, reason]);
+  return <TipAt open={Boolean(anchor && reason)} anchor={anchor} label={reason} />;
 }

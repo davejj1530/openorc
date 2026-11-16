@@ -11,6 +11,7 @@ import { ComposerCommitChip } from "./ComposerCommitChip";
 import { ContextUsage } from "./ContextUsage";
 import { HostedConversationBoundary } from "./HostedConversationBoundary";
 import { ModelPickerRail } from "./ModelPickerRail";
+import { TipLayer } from "./TipLayer";
 import { PickerAccountRows } from "./ModelPickerAccounts";
 import { cloudReviewThread } from "./test-fixtures/hosted-review";
 import { messageOf, press, type } from "./composer-editor/testing";
@@ -130,6 +131,27 @@ it("lets the keyboard reach each unavailable cloud command's reason", async () =
   expect(await screen.findByText(HOSTED_REASONS.compact)).toBeTruthy();
   expect(messageOf(field)).toBe("/");
 });
+it("says each unavailable cloud command's reason on hover, in the window's tip", async () => {
+  mount(
+    <>
+      <Draft />
+      <TipLayer />
+    </>,
+  );
+  const field = screen.getByRole("textbox", { name: "Message" });
+  type(field, "/", 1);
+  for (const [name, reason] of [
+    ["/compact", HOSTED_REASONS.compact],
+    ["/fork", HOSTED_REASONS.fork],
+  ] as const) {
+    const row = screen.getByRole("option", { name });
+    expect(row.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.mouseOver(row);
+    expect(await screen.findByText(reason, {}, { timeout: 2_000 })).toBeTruthy();
+    fireEvent.mouseOut(row);
+  }
+});
+
 it("leaves unknown context out of the cloud composer", () => {
   mount(<Draft />);
   expect(screen.queryByRole("button", { name: "Context" })).toBeNull();

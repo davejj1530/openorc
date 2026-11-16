@@ -11,7 +11,8 @@ export function hostedUnavailablePanel(context: PanelContext, page: PanelPage) {
   const tool = unavailableTool(page);
   if (!tool) return null;
   const control = hostedPanelControl(tool);
-  if (!control || control === "changes" || control === "publishing") return null;
+  // Changes, publishing and the terminal read the server themselves, and say its reason when it has one.
+  if (!control || control === "changes" || control === "publishing" || control === "terminal") return null;
   return <HostedUnavailablePanel title={panelTools[tool].label} control={control} />;
 }
 

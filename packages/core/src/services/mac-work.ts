@@ -30,7 +30,9 @@ async function githubBaseRef(folder: string): Promise<string> {
   throw new Error("This folder has no copy of its branch on GitHub. Fetch it, then try again.");
 }
 
-const removePack = (pack: MacWorkPack) => rm(path.dirname(pack.file), { recursive: true, force: true });
+const removePack = async (pack: MacWorkPack) => {
+  if (pack.file) await rm(path.dirname(pack.file), { recursive: true, force: true });
+};
 
 /** What the line before Start says of a pack; the pack itself is removed, as nothing is sent from a plan. */
 export async function planOf(pack: MacWorkPack | null): Promise<MacStartPlan> {
@@ -42,5 +44,8 @@ export async function planOf(pack: MacWorkPack | null): Promise<MacStartPlan> {
 
 /** A pack as the account sends it: streamed from its file, which goes once it is sent or refused. */
 export function uploadOf(pack: MacWorkPack): MacWorkUpload {
-  return { query: pack.query, refusal: pack.refusal, chunks: () => createReadStream(pack.file), done: () => removePack(pack) };
+  const done = () => removePack(pack);
+  if (pack.refusal || !pack.file) return { refusal: pack.refusal ?? "This folder's work could not be packed.", done };
+  const file = pack.file;
+  return { query: pack.query, refusal: null, chunks: () => createReadStream(file), done };
 }

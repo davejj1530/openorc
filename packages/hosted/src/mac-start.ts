@@ -12,17 +12,16 @@ import { PARITY_ROUTES } from "./wire-parity.js";
 import { ROUTES, type Route } from "./wire.js";
 
 /** A folder's work, packed, as core hands it over: what the server is told, why it can't go, its bytes, and its removal. */
-export type MacWorkUpload = {
-  query: { base: string; headSha: string; headTreeSha: string; treeSha: string; wip: string };
-  refusal: string | null;
-  chunks(): AsyncIterable<Uint8Array>;
-  done(): Promise<void>;
-};
+export type MacWorkUpload =
+  | { query: { base: string; headSha: string; headTreeSha: string; treeSha: string; wip: string }; refusal: null; chunks(): AsyncIterable<Uint8Array>; done(): Promise<void> }
+  /** Refused on the Mac, in words naming why: nothing to send. */
+  | { refusal: string; done(): Promise<void> };
+type Sendable = Extract<MacWorkUpload, { refusal: null }>;
 
 const taken = z.object({ saved: z.literal(true), bytes: z.number().int().nonnegative() });
 
 export const MAC_ROUTES = {
-  work: (threadId: string, query: MacWorkUpload["query"]): Route<z.infer<typeof taken>> => ({
+  work: (threadId: string, query: Sendable["query"]): Route<z.infer<typeof taken>> => ({
     method: "PUT",
     path: `/hosted/threads/${encodeURIComponent(threadId)}/mac-work?${new URLSearchParams(query)}`,
     reply: taken,
@@ -41,7 +40,7 @@ export async function macStartServed(on: Requests): Promise<boolean> {
 }
 
 /** Sends the pack as the new thread's first save. One that fails removes the thread, so no thread waits on work that never came. */
-export async function sendMacWork(on: Requests, threadId: string, upload: MacWorkUpload): Promise<void> {
+export async function sendMacWork(on: Requests, threadId: string, upload: Sendable): Promise<void> {
   try {
     await on.request(MAC_ROUTES.work(threadId, upload.query), new RawBody(() => upload.chunks()));
   } catch (error) {
@@ -56,9 +55,9 @@ export async function sendMacWork(on: Requests, threadId: string, upload: MacWor
 export async function packedFor(
   pack: ((projectId: string, include: readonly string[]) => Promise<MacWorkUpload | null>) | undefined,
   params: Pick<RpcParams<"threads.start">, "projectId" | "macWork">,
-): Promise<MacWorkUpload | null> {
+): Promise<Sendable | null> {
   const upload = params.macWork && pack ? await pack(params.projectId, params.macWork.include) : null;
-  if (upload?.refusal) {
+  if (upload && upload.refusal !== null) {
     await upload.done();
     throw new Refused(upload.refusal);
   }
@@ -72,7 +71,7 @@ type First = { first: { id: string; text: string; fileIds?: string[] } };
  * message, the work goes up as its first save, and then the first message is sent; `refusal` is the server's word when
  * that message can't start a turn (the thread stays).
  */
-export async function startWith(on: Requests, body: Record<string, unknown>, first: First, settings: unknown, mac: MacWorkUpload | null) {
+export async function startWith(on: Requests, body: Record<string, unknown>, first: First, settings: unknown, mac: Sendable | null) {
   if (!mac) return { reply: await on.request(ROUTES.start, { ...body, ...first }), refusal: null };
   const reply = await on.request(ROUTES.start, body).catch(async (error: unknown) => {
     await mac.done();

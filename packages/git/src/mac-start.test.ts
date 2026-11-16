@@ -1,9 +1,9 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { MAC_FILE_BYTES, packMacWork } from "./mac-start.js";
+import { MAC_FILE_BYTES, heldBack, packMacWork } from "./mac-start.js";
 
 const root = mkdtempSync(path.join(os.tmpdir(), "openorc-mac-start-test-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -62,7 +62,7 @@ describe("a folder's work for a cloud thread", () => {
     expect(pack.held).toEqual([".env.local"]);
     expect(pack.refusal).toBeNull();
     expect(pack.bytes).toBeGreaterThan(0);
-    const { blobs, paths } = unpacked(pack.file, origin);
+    const { blobs, paths } = unpacked(pack.file!, origin);
     expect(blobs).toContain("a commit GitHub lacks");
     expect(blobs).toContain("edited here");
     expect(blobs).toContain("new here");
@@ -73,16 +73,56 @@ describe("a folder's work for a cloud thread", () => {
     // The folder itself is as it was: nothing staged, no ref left.
     expect(git(mac, "status", "--porcelain")).toContain("?? .env.local");
     expect(git(mac, "for-each-ref", "refs/openorc")).toBe("");
-    expect(pack.query.base).toBe(git(mac, "rev-parse", "origin/main"));
-    expect(pack.query.headSha).toBe(git(mac, "rev-parse", "HEAD"));
+    expect(pack.query!.base).toBe(git(mac, "rev-parse", "origin/main"));
+    expect(pack.query!.headSha).toBe(git(mac, "rev-parse", "HEAD"));
   });
+
+  it("holds back every new file that looks like a secret, and only new ones", () => {
+    for (const file of [
+      ".env",
+      ".env.local",
+      ".envrc",
+      "config/.env.production",
+      ".npmrc",
+      ".netrc",
+      ".pypirc",
+      "certs/dev.pem",
+      "id_ed25519",
+      "release.keystore",
+      "upload.jks",
+      "creds.p12",
+      "server.key",
+      "credentials.json",
+    ])
+      expect(heldBack(file), file).toBe(true);
+    for (const file of ["environment.ts", "src/env.ts", "README.md", "keys.md", "npmrc.md"]) expect(heldBack(file), file).toBe(false);
+  });
+
+  it("never writes a held-back file's contents into the folder's own repository", async () => {
+    const { mac } = folder("unwritten");
+    const object = execFileSync("git", ["hash-object", "--stdin"], { cwd: mac, env, input: "HELD-CONTENT-93a" }).toString().trim();
+    await packMacWork(mac, { baseRef: "refs/remotes/origin/main" });
+    expect(spawnSync("git", ["cat-file", "-e", object], { cwd: mac, env }).status, "no object holds it").not.toBe(0);
+  });
+
+  it("refuses a file over its size before hashing or packing anything", async () => {
+    const { mac } = folder("early");
+    writeFileSync(path.join(mac, "video.bin"), Buffer.alloc(MAC_FILE_BYTES + 1024 * 1024, 9));
+    const object = execFileSync("git", ["hash-object", path.join(mac, "video.bin")], { cwd: mac, env })
+      .toString()
+      .trim();
+    const pack = await packMacWork(mac, { baseRef: "refs/remotes/origin/main" });
+    expect(pack.refusal).toBe("Too large to send from this Mac: video.bin (51 MB), over 50 MB each.");
+    expect(pack.file).toBeNull();
+    expect(spawnSync("git", ["cat-file", "-e", object], { cwd: mac, env }).status, "never hashed into the repository").not.toBe(0);
+  }, 60_000);
 
   it("sends a held-back file the person includes", async () => {
     const { mac, origin } = folder("included");
     const pack = await packMacWork(mac, { baseRef: "refs/remotes/origin/main", include: [".env.local"] });
     expect(pack.held).toEqual([]);
     expect(pack.added).toEqual([".env.local", "NEW.md"]);
-    expect(unpacked(pack.file, origin).blobs).toContain("HELD-CONTENT-93a");
+    expect(unpacked(pack.file!, origin).blobs).toContain("HELD-CONTENT-93a");
   });
 
   it("refuses a file over its size, naming it", async () => {

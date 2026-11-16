@@ -1,4 +1,4 @@
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { lstat, mkdtemp, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { git } from "./exec.js";
@@ -17,7 +17,10 @@ export const MAC_WORK_BYTES = 256 * 1024 * 1024;
 export const MAC_FILE_BYTES = 50 * 1024 * 1024;
 
 /** New files held back unless the person includes them: they look like secrets. */
-const HELD_BACK = /(^|\/)(\.env(\.[^/]*)?|[^/]*\.(pem|key|p12|pfx)|id_[^/]*|credentials[^/]*)$/i;
+const HELD_BACK = /(^|\/)(\.env[^/]*|\.npmrc|\.netrc|\.pypirc|[^/]*\.(pem|key|p12|pfx|keystore|jks)|id_[^/]*|credentials[^/]*)$/i;
+
+/** Whether a new file looks like a secret, so it stays here unless the person includes it. */
+export const heldBack = (file: string): boolean => HELD_BACK.test(file);
 
 const IDENTITY = { GIT_AUTHOR_NAME: "OpenOrc", GIT_AUTHOR_EMAIL: "cloud@openorc.app", GIT_COMMITTER_NAME: "OpenOrc", GIT_COMMITTER_EMAIL: "cloud@openorc.app" };
 const THROWAWAY_INDEX = ["-c", "core.splitIndex=false", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false"];
@@ -38,8 +41,11 @@ export interface MacWorkPlan {
   refusal: string | null;
 }
 
-/** A plan with its pack, a bundle at `file` for the caller to send and remove. */
-export type MacWorkPack = MacWorkPlan & { file: string; query: MacWorkQuery };
+/**
+ * A plan with its pack, a bundle at `file` for the caller to send and remove (its folder with it). A plan refused for a
+ * file's size before packing has none.
+ */
+export type MacWorkPack = MacWorkPlan & ({ file: string; query: MacWorkQuery } | { file: null; query: null });
 
 const megabytes = (bytes: number) => `${Math.max(1, Math.round(bytes / 1024 / 1024))} MB`;
 
@@ -72,15 +78,21 @@ export async function packMacWork(folder: string, options: { baseRef: string; in
     const file = entry.slice(3);
     if (code.startsWith("R") || code.startsWith("C")) at++;
     if (code !== "??") changed.push(file);
-    else if (HELD_BACK.test(file) && !include.has(file)) held.push(file);
+    else if (heldBack(file) && !include.has(file)) held.push(file);
     else added.push(file);
+  }
+  // A file too large is refused as it lies on disk, before anything of it is hashed or packed.
+  const onDisk = await sizesOf(folder, [...changed, ...added]);
+  if (onDisk.some((one) => one.bytes > MAC_FILE_BYTES)) {
+    const refusal = refusalOf(0, onDisk);
+    return { base, commits, changed, added, held, bytes: onDisk.reduce((sum, one) => sum + one.bytes, 0), largest: onDisk.slice(0, 5), refusal, file: null, query: null };
   }
   const dir = await mkdtemp(path.join(os.tmpdir(), "openorc-mac-work-"));
   const index = { GIT_INDEX_FILE: path.join(dir, "index") };
   try {
     await run([...THROWAWAY_INDEX, "read-tree", "HEAD"], index);
-    await run([...THROWAWAY_INDEX, "add", "-A"], index);
-    for (const file of held) await run([...THROWAWAY_INDEX, "rm", "--cached", "-q", "--ignore-unmatch", "--", file], index);
+    // A held-back file is left out of the add itself, so nothing of it is written, even as a loose object.
+    await run([...THROWAWAY_INDEX, "add", "-A", "--", ".", ...held.map((file) => `:(exclude,literal)${file}`)], index);
     const treeSha = (await run([...THROWAWAY_INDEX, "write-tree"], index)).trim();
     const wip = (await run(["commit-tree", treeSha, "-p", "HEAD", "-m", "OpenOrc work from the Mac"], IDENTITY)).trim();
     const largest = await largestFiles(folder, wip, base);
@@ -107,6 +119,12 @@ function refusalOf(bytes: number, largest: readonly { path: string; bytes: numbe
   if (tooBig.length) return `Too large to send from this Mac: ${named(tooBig)}, over ${megabytes(MAC_FILE_BYTES)} each.`;
   if (bytes > MAC_WORK_BYTES) return `Too much to send from this Mac: ${megabytes(bytes)}, over ${megabytes(MAC_WORK_BYTES)}. Largest: ${named(largest.slice(0, 3))}.`;
   return null;
+}
+
+/** The changed and new files' sizes as they lie in the folder, largest first; a file gone (deleted) has none. */
+async function sizesOf(folder: string, files: readonly string[]): Promise<{ path: string; bytes: number }[]> {
+  const sized = await Promise.all(files.map(async (file) => ({ path: file, bytes: (await lstat(path.join(folder, file)).catch(() => null))?.size ?? 0 })));
+  return sized.sort((a, b) => b.bytes - a.bytes);
 }
 
 /** The files the pack carries beyond `base`, largest first: every blob of the commits and the files' commit, by path. */

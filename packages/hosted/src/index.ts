@@ -33,6 +33,8 @@ import { Follower } from "./follow.js";
 import { Files } from "./files.js";
 import { Skills, type OwnSkills } from "./skills.js";
 import { ProjectEnvironment } from "./environment.js";
+import type { MacWorkUpload } from "./mac-start.js";
+export type { MacWorkUpload } from "./mac-start.js";
 import { CloudConnectors } from "./connectors.js";
 import type { HostedNotice } from "./notices.js";
 import { Session } from "./session.js";
@@ -73,6 +75,11 @@ export interface HostedDeps {
   kept: { load(part: KeptPart): string | null; save(part: KeptPart, json: string | null): void };
   /** This device's projects with their git remotes. Hosted projects are matched to them by GitHub repository. */
   projects(): readonly { id: string; name?: string; remote: string | null }[];
+  /**
+   * A project folder's work packed for a cloud thread started from it (mac-start.ts): null when it holds nothing GitHub
+   * lacks. `include` names held-back files to send after all.
+   */
+  macWork?(projectId: string, include: readonly string[]): Promise<MacWorkUpload | null>;
   fetch: typeof fetch;
   /** Opens the socket with the token. Called again after each sign-in and each early reconnect; it retries by itself in between. */
   connect(url: string, token: string): LiveSocket;
@@ -204,6 +211,8 @@ export interface HostedThreads {
   call<M extends RoutedMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]>;
   /** A project only the server has, as a window reads a project. */
   project(id: string): Project | null;
+  /** Whether a cloud thread of this Mac project may start from its folder (mac-start.ts). */
+  macStartOffered?(macProjectId: string, spaceId?: string): Promise<boolean>;
   /** This place's rows of a merged list, from what it last heard, at once. Null with none to add. */
   listed<M extends MergedMethod>(method: M, params: RpcParams<M>): PlacePage<M> | null;
 }
@@ -290,6 +299,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     server: deps.server,
     kept: deps.kept,
     projects: deps.projects,
+    ...(deps.macWork && { macWork: deps.macWork }),
     push: deps.push,
     notify: deps.notify,
     nameThread: deps.nameThread,

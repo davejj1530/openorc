@@ -27,6 +27,7 @@ import { StandInUploads } from "./stand-in-uploads.js";
 import { StandInSkills } from "./stand-in-skills.js";
 import { StandInEnvironment } from "./stand-in-environment.js";
 import { StandInConnectors } from "./stand-in-connectors.js";
+import { StandInMacWork } from "./stand-in-mac-work.js";
 import { StandInTerminals } from "./stand-in-terminals.js";
 import type { StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInOrganizations } from "./stand-in-organizations.js";
@@ -44,6 +45,8 @@ export interface StandIn {
   environment: StandInEnvironment;
   /** People's own cloud connectors as the server keeps them, behind the `httpsConnectors` capability of `threadFiles`. */
   connectors: StandInConnectors;
+  /** Threads' first work from a Mac's folder, behind the `macCode` capability of `threadFiles`. */
+  macWork: StandInMacWork;
   /** A cloud thread's terminals, with a shell that echoes, behind the `terminal` capability of `threadFiles`. */
   terminals: StandInTerminals;
   tasks: StandInTasks;
@@ -306,7 +309,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const server = transportServer({ connections, requests, holder, sockets, answerSocket, answer });
 
   async function answer(request: IncomingMessage, response: ServerResponse): Promise<void> {
-    if ((await uploads.raw(request, response, holder)) || (await parity.skills.answer(request, response, holder))) return;
+    if ((await uploads.raw(request, response, holder)) || (await parity.skills.answer(request, response, holder)) || (await parity.macWork.answer(request, response, holder))) return;
     const { method, path, query, body, token, space } = await asked(request);
     const who = holder(token);
     requests.push({ method, path, authorized: who !== null });
@@ -412,6 +415,7 @@ function parityStandIns({
     skills: new StandInSkills({ spaces, available: on("skills") }),
     environment: new StandInEnvironment({ spaces, available: on("projectEnvironment") }),
     connectors: new StandInConnectors({ available: on("httpsConnectors") }),
+    macWork: new StandInMacWork({ available: on("macCode"), messages: (threadId) => hosted.sent.filter((one) => one.threadId === threadId).length }),
     terminals: new StandInTerminals({ available: on("terminal"), readers: (threadId) => hosted.readersOf(threadId), peers, person }),
   };
 }

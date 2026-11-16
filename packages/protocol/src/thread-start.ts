@@ -16,6 +16,12 @@ export const ThreadStartParams = z
     claudeAccountId: ClaudeAccountId.optional(),
     projectId: z.string(),
     spaceId: SpaceId.optional(),
+    /**
+     * An OpenOrc Cloud start from this Mac's project folder carries the folder's work (cloud parity unit 5a): its commits
+     * GitHub lacks and its changed and new files, never ignored ones, with `include` naming the held-back files to send
+     * after all. Without it the thread starts from GitHub alone, as before.
+     */
+    macWork: z.object({ include: z.array(z.string().min(1).max(1024)).max(200) }).optional(),
     workingDirectory: z.string().min(1).max(4096).optional(),
     agent: AgentKind.optional(),
     executionTarget: ExecutionTarget.optional(),

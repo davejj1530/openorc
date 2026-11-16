@@ -43,6 +43,7 @@ import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, ty
 import type { QueuedStart } from "./shared-sends.js";
 
 import { firstMessage } from "./first-message.js";
+import { macStartServed, packedFor, startWith } from "./mac-start.js";
 import { nativeRowFields } from "./wire-subthreads.js";
 import { readNativeRows } from "./subthreads.js";
 import { nativeRowsFromEvents, withNativeSummary } from "./translate-subthreads.js";
@@ -78,7 +79,7 @@ type Heard = z.infer<typeof keptThreads>;
 
 type ThreadsDeps = { session: Session; spaces: Spaces; follower: Follower; account: Pick<Account, "status" | "refused">; skills: Pick<Skills, "bring"> } & Pick<
   HostedDeps,
-  "server" | "kept" | "projects" | "push" | "notify" | "nameThread" | "now" | "log"
+  "server" | "kept" | "projects" | "macWork" | "push" | "notify" | "nameThread" | "now" | "log"
 >;
 
 export class Threads implements HostedThreads {
@@ -255,8 +256,12 @@ export class Threads implements HostedThreads {
     // The person's own skills are the server's before the thread's first turn: a failure starts no thread.
     await this.deps.skills.bring(project.space, settings.agent);
     const generation = this.deps.session.generation;
-    const body = { projectId: project.id, ...(params.title && { title: params.title }), settings, ...(await firstMessage(this.deps.session.in(project.space), params)), ready: true };
-    const reply = await this.deps.session.in(project.space).request(ROUTES.start, body);
+    const on = this.deps.session.in(project.space);
+    // From this Mac's folder: its work is packed before anything leaves, and goes up before the first message.
+    const mac = await packedFor(this.deps.macWork, params);
+    const body = { projectId: project.id, ...(params.title && { title: params.title }), settings, ready: true };
+    const { reply, refusal } = await startWith(on, body, await firstMessage(on, params), settings, mac);
+    if (refusal !== null) return sends.refuse(this.calls, refusal, settings);
     if (generation !== this.deps.session.generation) throw new Refused("Your OpenOrc session changed. Try again.");
     if (!this.#heard?.projects.some((row) => row.id === project.id && row.space === project.space)) throw new Refused("You no longer have access to this project.");
     if (!reply.thread) return sends.refuse(this.calls, reply.first?.sent === false ? reply.first.refusal : "", settings);
@@ -269,6 +274,12 @@ export class Threads implements HostedThreads {
     }
     void this.refresh();
     return { thread: this.summary(row.id, params.spaceId), run: toRuns(row, this.reach)[0] ?? null };
+  }
+
+  /** Whether a cloud thread of this Mac project may start from its folder: the project is on OpenOrc Cloud and its server takes one. */
+  async macStartOffered(macProjectId: string, spaceId?: string): Promise<boolean> {
+    const project = this.#projectFor(macProjectId, spaceId);
+    return project ? macStartServed(this.deps.session.in(project.space)) : false;
   }
 
   /** Explicit scopes select that space's project. Legacy starts prefer Personal, then another matching space. */

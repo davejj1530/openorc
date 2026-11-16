@@ -1,4 +1,5 @@
 /** Mounts `@openorc/hosted` in the Mac's core: hands it what only this Mac has. Handlers call the package's own account. */
+import { packProject, uploadOf } from "./mac-work.js";
 import { projects, settings, type Db } from "@openorc/db";
 import { createHosted, type Hosted, type LiveSocket, type OwnSkills } from "@openorc/hosted";
 import { ACCOUNT_PROTOCOL_HEADER, ACCOUNT_PROTOCOL_VERSION } from "@openorc/protocol";
@@ -71,6 +72,10 @@ function createAccount(deps: AccountDeps): Hosted {
       save: (part, json) => (json === null ? settings.remove(deps.db, KEPT[part]) : settings.set(deps.db, KEPT[part], json)),
     },
     projects: () => projects.list(deps.db).map((project) => ({ id: project.id, name: project.name, remote: project.gitRemote })),
+    macWork: async (projectId, include) => {
+      const pack = await packProject(deps.db, projectId, include);
+      return pack ? uploadOf(pack) : null;
+    },
     fetch,
     connect: liveSocket,
     push: (push) => deps.windows.push(push),

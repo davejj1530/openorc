@@ -6,7 +6,8 @@ import { Db, projects } from "@openorc/db";
 import { MAC_FILE_BYTES } from "@openorc/git";
 import type { Hosted } from "@openorc/hosted";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MacProjects } from "./mac-projects.js";
+import { MacProjects, macOrigins } from "./mac-projects.js";
+import { HISTORY_GONE, packProject } from "./mac-work.js";
 
 const root = mkdtempSync(path.join(os.tmpdir(), "openorc-mac-projects-core-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -99,6 +100,30 @@ describe("a Personal project from a folder of this Mac", () => {
     expect(git(at, "bundle", "list-heads", file)).toBe(`${git(at, "rev-parse", "HEAD")} refs/heads/main`);
     expect(await mac.read()).toMatchObject({ projects: [{ hostedProjectId: "cloud-1", name: "sketches", localProjectId: local.id, folder: at }], folders: [] });
     expect(changed).toHaveBeenCalled();
+  });
+
+  it("keeps the commit the history arrived at, starts a Mac's work from it, and says so when the folder no longer holds it", async () => {
+    const at = folder();
+    const local = projects.insert(db, { name: "sketches", rootPath: at, gitRemote: null, defaultBranch: "main", settings: {} });
+    const { hosted } = account();
+    const mac = new MacProjects({ db, hosted: () => hosted, changed: () => {} });
+    await mac.add(local.id);
+    const head = git(at, "rev-parse", "HEAD");
+    await vi.waitFor(() => expect(macOrigins(db).get(local.id)).toEqual({ hostedProjectId: "cloud-1", head }));
+    writeFileSync(path.join(at, "b.txt"), "newer");
+    git(at, "add", "-A");
+    git(at, "commit", "-q", "-m", "Newer");
+    writeFileSync(path.join(at, "a.txt"), "edited");
+    const pack = await packProject(db, local.id, []);
+    expect(pack?.query?.base, "only what the folder has since").toBe(head);
+    expect(pack?.commits.map((one) => one.subject)).toEqual(["Newer"]);
+    expect(pack?.changed).toEqual(["a.txt"]);
+    // History rewritten past what was sent: the folder no longer holds it.
+    rmSync(path.join(at, ".git"), { recursive: true, force: true });
+    git(root, "init", "-q", "-b", "main", at);
+    git(at, "add", "-A");
+    git(at, "commit", "-q", "-m", "Again");
+    await expect(packProject(db, local.id, [])).rejects.toThrow(HISTORY_GONE);
   });
 
   it("makes nothing for a folder whose history is over the limits, and says why", async () => {

@@ -21,6 +21,8 @@ import { githubRepoOf, type Hosted } from "@openorc/hosted";
 import type { BringResult, BringState, MacProjects as MacProjectsView, MacProjectSending } from "@openorc/protocol";
 
 const FOLDERS = "mac.projects.folders";
+/** The commit each mac project's history was sent at, once it arrived: a Mac start's base is found from it. */
+const HEADS = "mac.projects.heads";
 const STILL_WORKING = "The agent is still working. Bring its work once it stops.";
 const ELSEWHERE = "This project's folder is on another Mac.";
 /** How long a bring waits for the thread to leave its machine with a save. */
@@ -30,6 +32,20 @@ const TOLD_MS = 500;
 
 type Sending = { state: MacProjectSending; abort: AbortController | null };
 
+const kept = (db: Db, key: string): Record<string, string> => {
+  try {
+    return JSON.parse(settings.get(db, key) ?? "{}") as Record<string, string>;
+  } catch {
+    return {};
+  }
+};
+
+/** Each local project this Mac made a Personal project of: that project, and the commit its history arrived at. */
+export function macOrigins(db: Db): Map<string, { hostedProjectId: string; head: string | null }> {
+  const heads = kept(db, HEADS);
+  return new Map(Object.entries(kept(db, FOLDERS)).map(([hostedProjectId, localId]) => [localId, { hostedProjectId, head: heads[hostedProjectId] ?? null }]));
+}
+
 export class MacProjects {
   /** Each mac project's history on its way from this Mac, or why it didn't go. */
   private readonly sending = new Map<string, Sending>();
@@ -38,11 +54,7 @@ export class MacProjects {
 
   /** Which local project each mac project came from, kept on this Mac. */
   private folders(): Record<string, string> {
-    try {
-      return JSON.parse(settings.get(this.deps.db, FOLDERS) ?? "{}") as Record<string, string>;
-    } catch {
-      return {};
-    }
+    return kept(this.deps.db, FOLDERS);
   }
 
   private keep(hostedProjectId: string, localProjectId: string | null): void {
@@ -50,6 +62,14 @@ export class MacProjects {
     if (localProjectId) all[hostedProjectId] = localProjectId;
     else delete all[hostedProjectId];
     settings.set(this.deps.db, FOLDERS, JSON.stringify(all));
+    if (!localProjectId) this.arrived(hostedProjectId, null);
+  }
+
+  private arrived(hostedProjectId: string, head: string | null): void {
+    const all = kept(this.deps.db, HEADS);
+    if (head) all[hostedProjectId] = head;
+    else delete all[hostedProjectId];
+    settings.set(this.deps.db, HEADS, JSON.stringify(all));
   }
 
   private personal(hosted: Hosted): string | null {
@@ -135,6 +155,7 @@ export class MacProjects {
     const ticking = setInterval(tell, TOLD_MS);
     try {
       await hosted.macProjects.sendOrigin(personal, hostedProjectId, pack.head, counted);
+      this.arrived(hostedProjectId, pack.head);
       this.sending.delete(hostedProjectId);
     } catch (error) {
       if (!abort.signal.aborted) this.sending.set(hostedProjectId, { state: { at: "failed", error: error instanceof Error ? error.message : String(error) }, abort: null });

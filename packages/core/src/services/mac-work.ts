@@ -5,6 +5,7 @@ import { projects, type Db } from "@openorc/db";
 import { git, packMacWork, type MacWorkPack } from "@openorc/git";
 import type { MacWorkUpload } from "@openorc/hosted";
 import type { MacStartPlan } from "@openorc/protocol";
+import { macOrigins } from "./mac-projects.js";
 
 /**
  * A project folder's work for a cloud thread started from it (cloud parity unit 5a), packed here before anything leaves:
@@ -14,11 +15,27 @@ import type { MacStartPlan } from "@openorc/protocol";
 export async function packProject(db: Db, projectId: string, include: readonly string[]): Promise<MacWorkPack | null> {
   const project = projects.get(db, projectId);
   if (!project) throw new Error("That project isn't on this Mac.");
-  const pack = await packMacWork(project.rootPath, { baseRef: await githubBaseRef(project.rootPath), include });
+  const pack = await packMacWork(project.rootPath, { baseRef: await baseRefOf(db, projectId, project.rootPath), include });
   if (pack.commits.length || pack.changed.length || pack.added.length || pack.held.length) return pack;
   await removePack(pack);
   return null;
 }
+
+/**
+ * What the folder's work goes beyond: for a folder made a Personal project with no remote, the commit its history
+ * arrived at, which the folder must still hold; otherwise GitHub's copy of its base branch.
+ */
+async function baseRefOf(db: Db, projectId: string, folder: string): Promise<string> {
+  const origin = macOrigins(db).get(projectId);
+  if (!origin) return githubBaseRef(folder);
+  if (!origin.head) throw new Error("This project's history hasn't reached OpenOrc Cloud yet.");
+  const held = await git(folder, ["cat-file", "-e", `${origin.head}^{commit}`], { okCodes: [0, 1, 128] });
+  if (held.code !== 0) throw new Error(HISTORY_GONE);
+  return origin.head;
+}
+
+/** A folder whose history was rewritten past what it sent when it was added: the origin is written once. */
+export const HISTORY_GONE = "This folder's history no longer meets what was sent when it was added. Remove the project and add it again.";
 
 /** GitHub's copy of the folder's base branch: the remote's own head, else its main or master. */
 async function githubBaseRef(folder: string): Promise<string> {

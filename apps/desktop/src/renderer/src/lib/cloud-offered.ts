@@ -32,6 +32,7 @@ function useDetachedProject(projectId: string): boolean {
 }
 
 function scopedHostedAccount(account: AccountStatus | undefined, current: string | null, projectId: string, project: SpaceProject | undefined): AccountStatus | undefined {
-  if (!current || account?.state !== "signed-in" || !project?.hostedProjectId || !project.repo) return account;
-  return { ...account, projects: [{ projectId, repo: project.repo, cloud: "added" }] };
+  // A project from a folder of this Mac has no repository: it is added once its Personal project is paired with it.
+  if (!current || account?.state !== "signed-in" || !project?.hostedProjectId) return account;
+  return { ...account, projects: [{ projectId, repo: project.repo ?? project.name, cloud: "added" }] };
 }

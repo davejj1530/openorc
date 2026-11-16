@@ -11,10 +11,11 @@ export function isDark(): boolean {
 }
 
 /**
- * An xterm drawn into `element` and fitted to its content. The fit measures the box xterm opens in by its border edge,
- * the size the app's border-box sizing gives it, so a box with padding would count the padding as room and draw the
- * last columns past the edge. xterm opens in a bare box of its own instead, filling `element` inside its padding,
- * which leaves with the terminal.
+ * An xterm drawn into `element` and fitted to its content. xterm opens in a bare box of its own, filling `element` inside
+ * its padding, which leaves with the terminal. Bare in two ways: the fit measures the box by its border edge, the size
+ * the app's border-box sizing gives it, so padding there would count as room for columns; and xterm measures a glyph
+ * with the letter-spacing it inherits but draws its rows with its own, so the app's text tracking there would draw each
+ * cell wider than measured. Either way the last columns would land past the edge.
  */
 export function openXterm(element: HTMLElement): { term: Xterm; fit: FitAddon } {
   const term = new Xterm({
@@ -31,7 +32,7 @@ export function openXterm(element: HTMLElement): { term: Xterm; fit: FitAddon } 
     theme: terminalTheme(getComputedStyle(element), isDark()),
   });
   const box = element.ownerDocument.createElement("div");
-  Object.assign(box.style, { width: "100%", height: "100%" });
+  Object.assign(box.style, { width: "100%", height: "100%", letterSpacing: "normal" });
   element.append(box);
   const fit = new FitAddon();
   term.loadAddon(fit);

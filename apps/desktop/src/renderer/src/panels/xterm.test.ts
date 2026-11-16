@@ -30,7 +30,7 @@ window.result = new Promise((resolve) => {
       range.setEnd(text, text.textContent.length);
       const last = range.getBoundingClientRect();
       const screen = host.querySelector(".xterm-screen").getBoundingClientRect();
-      resolve({ cols: term.cols, lastChar: range.toString(), lastRight: last.right, screenBottom: screen.bottom, inner });
+      resolve({ cols: term.cols, lastChar: range.toString(), lastRight: last.right, screenRight: screen.right, screenBottom: screen.bottom, inner });
     }));
   });
 });
@@ -67,8 +67,10 @@ it("fits a padded host so a full line's last character and the last row are insi
   writeFileSync(entry, main);
   const electron = require("electron") as unknown as string;
   const run = spawnSync(electron, [entry, file], { encoding: "utf8", timeout: 30_000 });
-  const result = JSON.parse(run.stdout) as { cols: number; lastChar: string; lastRight: number; screenBottom: number; inner: { right: number; bottom: number } };
+  const result = JSON.parse(run.stdout) as { cols: number; lastChar: string; lastRight: number; screenRight: number; screenBottom: number; inner: { right: number; bottom: number } };
   expect(result.lastChar).toBe("Z");
   expect(result.lastRight).toBeLessThanOrEqual(result.inner.right);
+  // Each character is drawn in its own cell: the line ends where xterm's screen does, never past it.
+  expect(result.lastRight).toBeLessThanOrEqual(result.screenRight + 0.5);
   expect(result.screenBottom).toBeLessThanOrEqual(result.inner.bottom);
 }, 60_000);

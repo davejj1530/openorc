@@ -1,6 +1,7 @@
 import "fake-indexeddb/auto";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FileVersion, FolderPath, WORKSPACE_ID, type FileRead, type FindResult, type Project, type RpcMethod, type RpcParams, type RpcResults, type ThreadSummary } from "@openorc/protocol";
 import { NewFileDialog } from "../dialogs/NewFileDialog";
@@ -16,6 +17,7 @@ import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 import { useRouter } from "../lib/router";
 import type { CodeEditorProps } from "./code-editor";
+import { Composer } from "./Composer";
 import { Panel } from "./Panel";
 
 vi.mock("../lib/window", () => ({ useTrafficLights: () => false, useWindowsControls: () => false }));
@@ -610,4 +612,61 @@ it("shows ignored entries dimmed, beside the rest", async () => {
   expect((await row(".github")).classList.contains("file-tree-ignored")).toBe(false);
   fireEvent.click(await screen.findByRole("treeitem", { name: ".env" }));
   expect(await screen.findByRole("treeitem", { name: ".env", selected: true })).toBeTruthy();
+});
+
+it("drags a file or folder from the tree into the conversation's composer as its path", async () => {
+  useLayout.setState({ panelOpen: true });
+  function Conversation() {
+    const [value, setValue] = useState("");
+    return (
+      <Composer
+        value={value}
+        onChange={setValue}
+        onSubmit={async () => {}}
+        placeholder="Message"
+        model={null}
+        onModel={() => {}}
+        mode="act"
+        onMode={() => {}}
+        permission="trusted"
+        onPermission={() => {}}
+        location={{ label: null, branch: null }}
+        fileSearch={{ kind: "thread", id: thread.id }}
+      />
+    );
+  }
+  render(
+    <>
+      <Window />
+      <QueryClientProvider client={queryClient}>
+        <Conversation />
+      </QueryClientProvider>
+    </>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Files" }));
+  fireEvent.click(await screen.findByRole("treeitem", { name: "src" }));
+  const composer = document.querySelector(".composer-shell")!;
+  const drag = (row: HTMLElement) => {
+    const data = new Map<string, string>();
+    const dataTransfer = {
+      effectAllowed: "all",
+      dropEffect: "none",
+      items: [],
+      files: [],
+      types: [] as string[],
+      setData: (type: string, value: string) => data.set(type, value),
+      getData: (type: string) => data.get(type) ?? "",
+    };
+    Object.defineProperty(dataTransfer, "types", { get: () => [...data.keys()] });
+    const handle = row.querySelector(".file-tree-row")!;
+    fireEvent.dragStart(handle, { dataTransfer });
+    expect(dataTransfer.effectAllowed).toBe("copy");
+    fireEvent.dragEnter(composer, { dataTransfer });
+    fireEvent.dragOver(composer, { dataTransfer });
+    fireEvent.drop(composer, { dataTransfer });
+    fireEvent.dragEnd(handle, { dataTransfer });
+  };
+  drag(await screen.findByRole("treeitem", { name: "cart.ts" }));
+  drag(screen.getByRole("treeitem", { name: "src" }));
+  expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" }).value).toBe("src/cart.ts src/ ");
 });

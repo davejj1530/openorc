@@ -196,7 +196,7 @@ export function Composer(props: ComposerProps) {
     removeAttachments(submission.attachments);
     acknowledge();
   }, [submission, value, onChange, acknowledge, removeAttachments]);
-  const drop = useComposerDrop((dropped) => void addFiles(dropped));
+  const drop = useComposerDrop((dropped) => void addFiles(dropped), props.fileSearch);
   const attachmentBlock = attachments.length > 0 ? props.attachmentsDisabledReason : null;
   const canSend = Boolean(props.allowEmpty || props.value.trim() || attachments.length > 0) && !props.busy && !submitting && !props.disabledReason && !attachmentBlock && uploading === 0;
 
@@ -220,8 +220,6 @@ export function Composer(props: ComposerProps) {
       removeAcceptedAttachments(props.draftKey, sent);
     });
   };
-
-  const pickFiles = () => chooseFiles((chosen) => void addFiles(chosen));
 
   const stopInsteadOfSend = actions.primary === "stop";
   const stopping = props.stopAction?.pending ?? interrupt.isPending;
@@ -257,7 +255,7 @@ export function Composer(props: ComposerProps) {
           </button>
         </p>
       ) : null}
-      <div ref={shell} className="composer-shell" data-dragging={drop.dragging || undefined} {...drop.handlers}>
+      <div ref={shell} className="composer-shell" data-dragging={drop.hover !== null || undefined} {...drop.handlers}>
         {attachments.length > 0 || uploading > 0 ? (
           <div className="composer-attachments">
             {attachments.map((attachment) => (
@@ -289,6 +287,7 @@ export function Composer(props: ComposerProps) {
             value={props.value}
             onChange={props.onChange}
             onSubmit={(duringTurn) => submit(actions.sendsNow || duringTurn)}
+            handle={drop.input}
             onFiles={addFiles}
             disabled={Boolean(props.busy || submitting)}
             placeholder={props.placeholder}
@@ -314,7 +313,7 @@ export function Composer(props: ComposerProps) {
         <div className="composer-bar">
           {/* Attach, then where and how the agent works. Chips truncate before the end group moves. */}
           <div className="composer-tools">
-            <ComposerAttach onAttach={pickFiles} disabledReason={props.attachmentsDisabledReason} />
+            <ComposerAttach onAttach={() => chooseFiles((chosen) => void addFiles(chosen))} disabledReason={props.attachmentsDisabledReason} />
             {composerDestination(props)}
             {composerModelControl(props)}
             {composerModeControl(props)}
@@ -366,7 +365,7 @@ export function Composer(props: ComposerProps) {
             />
           </div>
         </div>
-        {drop.dragging ? <ComposerDropZone count={drop.count} /> : null}
+        {drop.hover ? <ComposerDropZone hover={drop.hover} /> : null}
       </div>
     </div>
   );

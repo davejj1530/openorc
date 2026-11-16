@@ -1,9 +1,10 @@
 import { commandWordAt, useCommandWord, type SkillListNotice } from "@openorc/client";
 import type { FileScope, UsableConnector } from "@openorc/protocol";
-import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
+import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from "react";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
 import { filterMentions, insertMention, mentionQueryAt, type MentionEntry } from "../lib/composer-mentions";
+import { insertReference } from "../lib/file-drag";
 import type { SlashCommand } from "./Composer";
 import { asideMatching, commandRows, firstPickable, matchingCommands, matchingConnectors, mentionRows, nextPickable, suggestionKey, useConnectorWord, type SuggestionRow } from "./composer-commands";
 import { ComposerSuggestions } from "./ComposerSuggestions";
@@ -29,6 +30,15 @@ interface ComposerInputProps {
   onConnectorsWanted?: () => void;
   suggestionAnchor: RefObject<HTMLDivElement | null>;
   suggestionSide: "top" | "bottom";
+  /** What the composer around it can do to the prompt. */
+  handle?: Ref<ComposerInputHandle>;
+}
+
+export interface ComposerInputHandle {
+  /** False while the prompt can't be written in, as while a message sends. */
+  writable: boolean;
+  /** Put a reference, such as a file's path, where the caret last was, a word of its own, and the caret after it. */
+  insert: (reference: string) => void;
 }
 
 /** What `@` says while the connector list is read for the first time, which starts the agents' servers. */
@@ -104,6 +114,15 @@ export function ComposerInput(props: ComposerInputProps) {
     },
     [],
   );
+  useImperativeHandle(props.handle, () => ({
+    writable: !disabled,
+    insert: (reference: string) => {
+      const at = textareaRef.current?.selectionEnd ?? value.length;
+      const next = insertReference(value, at, reference);
+      onChange(next.text);
+      placeCaret(next.caret);
+    },
+  }));
   const suggestions: SuggestionRow[] = useMemo(() => {
     if (memberQuery && memberMatches.length) {
       return memberMatches.map((entry) => ({

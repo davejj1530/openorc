@@ -31,6 +31,7 @@ import { TeamChat } from "./chat.js";
 import { Follower } from "./follow.js";
 import { Files } from "./files.js";
 import { Skills, type OwnSkills } from "./skills.js";
+import { ProjectEnvironment } from "./environment.js";
 import type { HostedNotice } from "./notices.js";
 import { Session } from "./session.js";
 import { Threads } from "./threads.js";
@@ -215,6 +216,8 @@ export interface Hosted {
   readonly chat: TeamChat;
   readonly tasks: OnlineTasks;
   readonly files: Files;
+  /** A cloud project's own environment variables, read by name and set by value. */
+  readonly environment: ProjectEnvironment;
   /** Reads the stored session and the kept answers, and connects when signed in. Never rejects: no session is signed out. */
   start(): Promise<void>;
   /** The device woke or the network came back: connect now instead of at the next retry. */
@@ -297,6 +300,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     chat,
     tasks,
     files,
+    environment: new ProjectEnvironment({ session, now: deps.now }),
     start: async () => {
       await account.start();
       threads.start();

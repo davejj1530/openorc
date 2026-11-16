@@ -66,3 +66,4 @@ export * from "./organization-storage.js";
 export * from "./online-tasks.js";
 export * from "./online-task-execution.js";
 export * from "./hosted-files.js";
+export * from "./hosted-environment.js";

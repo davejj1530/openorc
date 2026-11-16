@@ -49,6 +49,7 @@ export const HostedCapabilities = z.object({
     terminal: availability,
     workKeeping: availability,
     httpsConnectors: availability,
+    projectEnvironment: availability,
   }),
 });
 export type HostedCapabilities = z.infer<typeof HostedCapabilities>;

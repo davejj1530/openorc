@@ -25,6 +25,7 @@ import { StandInTasks } from "./stand-in-tasks.js";
 import { StandInSeats } from "./stand-in-seats.js";
 import { StandInUploads } from "./stand-in-uploads.js";
 import { StandInSkills } from "./stand-in-skills.js";
+import { StandInEnvironment } from "./stand-in-environment.js";
 import type { StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInOrganizations } from "./stand-in-organizations.js";
 import { StandInChat, socketAnswers } from "./stand-in-chat.js";
@@ -37,6 +38,8 @@ export interface StandIn {
   uploads: StandInUploads;
   /** A person's own skills as the server keeps them, behind the `skills` capability of `threadFiles`. */
   skills: StandInSkills;
+  /** Projects' own environment variables as the server keeps them, behind the `projectEnvironment` capability of `threadFiles`. */
+  environment: StandInEnvironment;
   tasks: StandInTasks;
   chat: StandInChat;
   /** Its origin, for `HostedDeps.server` or `OpenOrcOptions.accountServer`. */
@@ -291,13 +294,13 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const uploads = new StandInUploads({ spaces, chat, origin: () => `http://127.0.0.1:${port}` });
   chat.attachFiles = (input) => uploads.attachChat(input);
   hosted.files.uploads = uploads;
-  const skills = new StandInSkills({ spaces, available: () => hosted.files.capabilities?.["skills"]?.available === true });
+  const parity = parityStandIns(spaces, () => hosted.files.capabilities);
   const answerSocket = socketAnswers(hosted, chat);
 
   const server = transportServer({ connections, requests, holder, sockets, answerSocket, answer });
 
   async function answer(request: IncomingMessage, response: ServerResponse): Promise<void> {
-    if ((await uploads.raw(request, response, holder)) || (await skills.answer(request, response, holder))) return;
+    if ((await uploads.raw(request, response, holder)) || (await parity.skills.answer(request, response, holder))) return;
     const { method, path, query, body, token, space } = await asked(request);
     const who = holder(token);
     requests.push({ method, path, authorized: who !== null });
@@ -307,6 +310,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
         return (
           seats.route({ method, path, query, space }, who, body) ??
           tasks.route({ method, path, query, space }, who, body) ??
+          parity.environment.route({ method, path, query, space }, who, body) ??
           chat.route({ method, path, query, space }, who, body) ??
           (await uploads.route(method, path, who, body, space)) ??
           (await organizations.route({ method, path, query, space }, who, body)) ??
@@ -334,7 +338,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     tasks,
     chat,
     uploads,
-    skills,
+    ...parity,
     signInPage: (url, email) => appSignIns.signInPage(url, email.toLowerCase()),
     appSignIns,
     ...paymentsFace(billing, payments),
@@ -383,6 +387,12 @@ function serverLifetime({ server, port, connections, peers, admit }: { server: R
       serving = false;
     },
   };
+}
+
+/** What a cloud thread brings from the Mac, each behind its capability as the server keeps it behind its switch. */
+function parityStandIns(spaces: StandInSpaces, capabilities: () => StandInThreadFiles["capabilities"]) {
+  const on = (feature: string) => () => capabilities()?.[feature]?.available === true;
+  return { skills: new StandInSkills({ spaces, available: on("skills") }), environment: new StandInEnvironment({ spaces, available: on("projectEnvironment") }) };
 }
 
 function teamAdder(spaces: StandInSpaces): StandIn["addTeam"] {

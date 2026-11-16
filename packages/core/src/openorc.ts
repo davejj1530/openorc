@@ -648,7 +648,7 @@ export class OpenOrc {
       createSlackHandlers({ slack: this.slack, invalidate }),
       createCloudHandlers(),
       createClaudeAccountHandlers(this.claudeAccounts),
-      createHostedHandlers(this.account, this.hostedFiles),
+      createHostedHandlers(this.account, this.hostedFiles, this.db),
       hostedParityHandlers,
       threadCollaborationHandlers,
       createAccountPersonHandlers(() => this.account),

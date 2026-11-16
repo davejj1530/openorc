@@ -2,6 +2,7 @@ import { z } from "zod";
 import { organizationBillingRpcParams, organizationSeatRpcParams, type OrganizationBillingRpcResults, type OrganizationSeatRpcResults } from "./organization-billing.js";
 import { organizationStorageRpcParams, type OrganizationStorageRpcResults } from "./organization-storage.js";
 import { hostedFilesRpcParams, type HostedFilesRpcResults } from "./hosted-files.js";
+import { hostedEnvironmentRpcParams, type HostedEnvironmentRpcResults } from "./hosted-environment.js";
 import { teamChatRpcParams, type TeamChatRpcResults } from "./team-chat.js";
 import { onlineTaskRpcParams, type OnlineTaskRpcResults } from "./online-tasks.js";
 import { onlineTaskExecutionRpcParams, type OnlineTaskExecutionRpcResults } from "./online-task-execution.js";
@@ -87,6 +88,7 @@ const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 export const rpcParams = {
   ...threadSendRpcParams,
   ...hostedFilesRpcParams,
+  ...hostedEnvironmentRpcParams,
   ...organizationBillingRpcParams,
   ...organizationSeatRpcParams,
   ...organizationStorageRpcParams,
@@ -568,6 +570,7 @@ export interface ResolvedExtraction {
 export interface RpcResults
   extends
     HostedFilesRpcResults,
+    HostedEnvironmentRpcResults,
     OrganizationBillingRpcResults,
     OrganizationSeatRpcResults,
     OrganizationStorageRpcResults,

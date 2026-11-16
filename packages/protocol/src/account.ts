@@ -213,8 +213,6 @@ export const accountRpcParams = {
   "account.github.cancel": z.object({}).strict(),
   /** Unlinks the person's GitHub account. What the app reaches on GitHub is changed on GitHub. */
   "account.github.disconnect": z.object({}).strict(),
-  /** Adds this Mac project's GitHub repository to the person's space as a cloud project. */
-  "account.projects.add": z.object({ projectId: z.string().min(1).max(200) }).strict(),
   /** Opens a checkout or the billing portal in the browser. What was bought arrives by itself in `account.status`. */
   "account.billing.open": BillingPageInput,
   /** The person left the screen they paid from: the app stops watching for the purchase and waits for the server's word. */

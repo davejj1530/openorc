@@ -81,6 +81,16 @@ export class StandInSpaces {
     return id;
   }
 
+  /** Takes a project out of a space, as DELETE /projects/:id does. Answers whether it was there. */
+  removeProject(space: string, id: string): boolean {
+    const before = this.projectsIn(space);
+    this.#projects.set(
+      space,
+      before.filter((project) => project.id !== id),
+    );
+    return before.some((project) => project.id === id);
+  }
+
   /** A repository made a project of a space, or the project it already is, as POST /projects answers. */
   ensureProject(space: string, repository: { fullName: string; repoId: number; defaultBranch: string }): StandInProject {
     const known = this.projectsIn(space).find((project) => project.repoId === repository.repoId);

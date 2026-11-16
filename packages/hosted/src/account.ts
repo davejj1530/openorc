@@ -194,17 +194,6 @@ export class Account implements HostedAccount {
     return this.#github.disconnect();
   }
 
-  /** The repository goes to the session's active space, the personal one unless the person chose another; the projects are read again. */
-  async addProject(projectId: string): Promise<void> {
-    const repo = githubRepoOf(this.deps.projects().find((project) => project.id === projectId)?.remote ?? null);
-    if (!repo) throw new Refused("This project has no GitHub repository.");
-    const found = this.#heard?.github?.repositories.find((repository) => repository.fullName.toLowerCase() === repo);
-    if (!found) throw new Refused(`GitHub doesn't let OpenOrc read ${repo} yet.`);
-    await this.deps.session.request(ROUTES.addProjects, { repositories: [{ installationId: found.installationId, repoId: found.repoId }] });
-    await this.deps.cloud.reread();
-    this.#announce();
-  }
-
   openBilling(page: BillingPage): Promise<void> {
     return this.#paying.open(page);
   }

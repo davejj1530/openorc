@@ -101,15 +101,21 @@ describe("GitHub on OpenOrc Cloud", () => {
 });
 
 describe("a cloud project and a new thread on it", () => {
-  it("adds a Mac project's repository as a cloud project, and refuses one GitHub doesn't let OpenOrc read, in words", async () => {
+  it("adds a Mac project's repository to the person's own cloud and takes it out again", async () => {
     stand.github.grant(ADA, ["acme/api"]);
     const hosted = await signedIn();
-    await expect(hosted.account.addProject("mac-api")).rejects.toThrow("GitHub doesn't let OpenOrc read acme/api yet.");
     await hosted.account.connectGithub();
     await vi.waitFor(() => expect(status(hosted).projects[0]?.cloud).toBe("addable"));
-    await hosted.account.addProject("mac-api");
-    expect(status(hosted).projects[0]).toEqual({ projectId: "mac-api", repo: "acme/api", cloud: "added" });
-    await expect(hosted.account.addProject("mac-local")).rejects.toThrow("This project has no GitHub repository.");
+    const spaces = hosted.spaces.status();
+    if (spaces.state !== "ready") throw new Error("The spaces must be read.");
+    const personal = spaces.personalSpaceId;
+    const [repository] = (await hosted.spaces.setup.repositories(personal)).repositories;
+    const [added] = await hosted.spaces.setup.addProjects({ spaceId: personal, repositories: [{ installationId: repository!.installationId, repoId: repository!.repoId }] });
+    expect(added).toMatchObject({ state: "added" });
+    const inCloud = async () => (await hosted.spaces.projects(personal)).find((project) => project.repo === "acme/api")?.hostedProjectId ?? null;
+    await vi.waitFor(async () => expect(await inCloud()).not.toBeNull());
+    await hosted.spaces.setup.removeProject({ spaceId: personal, projectId: (await inCloud())! });
+    await vi.waitFor(async () => expect(await inCloud()).toBeNull());
   });
 
   it("starts a thread for every agent OpenOrc Cloud runs, ready, with the prompt as its first message, and lists it at once", async () => {

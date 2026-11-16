@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
-import { CloudProjects, GithubRow } from "./settings-cloud-openorc-projects";
+import { GithubRow } from "./settings-cloud-openorc-projects";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
@@ -94,20 +94,4 @@ it("shows who GitHub is connected as and what it reaches, with Disconnect, and n
   cleanup();
   const { container } = show(<GithubRow account={{ ...account, github: { configured: false, login: null, installedOn: [], repositories: [] } }} />);
   expect(container.textContent).toBe("");
-});
-
-it("lists the projects on OpenOrc Cloud and adds another, naming why GitHub keeps one out", async () => {
-  const projects: SignedIn["projects"] = [
-    { projectId: "mac-api", repo: "acme/api", cloud: "added" },
-    { projectId: "mac-docs", repo: "acme/docs", cloud: "unreadable" },
-    { projectId: "mac-site", repo: "acme/site", cloud: "addable" },
-  ];
-  show(<CloudProjects account={{ ...account, projects }} active />);
-  await waitFor(() => expect(screen.getByText("api")).toBeTruthy());
-  expect(screen.getByText("Added")).toBeTruthy();
-  const keptOut = screen.getByRole("option", { name: "docs · GitHub doesn't let OpenOrc read it yet" }) as HTMLOptionElement;
-  expect(keptOut.disabled).toBe(true);
-  expect((screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value).toBe("mac-site");
-  fireEvent.click(screen.getByRole("button", { name: "Add" }));
-  await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.projects.add", { projectId: "mac-site" }));
 });

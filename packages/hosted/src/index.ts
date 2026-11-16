@@ -140,8 +140,6 @@ export interface HostedAccount {
   cancelGithub(): void;
   /** Unlinks the person's GitHub account. */
   disconnectGithub(): Promise<void>;
-  /** Adds a Mac project's GitHub repository to the person's space as a cloud project. Rejects in words when GitHub doesn't let OpenOrc read it. */
-  addProject(projectId: string): Promise<void>;
   /** Opens a checkout or the billing portal in the browser; what it was for shows in `status()` once the server has it. */
   openBilling(page: BillingPage): Promise<void>;
   /** Stops watching for a purchase more often than the server's word; `status().paying` ends. */
@@ -180,6 +178,7 @@ export interface HostedSpaces {
     repositories(spaceId: string): Promise<RpcResults["organization.repositories"]>;
     connect(spaceId: string, choice?: Omit<RpcParams<"organization.github.connect">, "spaceId">): Promise<RpcResults["organization.github.connect"]>;
     addProjects(input: RpcParams<"organization.projects.add">): Promise<RpcResults["organization.projects.add"]>;
+    removeProject(input: RpcParams<"organization.projects.remove">): Promise<RpcResults["organization.projects.remove"]>;
   };
   status(): SpacesStatus;
   projects(spaceId: string): Promise<SpaceProject[]>;

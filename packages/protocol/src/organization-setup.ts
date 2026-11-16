@@ -36,6 +36,8 @@ export const organizationSetupParams = {
   "organization.repositories": z.object({ spaceId: SpaceId }).strict(),
   "organization.github.connect": GithubConnectChoice.extend({ spaceId: SpaceId }),
   "organization.projects.add": z.object({ spaceId: SpaceId, repositories: z.array(repository).min(1).max(50) }).strict(),
+  /** Takes a project out of a space's cloud, and its cloud threads with it. */
+  "organization.projects.remove": z.object({ spaceId: SpaceId, projectId: SpaceId }).strict(),
 };
 export interface OrganizationSetupResults {
   "spaces.create": { spaceId: string; logoError: string | null };
@@ -43,4 +45,5 @@ export interface OrganizationSetupResults {
   "organization.repositories": OrganizationRepositories;
   "organization.github.connect": OrganizationRepositories;
   "organization.projects.add": OrganizationProjectAdded[];
+  "organization.projects.remove": Record<string, never>;
 }

@@ -23,7 +23,6 @@ export function createAccountHandlers(
   | "account.github.connect"
   | "account.github.cancel"
   | "account.github.disconnect"
-  | "account.projects.add"
   | "account.billing.open"
   | "account.billing.leave"
   | "account.offers"
@@ -46,7 +45,6 @@ export function createAccountHandlers(
     "account.github.connect": (input) => after((a) => a.connectGithub(input)),
     "account.github.cancel": () => after(async (a) => a.cancelGithub()),
     "account.github.disconnect": () => after((a) => a.disconnectGithub()),
-    "account.projects.add": ({ projectId }) => after((a) => a.addProject(projectId)),
     "account.billing.open": (page) => after((a) => a.openBilling(page)),
     "account.billing.leave": () => after(async (a) => a.leaveBilling()),
     "account.offers": () => account?.offers() ?? null,

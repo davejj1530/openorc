@@ -2,7 +2,7 @@ import { HOSTED_AGENTS, type AccountStatus } from "@openorc/protocol";
 import { Select } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Failure } from "./settings-secret-field";
-import { CloudProjects, GithubRow } from "./settings-cloud-openorc-projects";
+import { GithubRow } from "./settings-cloud-openorc-projects";
 import { AgentSignInRow } from "./settings-cloud-openorc-sign-ins";
 import { Field, Section } from "./settings-shared";
 
@@ -15,7 +15,7 @@ function proAccount(account: AccountStatus | undefined): ProAccount | null {
 
 /**
  * OpenOrc Cloud for a Pro person: where their threads run, when the server runs them in more than one place, each
- * agent's sign-in there with the ways to sign it in, their GitHub, and this Mac's projects there. The server's answers
+ * agent's sign-in there with the ways to sign it in, and their GitHub. The server's answers
  * are the state.
  */
 export function OpenOrcCloudSection({ active }: { active: boolean }) {
@@ -38,7 +38,6 @@ export function OpenOrcCloudSection({ active }: { active: boolean }) {
       ) : null}
       {account.signIns ? HOSTED_AGENTS.map((agent) => <AgentSignInRow key={agent} agent={agent} rows={account.signIns!.filter((row) => row.agent === agent)} work={account.signingIn[agent]} />) : null}
       <GithubRow account={account} />
-      <CloudProjects account={account} active={active} />
       <Failure error={choose.error} />
     </Section>
   );

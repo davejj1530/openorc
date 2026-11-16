@@ -119,6 +119,16 @@ export class OrganizationSetup {
     return this.repositories(spaceId);
   }
 
+  /** Takes one project out of the space's cloud; the server deletes its cloud threads with it. */
+  async removeProject({ spaceId, projectId }: RpcParams<"organization.projects.remove">): Promise<Record<string, never>> {
+    const generation = this.deps.session.generation;
+    await this.deps.session.in(spaceId).request(ROUTES.removeProject(projectId));
+    await this.deps.refresh();
+    this.#assert(generation);
+    this.deps.push({ type: "invalidate", keys: ["projects", "spaces", `repositories:${spaceId}`] });
+    return {};
+  }
+
   async addProjects({ spaceId, repositories }: RpcParams<"organization.projects.add">): Promise<OrganizationProjectAdded[]> {
     const generation = this.deps.session.generation;
     const results: OrganizationProjectAdded[] = [];

@@ -234,6 +234,7 @@ export const ROUTES = {
   projects: route("GET", "/projects", z.array(wireProject)),
   /** Makes repositories projects of the session's active space, its personal one unless the person chose another. */
   addProjects: route("POST", "/projects", z.array(wireProject)),
+  removeProject: (id: string) => route("DELETE", `/projects/${encodeURIComponent(id)}`, null),
   github: route("GET", "/github", wireGithub),
   githubLink: route("GET", "/github/account", wireGithubLink),
   githubRepositories: route("GET", "/github/repositories", z.array(wireGithubRepository)),

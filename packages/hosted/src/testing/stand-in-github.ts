@@ -75,10 +75,11 @@ export class StandInGithub {
 
   route(method: string, path: string, who: string, body: Record<string, unknown>, named: string | null = null): Reply | null {
     const person = this.#person(who);
-    if (!(path.startsWith("/github") || (method === "POST" && path === "/projects"))) return null;
+    const removing = method === "DELETE" && /^\/projects\/[^/]+$/.test(path);
+    if (!(path.startsWith("/github") || (method === "POST" && path === "/projects") || removing)) return null;
     const space = this.spaces.resolve(who, named);
     if (typeof space !== "string") return space;
-    if (["/github", "/github/repositories", "/github/install/start", "/projects"].includes(path) && space !== `personal-${who}` && this.spaces.member(space, who)?.role !== "admin")
+    if ((removing || ["/github", "/github/repositories", "/github/install/start", "/projects"].includes(path)) && space !== `personal-${who}` && this.spaces.member(space, who)?.role !== "admin")
       return { status: 403, body: { message: "Only an admin can do that." } };
     const installed = [...this.#installations.values()].filter((installation) => installation.space === space);
     const routes: Record<string, () => Reply> = {
@@ -104,6 +105,8 @@ export class StandInGithub {
       },
       "POST /projects": () => this.#addProjects(who, body, space),
     };
+    const removed = method === "DELETE" ? /^\/projects\/([^/]+)$/.exec(path)?.[1] : undefined;
+    if (removed) return this.#removeProject(who, decodeURIComponent(removed), space);
     return routes[`${method} ${path}`]?.() ?? null;
   }
 
@@ -178,6 +181,12 @@ export class StandInGithub {
     });
     this.projectsChanged(who);
     return { status: 200, body: { outcome: "connected" } };
+  }
+
+  #removeProject(who: string, id: string, space: string): Reply {
+    if (!this.spaces.removeProject(space, id)) return { status: 404, body: { message: "That project isn't here.", statusCode: 404 } };
+    this.projectsChanged(who);
+    return { status: 204, body: null };
   }
 
   #addProjects(who: string, body: Record<string, unknown>, space: string): Reply {

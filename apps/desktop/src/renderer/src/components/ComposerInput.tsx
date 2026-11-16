@@ -1,6 +1,6 @@
 import { commandWordAt, useCommandWord, type SkillListNotice } from "@openorc/client";
 import type { FileScope, UsableConnector } from "@openorc/protocol";
-import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from "react";
+import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type Ref, type RefObject } from "react";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
 import { filterMentions, insertMention, mentionQueryAt, type MentionEntry } from "../lib/composer-mentions";
@@ -70,6 +70,17 @@ function suggestionLabel(members: boolean, mention: boolean): string {
   return "Commands";
 }
 
+/**
+ * Chromium starts the caret of a textarea that mounts holding a restored draft before the draft, focused or not, so
+ * typing or a dropped file would land in front of it. A draft is picked up at its end.
+ */
+function useCaretAtEnd(textareaRef: RefObject<HTMLTextAreaElement | null>) {
+  useLayoutEffect(() => {
+    const input = textareaRef.current;
+    input?.setSelectionRange(input.value.length, input.value.length);
+  }, [textareaRef]);
+}
+
 /** Owns text interaction: suggestions, selection, focus and the highlight mirror. */
 export function ComposerInput(props: ComposerInputProps) {
   const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, fileSearch, mentions, commands, onCommandsWanted, connectors, onConnectorsWanted } = props;
@@ -79,6 +90,7 @@ export function ComposerInput(props: ComposerInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
   const listId = useId();
+  useCaretAtEnd(textareaRef);
   useEffect(() => {
     if (autoFocus) textareaRef.current?.focus();
   }, [autoFocus]);

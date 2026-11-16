@@ -82,6 +82,13 @@ it("mentions a file dragged from its own folder at the caret, a word of its own,
   expect(document.querySelector(".composer-drop-zone")).toBeNull();
 });
 
+it("mentions a file dropped on a restored draft the prompt was never clicked in at the draft's end", () => {
+  mount({ value: "look at" });
+  expect(message().selectionEnd).toBe("look at".length);
+  expect(dragOnto(here, "src/cart.ts").accepted).toBe(true);
+  expect(message().value).toBe("look at src/cart.ts ");
+});
+
 it("mentions a folder with its trailing slash", () => {
   mount();
   expect(dragOnto(here, "src/lib", true).label).toBe("Release to mention lib/");

@@ -1,7 +1,9 @@
 import { canStopCommands, personFirst, queuedBy, startBlock, threadTogether, togetherActivity, withOthers, writesAsCreator } from "@openorc/client";
-import { defaultHarnessId, harnessShortName, type ThreadSummary } from "@openorc/protocol";
+import { defaultHarnessId, harnessShortName, type BackgroundCommand, type ThreadSummary } from "@openorc/protocol";
 import type { RefObject } from "react";
 import { useRpcMutation } from "../lib/client";
+import { currentPage, usePanelSessions } from "../lib/panel-tabs";
+import { terminalNames } from "../panels/cloud-terminal-claims";
 import { BackgroundCommands } from "./BackgroundCommands";
 import type { ComposerHandle } from "./Composer";
 import { MessageQueue, type QueuedBy } from "./MessageQueue";
@@ -21,6 +23,7 @@ export function useThreadControls(
   const sendQueued = useRpcMutation("threads.sendQueued");
   const startQueued = useRpcMutation("threads.startQueued");
   const stopCommand = useRpcMutation("threads.stopCommand");
+  const background = useNamedCommands(thread);
   const queued = thread?.queued ?? [];
   const queue = thread ? (
     <MessageQueue
@@ -48,14 +51,23 @@ export function useThreadControls(
     />
   ) : null;
   const commands = thread ? (
-    <BackgroundCommands
-      commands={thread.backgroundCommands ?? []}
-      pending={stopCommand.isPending}
-      canStop={canStopCommands(thread)}
-      onStop={(commandId) => stopCommand.mutate({ id: thread.id, commandId })}
-    />
+    <BackgroundCommands commands={background} pending={stopCommand.isPending} canStop={canStopCommands(thread)} onStop={(commandId) => stopCommand.mutate({ id: thread.id, commandId })} />
   ) : null;
   return { queue, commands, composer, error: sendQueued.error ?? startQueued.error ?? stopCommand.error ?? unqueue.error };
+}
+
+/** The thread's background commands, each cloud terminal named as its Terminal tab here is, so no two read alike. */
+function useNamedCommands(thread: ThreadSummary | null): BackgroundCommand[] {
+  const session = usePanelSessions((state) => (thread ? state.sessions[`thread:${thread.id}`] : undefined));
+  const commands = thread?.backgroundCommands ?? [];
+  const terminals = commands.flatMap((command) => (command.id.startsWith("terminal-") ? [command.id] : []));
+  if (!thread || terminals.length === 0) return commands;
+  const shells = (session?.tabs ?? []).flatMap((tab) => {
+    const page = currentPage(tab);
+    return page.kind === "tool" && page.tool === "terminal" ? [page.shell ?? null] : [];
+  });
+  const names = terminalNames(thread.id, shells, terminals);
+  return commands.map((command) => ({ ...command, description: names.get(command.id) ?? command.description }));
 }
 
 /**

@@ -5,10 +5,11 @@
  *
  * A skill is named by the SHA-256 of its pack, and a pack is read from the disk as it is sent, never held whole. A
  * skill whose files are as they were (their paths, sizes, times and whether they run) keeps the digest it had, so an
- * unchanged skill is not read again. Nothing is left out for its size.
+ * unchanged skill is not read again. Nothing is left out for its size. A skill that can't be read is left out, with its
+ * cause in plain words (`leftOut`), and the turn goes with the person's other skills.
  */
 import { createHash } from "node:crypto";
-import { open, readdir, realpath, stat } from "node:fs/promises";
+import { lstat, open, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { listSkills } from "@openorc/agents";
 import type { OwnSkill } from "@openorc/hosted";
@@ -23,41 +24,45 @@ const CHUNK_BYTES = 256 * 1024;
 /** One file of a skill as it stood when it was listed. */
 type SkillFile = { rel: string; at: string; bytes: number; modified: number; runs: boolean };
 
-/**
- * A skill this Mac could not read, with the file in it that could not be, by its place in the skill, or none for the
- * skill's folder itself. Its words name the two ways on that the app already has.
- */
+/** A skill left out of the cloud's set because this Mac could not read it, and why, in plain words. */
+export type LeftOutSkill = { name: string; cause: string };
+
+/** A skill this Mac could not read, with why: its folder, a file or folder in it, or a link in it to nothing. */
 class SkillUnreadable extends Error {
-  constructor(name: string, rel: string | null) {
-    super(
-      rel
-        ? `Your skill ${name} couldn't be read on this Mac (${rel}). Fix that file, or turn the skill off in Settings > Skills, then send again.`
-        : `Your skill ${name} couldn't be read on this Mac. Fix its folder, or turn the skill off in Settings > Skills, then send again.`,
-    );
+  constructor(readonly why: string) {
+    super(why);
   }
+}
+
+/** Why an entry of a skill could not be read: a link to something gone, or the entry itself. */
+async function unreadable(at: string, rel: string, kind: "file" | "folder"): Promise<SkillUnreadable> {
+  const link = await lstat(at).catch(() => null);
+  if (link?.isSymbolicLink()) return new SkillUnreadable(`its link ${rel} points to something that is no longer there.`);
+  return new SkillUnreadable(`its ${kind} ${rel} can't be read.`);
 }
 
 const changed = (name: string) => new Error(`The skill ${name} changed while it was being sent. Send again.`);
 
-/** Every file of the skill `name` in `folder`, links read through, in the order of their paths. A folder met twice is walked once. */
-async function filesOf(name: string, folder: string): Promise<SkillFile[]> {
+/** Every file of the skill in `folder`, links read through, in the order of their paths. A folder met twice is walked once. */
+async function filesOf(folder: string): Promise<SkillFile[]> {
   const files: SkillFile[] = [];
   const walked = new Set<string>();
   const walk = async (dir: string): Promise<void> => {
-    const real = await realpath(path.join(folder, dir)).catch(() => {
-      throw new SkillUnreadable(name, dir || null);
+    const real = await realpath(path.join(folder, dir)).catch(async (error: NodeJS.ErrnoException) => {
+      if (!dir) throw new SkillUnreadable(error.code === "ENOENT" ? "its folder is no longer there." : "its folder can't be read.");
+      throw await unreadable(path.join(folder, dir), dir, "folder");
     });
     if (walked.has(real)) return;
     walked.add(real);
     const entries = await readdir(real).catch(() => {
-      throw new SkillUnreadable(name, dir || null);
+      throw new SkillUnreadable(dir ? `its folder ${dir} can't be read.` : "its folder can't be read.");
     });
     for (const entry of entries) {
       if (LEFT_OUT.has(entry)) continue;
       const rel = dir ? `${dir}/${entry}` : entry;
       const at = path.join(real, entry);
-      const info = await stat(at).catch(() => {
-        throw new SkillUnreadable(name, rel);
+      const info = await stat(at).catch(async () => {
+        throw await unreadable(at, rel, "file");
       });
       if (info.isDirectory()) await walk(rel);
       else if (info.isFile()) files.push({ rel, at, bytes: info.size, modified: info.mtimeMs, runs: (info.mode & 0o111) !== 0 });
@@ -100,6 +105,8 @@ async function* packOf(name: string, files: readonly SkillFile[]): AsyncGenerato
 const standing = (files: readonly SkillFile[]) => files.map((file) => `${file.rel}\0${file.bytes}\0${file.modified}\0${file.runs ? "x" : "-"}`).join("\n");
 
 export class HostedSkills {
+  /** Each agent's skills left out of its last set, with why. */
+  private readonly left = new Map<HarnessId, LeftOutSkill[]>();
   private readonly listed = new Map<HarnessId, { at: number; skills: AgentSkill[] }>();
   private readonly listing = new Map<HarnessId, Promise<AgentSkill[]>>();
   /** Each skill's digest by its folder, with what its files stood as when it was taken. */
@@ -113,31 +120,44 @@ export class HostedSkills {
       claudeEnv?: () => NodeJS.ProcessEnv;
       list?: typeof listSkills;
       now?: () => number;
+      /** Told when what an agent's set leaves out changes: a skill, or why. */
+      changed?: () => void;
     },
   ) {}
 
   /**
-   * The agent's own skills that are on. Rejects in words when the agent cannot list them or one cannot be read; after
-   * one could not be, the agent is asked again at the next call, so a skill turned off in Settings is left out then.
+   * The agent's own skills that are on. Rejects in words when the agent cannot list them. A skill that can't be read is
+   * left out, with why (`leftOut`), and the rest go; the agent is then asked again at the next call, so a skill fixed or
+   * turned off in Settings counts then.
    */
   async own(agent: HarnessId): Promise<OwnSkill[]> {
     const own: OwnSkill[] = [];
+    const left: LeftOutSkill[] = [];
     const taken = new Set<string>();
-    try {
-      for (const skill of await this.list(agent)) {
-        const folder = path.dirname(skill.path);
-        const name = path.basename(folder);
-        // The agent finds one skill under a name; its first is the one it runs.
-        if (!skill.path || name.startsWith(".") || taken.has(name)) continue;
-        taken.add(name);
-        const files = await filesOf(name, folder);
+    for (const skill of await this.list(agent)) {
+      const folder = path.dirname(skill.path);
+      const name = path.basename(folder);
+      // The agent finds one skill under a name; its first is the one it runs.
+      if (!skill.path || name.startsWith(".") || taken.has(name)) continue;
+      taken.add(name);
+      try {
+        const files = await filesOf(folder);
         own.push({ name, digest: await this.digest(folder, name, files), pack: () => packOf(name, files) });
+      } catch (error) {
+        if (!(error instanceof SkillUnreadable)) throw error;
+        left.push({ name, cause: error.why });
       }
-    } catch (error) {
-      if (error instanceof SkillUnreadable) this.listed.delete(agent);
-      throw error;
     }
+    if (left.length) this.listed.delete(agent);
+    const before = JSON.stringify(this.left.get(agent) ?? []);
+    this.left.set(agent, left);
+    if (JSON.stringify(left) !== before) this.deps.changed?.();
     return own;
+  }
+
+  /** The agent's skills left out of its last set, because this Mac could not read them, with why. */
+  leftOut(agent: HarnessId): LeftOutSkill[] {
+    return this.left.get(agent) ?? [];
   }
 
   private async digest(folder: string, name: string, files: readonly SkillFile[]): Promise<string> {
@@ -151,7 +171,7 @@ export class HostedSkills {
       try {
         for await (const chunk of bytesOf(name, file)) hash.update(chunk);
       } catch {
-        throw new SkillUnreadable(name, file.rel);
+        throw new SkillUnreadable(`its file ${file.rel} can't be read.`);
       }
     }
     const digest = hash.digest("hex");

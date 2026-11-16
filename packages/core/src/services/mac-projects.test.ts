@@ -139,11 +139,11 @@ describe("a thread's work brought to this Mac", () => {
     const { at, mac, work, asks } = await broughtSetUp();
     work.current = false;
     work.ends = ["pnpm dev"];
-    expect(await mac.bringState("personal", "thread-1")).toEqual({ mac: true, can: true, ends: ["pnpm dev"] });
-    expect(await mac.bring("personal", "thread-1", false)).toEqual({ confirm: ["pnpm dev"] });
+    expect(await mac.bringState("thread-1")).toEqual({ mac: true, can: true, ends: ["pnpm dev"] });
+    expect(await mac.bring("thread-1", false)).toEqual({ confirm: ["pnpm dev"] });
     expect(asks).toEqual([]);
     expect(await mac.unbrought("cloud-1")).toEqual({ threads: 1 });
-    expect(await mac.bring("personal", "thread-1", true)).toEqual({ brought: { branch: "fix-login", commits: 1, uncommitted: true } });
+    expect(await mac.bring("thread-1", true)).toEqual({ brought: { branch: "fix-login", commits: 1, uncommitted: true } });
     expect(asks).toEqual(["thread-1"]);
     expect(git(at, "show", "fix-login:fix.txt")).toBe("from the cloud");
     expect(await mac.unbrought("cloud-1")).toEqual({ threads: 0 });
@@ -152,27 +152,27 @@ describe("a thread's work brought to this Mac", () => {
   it("brings without a question when nothing would end", async () => {
     const { mac, work, asks } = await broughtSetUp();
     work.current = false;
-    expect(await mac.bring("personal", "thread-1", false)).toMatchObject({ brought: { branch: "fix-login" } });
+    expect(await mac.bring("thread-1", false)).toMatchObject({ brought: { branch: "fix-login" } });
     expect(asks).toEqual(["thread-1"]);
   });
 
   it("holds Bring with why: the agent working, the folder gone, or not the thread's history", async () => {
     const { at, mac, work } = await broughtSetUp();
     work.working = true;
-    expect(await mac.bringState("personal", "thread-1")).toEqual({ mac: true, can: false, reason: "The agent is still working. Bring its work once it stops." });
+    expect(await mac.bringState("thread-1")).toEqual({ mac: true, can: false, reason: "The agent is still working. Bring its work once it stops." });
     work.working = false;
     work.save = { ...work.save!, base: "f".repeat(40) };
-    expect(await mac.bringState("personal", "thread-1")).toEqual({ mac: true, can: false, reason: "This folder doesn't hold this thread's history, so its work can't come here." });
+    expect(await mac.bringState("thread-1")).toEqual({ mac: true, can: false, reason: "This folder doesn't hold this thread's history, so its work can't come here." });
     rmSync(at, { recursive: true, force: true });
-    expect(await mac.bringState("personal", "thread-1")).toEqual({ mac: true, can: false, reason: "The folder sketches was in isn't on this Mac anymore." });
+    expect(await mac.bringState("thread-1")).toEqual({ mac: true, can: false, reason: "The folder sketches was in isn't on this Mac anymore." });
   });
 
   it("says a mac project whose folder is on another Mac is held there, and a GitHub thread is not one", async () => {
     const made = account();
     made.cloud.push({ id: "cloud-1", name: "sketches", origin: "mac", defaultBranch: "main", sent: true });
     const mac = new MacProjects({ db, hosted: () => made.hosted, changed: () => {} });
-    expect(await mac.bringState("personal", "thread-1")).toEqual({ mac: true, can: false, reason: "This project's folder is on another Mac." });
+    expect(await mac.bringState("thread-1")).toEqual({ mac: true, can: false, reason: "This project's folder is on another Mac." });
     made.cloud.length = 0;
-    expect(await mac.bringState("personal", "thread-1")).toEqual({ mac: false });
+    expect(await mac.bringState("thread-1")).toEqual({ mac: false });
   });
 });

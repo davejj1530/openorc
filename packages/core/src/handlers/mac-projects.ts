@@ -10,7 +10,7 @@ export function createMacProjectsHandlers(mac: MacProjects): Pick<Handlers, keyo
     "macProjects.retry": ({ hostedProjectId }) => mac.retry(hostedProjectId),
     "macProjects.cancel": ({ hostedProjectId }) => mac.cancel(hostedProjectId),
     "macProjects.unbrought": ({ hostedProjectId }) => mac.unbrought(hostedProjectId),
-    "macProjects.bringState": ({ spaceId, threadId }) => mac.bringState(spaceId, threadId),
-    "macProjects.bring": ({ spaceId, threadId, endsOk }) => mac.bring(spaceId, threadId, endsOk),
+    "macProjects.bringState": ({ threadId }) => mac.bringState(threadId),
+    "macProjects.bring": ({ threadId, endsOk }) => mac.bring(threadId, endsOk),
   };
 }

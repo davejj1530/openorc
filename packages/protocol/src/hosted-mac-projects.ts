@@ -27,8 +27,8 @@ export const hostedMacProjectsRpcParams = {
   "macProjects.retry": z.object({ hostedProjectId: id }).strict(),
   "macProjects.cancel": z.object({ hostedProjectId: id }).strict(),
   "macProjects.unbrought": z.object({ hostedProjectId: id }).strict(),
-  "macProjects.bringState": z.object({ spaceId: id, threadId: id }).strict(),
-  "macProjects.bring": z.object({ spaceId: id, threadId: id, endsOk: z.boolean() }).strict(),
+  "macProjects.bringState": z.object({ threadId: id }).strict(),
+  "macProjects.bring": z.object({ threadId: id, endsOk: z.boolean() }).strict(),
 };
 export interface HostedMacProjectsRpcResults {
   "macProjects.read": MacProjects;

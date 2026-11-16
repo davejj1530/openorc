@@ -161,7 +161,7 @@ export class MacProjects {
   }
 
   /** Whether a thread's work can come to this Mac now, and what making it current would end; or why not. */
-  async bringState(spaceId: string, threadId: string): Promise<BringState> {
+  async bringState(threadId: string): Promise<BringState> {
     const hosted = this.deps.hosted();
     if (!hosted) return { mac: false };
     const row = hosted.threads.row?.(threadId);
@@ -174,7 +174,7 @@ export class MacProjects {
     }
     const project = projects.get(this.deps.db, localId);
     if (!project || !(await stat(project.rootPath).catch(() => null))) return { mac: true, can: false, reason: `The folder ${project?.name ?? "this project"} was in isn't on this Mac anymore.` };
-    const work = await hosted.macProjects.workSave(spaceId, threadId);
+    const work = await hosted.macProjects.workSave(row.space, threadId);
     if (work.working) return { mac: true, can: false, reason: STILL_WORKING };
     if (work.save && (await git(project.rootPath, ["cat-file", "-e", `${work.save.base}^{commit}`], { okCodes: [0, 1, 128] })).code !== 0) return { mac: true, can: false, reason: NOT_THAT_FOLDER };
     if (!work.save && work.current) return { mac: true, can: false, reason: "The thread has no work to bring yet." };
@@ -185,12 +185,13 @@ export class MacProjects {
    * Brings the thread's newest commits into the folder as its branch. A thread still on its machine leaves it with a
    * save first; when that would end something running there, the answer asks first (`confirm`) unless `endsOk`.
    */
-  async bring(spaceId: string, threadId: string, endsOk: boolean): Promise<BringResult> {
+  async bring(threadId: string, endsOk: boolean): Promise<BringResult> {
     const hosted = this.deps.hosted();
-    const state = await this.bringState(spaceId, threadId);
+    const state = await this.bringState(threadId);
     if (!hosted || !state.mac) throw new Error("This thread's work has no folder on this Mac to come to.");
     if (!state.can) throw new BringRefused(state.reason);
     if (state.ends.length && !endsOk) return { confirm: state.ends };
+    const spaceId = hosted.threads.row?.(threadId).space ?? "";
     let work = await hosted.macProjects.workSave(spaceId, threadId);
     if (!work.current) {
       await hosted.macProjects.ask(spaceId, threadId);

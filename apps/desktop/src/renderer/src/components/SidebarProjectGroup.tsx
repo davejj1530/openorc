@@ -9,8 +9,9 @@ import { cn } from "../lib/cn";
 import { newThread, openProject } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { useProjectAccess } from "../lib/project-access";
+import { useProjectEnvironment } from "../lib/project-environment";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { ChevronRight, Image as ImageIcon, MoreHorizontal, PenSquare, People, Plus, Settings, X } from "./icons";
+import { ChevronRight, Image as ImageIcon, MoreHorizontal, PenSquare, People, Plus, Settings, SlidersHorizontal, X } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { ProjectIconChooser, ProjectLogo } from "./ProjectIconPicker";
 import { RemoveProjectDialog } from "./ProjectMenu";
@@ -101,12 +102,14 @@ type ProjectDialogs = ReturnType<typeof useProjectDialogs>;
 /** The dialogs a project's actions open, shared by its label's right click and the More button at its end. */
 function useProjectDialogs(project: GroupProject, anchor: RefObject<HTMLButtonElement | null>) {
   const access = useProjectAccess(project.id);
+  const environment = useProjectEnvironment(project.id);
   const [choosing, setChoosing] = useState(false);
   const [removing, setRemoving] = useState(false);
   const own = project.id !== WORKSPACE_ID;
   return {
     organization: access.organization,
     access: access.open,
+    environment: environment.open,
     choose: () => setChoosing(true),
     remove: () => setRemoving(true),
     dialogs: (
@@ -114,6 +117,7 @@ function useProjectDialogs(project: GroupProject, anchor: RefObject<HTMLButtonEl
         {own && project.rootPath ? <ProjectIconChooser rootPath={project.rootPath} open={choosing} onOpenChange={setChoosing} anchor={anchor} /> : null}
         {removing ? <RemoveProjectDialog project={project} onClose={() => setRemoving(false)} /> : null}
         {access.dialog}
+        {environment.dialog}
       </>
     ),
   };
@@ -130,6 +134,11 @@ function ProjectMenuItems({ project, parts: M, actions }: { project: GroupProjec
       {actions.access ? (
         <M.Item className={menuItem} onClick={actions.access}>
           <People size={13} /> Project access…
+        </M.Item>
+      ) : null}
+      {actions.environment ? (
+        <M.Item className={menuItem} onClick={actions.environment}>
+          <SlidersHorizontal size={13} /> Environment…
         </M.Item>
       ) : null}
       {own && !project.cloud ? (
@@ -157,7 +166,7 @@ function ProjectMenuItems({ project, parts: M, actions }: { project: GroupProjec
 /** The project's actions on its label's right click, or the context menu key while the label has focus. */
 function ProjectActions({ project, actions, children }: { project: GroupProject; actions: ProjectDialogs; children: ReactNode }) {
   return (
-    <ContextMenu.Root disabled={project.cloud && !actions.organization}>
+    <ContextMenu.Root disabled={project.cloud && !actions.organization && !actions.environment}>
       {children}
       <ContextMenu.Portal>
         <CoversPreview />

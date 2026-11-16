@@ -12,6 +12,7 @@ const fixture: {
     Partial<Pick<ThreadSummary, "createdAt" | "archivedAt" | "parentThreadId" | "parentRelation" | "subagent" | "prUrl" | "prState" | "workspaceMode" | "branch" | "owner">>)[];
   tasks?: { status: string; approval?: string }[];
   account?: { state: "signed-in"; email: string; name: string; image: null; plan: { pro: boolean } };
+  environment?: boolean;
 } = vi.hoisted(() => ({ projects: [], threads: [] }));
 
 /** The core's answer to a thread list, as the fixture's threads read. */
@@ -67,6 +68,9 @@ vi.mock("../lib/rpc", () => ({
   },
 }));
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
+// The hook's own reads are proven in ProjectMenu.test.tsx; here, only where the sidebar offers it.
+const environmentOpened = vi.hoisted(() => vi.fn());
+vi.mock("../lib/project-environment", () => ({ useProjectEnvironment: () => ({ open: fixture.environment ? environmentOpened : null, dialog: null }) }));
 vi.mock("./ui", async (importOriginal) => {
   const { cloneElement } = await import("react");
   return {
@@ -99,6 +103,7 @@ beforeEach(() => {
   fixture.threads = [];
   fixture.tasks = undefined;
   fixture.account = undefined;
+  fixture.environment = undefined;
   localStorage.clear();
   useWindow.setState({ fullscreen: false });
   useLayout.setState({ collapsed: [], workspace: ALL_WORKSPACES, sidebarOpen: true, pinnedOnly: false, hiddenWorkspaces: [] });
@@ -424,6 +429,17 @@ it("opens a project's own actions from a right click on its label", async () => 
   expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent?.trim())).toEqual(["New thread", "New task", "Choose icon…", "Project settings", "Remove project…"]);
   fireEvent.click(screen.getByRole("menuitem", { name: "Project settings" }));
   expect(useRouter.getState().route).toEqual({ view: "project", projectId: "two" });
+});
+
+it("offers a cloud project's environment in its menu where the space's server keeps one", async () => {
+  projectThreads();
+  fixture.environment = true;
+  mountSidebar();
+  await screen.findByRole("button", { name: /Other notes/ });
+  fireEvent.contextMenu(label("Second project"));
+  expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent?.trim())).toEqual(["New thread", "Environment…", "New task", "Choose icon…", "Project settings", "Remove project…"]);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Environment…" }));
+  expect(environmentOpened).toHaveBeenCalledOnce();
 });
 
 it("folds a project's group and keeps the fold, holding the open thread, and counts what in it waits on the person", async () => {

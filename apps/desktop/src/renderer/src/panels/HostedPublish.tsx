@@ -6,6 +6,7 @@ import { Button } from "../components/ui";
 import { useHostedReviewAction, type HostedActionController } from "../lib/hosted-review-action";
 import { useRpc } from "../lib/client";
 import { HostedCommitControl, HostedPullRequestControl, HostedPushControl } from "./HostedPublishControls";
+import { useHostedBring } from "./HostedBring";
 
 type PublishProps = {
   thread: ThreadSummary;
@@ -37,13 +38,16 @@ function commitUnavailable(reason: string | null, changes: HostedThreadChanges |
 
 function HostedPublishForm({ thread, state, changes, heading, meta, refresh, stateError, account, surface = "changes" }: PublishProps & { account: string }) {
   const action = useHostedReviewAction(thread.id, thread.owner?.reach === "live", account);
+  // A project from a folder of a Mac has no GitHub to push to: its work comes back to the folder instead.
+  const bring = useHostedBring(thread.id);
   const waiting = action.pending ? "Wait for the current action to finish." : null;
   const reason = waiting ?? stateError?.message ?? hostedPublishReason(thread, state);
+  const commits = bring.mac ? bring.control : <HostedCommitActions thread={thread} state={state} action={action} reason={reason} />;
   return (
     <>
       <PanelBar title={heading} meta={meta}>
         {surface === "commits" ? (
-          <HostedCommitActions thread={thread} state={state} action={action} reason={reason} />
+          commits
         ) : (
           <>
             {state?.pullRequest?.url || thread.prUrl ? <HostedPullRequestControl thread={thread} state={state} action={action} reason={reason} /> : null}
@@ -53,6 +57,7 @@ function HostedPublishForm({ thread, state, changes, heading, meta, refresh, sta
         )}
       </PanelBar>
       <HostedPublishNotice action={action} state={state} />
+      {bring.notice}
     </>
   );
 }

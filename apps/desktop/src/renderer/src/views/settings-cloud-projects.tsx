@@ -1,15 +1,18 @@
 import { useState } from "react";
-import type { SpaceProject } from "@openorc/protocol";
+import type { MacFolder, SpaceProject } from "@openorc/protocol";
 import { Button, Dialog, Select, TextButton } from "../components/ui";
 import { ProjectEnvironmentDialog } from "../dialogs/ProjectEnvironmentDialog";
-import { useRpc, useRpcMutation } from "../lib/client";
+import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { Failure } from "./settings-secret-field";
 import { Section, SettingRow, Status } from "./settings-shared";
+import { MacProjectRowView, useMacProjects } from "./settings-cloud-mac-projects";
 
 type CloudProject = SpaceProject & { hostedProjectId: string };
 
 const inCloud = (project: SpaceProject): project is CloudProject => project.hostedProjectId !== null;
+/** A picker value that names a folder of this Mac with no remote, not a GitHub project. */
+const FOLDER = "folder:";
 const repoKey = (repo: string) => repo.toLowerCase();
 
 /** This Mac's projects with a GitHub repository that the space's cloud does not have yet, and which of them GitHub lets OpenOrc read there. */
@@ -28,22 +31,27 @@ type Addable = ReturnType<typeof useAddable>;
  * it. Add makes it one of the space's cloud projects. A route that names a project, as a new thread's OpenOrc Cloud
  * choice sends, picks it.
  */
-function AddProject({ spaceId, addable: { rest, repositories }, first }: { spaceId: string; addable: Addable; first: boolean }) {
+function AddProject({ spaceId, addable: { rest, repositories }, folders, first }: { spaceId: string; addable: Addable; folders: readonly MacFolder[]; first: boolean }) {
   const add = useRpcMutation("organization.projects.add");
+  const addFolder = useRpcMutation("macProjects.add");
   const asked = useRouter((s) => (s.route.view === "settings" ? s.route.project : undefined));
   const [picked, setPicked] = useState<string | null>(null);
   const names = new Map((useRpc("projects.list", {}).data ?? []).map((project) => [project.id, project.name]));
   const open = rest.filter((project) => repositories.has(repoKey(project.repo)));
-  const id = [picked, asked].find((each) => open.some((project) => project.projectId === each)) ?? open[0]?.projectId ?? "";
+  // A folder with no remote is offered beside them, by a value of its own.
+  const choices = [...open.map((project) => project.projectId), ...folders.map((folder) => `${FOLDER}${folder.localProjectId}`)];
+  const id = [picked, asked].find((each) => each && choices.includes(each)) ?? choices[0] ?? "";
   const refused = add.data?.find((result) => result.state === "refused");
+  const busy = add.isPending || addFolder.isPending;
   const submit = () => {
+    if (id.startsWith(FOLDER)) return addFolder.mutate({ localProjectId: id.slice(FOLDER.length) }, { onSuccess: (state) => queryClient.setQueryData(["macProjects.read", {}], state) });
     const repository = repositories.get(repoKey(open.find((project) => project.projectId === id)?.repo ?? ""));
     if (repository) add.mutate({ spaceId, repositories: [{ installationId: repository.installationId, repoId: repository.repoId }] });
   };
   return (
     <>
       <SettingRow label={first ? "Add a project" : "Add another project"}>
-        <Select aria-label="Project" value={id} disabled={add.isPending} onChange={(event) => setPicked(event.target.value)}>
+        <Select aria-label="Project" value={id} disabled={busy} onChange={(event) => setPicked(event.target.value)}>
           {rest.map((project) => {
             const name = names.get(project.projectId) ?? project.repo;
             const readableHere = repositories.has(repoKey(project.repo));
@@ -53,13 +61,18 @@ function AddProject({ spaceId, addable: { rest, repositories }, first }: { space
               </option>
             );
           })}
+          {folders.map((folder) => (
+            <option key={folder.localProjectId} value={`${FOLDER}${folder.localProjectId}`}>
+              {`${folder.name} · no remote`}
+            </option>
+          ))}
         </Select>
-        <Button disabled={!id || add.isPending} onClick={submit}>
+        <Button disabled={!id || busy} onClick={submit}>
           Add
         </Button>
       </SettingRow>
       {refused?.state === "refused" ? <p className="text-bad py-2">{refused.error}</p> : null}
-      <Failure error={add.error} />
+      <Failure error={add.error ?? addFolder.error} />
     </>
   );
 }
@@ -110,7 +123,12 @@ function PersonalRow({ spaceId, project, environment }: { spaceId: string; proje
 export function SpaceCloudProjects({ spaceId, title, personal, active }: { spaceId: string; title: string; personal: boolean; active: boolean }) {
   const projects = useRpc("spaces.projects", { spaceId }, { enabled: active });
   const environment = useRpc("hostedEnvironment.available", { spaceId }, { enabled: active && personal, staleTime: 60_000 }).data === true;
-  const added = (projects.data ?? []).filter(inCloud);
+  const mac = useMacProjects(active && personal).data;
+  const macRows = mac?.state === "ready" ? mac.projects : [];
+  const macIds = new Set(macRows.map((one) => one.hostedProjectId));
+  // A mac project shows as its own row; the space's list may know it by its cloud id alone.
+  const added = (projects.data ?? []).filter(inCloud).filter((project) => !macIds.has(project.hostedProjectId));
+  const folders = mac?.state === "ready" ? mac.folders : [];
   const addable = useAddable(spaceId, added, active);
   if (projects.error) return <Failure error={projects.error} />;
   if (!projects.data) return null;
@@ -125,8 +143,11 @@ export function SpaceCloudProjects({ spaceId, title, personal, active }: { space
           </SettingRow>
         ),
       )}
-      {addable.rest.length ? <AddProject spaceId={spaceId} addable={addable} first={!added.length} /> : null}
-      {added.length || addable.rest.length ? null : <SettingRow label="No projects">{null}</SettingRow>}
+      {macRows.map((project) => (
+        <MacProjectRowView key={project.hostedProjectId} spaceId={spaceId} project={project} environment={environment} />
+      ))}
+      {addable.rest.length || folders.length ? <AddProject spaceId={spaceId} addable={addable} folders={folders} first={!added.length && !macRows.length} /> : null}
+      {added.length || macRows.length || addable.rest.length || folders.length ? null : <SettingRow label="No projects">{null}</SettingRow>}
     </Section>
   );
 }

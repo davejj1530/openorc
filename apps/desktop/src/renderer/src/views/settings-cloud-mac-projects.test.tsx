@@ -52,8 +52,8 @@ const show = () => render(<QueryClientProvider client={queryClient}>{<SpaceCloud
 
 it("shows each mac project by where it came from, its history on its way with Cancel, or why it didn't arrive with Send again", async () => {
   show();
-  expect(await screen.findByText("~/dev/clients/northwind/sketches-for-the-spring-launch · No remote")).toBeTruthy();
-  expect(screen.getByText("Sending 12 MB of 40 MB")).toBeTruthy();
+  expect(await screen.findByText("~/dev/clients/northwind/sketches-for-the-spring-launch")).toBeTruthy();
+  expect(screen.getByText("12 MB of 40 MB")).toBeTruthy();
   expect(screen.getByText("Couldn't send: The connection was lost.")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Send again" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("macProjects.retry", { hostedProjectId: "m3" }));

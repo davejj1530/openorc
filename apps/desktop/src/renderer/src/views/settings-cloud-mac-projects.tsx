@@ -12,6 +12,18 @@ const SENDING_MS = 1_000;
 const megabytes = (bytes: number) => `${Math.max(1, Math.round(bytes / 1024 / 1024))} MB`;
 const shown = (state: MacProjects) => queryClient.setQueryData(["macProjects.read", {}], state);
 
+/** A path that wraps only before a slash, never inside a folder's name. */
+const pathParts = (folder: string) =>
+  folder.split("/").map((part, at) => (
+    <span key={at}>
+      {at ? <wbr /> : null}
+      <span className="whitespace-nowrap">
+        {at ? "/" : ""}
+        {part}
+      </span>
+    </span>
+  ));
+
 /** A folder's path with the home folder as ~, as the Finder's people read it. */
 function nearby(folder: string): string {
   const home = /^\/Users\/[^/]+/.exec(folder)?.[0];
@@ -62,10 +74,9 @@ function RemoveMacProject({ project, onClose }: { project: MacProjectRow; onClos
 
 /** What a mac project's row says under its name: where it came from, or how its history's way up stands. */
 function hintOf(project: MacProjectRow) {
-  const from = project.folder ? `${nearby(project.folder)} · No remote` : "No remote";
-  if (project.sending.at === "sending") return `Sending ${megabytes(project.sending.sent)} of ${megabytes(project.sending.total)}`;
+  if (project.sending.at === "sending") return `${megabytes(project.sending.sent)} of ${megabytes(project.sending.total)}`;
   if (project.sending.at === "failed") return <span className="text-bad">Couldn't send: {project.sending.error}</span>;
-  return from;
+  return project.folder ? <>No remote · {pathParts(nearby(project.folder))}</> : "No remote";
 }
 
 /** One Personal project from a folder of this Mac: its history's way up, its environment, and Remove. */

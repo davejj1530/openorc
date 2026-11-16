@@ -400,6 +400,8 @@ const pushes: { [T in Broadcast["type"]]: (push: Extract<Broadcast, { type: T }>
   "bench.done": () => null,
   // The phone has no Device panel.
   "device.panel": () => null,
+  // Nor a cloud thread's terminal: its output is the Mac's windows' alone.
+  "hosted.terminal": () => null,
   // Only for the Mac's windows: phones hear the brain themselves.
   gap: () => null,
 };

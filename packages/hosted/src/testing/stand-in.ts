@@ -26,6 +26,7 @@ import { StandInSeats } from "./stand-in-seats.js";
 import { StandInUploads } from "./stand-in-uploads.js";
 import { StandInSkills } from "./stand-in-skills.js";
 import { StandInEnvironment } from "./stand-in-environment.js";
+import { StandInTerminals } from "./stand-in-terminals.js";
 import type { StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInOrganizations } from "./stand-in-organizations.js";
 import { StandInChat, socketAnswers } from "./stand-in-chat.js";
@@ -40,6 +41,8 @@ export interface StandIn {
   skills: StandInSkills;
   /** Projects' own environment variables as the server keeps them, behind the `projectEnvironment` capability of `threadFiles`. */
   environment: StandInEnvironment;
+  /** A cloud thread's terminals, with a shell that echoes, behind the `terminal` capability of `threadFiles`. */
+  terminals: StandInTerminals;
   tasks: StandInTasks;
   chat: StandInChat;
   /** Its origin, for `HostedDeps.server` or `OpenOrcOptions.accountServer`. */
@@ -294,8 +297,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const uploads = new StandInUploads({ spaces, chat, origin: () => `http://127.0.0.1:${port}` });
   chat.attachFiles = (input) => uploads.attachChat(input);
   hosted.files.uploads = uploads;
-  const parity = parityStandIns(spaces, () => hosted.files.capabilities);
-  const answerSocket = socketAnswers(hosted, chat);
+  const parity = parityStandIns({ spaces, hosted, peers: () => [...peers, ...sockets], person });
+  const answerSocket = withTerminals(socketAnswers(hosted, chat), parity.terminals);
 
   const server = transportServer({ connections, requests, holder, sockets, answerSocket, answer });
 
@@ -310,7 +313,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
         return (
           seats.route({ method, path, query, space }, who, body) ??
           tasks.route({ method, path, query, space }, who, body) ??
-          parity.environment.route({ method, path, query, space }, who, body) ??
+          parityRoute(parity, { method, path, query, space }, who, body) ??
           chat.route({ method, path, query, space }, who, body) ??
           (await uploads.route(method, path, who, body, space)) ??
           (await organizations.route({ method, path, query, space }, who, body)) ??
@@ -390,9 +393,33 @@ function serverLifetime({ server, port, connections, peers, admit }: { server: R
 }
 
 /** What a cloud thread brings from the Mac, each behind its capability as the server keeps it behind its switch. */
-function parityStandIns(spaces: StandInSpaces, capabilities: () => StandInThreadFiles["capabilities"]) {
-  const on = (feature: string) => () => capabilities()?.[feature]?.available === true;
-  return { skills: new StandInSkills({ spaces, available: on("skills") }), environment: new StandInEnvironment({ spaces, available: on("projectEnvironment") }) };
+function parityStandIns({
+  spaces,
+  hosted,
+  peers,
+  person,
+}: {
+  spaces: StandInSpaces;
+  hosted: StandInThreads;
+  peers: () => Iterable<StandInPeer>;
+  person: (email: string) => { name: string; image: string | null };
+}) {
+  const on = (feature: string) => () => hosted.files.capabilities?.[feature]?.available === true;
+  return {
+    skills: new StandInSkills({ spaces, available: on("skills") }),
+    environment: new StandInEnvironment({ spaces, available: on("projectEnvironment") }),
+    terminals: new StandInTerminals({ available: on("terminal"), readers: (threadId) => hosted.readersOf(threadId), peers, person }),
+  };
+}
+
+/** The routes of what a cloud thread brings that answer as JSON: its project's environment and its terminals. */
+function parityRoute(parity: ReturnType<typeof parityStandIns>, request: { method: string; path: string; query: URLSearchParams; space: string | null }, who: string, body: unknown) {
+  return parity.environment.route(request, who, body) ?? parity.terminals.route(request, who, body);
+}
+
+/** The socket's answers, a cloud thread's terminals first. */
+function withTerminals(answer: (peer: StandInPeer, event: string, body: unknown) => unknown, terminals: StandInTerminals) {
+  return (peer: StandInPeer, event: string, body: unknown) => (event.startsWith("hosted:terminal:") ? terminals.socket(peer, event, body) : answer(peer, event, body));
 }
 
 function teamAdder(spaces: StandInSpaces): StandIn["addTeam"] {

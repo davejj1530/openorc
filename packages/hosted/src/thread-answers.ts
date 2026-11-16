@@ -3,6 +3,7 @@ import type { Threads } from "./threads.js";
 import { toRuns } from "./translate.js";
 import * as sends from "./sends.js";
 import * as review from "./thread-review.js";
+import * as terminals from "./thread-terminals.js";
 import { lastMessage } from "./thread-history.js";
 import { capabilities } from "./capabilities.js";
 import { nativeRuns, stopNative } from "./subthreads.js";
@@ -31,6 +32,13 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "hosted.review.file": review.file,
   "hosted.review.state": review.state,
   "hosted.review.action": review.action,
+  "hosted.terminal.list": terminals.list,
+  "hosted.terminal.open": terminals.open,
+  "hosted.terminal.output": terminals.output,
+  "hosted.terminal.input": terminals.input,
+  "hosted.terminal.size": terminals.size,
+  "hosted.terminal.end": terminals.end,
+  "hosted.terminal.watch": terminals.watch,
   "threads.collaboration": together.collaboration,
   "threads.authors": together.authors,
   "threads.people": together.people,

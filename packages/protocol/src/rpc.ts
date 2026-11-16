@@ -3,6 +3,7 @@ import { organizationBillingRpcParams, organizationSeatRpcParams, type Organizat
 import { organizationStorageRpcParams, type OrganizationStorageRpcResults } from "./organization-storage.js";
 import { hostedFilesRpcParams, type HostedFilesRpcResults } from "./hosted-files.js";
 import { hostedEnvironmentRpcParams, type HostedEnvironmentRpcResults } from "./hosted-environment.js";
+import { HostedTerminalPush, hostedTerminalRpcParams, type HostedTerminalRpcResults } from "./hosted-terminals.js";
 import { teamChatRpcParams, type TeamChatRpcResults } from "./team-chat.js";
 import { onlineTaskRpcParams, type OnlineTaskRpcResults } from "./online-tasks.js";
 import { onlineTaskExecutionRpcParams, type OnlineTaskExecutionRpcResults } from "./online-task-execution.js";
@@ -89,6 +90,7 @@ export const rpcParams = {
   ...threadSendRpcParams,
   ...hostedFilesRpcParams,
   ...hostedEnvironmentRpcParams,
+  ...hostedTerminalRpcParams,
   ...organizationBillingRpcParams,
   ...organizationSeatRpcParams,
   ...organizationStorageRpcParams,
@@ -571,6 +573,7 @@ export interface RpcResults
   extends
     HostedFilesRpcResults,
     HostedEnvironmentRpcResults,
+    HostedTerminalRpcResults,
     OrganizationBillingRpcResults,
     OrganizationSeatRpcResults,
     OrganizationStorageRpcResults,
@@ -768,6 +771,7 @@ export const CorePush = z.discriminatedUnion("type", [
   /** These runs need a fresh snapshot: events were missed or their live state changed without an event. */
   z.object({ type: z.literal("gap"), runIds: z.array(z.string()) }),
   DevicePanelPush,
+  HostedTerminalPush,
   /** Something worth telling the user about when they are looking elsewhere. */
   z.object({
     type: z.literal("notify"),

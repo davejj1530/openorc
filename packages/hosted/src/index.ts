@@ -17,6 +17,7 @@ import type {
   BillingPage,
   Frame,
   HostedAgent,
+  HostedTerminalPush,
   OwnerReach,
   Project,
   RoutedMethod,
@@ -75,7 +76,7 @@ export interface HostedDeps {
   /** Opens the socket with the token. Called again after each sign-in and each early reconnect; it retries by itself in between. */
   connect(url: string, token: string): LiveSocket;
   /** What the host's windows hear. Frames carry the app's run ids. Never reaches a paired phone. */
-  push(push: { type: "invalidate"; keys: string[] } | { type: "frame"; frame: Frame } | { type: "gap"; runIds: string[] }): void;
+  push(push: { type: "invalidate"; keys: string[] } | { type: "frame"; frame: Frame } | { type: "gap"; runIds: string[] } | HostedTerminalPush): void;
   /** A notice for the person about a cloud thread: an ask it waits on, or a turn that ended. The host words and shows it as its own. */
   notify(notice: HostedNotice): void;
   /** The host's shared small-model naming rule. Its proposal is saved only while the expected title still matches. */

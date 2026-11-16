@@ -171,6 +171,8 @@ export class StandInThreads {
   readonly files = new StandInThreadFiles();
   /** Who writes, sends and waits in a thread, and the server's capability for it. */
   readonly collaboration: StandInCollaboration;
+  /** Who reads a thread, as its terminals' watchers are found (stand-in-terminals.ts). */
+  readonly readersOf: (threadId: string) => string[];
   /** The notes of each thread, for the people they tag. */
   readonly notes: StandInNotes;
 
@@ -184,6 +186,7 @@ export class StandInThreads {
       const thread = this.#threads.get(threadId);
       return thread ? this.spaces.readers(thread.space).filter((who) => this.#reads(who, thread)) : [];
     };
+    this.readersOf = readers;
     this.collaboration = new StandInCollaboration(person, readers);
     this.notes = new StandInNotes((email) => this.collaboration.personOf(email), readers);
     this.collaboration.noteHead = (threadId) => this.notes.head(threadId);

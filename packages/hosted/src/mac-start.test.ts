@@ -96,6 +96,8 @@ describe("a cloud thread started from this Mac's folder", () => {
     expect(macWork).toHaveBeenCalledWith("mac-sketches", []);
     expect(stand.started[0]!.body).toMatchObject({ projectId: sketches });
     expect(started.thread.projectId).toBe("mac-sketches");
+    // Added, so the account offers the cloud for it, and keeps it out of the repositories to add.
+    expect((hosted.account.status() as { projects: unknown[] }).projects).toContainEqual({ projectId: "mac-sketches", repo: "mac-sketches", cloud: "added", origin: "mac" });
     // A folder with no remote that was never added has no project to start on.
     device.projects.push({ id: "mac-drafts", remote: null });
     expect(await hosted.threads.macStartOffered?.("mac-drafts")).toBe(false);

@@ -291,6 +291,7 @@ export function createHosted(deps: HostedDeps): Hosted {
   // The account says which of this Mac's projects are on OpenOrc Cloud, from the projects the thread rows were read with.
   const cloud = {
     repos: () => threads.cloudRepos(),
+    ids: () => threads.cloudIds(),
     reread: async () => {
       await spaces.refresh();
       await threads.refresh();

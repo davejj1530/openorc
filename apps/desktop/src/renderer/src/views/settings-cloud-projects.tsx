@@ -21,7 +21,8 @@ function useAddable(spaceId: string, added: readonly CloudProject[], active: boo
   const readable = useRpc("organization.repositories", { spaceId }, { enabled: active });
   const there = new Set(added.flatMap((project) => (project.repo ? [repoKey(project.repo)] : [])));
   const repositories = new Map((readable.data?.repositories ?? []).map((repository) => [repoKey(repository.fullName), repository]));
-  const mine = account.data?.state === "signed-in" ? account.data.projects : [];
+  // A folder added from this Mac has no repository to offer; its own row is the mac project's.
+  const mine = account.data?.state === "signed-in" ? account.data.projects.filter((project) => !project.origin) : [];
   return { rest: readable.data ? mine.filter((project) => !there.has(repoKey(project.repo))) : [], repositories };
 }
 type Addable = ReturnType<typeof useAddable>;

@@ -121,12 +121,14 @@ export type GithubWork = { state: "waiting" } | { state: "failed"; error: string
 /**
  * Where a project of this Mac stands on OpenOrc Cloud, by its GitHub repository, which is how the two are matched and
  * never stored. `added`: one of the person's spaces has it as a cloud project. `addable`: GitHub lets OpenOrc read it.
- * `unreadable`: not yet, so GitHub is connected first.
+ * `unreadable`: not yet, so GitHub is connected first. `origin` "mac": a folder with no remote this Mac added as a
+ * Personal project, always `added`, with its name as `repo`.
  */
 export interface AccountProject {
   projectId: string;
   repo: string;
   cloud: "added" | "addable" | "unreadable";
+  origin?: "mac";
 }
 
 /** Everything the app knows about the OpenOrc account, in one answer. `unavailable`: this build has no account server to sign in to. */

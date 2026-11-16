@@ -295,6 +295,11 @@ export class Threads implements HostedThreads {
     return matching.find((project) => project.space === heard.personal) ?? matching[0] ?? null;
   }
 
+  /** Every project of the person's spaces, by id. */
+  cloudIds(): ReadonlySet<string> {
+    return new Set((this.#heard?.projects ?? []).map((project) => project.id));
+  }
+
   /** The repositories every space of the person's has as projects, owner/name in lower case. */
   cloudRepos(): ReadonlySet<string> {
     return new Set((this.#heard?.projects ?? []).flatMap((project) => (project.fullName ? [project.fullName.toLowerCase()] : [])));

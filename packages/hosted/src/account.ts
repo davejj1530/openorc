@@ -47,7 +47,7 @@ const keptAnswers = z.object({
 type Heard = z.infer<typeof keptAnswers>;
 
 /** `cloud`: the repositories the person's spaces have as projects, and a read of them again. */
-type AccountDeps = { session: Session; cloud: { repos(): ReadonlySet<string>; reread(): Promise<void> } } & Pick<
+type AccountDeps = { session: Session; cloud: { repos(): ReadonlySet<string>; ids(): ReadonlySet<string>; reread(): Promise<void> } } & Pick<
   HostedDeps,
   "kept" | "server" | "push" | "now" | "mintClaudeToken" | "browser" | "deviceName" | "projects"
 >;
@@ -127,13 +127,14 @@ export class Account implements HostedAccount {
     };
   }
 
-  /** This Mac's projects with a GitHub repository, each with where it stands on OpenOrc Cloud. */
+  /** This Mac's projects with a GitHub repository, each with where it stands on OpenOrc Cloud, and the folders it added as Personal projects. */
   #projects(readable: readonly { fullName: string }[]): AccountProject[] {
     const cloud = this.deps.cloud.repos();
+    const ids = this.deps.cloud.ids();
     const reads = new Set(readable.map((repository) => repository.fullName.toLowerCase()));
     return this.deps.projects().flatMap((project): AccountProject[] => {
       const repo = githubRepoOf(project.remote);
-      if (!repo) return [];
+      if (!repo) return project.cloudProjectId && ids.has(project.cloudProjectId) ? [{ projectId: project.id, repo: project.name ?? project.id, cloud: "added", origin: "mac" }] : [];
       if (cloud.has(repo)) return [{ projectId: project.id, repo, cloud: "added" }];
       return [{ projectId: project.id, repo, cloud: reads.has(repo) ? "addable" : "unreadable" }];
     });

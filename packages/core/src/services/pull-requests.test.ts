@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { Db, checkpoints, projects, pullReviews, runs, threads } from "@openorc/db";
 import { GhError, GitHubPulls, commitAll, git, type GhRunner, type ReviewSubmission } from "@openorc/git";
-import type { SystemInfo, Thread } from "@openorc/protocol";
+import { PULL_REVIEW_NEEDS_FOLDER, type Project, type SystemInfo, type Thread } from "@openorc/protocol";
 import { PullRequestService, type PullRequestServiceOptions } from "./pull-requests.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
 
@@ -369,4 +369,52 @@ it("keeps review checkouts beside the app's other worktrees", async () => {
   const checkout = start.mock.calls[0]![0].checkout!.path;
   expect(checkout).toContain(`${path.sep}worktrees${path.sep}app-`);
   expect((await stat(checkout)).isDirectory()).toBe(true);
+});
+
+describe("a project only OpenOrc Cloud has", () => {
+  const cloudProject: Project = {
+    id: "cloud-project",
+    name: "openorc-cloud-test",
+    rootPath: "",
+    gitRemote: "https://github.com/Acme/App",
+    defaultBranch: null,
+    settings: { setupScript: null, worktreeInclude: [], branchPrefix: "", detectedConfigs: [], claudeAccounts: null },
+    createdAt: 0,
+    updatedAt: 0,
+  };
+  const cloudService = () => {
+    const calls: { cwd: string; args: string[] }[] = [];
+    const gh: GhRunner = async (cwd, args) => {
+      calls.push({ cwd, args });
+      if (args[0] === "api") return "ada\n";
+      return args[1] === "list" ? "[]" : detail("h".repeat(40), "b".repeat(40));
+    };
+    const service = new PullRequestService(Db.memory(), {
+      dataDir: root,
+      github: new GitHubPulls(gh),
+      system: { info: async () => ({ gh: { installed: true, path: "/usr/bin/gh" } }) as SystemInfo },
+      threads: { start: vi.fn(), update: vi.fn(), queueFollowUp: vi.fn() },
+      runs: { threadActivity: () => "idle", models: async () => [] },
+      reviewerApp: { submitReview: vi.fn() },
+      writers: new WorkspaceWriters(),
+      cloudProject: (id) => (id === cloudProject.id ? cloudProject : null),
+      invalidate: vi.fn(),
+    });
+    return { service, calls };
+  };
+
+  it("reads its pull requests on GitHub by the repository's name, with no draft review and no agent review here", async () => {
+    const { service, calls } = cloudService();
+    const key = { projectId: cloudProject.id, number: 7 };
+    expect(await service.list(cloudProject.id, "open")).toEqual([]);
+    expect(await service.get(key)).toMatchObject({ number: 7 });
+    expect(calls.filter((call) => call.args[0] === "pr").map((call) => call.args.slice(call.args.indexOf("--repo"), call.args.indexOf("--repo") + 2))).toEqual([
+      ["--repo", "acme/app"],
+      ["--repo", "acme/app"],
+    ]);
+    expect(service.review(key)).toBeNull();
+    await expect(service.start(key, { agent: "claude", model: "claude-opus-5-5", effort: null, fastMode: false })).rejects.toThrow(PULL_REVIEW_NEEDS_FOLDER);
+    expect(() => service.comment({ ...key, commitId: "h".repeat(40), ...yours })).toThrow(PULL_REVIEW_NEEDS_FOLDER);
+    await expect(service.list("unknown", "open")).rejects.toThrow("project unknown not found");
+  });
 });

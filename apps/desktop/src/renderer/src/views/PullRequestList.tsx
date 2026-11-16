@@ -239,7 +239,8 @@ function usePullEntries(scoped: Project[], filter: PullRequestFilter, enabled: b
 export function PullRequestList() {
   const projectId = useLayout(focusedProject);
   const system = useRpc("system.info", {});
-  const projectList = useSpaceProjects(true);
+  // A project only the cloud has is read on GitHub by its name, as one with a folder here is read in it.
+  const projectList = useSpaceProjects();
   const [filter, setFilter] = useState<PullRequestFilter>("open");
   const scoped = (projectList.data ?? []).filter((project) => (projectId ? project.id === projectId : onGitHub(project.gitRemote)));
   const reason = unavailable({ ghInstalled: system.data?.gh.installed, projects: projectList.data ? scoped : [] });

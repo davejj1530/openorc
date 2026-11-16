@@ -6,6 +6,7 @@ import { core } from "../lib/rpc";
 import { useLayout } from "../lib/layout";
 import { queryClient } from "../lib/client";
 import { useRouter } from "../lib/router";
+import { spaceNavigation } from "../lib/space-navigation";
 import { PullRequestList } from "./PullRequestList";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
@@ -123,4 +124,25 @@ it("offers no Open thread while the thread that opened the pull request still wo
   const studio = await screen.findByRole("region", { name: "studio pull requests" });
   await within(studio).findByRole("button", { name: /Fix the dark theme, #4, Changes requested/ });
   expect(within(studio).queryByRole("button", { name: "Open thread" })).toBeNull();
+});
+
+it("lists the pull requests of an organization's project that lives only in the cloud, read on GitHub by its name", async () => {
+  const before = spaceNavigation.getState();
+  spaceNavigation.setState({ current: "org:altalogy", inventory: [{ id: "org:altalogy", accountId: "account-a", personal: false, projects: [], threads: [], taskIds: [] }] } as never);
+  lists["cloud-project"] = { open: [pull(4, "Export the activity log")], review_requested: [], authored: [], closed: [] };
+  const answered = vi.mocked(core.call).getMockImplementation()!;
+  vi.mocked(core.call).mockImplementation(async (method, params) => {
+    if (method === "spaces.projects")
+      return [{ key: "cloud-project", localProjectId: null, hostedProjectId: "server-project", name: "openorc-cloud-test", repo: "acme/cloud", connected: true }] as never;
+    if (method === "projects.get") return { id: "cloud-project", name: "openorc-cloud-test", rootPath: "", gitRemote: "https://github.com/acme/cloud" } as never;
+    if (method === "projects.list") return [] as never;
+    return answered(method, params);
+  });
+  try {
+    renderPage();
+    expect(await screen.findByRole("button", { name: /Export the activity log/ })).toBeTruthy();
+    expect(screen.queryByText("No GitHub projects")).toBeNull();
+  } finally {
+    spaceNavigation.setState(before, true);
+  }
 });

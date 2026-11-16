@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { PullRequestDetail, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import { PULL_REVIEW_NEEDS_FOLDER, type PullRequestDetail, type RpcMethod, type RpcParams, type RpcResults } from "@openorc/protocol";
 import type { CommentDraft, CommentLocation } from "../components/DiffView";
 import { core } from "../lib/rpc";
 import { invalidateTags, queryClient } from "../lib/client";
@@ -17,7 +17,13 @@ vi.mock("../components/DiffView", () => ({
     return <div data-testid="diff" />;
   },
 }));
-vi.mock("../components/PullRequestReviewer", () => ({ PullRequestReviewer: () => null }));
+const reviewer = vi.hoisted(() => ({ held: undefined as string | null | undefined }));
+vi.mock("../components/PullRequestReviewer", () => ({
+  PullRequestReviewer: (props: { held?: string | null }) => {
+    reviewer.held = props.held;
+    return null;
+  },
+}));
 vi.mock("../components/PullRequestReviewBar", () => ({ PullRequestReviewBar: () => null }));
 vi.mock("../components/TopBar", () => ({ TopBar: () => null }));
 
@@ -70,4 +76,22 @@ it("comments on the commit whose diff the comment was started on, after the diff
       body: "Name this constant.",
     } satisfies RpcParams<"pulls.review.comment">),
   );
+});
+
+it("reads a pull request of a project only the cloud has, with its diff, and drafts no review of it here", async () => {
+  vi.mocked(core.call).mockImplementation(async <M extends RpcMethod>(method: M): Promise<RpcResults[M]> => {
+    if (method === "pulls.get") return pull as RpcResults[M];
+    if (method === "pulls.diff") return { patch: patchAt("a"), headSha: commit("a") } as RpcResults[M];
+    if (method === "projects.get") return { id: "cloud-project", name: "openorc-cloud-test", rootPath: "", gitRemote: "https://github.com/acme/app" } as RpcResults[M];
+    if (method === "pulls.review.get") return null as RpcResults[M];
+    return [] as unknown as RpcResults[M];
+  });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <PullRequestView projectId="cloud-project" number={7} />
+    </QueryClientProvider>,
+  );
+  await screen.findByTestId("diff");
+  await waitFor(() => expect(reviewer.held).toBe(PULL_REVIEW_NEEDS_FOLDER));
+  expect(viewer.props!.onRequestComment).toBeUndefined();
 });

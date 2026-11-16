@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { audit, orclings, projects, pullReviews, runs, threads, type Db, type PullReviewKey } from "@openorc/db";
-import { GitHubPulls, git, worktree } from "@openorc/git";
+import { GitHubPulls, git, remoteRepository, worktree, type PullsAt } from "@openorc/git";
 import type { PullReviewTools } from "@openorc/mcp";
 import {
+  PULL_REVIEW_NEEDS_FOLDER,
   WORKSPACE_ID,
   harnessName,
   isHarnessId,
@@ -42,6 +43,8 @@ export interface PullRequestServiceOptions {
   writers: Pick<WorkspaceWriters, "withLease">;
   /** Posts reviews as the user's GitHub App instead of their gh account. */
   reviewerApp: Pick<ReviewerAppService, "submitReview">;
+  /** A project only OpenOrc Cloud has, with no folder on this Mac: its pull requests are read on GitHub by name. */
+  cloudProject?(projectId: string): Project | null;
   invalidate(keys: string[]): void;
 }
 
@@ -72,6 +75,13 @@ function againPrompt(detail: PullRequestDetail, previous: string | null): string
     lines.push("No commits were added since your last review. Look again, and add only findings you haven't made.");
   }
   return lines.join("\n");
+}
+
+/** The `owner/name` of a cloud project's repository on GitHub. */
+function cloudRepository(project: Project): string {
+  const repository = project.gitRemote ? remoteRepository(project.gitRemote) : null;
+  if (repository?.host !== "github.com") throw new Error("This project's repository isn't on GitHub.");
+  return repository.path;
 }
 
 /**
@@ -110,6 +120,8 @@ export class PullRequestService {
   }
 
   review(key: PullReviewKey): PullRequestReview | null {
+    // A project only OpenOrc Cloud has keeps no draft review on this Mac.
+    if (this.cloud(key.projectId)) return null;
     this.project(key.projectId);
     return pullReviews.get(this.db, key);
   }
@@ -409,17 +421,26 @@ export class PullRequestService {
     else if (review.commitId !== commitId) pullReviews.update(this.db, key, { commitId });
   }
 
+  /** The project's folder on this Mac, which a review drafts on. */
   private project(projectId: string): Project {
     if (projectId === WORKSPACE_ID) throw new Error("Workspace has no pull requests. Choose a project.");
     const project = projects.get(this.db, projectId);
-    if (!project) throw new Error(`project ${projectId} not found`);
-    return project;
+    if (project) return project;
+    throw new Error(this.cloud(projectId) ? PULL_REVIEW_NEEDS_FOLDER : `project ${projectId} not found`);
   }
 
-  private async repository(projectId: string): Promise<string> {
-    const project = this.project(projectId);
+  /** A project OpenOrc Cloud has and this Mac does not; null for any other. */
+  private cloud(projectId: string): Project | null {
+    if (projectId === WORKSPACE_ID || projects.get(this.db, projectId)) return null;
+    return this.options.cloudProject?.(projectId) ?? null;
+  }
+
+  /** Where gh reads a project's pull requests: its folder on this Mac, or, for a project only OpenOrc Cloud has, its name on GitHub. */
+  private async repository(projectId: string): Promise<PullsAt> {
+    const cloud = this.cloud(projectId);
+    const at = cloud ? { repo: cloudRepository(cloud) } : this.project(projectId).rootPath;
     await this.assertGh();
-    return project.rootPath;
+    return at;
   }
 
   private async assertGh(): Promise<void> {

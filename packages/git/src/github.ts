@@ -8,6 +8,7 @@ import type {
   PullRequestState,
   PullRequestSummary,
 } from "@openorc/protocol";
+import os from "node:os";
 import { git, run, GitError } from "./exec.js";
 
 /** Runs the user's own gh in a repository and returns what it printed. A failure rejects with a GhError. */
@@ -190,23 +191,37 @@ export function reviewPayload(review: ReviewSubmission): Record<string, unknown>
   };
 }
 
+/**
+ * Where gh finds a repository's pull requests: a clone's folder on this Mac, or, for a project with no folder here, its
+ * `owner/name` on GitHub, which gh is told with `--repo`.
+ */
+export type PullsAt = string | { repo: string };
+const cwdOf = (at: PullsAt): string => (typeof at === "string" ? at : os.homedir());
+const repoFlag = (at: PullsAt): string[] => (typeof at === "string" ? [] : ["--repo", at.repo]);
+/** The repository a query names: gh's own placeholders in a clone, else the owner and name given. */
+function queryRepository(at: PullsAt): string[] {
+  if (typeof at === "string") return ["-F", "owner={owner}", "-F", "repo={repo}"];
+  const [owner = "", name = ""] = at.repo.split("/");
+  return ["-f", `owner=${owner}`, "-f", `repo=${name}`];
+}
+
 /** The user's own gh, asked about one repository's pull requests. Nothing here reads credentials. */
 export class GitHubPulls {
   constructor(private readonly gh: GhRunner = runGh) {}
 
-  async list(cwd: string, filter: PullRequestFilter): Promise<PullRequestSummary[]> {
-    const out = await this.gh(cwd, ["pr", "list", ...filterArgs[filter], "--limit", LIST_LIMIT, "--json", SUMMARY_FIELDS]).catch((error: unknown) => {
+  async list(at: PullsAt, filter: PullRequestFilter): Promise<PullRequestSummary[]> {
+    const out = await this.gh(cwdOf(at), ["pr", "list", ...repoFlag(at), ...filterArgs[filter], "--limit", LIST_LIMIT, "--json", SUMMARY_FIELDS]).catch((error: unknown) => {
       throw ghFailure(error, "Pull requests");
     });
     return (JSON.parse(out) as RawPullRequest[]).map(pullRequestSummary);
   }
 
-  async get(cwd: string, number: number): Promise<PullRequestDetail> {
+  async get(at: PullsAt, number: number): Promise<PullRequestDetail> {
     const [out, viewer] = await Promise.all([
-      this.gh(cwd, ["pr", "view", String(number), "--json", `${SUMMARY_FIELDS},body,headRefOid,baseRefOid`]).catch((error: unknown) => {
+      this.gh(cwdOf(at), ["pr", "view", String(number), ...repoFlag(at), "--json", `${SUMMARY_FIELDS},body,headRefOid,baseRefOid`]).catch((error: unknown) => {
         throw ghFailure(error, `Pull request #${number}`);
       }),
-      this.viewer(cwd),
+      this.viewer(cwdOf(at)),
     ]);
     const raw = JSON.parse(out) as RawPullRequestDetail;
     return { ...pullRequestSummary(raw), body: raw.body ?? "", headSha: raw.headRefOid, baseSha: raw.baseRefOid, viewer };
@@ -216,9 +231,9 @@ export class GitHubPulls {
    * The changes as GitHub shows them, the head against where it left its base branch, and the head they are for.
    * gh can't name that head with the diff, so it is read before and after; a push in between reads the diff again.
    */
-  async diff(cwd: string, number: number): Promise<{ patch: string; headSha: string }> {
+  async diff(at: PullsAt, number: number): Promise<{ patch: string; headSha: string }> {
     const ask = (args: string[]) =>
-      this.gh(cwd, ["pr", ...args]).catch((error: unknown) => {
+      this.gh(cwdOf(at), ["pr", ...args, ...repoFlag(at)]).catch((error: unknown) => {
         throw ghFailure(error, `Pull request #${number}`);
       });
     const head = async () => (JSON.parse(await ask(["view", String(number), "--json", "headRefOid"])) as { headRefOid: string }).headRefOid;
@@ -234,27 +249,14 @@ export class GitHubPulls {
    * The branches a new pull request can target in the repository gh opens pull requests in: the default branch first,
    * `prefer` next when it exists, then the rest by name.
    */
-  async branches(cwd: string, prefer?: string): Promise<PullRequestBranches> {
+  async branches(at: PullsAt, prefer?: string): Promise<PullRequestBranches> {
     const names: string[] = [];
     let defaultBranch: string | null = null;
     let preferred: string | null = null;
     let after: string | null = null;
     for (let page = 0; page < BRANCH_PAGES; page += 1) {
-      const args = [
-        "api",
-        "graphql",
-        "-F",
-        "owner={owner}",
-        "-F",
-        "repo={repo}",
-        "-f",
-        `query=${BRANCHES_QUERY}`,
-        "-f",
-        `prefer=refs/heads/${prefer ?? ""}`,
-        "-F",
-        `checkPrefer=${page === 0 && prefer !== undefined}`,
-      ];
-      const out: string = await this.gh(cwd, after === null ? args : [...args, "-f", `after=${after}`]).catch((error: unknown) => {
+      const args = ["api", "graphql", ...queryRepository(at), "-f", `query=${BRANCHES_QUERY}`, "-f", `prefer=refs/heads/${prefer ?? ""}`, "-F", `checkPrefer=${page === 0 && prefer !== undefined}`];
+      const out: string = await this.gh(cwdOf(at), after === null ? args : [...args, "-f", `after=${after}`]).catch((error: unknown) => {
         throw ghFailure(error, "The repository's branches");
       });
       const { repository }: RawBranchPage["data"] = (JSON.parse(out) as RawBranchPage).data;

@@ -2,7 +2,7 @@ export { changeStats, filePatch, type ChangeList } from "./changes.js";
 export { diskUsage } from "./disk.js";
 export { GitError, git, gitToFile, run, useGitHubSignIn, type ExecOptions, type ExecResult } from "./exec.js";
 export { GitHubAppClient, appJwt, reviewerAppManifest, type GitHubAppCredentials, type GitHubAppIdentity } from "./github-app.js";
-export { GhError, GitHubPulls, fetchPullRequest, pullRequestRepository, pullRequestSource, remoteRepository, reviewPayload, type GhRunner, type ReviewSubmission } from "./github.js";
+export { GhError, GitHubPulls, fetchPullRequest, pullRequestRepository, pullRequestSource, remoteRepository, reviewPayload, type GhRunner, type PullsAt, type ReviewSubmission } from "./github.js";
 export { grepWorkingTree, type GrepLimits, type GrepLine, type GrepQuery, type GrepResult } from "./grep.js";
 export { commitAll, createPr, hasGh, pullRequestTemplate, push, unpushedCommits, type UnpushedCommits } from "./publish.js";
 export { pinObject, unpinAll } from "./refs.js";

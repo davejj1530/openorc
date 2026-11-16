@@ -117,6 +117,27 @@ describe("GitHubPulls", () => {
     await expect(new GitHubPulls(restless).diff("/repo", 7)).rejects.toThrow("Pull request #7 kept changing while it loaded. Try again.");
   });
 
+  it("reads a repository with no clone on this Mac by its name, outside any folder of the project", async () => {
+    const at = { repo: "acme/app" };
+    const calls: { cwd: string; args: string[] }[] = [];
+    const branchPage = JSON.stringify({ data: { repository: { defaultBranchRef: { name: "main" }, refs: { nodes: [{ name: "main" }], pageInfo: { hasNextPage: false, endCursor: null } } } } });
+    const gh: GhRunner = async (cwd, args) => {
+      calls.push({ cwd, args });
+      if (args[0] === "api") return args[1] === "user" ? "ada\n" : branchPage;
+      if (args[1] === "list") return JSON.stringify([raw]);
+      if (args[1] === "diff") return "diff";
+      return JSON.stringify({ ...raw, body: "", headRefOid: "h".repeat(40), baseRefOid: "b".repeat(40) });
+    };
+    const pulls = new GitHubPulls(gh);
+    expect(await pulls.list(at, "open")).toHaveLength(1);
+    expect(await pulls.get(at, 7)).toMatchObject({ number: 7, viewer: "ada" });
+    expect(await pulls.diff(at, 7)).toEqual({ patch: "diff", headSha: "h".repeat(40) });
+    expect(await pulls.branches(at)).toEqual({ branches: ["main"], defaultBranch: "main" });
+    for (const { args } of calls.filter((call) => call.args[0] === "pr")) expect(args.slice(args.indexOf("--repo"), args.indexOf("--repo") + 2)).toEqual(["--repo", "acme/app"]);
+    expect(calls.find((call) => call.args[1] === "graphql")!.args).toEqual(expect.arrayContaining(["owner=acme", "repo=app"]));
+    expect(new Set(calls.map((call) => call.cwd))).toEqual(new Set([os.homedir()]));
+  });
+
   it("lists the branches a pull request can target: the default, the preferred one, then the rest by name", async () => {
     const page = (nodes: string[], endCursor: string | null, extra: Record<string, unknown> = {}) =>
       JSON.stringify({

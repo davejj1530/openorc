@@ -6,6 +6,9 @@ import { ModelExecutionSettings } from "./execution-target.js";
 export const PullRequestFilter = z.enum(["open", "review_requested", "authored", "closed"]);
 export type PullRequestFilter = z.infer<typeof PullRequestFilter>;
 
+/** Why a project only OpenOrc Cloud has can't be reviewed here: a review drafts on a checkout of the project on this Mac. */
+export const PULL_REVIEW_NEEDS_FOLDER = "Reviewing with an agent needs this project's folder on this Mac.";
+
 export type PullRequestState = "open" | "closed" | "merged";
 export type PullRequestReviewDecision = "approved" | "changes_requested" | "review_required";
 

@@ -12,6 +12,13 @@ const SEGMENT = String.raw`[\p{L}\p{N}_.@+~%\[\]()-]+`;
 const PATH = new RegExp(String.raw`^(?!~)(?:[A-Za-z]:[\\/]|/)?(?:${SEGMENT}[\\/])+${SEGMENT}$`, "u");
 /** The file name's extension starts with a letter, so `1/2.5` and `v1/2.0` are not files. */
 const FILE_NAME = /(?:^|[\\/])[^\\/]*\.[\p{L}_][\p{L}\p{N}_-]*$/u;
+/**
+ * A first folder that is a host name, like `github.com` or `docs.rs`, makes an address without its scheme rather than a
+ * path. Only hosts under common top-level domains count, so dotted folders like `Contoso.Web/` or `chart.js/` still do.
+ */
+const HOST = /^(?:www\.[a-z\d.-]+|(?:[a-z\d-]+\.)+(?:com|org|net|io|dev|co|ai|rs|gov|edu))$/;
+/** A media type whose subtype is a vendor's or private, like `application/vnd.ms-excel`, has dots that aren't an extension's. */
+const MEDIA_TYPE = /^(?:application|audio|font|image|model|text|video)\/(?:vnd|prs|x)[.-][^\\/]*$/;
 /** `:12`, `:12:5` (a column, dropped), `:12-20`, `#L12` or `#L12-L20`. */
 const LOCATION = /(?::(\d+)(?:-(\d+)|:\d+)?|#L(\d+)(?:-L?(\d+))?)$/;
 
@@ -28,7 +35,7 @@ export function codePathHref(code: string): string | null {
   if (!text || text.length > 1024) return null;
   const location = LOCATION.exec(text);
   const path = location ? text.slice(0, location.index) : text;
-  if (!PATH.test(path) || !FILE_NAME.test(path)) return null;
+  if (!PATH.test(path) || !FILE_NAME.test(path) || MEDIA_TYPE.test(path) || HOST.test(path.split(/[\\/]/)[0]!)) return null;
   // Links decode their path, so each segment is encoded to keep names like `a:b.ts` or `100%.md` whole.
   return path.split("/").map(encodeURIComponent).join("/") + (location ? lineAnchor(location) : "");
 }

@@ -15,6 +15,9 @@ it.each([
   ["/home/me/repo/src/app.ts:3", "/home/me/repo/src/app.ts#L3"],
   ["C:\\repo\\src\\app.ts", "C%3A%5Crepo%5Csrc%5Capp.ts"],
   ["  src/app.ts  ", "src/app.ts"],
+  ["Contoso.Web/Controllers/HomeController.cs", "Contoso.Web/Controllers/HomeController.cs"],
+  ["chart.js/dist/chart.umd.js", "chart.js/dist/chart.umd.js"],
+  ["image/logo.png", "image/logo.png"],
 ])("links %j as %j", (code, href) => {
   expect(codePathHref(code)).toBe(href);
 });
@@ -30,6 +33,12 @@ it.each([
   "v1/2.0",
   "https://example.com/app.js",
   "localhost:3000/api/data.json",
+  "github.com/owner/repo.git",
+  "example.com/docs/index.html",
+  "www.example.org/a.html",
+  "docs.rs/serde/latest/serde.html",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "src/**/*.ts",
   "$HOME/.config/app.json",
   "~/.claude/settings.json",

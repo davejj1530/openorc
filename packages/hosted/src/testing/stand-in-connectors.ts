@@ -33,18 +33,19 @@ export class StandInConnectors {
     this.#kept.set(who, mine);
     if (!agent && request.method === "GET") return this.#listed(mine);
     if (!agent || !name) return refused(404, `Cannot ${request.method} ${request.path}`);
-    const key = `${decodeURIComponent(agent)}/${decodeURIComponent(name)}`;
+    return this.#one(request, mine, `${decodeURIComponent(agent)}/${decodeURIComponent(name)}`, Boolean(check), body);
+  }
+
+  /** A route of one connector: its check, its removal, or its save. */
+  #one(request: Request, mine: Map<string, Kept>, key: string, check: boolean, body: unknown): Reply {
     const found = mine.get(key);
-    if (check && request.method === "POST") {
-      if (!found) return refused(404, "That connector isn't here.");
-      return { status: 200, body: this.answers.get(found.url) ?? { status: "connected", message: null } };
-    }
-    if (request.method === "DELETE") {
-      if (!found) return refused(404, "That connector isn't here.");
+    if (request.method === "PUT" && !check) return this.#put(mine, key, found, body);
+    if (!found) return refused(404, "That connector isn't here.");
+    if (check && request.method === "POST") return { status: 200, body: this.answers.get(found.url) ?? { status: "connected", message: null } };
+    if (!check && request.method === "DELETE") {
       mine.delete(key);
       return this.#listed(mine);
     }
-    if (request.method === "PUT") return this.#put(mine, key, found, body);
     return refused(404, `Cannot ${request.method} ${request.path}`);
   }
 

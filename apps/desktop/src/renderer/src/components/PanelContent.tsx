@@ -75,7 +75,10 @@ type ContentProps = { context: PanelContext; page: PanelPage; onNavigate: (page:
 
 /** A cloud thread's terminal is a shell on its machine; any other is a shell on this Mac. */
 function TerminalContent({ context, page }: { context: PanelContext; page: Extract<PanelPage, { kind: "tool" }> }) {
-  if (context.kind === "thread" && context.thread.owner?.brain === "hosted") return <CloudTerminalPanel key={context.thread.id} threadId={context.thread.id} />;
+  if (context.kind === "thread" && context.thread.owner?.brain === "hosted") {
+    const slot = page.shell?.id ?? "main";
+    return <CloudTerminalPanel key={`${context.thread.id}:${slot}`} threadId={context.thread.id} slot={slot} />;
+  }
   const id = terminalId(context, page);
   return <TerminalPanel key={id} id={id} cwd={panelDirectory(context)} />;
 }

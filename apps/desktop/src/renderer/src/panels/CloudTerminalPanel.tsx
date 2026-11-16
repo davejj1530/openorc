@@ -10,6 +10,7 @@ import { useTheme } from "../lib/theme";
 import { followTerminalFont } from "./terminal-font";
 import { isDark, openXterm, TerminalBar } from "./TerminalPanel";
 import { terminalTheme } from "./terminal-theme";
+import { claimTerminal, terminalFor } from "./cloud-terminal-claims";
 
 /** A view slides over 220ms; the shell is told the size it settles at, as on this Mac (TerminalPanel). */
 const RESIZE_SETTLE_MS = 150;
@@ -19,28 +20,36 @@ const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 type Ids = { threadId: string; terminalId: string };
 
 /**
- * Which terminal of a cloud thread the panel shows: the one it opened, else the newest open one, else the newest. A
- * thread with none opens one for a reader who may: opening the panel is asking for a shell, as on this Mac.
+ * Which terminal of a cloud thread this tab shows (cloud-terminal-claims.ts). A tab with none opens one for a reader
+ * who may: opening a Terminal tab is asking for a shell, as on this Mac, so a second tab is a second terminal.
  */
-function useCloudTerminal(threadId: string) {
+function useCloudTerminal(threadId: string, slot: string) {
   const params = { threadId };
   const list = useRpc("hosted.terminal.list", params, { staleTime: 0 });
   const open = useRpcMutation("hosted.terminal.open");
   const end = useRpcMutation("hosted.terminal.end");
-  const [shownId, setShownId] = useState<string | null>(null);
+  const [, setClaimed] = useState(0);
   const asked = useRef(false);
   const data = list.data;
-  const terminals = data?.terminals ?? [];
-  const shown = terminals.find((each) => each.id === shownId) ?? terminals.find((each) => each.state !== "ended") ?? terminals[0] ?? null;
+  const shown = data ? terminalFor(threadId, slot, data.terminals) : null;
+  const claim = (terminalId: string) => {
+    claimTerminal(threadId, slot, terminalId);
+    setClaimed((n) => n + 1);
+  };
+  // The tab keeps the terminal it shows, so it finds it again, and other tabs leave it to it.
+  const shownId = shown?.id;
+  useEffect(() => {
+    if (shownId) claimTerminal(threadId, slot, shownId);
+  }, [threadId, slot, shownId]);
   const reread = () => void queryClient.invalidateQueries({ queryKey: ["hosted.terminal.list", params] });
   const start = async () => {
     const opened = await open.mutateAsync({ threadId, cols: 100, rows: 24 }).catch(() => null);
     if (!opened) return;
-    setShownId(opened.id);
+    claim(opened.id);
     reread();
   };
   useEffect(() => {
-    if (!data || asked.current || data.terminals.length > 0 || !data.canOpen) return;
+    if (!data || asked.current || shown || !data.canOpen) return;
     asked.current = true;
     void start();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on the first read
@@ -64,8 +73,8 @@ function useCloudTerminal(threadId: string) {
  * A cloud thread's terminal: a shell on the thread's machine. Its opener types in it; anyone else in the thread watches
  * it, with no cursor, and may end it. One that ended says only the server's reason for that end.
  */
-export function CloudTerminalPanel({ threadId }: { threadId: string }) {
-  const { data, shown, mine, restart, stop, reread, failure, retry } = useCloudTerminal(threadId);
+export function CloudTerminalPanel({ threadId, slot = "main" }: { threadId: string; slot?: string }) {
+  const { data, shown, mine, restart, stop, reread, failure, retry } = useCloudTerminal(threadId, slot);
   if (failure) return <TerminalEmpty title="Could not open a terminal" words={failure.message} onRetry={retry} />;
   if (!data) return null;
   if (!shown) return <TerminalEmpty title="No terminal here" words={data.reason ?? ""} onRetry={null} />;
@@ -165,6 +174,14 @@ function CloudTerminalView({ threadId, terminal, typing, onChanged }: { threadId
     // The screen belongs to one terminal; its state changing does not start it again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId, terminal.id, typing]);
+
+  // Ended: the screen keeps what it said, with no cursor and nothing to type into.
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term || terminal.state !== "ended") return;
+    Object.assign(term.options, { disableStdin: true, cursorInactiveStyle: "none", cursorBlink: false });
+    term.blur();
+  }, [terminal.state]);
 
   // Open, or opened since the screen was made: the shell is told the view's size, and the opener types in it.
   useEffect(() => {

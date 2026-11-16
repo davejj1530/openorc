@@ -15,6 +15,7 @@ vi.mock("@xterm/xterm", () => ({
     loadAddon() {}
     open() {}
     focus() {}
+    blur() {}
     write(data: Uint8Array | string) {
       screenState.written.push(typeof data === "string" ? data : new TextDecoder().decode(data));
     }
@@ -63,6 +64,7 @@ beforeEach(() => {
   screenState.written = [];
   screenState.options = {};
   screenState.type = () => {};
+  localStorage.clear();
   queryClient.clear();
   output = "$ ls\r\n";
   listed = { terminals: [terminal()], canOpen: true, reason: null, viewer: ANA.id };
@@ -85,10 +87,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function show() {
-  render(
+function show(slot = "main") {
+  return render(
     <QueryClientProvider client={queryClient}>
-      <CloudTerminalPanel threadId="thread" />
+      <CloudTerminalPanel threadId="thread" slot={slot} />
     </QueryClientProvider>,
   );
 }
@@ -162,4 +164,41 @@ it("opens a terminal for a reader who may when the thread has none, and says why
   show();
   expect(await screen.findByText("You can read this thread but not run its work.")).toBeTruthy();
   expect(calls("hosted.terminal.open")).toEqual([]);
+});
+
+it("hides the cursor and takes no keys once the terminal has ended", async () => {
+  listed = { terminals: [terminal({ state: "ended", ended: { reason: "closed", message: "Ben ended this terminal.", exitCode: null, by: BEN } })], canOpen: true, reason: null, viewer: ANA.id };
+  show();
+  await screen.findByText(/Ben ended this terminal\./);
+  await waitFor(() => expect(screenState.options["disableStdin"]).toBe(true));
+  expect(screenState.options["cursorInactiveStyle"]).toBe("none");
+});
+
+it("gives a second Terminal tab a terminal of its own, and finds each tab's again after the app opens anew", async () => {
+  show("main");
+  await waitFor(() => expect(screenState.written.join("")).toBe("$ ls\r\n"));
+  expect(calls("hosted.terminal.open")).toEqual([]);
+  // A second tab: the thread's one open terminal is the first tab's, so it opens another.
+  show("shell-2");
+  await waitFor(() => expect(calls("hosted.terminal.open")).toEqual([{ threadId: "thread", cols: 100, rows: 24 }]));
+  cleanup();
+  queryClient.clear();
+  mock.call.mockClear();
+  // Opened anew: each tab shows the terminal it held, and nothing is opened.
+  listed = { terminals: [terminal({ id: "terminal-2", typed: 0 }), terminal()], canOpen: true, reason: null, viewer: ANA.id };
+  show("shell-2");
+  await waitFor(() => expect(calls("hosted.terminal.watch")).toEqual([{ threadId: "thread", terminalId: "terminal-2", watch: true }]));
+  expect(calls("hosted.terminal.open")).toEqual([]);
+});
+
+it("says the server's refusal in a tab past the most a thread keeps open", async () => {
+  listed = { terminals: [terminal()], canOpen: true, reason: null, viewer: ANA.id };
+  mock.call.mockImplementation(async (method) => {
+    if (method === "hosted.terminal.list") return listed;
+    if (method === "hosted.terminal.open") throw new Error("A thread keeps up to 4 terminals open. Close one first.");
+    return null;
+  });
+  show("main");
+  show("shell-5");
+  expect(await screen.findByText("A thread keeps up to 4 terminals open. Close one first.")).toBeTruthy();
 });

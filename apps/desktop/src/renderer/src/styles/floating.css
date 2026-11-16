@@ -457,10 +457,13 @@
 .dialog-backdrop[data-ending-style] {
   transition-duration: var(--duration-leave);
 }
+/* The sheet's head stays in reach while its body scrolls. */
 .dialog-sheet {
+  display: flex;
+  flex-direction: column;
   max-width: calc(100vw - 48px);
   max-height: 75vh;
-  overflow-y: auto;
+  overflow: hidden;
   border-radius: var(--radius-3xl);
   background: var(--surface);
   color: var(--ink);
@@ -480,6 +483,7 @@
 }
 .dialog-sheet-head {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -492,6 +496,8 @@
   letter-spacing: var(--text-md--letter-spacing);
 }
 .dialog-sheet-body {
+  min-height: 0;
+  overflow-y: auto;
   padding: 12px 20px 20px;
 }
 

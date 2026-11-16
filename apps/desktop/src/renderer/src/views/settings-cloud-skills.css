@@ -1,0 +1,33 @@
+/* The skills sheet: its search stays under the head while the list scrolls below a hairline. */
+.cloud-skills-dialog .dialog-sheet-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.cloud-skills-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* A skill in the cloud skills sheet: its name and words take the width up to its size and switch. */
+.cloud-skill {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 52px;
+  padding-block: 12px;
+  border-bottom: var(--hairline) solid var(--line);
+}
+.cloud-skill:last-child {
+  border-bottom: 0;
+}
+.cloud-skill-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cloud-skill-size {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}

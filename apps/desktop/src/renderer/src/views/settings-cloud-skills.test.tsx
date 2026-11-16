@@ -87,3 +87,18 @@ it("turns one skill off from its switch", async () => {
   fireEvent.click(within(await screen.findByRole("dialog")).getByRole("switch", { name: "review in cloud threads" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("hostedSkills.choose", { agent: "claude", names: ["review"], on: false }));
 });
+
+it("holds only the switch being changed while its choice is on its way", async () => {
+  let answer: () => void = () => {};
+  const call = vi.mocked(core.call).getMockImplementation()!;
+  vi.mocked(core.call).mockImplementation(((method: string, params: never) =>
+    method === "hostedSkills.choose" ? new Promise((resolve) => (answer = () => resolve(call(method as never, params)))) : call(method as never, params)) as never);
+  show();
+  fireEvent.click((await screen.findAllByRole("button", { name: "Choose" }))[0]!);
+  const sheet = await screen.findByRole("dialog");
+  fireEvent.click(within(sheet).getByRole("switch", { name: "review in cloud threads" }));
+  await waitFor(() => expect((within(sheet).getByRole("switch", { name: "review in cloud threads" }) as HTMLInputElement).disabled).toBe(true));
+  expect((within(sheet).getByRole("switch", { name: "notes in cloud threads" }) as HTMLInputElement).disabled).toBe(false);
+  answer();
+  await waitFor(() => expect((within(sheet).getByRole("switch", { name: "review in cloud threads" }) as HTMLInputElement).disabled).toBe(false));
+});

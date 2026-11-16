@@ -6,6 +6,7 @@ import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { formatBytes } from "../lib/file-imports";
 import { Failure } from "./settings-secret-field";
 import { Section, SettingRow } from "./settings-shared";
+import "./settings-cloud-skills.css";
 
 type Choose = ReturnType<typeof useRpcMutation<"hostedSkills.choose">>;
 
@@ -27,20 +28,24 @@ const sentence = (cause: string) => cause.charAt(0).toUpperCase() + cause.slice(
 
 function SkillRow({ skill, agent, choose }: { skill: CloudSkill; agent: HostedAgent; choose: Choose }) {
   const pending = choose.isPending && choose.variables?.names.includes(skill.name) ? choose.variables.on : null;
-  const held = skill.cause !== null;
+  const cause = skill.cause;
   return (
-    <SettingRow label={skill.name} hint={skill.description ? <span className="line-clamp-2">{skill.description}</span> : undefined}>
-      <span className="text-ink-3 tabular-nums">{held ? "Can't be read" : formatBytes(skill.bytes ?? 0)}</span>
+    <div className="cloud-skill">
+      <div className="cloud-skill-text">
+        <div>{skill.name}</div>
+        {skill.description ? <div className="settings-hint line-clamp-2">{skill.description}</div> : null}
+      </div>
+      <span className="cloud-skill-size">{cause === null ? formatBytes(skill.bytes ?? 0) : "Can't be read"}</span>
       {/* The switch's knob covers its input, so a held one carries its reason around it. */}
-      <span data-tip={held ? sentence(skill.cause!) : undefined}>
+      <span data-tip={cause === null ? undefined : sentence(cause)}>
         <Switch
           aria-label={`${skill.name} in cloud threads`}
-          checked={held ? false : (pending ?? skill.on)}
-          disabled={held || choose.isPending}
+          checked={cause === null && (pending ?? skill.on)}
+          disabled={cause !== null || pending !== null}
           onChange={(event) => choose.mutate({ agent, names: [skill.name], on: event.target.checked }, { onSuccess: shown(agent) })}
         />
       </span>
-    </SettingRow>
+    </div>
   );
 }
 
@@ -52,8 +57,8 @@ function SkillSwitches({ agent, skills, choose }: { agent: HostedAgent; skills: 
   const names = sendable(listed).map((skill) => skill.name);
   const all = (on: boolean) => choose.mutate({ agent, names, on }, { onSuccess: shown(agent) });
   return (
-    <div className="space-y-3">
-      <div className="sticky top-0 z-10 -mt-3 flex items-center gap-3 bg-surface pt-3 pb-3">
+    <>
+      <div className="flex shrink-0 items-center gap-3 border-b border-line pb-3">
         <Input aria-label="Search skills" placeholder="Search" value={search} onChange={(event) => setSearch(event.target.value)} />
         <TextButton tone="muted" className="shrink-0" disabled={!names.length || choose.isPending} onClick={() => all(true)}>
           All on
@@ -62,14 +67,14 @@ function SkillSwitches({ agent, skills, choose }: { agent: HostedAgent; skills: 
           All off
         </TextButton>
       </div>
-      <div className="settings-group">
+      <div className="cloud-skills-list">
         {listed.map((skill) => (
           <SkillRow key={skill.name} skill={skill} agent={agent} choose={choose} />
         ))}
         {listed.length ? null : <p className="text-ink-3 py-3">No skill matches.</p>}
       </div>
       <Failure error={choose.error} />
-    </div>
+    </>
   );
 }
 
@@ -93,7 +98,7 @@ function AgentSkills({ agent, active }: { agent: HostedAgent; active: boolean })
           Choose
         </TextButton>
       ) : null}
-      <Dialog open={open} onOpenChange={setOpen} title={`${name} skills in the cloud`} width={640}>
+      <Dialog className="cloud-skills-dialog" open={open} onOpenChange={setOpen} title={`${name} skills in the cloud`} width={640}>
         <SkillSwitches agent={agent} skills={list} choose={choose} />
       </Dialog>
     </SettingRow>

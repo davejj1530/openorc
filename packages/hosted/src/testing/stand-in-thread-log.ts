@@ -38,3 +38,12 @@ export function pageOf(thread: Thread, query: URLSearchParams) {
     .map((stored) => wire(thread, stored));
   return { events, head: headOf(thread), ...(fromTurn !== undefined && { fromTurn }) };
 }
+
+/** A turn's end as its host writes it: one that ended on an ask nobody answered parks, and its end says so. */
+export const turnEnd = (turnId: string, status: "success" | "cancelled", parks: boolean) => ({
+  type: "turn.completed",
+  ts: Date.now(),
+  turnId,
+  ...(parks ? { status: "cancelled", parked: true } : { status }),
+  durationMs: 1000,
+});

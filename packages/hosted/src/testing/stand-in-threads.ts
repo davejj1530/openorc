@@ -33,7 +33,7 @@ import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 import { attachedPath, StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInCollaboration } from "./stand-in-collaboration.js";
 import { StandInNotes } from "./stand-in-notes.js";
-import { headOf, lastAgentSeq, messageOf, pageOf, turnEnds, wire } from "./stand-in-thread-log.js";
+import { headOf, lastAgentSeq, messageOf, pageOf, turnEnd, turnEnds, wire } from "./stand-in-thread-log.js";
 import { placeOwn, placeShared } from "./stand-in-thread-placement.js";
 import type { UploadedFile } from "../wire-files.js";
 
@@ -633,12 +633,10 @@ export class StandInThreads {
     thread.stopping = false;
     thread.stoppedBy = null;
     thread.turnStartedAt = null;
-    // A turn that ends on an ask nobody answered parks, and its end says so, as the server writes it.
     const parks = thread.asks.some((ask) => !ask.answered && !ask.parked);
     for (const ask of thread.asks) if (!ask.answered) ask.parked = true;
     thread.status = openAsk(thread) ? "needs_answer" : "idle";
-    const end = parks ? { status: "cancelled", parked: true } : { status };
-    this.append(threadId, [{ type: "turn.completed", ts: Date.now(), turnId: agentTurn(thread.turnId ?? `turn-${threadId}`), ...end, durationMs: 1000 }]);
+    this.append(threadId, [turnEnd(agentTurn(thread.turnId ?? `turn-${threadId}`), status, parks)]);
     thread.turnId = null;
     for (const message of thread.messages) if (message.state === "pending" && !this.#reads(message.author, thread)) message.state = "cancelled";
     const next = thread.messages.find((message) => message.state === "pending" && !message.paused);

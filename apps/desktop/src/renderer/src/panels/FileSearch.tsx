@@ -368,6 +368,8 @@ export function FileSearchResults({
                   aria-label={path}
                   data-tip={path}
                   onClick={() => open(scope, path)}
+                  draggable
+                  onDragStart={(event) => startFileDrag(event.dataTransfer, scope, path, false)}
                 >
                   <FileGlyph path={path} size={14} />
                   <span className="truncate">

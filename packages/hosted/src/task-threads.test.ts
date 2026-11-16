@@ -74,6 +74,22 @@ it("holds a newly prepared thread in the app's own client before returning it, w
   expect(await current.hosted.threads.call("threads.get", { id: result.threadId })).toMatchObject({ id: result.threadId, owner: { brain: "hosted" } });
 });
 
+it("makes a task's new thread with the opener's settings, their own permission among them", async () => {
+  stand.threadFiles.capabilities = { tasks: { available: true } };
+  const current = await taskClient(stand, ADMIN, { organization: true, personal: false });
+  close.push(current.close);
+  const settings = { agent: "claude", model: "claude-sonnet-5", effort: "medium", mode: "act", permissionMode: "autonomous" } as const;
+  const result = await current.tasks.openThread({ ...input(seed()), settings });
+  if (result.state !== "ready") throw new Error("Preparation conflicted");
+  expect(await current.hosted.threads.call("threads.get", { id: result.threadId })).toMatchObject({
+    agent: "claude",
+    model: "claude-sonnet-5",
+    effort: "medium",
+    mode: "act",
+    permissionMode: "autonomous",
+  });
+});
+
 it("opens one shared thread for two people without preparing or starting a paid turn", async () => {
   const a = await client(),
     b = await client(MEMBER),

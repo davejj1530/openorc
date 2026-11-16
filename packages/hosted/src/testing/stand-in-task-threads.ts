@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { OnlineTaskOpen } from "@openorc/protocol";
+import { OnlineTaskOpenThread } from "@openorc/protocol";
 import { fixturePerson, taskFixtureView, taskFixtureWire, type TaskFixtureDeps, type TaskFixtureRecord } from "./stand-in-task-data.js";
 
 type Reply = { status: number; body: unknown };
@@ -10,7 +10,7 @@ export class StandInTaskThreads {
   readonly #receipts = new Map<string, Receipt>();
   constructor(private readonly deps: TaskFixtureDeps) {}
   open(record: TaskFixtureRecord, who: string, body: unknown, accessRevision: number): Reply {
-    const parsed = OnlineTaskOpen.safeParse(body);
+    const parsed = OnlineTaskOpenThread.safeParse(body);
     if (!parsed.success) return refusal(400, "Check the task revision.");
     const task = record.task;
     const key = JSON.stringify([who, task.spaceId, task.id, parsed.data.requestId]);
@@ -28,7 +28,10 @@ export class StandInTaskThreads {
     const threads = this.deps.threads;
     if (!threads) return refusal(404, "Thread unavailable");
     const threadId = threads.addThread(who, { projectId: task.projectId, title: task.title });
-    threads.route({ method: "PATCH", path: `/hosted/threads/${threadId}`, query: new URLSearchParams(), space: task.spaceId }, who, { settings: { mode: "act", permissionMode: "review" } });
+    // Made with the opener's settings, over the server's own for what they leave out.
+    threads.route({ method: "PATCH", path: `/hosted/threads/${threadId}`, query: new URLSearchParams(), space: task.spaceId }, who, {
+      settings: { mode: "act", permissionMode: "review", ...parsed.data.settings },
+    });
     task.execution = { state: "readable", threadId, title: task.title };
     task.revision++;
     task.updatedAt = Date.now();

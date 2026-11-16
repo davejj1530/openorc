@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { isHostedAgent, type OnlineTask, type OnlineTaskRef, type OnlineTaskThreadSettings } from "@openorc/protocol";
-import { useRpc } from "./client";
+import { usePermissionSelection, useRpc } from "./client";
 import { useDefaultHarness } from "./default-harness";
 import { initialThreadChoice } from "./new-thread-availability";
 import { useHostedFileScope } from "./hosted-file-scope";
@@ -52,14 +52,18 @@ export function useTaskThreadAction({ reference, task, beforeOpen, getTask, onCo
   return { open, reason, pending, error };
 }
 
-/** The model a new cloud thread's composer starts with, so a task's new thread names the person's agent from the start. */
-function useCloudThreadSettings(): OnlineTaskThreadSettings | null {
+/**
+ * What a new cloud thread's composer starts with, so a task's new thread names the person's agent and runs with their
+ * own permission from the start, as their other cloud threads do.
+ */
+export function useCloudThreadSettings(): OnlineTaskThreadSettings | null {
   const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
   const info = useRpc("system.info", {});
   const preferred = useDefaultHarness();
-  if (!models.data || preferred === undefined) return null;
+  const { permission, ready } = usePermissionSelection();
+  if (!models.data || preferred === undefined || !ready) return null;
   const choice = initialThreadChoice(models.data, preferred, info.data, true);
-  return choice && isHostedAgent(choice.agent) ? { agent: choice.agent, model: choice.model, effort: choice.effort ?? null } : null;
+  return choice && isHostedAgent(choice.agent) ? { agent: choice.agent, model: choice.model, effort: choice.effort ?? null, mode: "act", permissionMode: permission } : null;
 }
 
 function taskThreadReason(task: OnlineTask, execution: boolean, available: boolean): string | null {

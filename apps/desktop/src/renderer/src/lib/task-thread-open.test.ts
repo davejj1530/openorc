@@ -25,7 +25,7 @@ it("flushes before capturing the revision and waits for existing files before st
 });
 it("makes a task's new thread with the model a new cloud thread starts with", async () => {
   const prepare = vi.fn(async () => ready());
-  const settings = { agent: "claude", model: "claude-sonnet-5", effort: "medium" } as const;
+  const settings = { agent: "claude", model: "claude-sonnet-5", effort: "medium", mode: "act", permissionMode: "autonomous" } as const;
   await new TaskThreadOpener(onlineReference, prepare).open({ ...fixture(), settings });
   expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ settings }));
 });

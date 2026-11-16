@@ -11,6 +11,7 @@ import { useRpc, useRpcMutation } from "../lib/client";
 import { agentName, agentStatusText, connectorOrigin, connectorStatus, isDormant, isYours } from "../lib/connector-presentation";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { ConnectorForm, type ConnectorDraft } from "./settings-connector-form";
+import { CloudLine } from "./settings-cloud-connector";
 import { LoadError } from "./settings-shared";
 import "./settings-connectors.css";
 
@@ -100,7 +101,7 @@ function RowMenu({ connector, onEdit, onProblem }: { connector: Connector; onEdi
  * One connector as a card: its image, name and where it comes from, Sign in when it needs one, and a line for each
  * agent that has it, saying how it stands there, with its switch.
  */
-function ConnectorCard({ connector, busy, onEdit }: { connector: Connector; busy: boolean; onEdit: () => void }) {
+function ConnectorCard({ connector, busy, cloud = false, onEdit }: { connector: Connector; busy: boolean; cloud?: boolean; onEdit: () => void }) {
   const [problem, setProblem] = useState<string | null>(null);
   const signIn = useRpcMutation("connectors.signIn");
   const status = connectorStatus(connector);
@@ -131,12 +132,13 @@ function ConnectorCard({ connector, busy, onEdit }: { connector: Connector; busy
         {connector.agents.map((agent) => (
           <AgentLine key={agent.agent} connector={connector} agent={agent} />
         ))}
+        {cloud ? <CloudLine connector={connector} active /> : null}
       </div>
     </li>
   );
 }
 
-function ConnectorGroup({ title, connectors, busy, onEdit }: { title: string; connectors: Connector[]; busy: boolean; onEdit: (connector: Connector) => void }) {
+function ConnectorGroup({ title, connectors, busy, cloud = false, onEdit }: { title: string; connectors: Connector[]; busy: boolean; cloud?: boolean; onEdit: (connector: Connector) => void }) {
   if (!connectors.length) return null;
   return (
     <section className="settings-section">
@@ -145,7 +147,7 @@ function ConnectorGroup({ title, connectors, busy, onEdit }: { title: string; co
       </header>
       <ul className="connector-grid">
         {connectors.map((connector) => (
-          <ConnectorCard key={connector.name} connector={connector} busy={busy} onEdit={() => onEdit(connector)} />
+          <ConnectorCard key={connector.name} connector={connector} busy={busy} cloud={cloud} onEdit={() => onEdit(connector)} />
         ))}
       </ul>
     </section>
@@ -208,7 +210,13 @@ export function ConnectorSettings({ active, description }: { active: boolean; de
       {list.isError ? <LoadError retry={() => void list.refetch()} /> : null}
       {list.data ? <SignInProgress list={list.data} /> : null}
       {list.data && !connectors.length ? <p className="settings-note">No connectors yet.</p> : null}
-      <ConnectorGroup title="Yours" connectors={connectors.filter((connector) => isYours(connector) && !isDormant(connector))} busy={busy} onEdit={(connector) => void edit(connector)} />
+      <ConnectorGroup
+        title="Yours"
+        connectors={connectors.filter((connector) => isYours(connector) && !isDormant(connector))}
+        busy={busy}
+        cloud={active}
+        onEdit={(connector) => void edit(connector)}
+      />
       <ConnectorGroup
         title="From projects, plugins and accounts"
         connectors={connectors.filter((connector) => !isYours(connector) && !isDormant(connector))}

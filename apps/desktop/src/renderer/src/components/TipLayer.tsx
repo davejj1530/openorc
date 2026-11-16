@@ -153,7 +153,8 @@ export function TipAt({
   return (
     <BaseTooltip.Root open={open} onOpenChange={(next) => (next ? undefined : onClose?.())}>
       <BaseTooltip.Portal>
-        <BaseTooltip.Positioner key={shown} anchor={anchor} sideOffset={6}>
+        {/* Above every floating layer, such as a list of suggestions, whose rows it explains. */}
+        <BaseTooltip.Positioner key={shown} anchor={anchor} sideOffset={6} className="z-50">
           <BaseTooltip.Popup ref={floatingGround} className={cn("tooltip-popup tooltip-popup-tip", detail && "tooltip-popup-detail")}>
             {label}
           </BaseTooltip.Popup>

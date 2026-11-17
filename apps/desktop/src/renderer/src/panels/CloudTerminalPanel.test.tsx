@@ -5,11 +5,11 @@ import type { HostedTerminal, HostedTerminalPush, HostedTerminals } from "@openo
 import { queryClient } from "../lib/client";
 import { CloudTerminalPanel } from "./CloudTerminalPanel";
 
-const screenState = vi.hoisted(() => ({ written: [] as string[], options: {} as Record<string, unknown>, type: (_data: string) => {} }));
+const screenState = vi.hoisted(() => ({ written: [] as string[], options: {} as Record<string, unknown>, type: (_data: string) => {}, cols: 80, rows: 24 }));
 vi.mock("@xterm/xterm", () => ({
   Terminal: class {
-    cols = 80;
-    rows = 24;
+    cols = screenState.cols;
+    rows = screenState.rows;
     options = screenState.options;
     element = undefined;
     loadAddon() {}
@@ -56,14 +56,20 @@ const b64 = (text: string) => btoa(text);
 beforeEach(() => {
   vi.stubGlobal(
     "ResizeObserver",
+    // As in a browser, a screen is heard once as it is first observed.
     class {
-      observe() {}
+      constructor(private readonly heard: () => void) {}
+      observe() {
+        queueMicrotask(this.heard);
+      }
       disconnect() {}
     },
   );
   screenState.written = [];
   screenState.options = {};
   screenState.type = () => {};
+  screenState.cols = 80;
+  screenState.rows = 24;
   localStorage.clear();
   queryClient.clear();
   output = "$ ls\r\n";
@@ -175,7 +181,7 @@ it("says only the server's reason for an end, beside the output it kept, and sta
 it("opens a terminal for a reader who may when the thread has none, and says why not for one who may not", async () => {
   listed = { terminals: [], canOpen: true, reason: null, viewer: ANA.id };
   show();
-  await waitFor(() => expect(calls("hosted.terminal.open")).toEqual([{ threadId: "thread", cols: 100, rows: 24 }]));
+  await waitFor(() => expect(calls("hosted.terminal.open")).toEqual([{ threadId: "thread", cols: 80, rows: 24 }]));
   cleanup();
   queryClient.clear();
   mock.call.mockClear();
@@ -183,6 +189,20 @@ it("opens a terminal for a reader who may when the thread has none, and says why
   show();
   expect(await screen.findByText("You can read this thread but not run its work.")).toBeTruthy();
   expect(calls("hosted.terminal.open")).toEqual([]);
+});
+
+it("opens a terminal at the size its screen settles at, so its shell starts as wide as the view, and shows it from the open's answer", async () => {
+  listed = { terminals: [], canOpen: true, reason: null, viewer: ANA.id };
+  const answer = mock.call.getMockImplementation()!;
+  let reads = 0;
+  // The list is read once; read again after the open, it hasn't answered yet.
+  mock.call.mockImplementation((method, params) => (method === "hosted.terminal.list" && reads++ > 0 ? new Promise(() => {}) : answer(method, params)));
+  screenState.cols = 63;
+  screenState.rows = 17;
+  show();
+  await waitFor(() => expect(calls("hosted.terminal.open")).toEqual([{ threadId: "thread", cols: 63, rows: 17 }]));
+  await waitFor(() => expect(calls("hosted.terminal.watch")).toEqual([{ threadId: "thread", terminalId: "terminal-2", watch: true }]));
+  expect(reads).toBe(2);
 });
 
 it("hides the cursor and takes no keys once the terminal has ended", async () => {
@@ -199,7 +219,7 @@ it("gives a second Terminal tab a terminal of its own, and finds each tab's agai
   expect(calls("hosted.terminal.open")).toEqual([]);
   // A second tab: the thread's one open terminal is the first tab's, so it opens another.
   show("shell-2");
-  await waitFor(() => expect(calls("hosted.terminal.open")).toEqual([{ threadId: "thread", cols: 100, rows: 24 }]));
+  await waitFor(() => expect(calls("hosted.terminal.open")).toEqual([{ threadId: "thread", cols: 80, rows: 24 }]));
   cleanup();
   queryClient.clear();
   mock.call.mockClear();

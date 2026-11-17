@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import type { HostedTerminal } from "@openorc/protocol";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import type { HostedTerminal, HostedTerminals } from "@openorc/protocol";
 import type { Terminal as Xterm } from "@xterm/xterm";
 import { Terminal } from "../components/icons";
 import { PanelBarMeta, PanelNotice } from "../components/PanelBar";
@@ -17,44 +17,47 @@ import { claimTerminal, terminalFor } from "./cloud-terminal-claims";
 const RESIZE_SETTLE_MS = 150;
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
+const WORDS = { end: "End terminal", endTip: "End this terminal", restart: "Restart terminal", restartTip: "Start a new terminal" };
 
 type Ids = { threadId: string; terminalId: string };
+type Size = { cols: number; rows: number };
 
 /**
  * Which terminal of a cloud thread this tab shows (cloud-terminal-claims.ts). A tab with none opens one for a reader
- * who may: opening a Terminal tab is asking for a shell, as on this Mac, so a second tab is a second terminal.
+ * who may: opening a Terminal tab is asking for a shell, as on this Mac, so a second tab is a second terminal. A
+ * terminal is opened by its screen (`opening`), at the size the screen settles at, so its shell starts at the view's
+ * size, as on this Mac.
  */
 function useCloudTerminal(threadId: string, slot: string) {
   const params = { threadId };
   const list = useRpc("hosted.terminal.list", params, { staleTime: 0 });
   const open = useRpcMutation("hosted.terminal.open");
   const end = useRpcMutation("hosted.terminal.end");
-  const [, setClaimed] = useState(0);
+  const [opening, setOpening] = useState(false);
   const asked = useRef(false);
   const data = list.data;
   const shown = data ? terminalFor(threadId, slot, data.terminals) : null;
-  const claim = (terminalId: string) => {
-    claimTerminal(threadId, slot, terminalId);
-    setClaimed((n) => n + 1);
-  };
   // The tab keeps the terminal it shows, so it finds it again, and other tabs leave it to it.
   const shownId = shown?.id;
   useEffect(() => {
     if (shownId) claimTerminal(threadId, slot, shownId);
   }, [threadId, slot, shownId]);
   const reread = () => void queryClient.invalidateQueries({ queryKey: ["hosted.terminal.list", params] });
-  const start = async () => {
-    const opened = await open.mutateAsync({ threadId, cols: 100, rows: 24 }).catch(() => null);
-    if (!opened) return;
-    claim(opened.id);
-    reread();
-  };
   useEffect(() => {
     if (!data || asked.current || shown || !data.canOpen) return;
     asked.current = true;
-    void start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on the first read
-  }, [data]);
+    setOpening(true);
+  }, [data, shown]);
+  const openAt = async (size: Size) => {
+    const opened = await open.mutateAsync({ threadId, ...size }).catch(() => null);
+    if (opened) {
+      claimTerminal(threadId, slot, opened.id);
+      // Shown from the server's answer while the list is read again.
+      queryClient.setQueryData<HostedTerminals>(["hosted.terminal.list", params], (read) => read && { ...read, terminals: [opened, ...read.terminals.filter((each) => each.id !== opened.id)] });
+      reread();
+    }
+    setOpening(false);
+  };
   const mine = Boolean(shown && data && shown.openedBy.id === data.viewer);
   // One's own running terminal restarts even with the most open: it is ended, and its end waited for, before the next opens.
   const running = Boolean(shown && mine && shown.state !== "ended");
@@ -65,15 +68,20 @@ function useCloudTerminal(threadId: string, slot: string) {
             await end.mutateAsync({ threadId, terminalId: shown.id }).catch(() => undefined);
             await endedSoon(threadId, shown.id);
           }
-          await start();
+          open.reset();
+          setOpening(true);
         }
       : null;
   const stop = () => {
     if (shown) void end.mutateAsync({ threadId, terminalId: shown.id }).then(reread, () => undefined);
   };
   const failure = open.error ?? list.error;
-  const retry = () => (open.error ? void start() : void list.refetch());
-  return { data, shown, mine, restart, stop, reread, failure, retry };
+  const retry = () => {
+    if (!open.error) return void list.refetch();
+    open.reset();
+    setOpening(true);
+  };
+  return { data, shown, mine, opening, openAt, restart, stop, reread, failure, retry };
 }
 
 /**
@@ -81,9 +89,16 @@ function useCloudTerminal(threadId: string, slot: string) {
  * it, with no cursor, and may end it. One that ended says only the server's reason for that end.
  */
 export function CloudTerminalPanel({ threadId, slot = "main" }: { threadId: string; slot?: string }) {
-  const { data, shown, mine, restart, stop, reread, failure, retry } = useCloudTerminal(threadId, slot);
+  const { data, shown, mine, opening, openAt, restart, stop, reread, failure, retry } = useCloudTerminal(threadId, slot);
   if (failure) return <TerminalEmpty title="Could not open a terminal" words={failure.message} onRetry={retry} />;
   if (!data) return null;
+  if (opening)
+    return (
+      <div className="h-full flex flex-col min-h-0">
+        <TerminalBar meta={<PanelBarMeta>OpenOrc Cloud</PanelBarMeta>} running={false} onStop={() => {}} onRestart={null} words={WORDS} />
+        <OpeningScreen onSettled={(size) => void openAt(size)} />
+      </div>
+    );
   if (!shown) return <TerminalEmpty title="No terminal here" words={data.reason ?? ""} onRetry={null} />;
   const owner = firstName(shown.openedBy.name);
   return (
@@ -93,7 +108,7 @@ export function CloudTerminalPanel({ threadId, slot = "main" }: { threadId: stri
         running={shown.state !== "ended"}
         onStop={stop}
         onRestart={mine && restart ? () => void restart() : null}
-        words={{ end: "End terminal", endTip: mine ? "End this terminal" : `End ${owner}'s terminal`, restart: "Restart terminal", restartTip: "Start a new terminal" }}
+        words={{ ...WORDS, endTip: mine ? WORDS.endTip : `End ${owner}'s terminal` }}
       />
       {shown.ended ? <EndedNotice message={shown.ended.message} onStart={restart && (() => void restart())} /> : null}
       <CloudTerminalView key={shown.id} threadId={threadId} terminal={shown} typing={mine} onChanged={reread} />
@@ -147,30 +162,27 @@ function EndedNotice({ message, onStart }: { message: string; onStart: (() => vo
   );
 }
 
-/** One terminal's screen: its output followed by offset, its opener's keystrokes and size sent on. */
-function CloudTerminalView({ threadId, terminal, typing, onChanged }: { threadId: string; terminal: HostedTerminal; typing: boolean; onChanged: () => void }) {
+/**
+ * An xterm drawn into the screen at `hostRef`, in the theme, fitted to the screen in the selected face. `settled`
+ * hears each size the screen settles at: once the view has slid in, and again on every change after.
+ */
+function useScreen(hostRef: RefObject<HTMLDivElement | null>, settled: (term: Xterm) => void): RefObject<Xterm | null> {
   const resolved = useTheme((s) => s.resolved);
   const preset = useTheme((s) => s.preset);
   const custom = useTheme((s) => s.custom);
-  const hostRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Xterm | null>(null);
-  const open = terminal.state === "open";
-  const openNow = useRef(open);
-  openNow.current = open;
+  const heard = useRef(settled);
+  heard.current = settled;
 
   useEffect(() => {
     const element = hostRef.current;
     if (!element) return;
     const { term, fit } = openXterm(element);
     termRef.current = term;
-    if (!typing) Object.assign(term.options, { disableStdin: true, cursorInactiveStyle: "none", cursorBlink: false });
-    const ids = { threadId, terminalId: terminal.id };
-    const unfollow = followOutput(term, ids, onChanged);
-    const keys = typing ? typeInto(term, ids, terminal.typed) : () => {};
     let settle = 0;
     const resize = (): void => {
       fit.fit();
-      if (typing && openNow.current) void core.call("hosted.terminal.size", { ...ids, cols: term.cols, rows: term.rows }).catch(() => undefined);
+      heard.current(term);
     };
     const observer = new ResizeObserver(() => {
       window.clearTimeout(settle);
@@ -182,10 +194,57 @@ function CloudTerminalView({ threadId, terminal, typing, onChanged }: { threadId
       window.clearTimeout(settle);
       observer.disconnect();
       stopFont();
-      unfollow();
-      keys();
       term.dispose();
       termRef.current = null;
+    };
+  }, [hostRef]);
+
+  useEffect(() => {
+    const term = termRef.current;
+    if (term) term.options.theme = terminalTheme(getComputedStyle(term.element ?? document.documentElement), isDark());
+  }, [resolved, preset, custom]);
+
+  return termRef;
+}
+
+/** The screen a terminal is opened from, empty until it is: it opens the terminal at the size it first settles at. */
+function OpeningScreen({ onSettled }: { onSettled: (size: Size) => void }) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const asked = useRef(false);
+  useScreen(hostRef, (term) => {
+    if (asked.current) return;
+    asked.current = true;
+    onSettled({ cols: term.cols, rows: term.rows });
+  });
+  return <ScreenHost hostRef={hostRef} />;
+}
+
+function ScreenHost({ hostRef }: { hostRef: RefObject<HTMLDivElement | null> }) {
+  return (
+    <div className="relative flex-1 min-h-0">
+      <div ref={hostRef} className="absolute inset-0 pl-5 pr-2.5 pb-2.5" />
+    </div>
+  );
+}
+
+/** One terminal's screen: its output followed by offset, its opener's keystrokes and size sent on. */
+function CloudTerminalView({ threadId, terminal, typing, onChanged }: { threadId: string; terminal: HostedTerminal; typing: boolean; onChanged: () => void }) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const open = terminal.state === "open";
+  const termRef = useScreen(hostRef, (term) => {
+    if (typing && open) void core.call("hosted.terminal.size", { threadId, terminalId: terminal.id, cols: term.cols, rows: term.rows }).catch(() => undefined);
+  });
+
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+    if (!typing) Object.assign(term.options, { disableStdin: true, cursorInactiveStyle: "none", cursorBlink: false });
+    const ids = { threadId, terminalId: terminal.id };
+    const unfollow = followOutput(term, ids, onChanged);
+    const keys = typing ? typeInto(term, ids, terminal.typed) : () => {};
+    return () => {
+      unfollow();
+      keys();
     };
     // The screen belongs to one terminal; its state changing does not start it again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -197,7 +256,7 @@ function CloudTerminalView({ threadId, terminal, typing, onChanged }: { threadId
     if (!term || terminal.state !== "ended") return;
     Object.assign(term.options, { disableStdin: true, cursorInactiveStyle: "none", cursorBlink: false });
     term.blur();
-  }, [terminal.state]);
+  }, [termRef, terminal.state]);
 
   // Open, or opened since the screen was made: the shell is told the view's size, and the opener types in it.
   useEffect(() => {
@@ -205,18 +264,9 @@ function CloudTerminalView({ threadId, terminal, typing, onChanged }: { threadId
     if (!term || !open || !typing) return;
     void core.call("hosted.terminal.size", { threadId, terminalId: terminal.id, cols: term.cols, rows: term.rows }).catch(() => undefined);
     term.focus();
-  }, [open, typing, threadId, terminal.id]);
+  }, [termRef, open, typing, threadId, terminal.id]);
 
-  useEffect(() => {
-    const term = termRef.current;
-    if (term) term.options.theme = terminalTheme(getComputedStyle(term.element ?? document.documentElement), isDark());
-  }, [resolved, preset, custom]);
-
-  return (
-    <div className="relative flex-1 min-h-0">
-      <div ref={hostRef} className="absolute inset-0 pl-5 pr-2.5 pb-2.5" />
-    </div>
-  );
+  return <ScreenHost hostRef={hostRef} />;
 }
 
 /**

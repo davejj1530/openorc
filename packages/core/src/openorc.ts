@@ -49,7 +49,7 @@ import { rememberedConnectors } from "./services/remembered-connectors.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
 import { createCodeExplanationHandlers } from "./handlers/code-explanations.js";
 import { createDeviceHandlers } from "./handlers/devices.js";
-import { invalidParamsMessage, rpcLogLine } from "./handlers/diagnostics.js";
+import { invalidParamsMessage, logRpc } from "./handlers/diagnostics.js";
 import { createEventsHandlers } from "./handlers/events.js";
 import { createFilesHandlers } from "./handlers/files.js";
 import { createSkillsHandlers } from "./handlers/skills.js";
@@ -651,9 +651,7 @@ export class OpenOrc {
       const handler = this.handlers[method as RpcMethod] as (p: unknown) => Promise<unknown> | unknown;
       const started = Date.now();
       const result = await requestOrigin.run(origin, () => handler(parsed.data));
-      if (process.env["OPENORC_RPC_LOG"] === "1") {
-        console.log(rpcLogLine(method, parsed.data, result, Date.now() - started));
-      }
+      logRpc(method, parsed.data, result, started);
       return { type: "rpc.result", id, result: result ?? null };
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);

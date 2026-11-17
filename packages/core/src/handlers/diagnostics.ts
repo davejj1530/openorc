@@ -18,3 +18,8 @@ export function resultSummary(result: unknown): string {
 export function rpcLogLine(method: string, params: unknown, result: unknown, ms: number): string {
   return `[rpc] ${method} ${secretParams(method) ? "[private]" : JSON.stringify(params).slice(0, 120)} -> ${resultSummary(result)} in ${ms} ms`;
 }
+
+/** Writes the call's `rpcLogLine` when OPENORC_RPC_LOG is 1. */
+export function logRpc(method: string, params: unknown, result: unknown, startedAt: number): void {
+  if (process.env["OPENORC_RPC_LOG"] === "1") console.log(rpcLogLine(method, params, result, Date.now() - startedAt));
+}

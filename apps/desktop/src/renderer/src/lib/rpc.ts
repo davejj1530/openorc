@@ -126,21 +126,10 @@ class CoreClient implements CoreConnection {
         this.push({ type: "session", resumed });
         return;
       }
-      case "rpc.result": {
-        const p = this.pending.get(msg.id);
-        if (!p) return;
-        this.pending.delete(msg.id);
-        p.resolve(msg.result);
+      case "rpc.result":
+      case "rpc.error":
+        this.answer(msg);
         return;
-      }
-      case "rpc.error": {
-        const p = this.pending.get(msg.id);
-        if (!p) return;
-        this.pending.delete(msg.id);
-        if (!msg.superseded) console.error(`rpc ${msg.id} failed: ${msg.message}`);
-        p.reject(new Error(msg.message));
-        return;
-      }
       case "frame":
         this.push({ type: "frame", frame: msg.frame });
         return;
@@ -168,6 +157,16 @@ class CoreClient implements CoreConnection {
         emit(this.benchListeners, { eventsSent: msg.eventsSent, framesSent: msg.framesSent, durationMs: msg.durationMs });
         return;
     }
+  }
+
+  /** A call's answer: its result, or its failure, logged unless the read was only superseded. */
+  private answer(msg: Extract<CorePush, { type: "rpc.result" | "rpc.error" }>): void {
+    const p = this.pending.get(msg.id);
+    if (!p) return;
+    this.pending.delete(msg.id);
+    if (msg.type === "rpc.result") return p.resolve(msg.result);
+    if (!msg.superseded) console.error(`rpc ${msg.id} failed: ${msg.message}`);
+    p.reject(new Error(msg.message));
   }
 
   private setStartup(message: string | null): void {

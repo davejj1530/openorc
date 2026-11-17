@@ -75,6 +75,8 @@ export interface LiveSocket {
 export interface HostedDeps {
   /** The server's origin. Tests pass their stand-in's. */
   server: string;
+  /** The account no longer belongs to an organization it belonged to when last read: what this device keeps of it goes. */
+  spaceLeft?(left: { apiOrigin: string; accountId: string; spaceId: string }): void;
   /**
    * Keeps the signed-in session (its token and address, as one opaque value) in protected storage. The package reads
    * it once at start, holds it in memory, and never returns, logs or throws the token. `save(null)` forgets it.

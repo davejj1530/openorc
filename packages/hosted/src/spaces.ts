@@ -21,7 +21,7 @@ export interface SpaceCatalog {
   ids: string[];
   projects: ScopedProject[];
 }
-type SpacesDeps = { session: Session; accessChanged?(): void } & Pick<HostedDeps, "browser" | "server" | "kept" | "projects" | "push" | "now">;
+type SpacesDeps = { session: Session; accessChanged?(): void } & Pick<HostedDeps, "browser" | "server" | "kept" | "projects" | "push" | "now" | "spaceLeft">;
 
 /** The account's membership and project authority, independent of any window's selected space. */
 export class Spaces implements HostedSpaces {
@@ -178,8 +178,10 @@ export class Spaces implements HostedSpaces {
         ),
       ]);
       if (!this.#current(generation)) return;
-      const before = this.#snapshot?.email === state.email ? this.#snapshot.index.organizationAccess : undefined;
+      const previous = this.#snapshot?.email === state.email ? this.#snapshot : null;
+      const before = previous?.index.organizationAccess;
       this.#snapshot = { apiOrigin: this.#origin, email: state.email, index, projects: projects.rows, heardAt: this.deps.now() };
+      this.#tellLeft(previous?.index, index);
       // A deadline passing changes access with nothing pushed; the account's plan and hours are read again with it.
       if (before !== undefined && JSON.stringify(before) !== JSON.stringify(index.organizationAccess)) this.deps.accessChanged?.();
       this.#error = projects.error ?? inbox.error;
@@ -296,6 +298,12 @@ export class Spaces implements HostedSpaces {
   }
   #assertCurrent(generation: number): void {
     if (!this.#current(generation)) throw new Refused("Your OpenOrc session changed. Try again.");
+  }
+  /** The organizations the same account no longer belongs to, since the last read. */
+  #tellLeft(before: Snapshot["index"] | undefined, now: Snapshot["index"]): void {
+    if (!before || before.userId !== now.userId) return;
+    for (const space of before.spaces)
+      if (space.kind === "organization" && !now.spaces.some((still) => still.id === space.id)) this.deps.spaceLeft?.({ apiOrigin: this.#origin, accountId: now.userId, spaceId: space.id });
   }
   #tell(): void {
     const status = this.status();

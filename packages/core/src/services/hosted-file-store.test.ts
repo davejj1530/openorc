@@ -95,3 +95,17 @@ it("keeps an oversized file's refusal without copying its bytes", async () => {
   const account = (await readdir(path.join(directory, "hosted-files")))[0]!;
   expect(await readdir(path.join(directory, "hosted-files", account))).toEqual([`${draft.id}.json`]);
 });
+
+it("forgets every file of a left organization's drafts, bytes and all, and keeps the account's others", async () => {
+  const left = { ...input(5), draftKey: "team-chat-files:left" };
+  left.scope = { ...left.scope, spaceId: "left-space", destination: { kind: "chat", conversationId: "general" } };
+  const kept = input(5);
+  for (const draft of [left, kept]) {
+    await store.begin(draft);
+    await store.append(draft, 0, Buffer.from("bytes"));
+  }
+  await store.forgetSpace({ apiOrigin: left.scope.apiOrigin, accountId: left.scope.accountId, spaceId: "left-space" });
+  expect(await store.list(left)).toEqual([]);
+  expect((await store.list(kept)).map((record) => record.id)).toEqual([kept.id]);
+  await expect(store.get(left)).rejects.toThrow("That file isn't in this draft.");
+});

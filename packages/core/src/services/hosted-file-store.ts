@@ -26,7 +26,17 @@ export class HostedFileStore {
   }
 
   async list(input: Pick<HostedFileRef, "scope" | "draftKey">): Promise<HostedFileRecord[]> {
-    const directory = this.#directory(input.scope);
+    const records = await this.#records(input.scope);
+    return records.filter((record) => sameFileDraft(record, input)).sort((a, b) => a.selectedAt - b.selectedAt);
+  }
+
+  /** Forgets every file of an organization's drafts, bytes and all, once the account no longer belongs to it. */
+  async forgetSpace(left: { apiOrigin: string; accountId: string; spaceId: string }): Promise<void> {
+    for (const record of await this.#records(left)) if (record.scope.spaceId === left.spaceId) await this.remove(record);
+  }
+
+  async #records(scope: Pick<HostedFileRef["scope"], "apiOrigin" | "accountId">): Promise<HostedFileRecord[]> {
+    const directory = this.#directory(scope);
     const entries = await readdir(directory).catch((error: unknown) => {
       if (missing(error)) return [];
       throw error;
@@ -35,9 +45,9 @@ export class HostedFileStore {
     for (const name of entries) {
       if (!/^[0-9a-f-]{36}\.json$/i.test(name)) continue;
       const record = await this.#read(path.join(directory, name));
-      if (record && sameFileDraft(record, input)) result.push(record);
+      if (record) result.push(record);
     }
-    return result.sort((a, b) => a.selectedAt - b.selectedAt);
+    return result;
   }
 
   async get(ref: HostedFileRef): Promise<HostedFileRecord> {
@@ -177,7 +187,7 @@ export class HostedFileStore {
     }
   }
 
-  #directory(scope: HostedFileRef["scope"]): string {
+  #directory(scope: Pick<HostedFileRef["scope"], "apiOrigin" | "accountId">): string {
     const key = createHash("sha256")
       .update(JSON.stringify([scope.apiOrigin, scope.accountId]))
       .digest("hex");

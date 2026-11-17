@@ -2,7 +2,7 @@
 import { macOrigins } from "./mac-projects.js";
 import { packProject, uploadOf } from "./mac-work.js";
 import { cloudMoves, projects, settings, type Db } from "@openorc/db";
-import { createHosted, type Hosted, type OwnSkills } from "@openorc/hosted";
+import { createHosted, type Hosted, type HostedDeps, type OwnSkills } from "@openorc/hosted";
 import { liveSocketOf } from "@openorc/hosted/socket";
 import { randomUUID } from "node:crypto";
 import { io } from "socket.io-client";
@@ -48,6 +48,8 @@ export interface AccountDeps {
   skills: OwnSkills;
   log: Logger;
   textGeneration?: Pick<TextGenerationService, "title">;
+  /** The account left an organization; this Mac forgets what it keeps of it. */
+  spaceLeft?: HostedDeps["spaceLeft"];
 }
 
 /** The account for this core: none with no account server. */
@@ -100,6 +102,7 @@ function createAccount(deps: AccountDeps): Hosted {
     skills: deps.skills,
     now: Date.now,
     log: deps.log,
+    ...(deps.spaceLeft && { spaceLeft: deps.spaceLeft }),
     nameThread: generator ? (thread, exchange) => nameThread(thread, exchange, (input, agent, account) => generator.title(input, agent, account), deps.log) : undefined,
   });
 }

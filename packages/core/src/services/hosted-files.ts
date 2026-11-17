@@ -27,6 +27,12 @@ export class HostedFiles {
     this.assets = new HostedAssets(deps);
   }
 
+  /** The account left an organization: its drafts' files are no longer theirs to send, so they go from this Mac. */
+  async forgetSpace(left: { apiOrigin: string; accountId: string; spaceId: string }): Promise<void> {
+    await this.#store.forgetSpace(left);
+    this.deps.changed();
+  }
+
   capture(scope: HostedFileScope): Promise<HostedFileScope> {
     const account = this.deps.account();
     if (!account) throw new Error("Sign in to OpenOrc to attach files.");

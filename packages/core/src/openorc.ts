@@ -375,7 +375,15 @@ export class OpenOrc {
     if (this.hosted === undefined)
       this.hosted = accountFor(
         this.options,
-        { db: this.db, windows: this.accountTransport, notices: () => this.settings.get().notifications, claude: this.claudeAccounts, skills: this.ownSkills(), log: this.log },
+        {
+          db: this.db,
+          windows: this.accountTransport,
+          notices: () => this.settings.get().notifications,
+          claude: this.claudeAccounts,
+          skills: this.ownSkills(),
+          log: this.log,
+          spaceLeft: (left) => void this.hostedFiles.forgetSpace(left).catch((error: unknown) => this.log.warn(`hosted files: a left organization's drafts could not be forgotten: ${String(error)}`)),
+        },
         this.textGeneration,
       );
     return this.hosted;

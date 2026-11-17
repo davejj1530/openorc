@@ -77,6 +77,7 @@ function account() {
   type Row = { id: string; space: string; projectId: string; title: string; settings: { agent: "claude"; model: null; effort: null; mode: "act"; permissionMode: "trusted" } };
   const rows = new Map<string, Row>();
   const made = new Map<string, Row>();
+  const leaving = new Set<string>();
   const cloud = {
     save: null as null | { branch: string; head: string; base: string; bundle: boolean; uncommitted: boolean; savedAt: string },
     bundle: "",
@@ -96,7 +97,10 @@ function account() {
       summary: (id: string) => ({ id, projectId: cloud.summaryProject }),
       cloudProjectFor: () => ({ id: "cloud-app", space: "personal" }),
       // The Mac hears a thread made on the server once it reads the server again.
-      refresh: async () => made.forEach((row, id) => rows.set(id, row)),
+      refresh: async () => {
+        made.forEach((row, id) => rows.set(id, row));
+        leaving.forEach((id) => rows.delete(id));
+      },
     },
     moves: {
       arrive: async (space: string, input: { id: string; projectId: string }) => (sent.arrived.push({ space, id: input.id, projectId: input.projectId }), { id: input.id }),
@@ -126,7 +130,7 @@ function account() {
       savedSession: async () => (cloud.session ? new Response(new Uint8Array(cloud.session)) : new Response(null, { status: 404 })),
       movedAway: async (_space: string, id: string) => {
         sent.away.push(id);
-        rows.delete(id);
+        leaving.add(id);
       },
     },
     macProjects: {
@@ -138,7 +142,7 @@ function account() {
   return { hosted, sent, fail, rows, cloud };
 }
 
-function moves(hosted: Hosted, deleted: string[] = []) {
+function moves(hosted: Hosted, deleted: string[] = [], changed: (id: string) => void = () => {}) {
   return new CloudMoves({
     db,
     hosted: () => hosted,
@@ -149,7 +153,7 @@ function moves(hosted: Hosted, deleted: string[] = []) {
       deleted.push(id);
       threads.delete(db, id);
     },
-    changed: () => {},
+    changed,
     machine: "this Mac",
     log: quiet,
   });
@@ -294,11 +298,14 @@ describe("a cloud thread moving to this Mac", () => {
     const project = projects.insert(db, { name: "App", rootPath: folder, gitRemote: "https://github.com/acme/app.git", defaultBranch: "main", settings: {} });
     const made = account();
     const id = await cloudThread(made, project);
-    const service = moves(made.hosted);
+    // Each time the thread is said to have changed: whether it has arrived here while the Mac still reads it from the cloud.
+    const both: boolean[] = [];
+    const service = moves(made.hosted, [], (changed) => both.push(cloudMoves.latest(db, changed)?.phase === "done" && made.hosted.threads.holds({ thread: changed })));
     expect(await service.check(id)).toEqual({ to: "mac", can: true, ends: [] });
     await service.move(id, false);
     await settled(id);
     expect(cloudMoves.latest(db, id)).toMatchObject({ phase: "done", error: null });
+    expect(both).not.toContain(true);
     expect(made.sent.away).toEqual([id]);
     const here = threads.get(db, id)!;
     expect(here).toMatchObject({ projectId: project.id, title: "Fix the login", branch: "openorc/fix-the-login-6f1c2d3e", importedFrom: `cloud:${id}` });
@@ -310,6 +317,18 @@ describe("a cloud thread moving to this Mac", () => {
     expect(git(here.worktreePath!, "status", "--porcelain")).toBe("M README.md");
     const taken = await readFile(claudeSessionFile(claude, here.worktreePath!, SESSION), "utf8");
     expect(taken).toContain(here.worktreePath!);
+  });
+
+  it("comes into a worktree at its base, its conversation with it, when the cloud kept nothing beyond the base", async () => {
+    const project = projects.insert(db, { name: "App", rootPath: folder, gitRemote: "https://github.com/acme/app.git", defaultBranch: "main", settings: {} });
+    const made = account();
+    const id = await cloudThread(made, project);
+    made.cloud.save = { ...made.cloud.save!, bundle: false, uncommitted: false };
+    await moves(made.hosted).move(id, false);
+    await settled(id);
+    const here = threads.get(db, id)!;
+    expect(git(here.worktreePath!, "rev-parse", "HEAD")).toBe(made.cloud.save.base);
+    expect(await readFile(claudeSessionFile(claude, here.worktreePath!, SESSION), "utf8")).toContain(here.worktreePath!);
   });
 
   it("leaves a folder of the thread's with other work alone, and stays in the cloud", async () => {

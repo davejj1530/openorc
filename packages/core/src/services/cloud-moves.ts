@@ -36,7 +36,7 @@ const ONLY_OWN_SPACE = "Only a thread in your own space can move to this Mac.";
 const NOT_HERE = "This project isn't on this Mac.";
 /** How long a move to this Mac waits for the thread to leave its cloud machine with a save. */
 const CURRENT_MS = 3 * 60_000;
-/** How long a move to the cloud waits to hear the cloud thread before it lets the Mac's go. */
+/** How long a move waits for this Mac's list of cloud threads to take the thread in, or let it go. */
 const HEARD_MS = 30_000;
 
 const words = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -195,19 +195,19 @@ export class CloudMoves {
     }
     // The commit point is passed: the cloud thread is whole. Let the Mac's go once the cloud's is heard, so the thread is
     // never in neither list.
-    await this.heard(hosted, thread.id);
+    await this.listed(hosted, thread.id, true);
     this.step(move, { phase: "done", step: null });
     await this.deps.deleteThread(thread.id).catch((error: unknown) => this.deps.log.warn(`thread ${thread.id} moved to OpenOrc Cloud and its copy here couldn't be deleted: ${words(error)}`));
     this.deps.changed(thread.id);
   }
 
-  /** Waits a while for this Mac to hear the cloud thread it just made, reading the server again meanwhile. */
-  private async heard(hosted: Hosted, threadId: string): Promise<void> {
+  /** Waits a while for this Mac's list of cloud threads to hold the thread, or to let it go, reading the server again meanwhile. */
+  private async listed(hosted: Hosted, threadId: string, held: boolean): Promise<void> {
     const until = (this.deps.now ?? Date.now)() + HEARD_MS;
-    const known = () => hosted.threads.holds({ thread: threadId });
-    while (!known() && (this.deps.now ?? Date.now)() < until) {
+    const settled = () => hosted.threads.holds({ thread: threadId }) === held;
+    while (!settled() && (this.deps.now ?? Date.now)() < until) {
       await hosted.threads.refresh?.().catch(() => undefined);
-      if (!known()) await new Promise((resolve) => setTimeout(resolve, 500));
+      if (!settled()) await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }
 
@@ -250,6 +250,7 @@ export class CloudMoves {
       const thread = this.writeHere(threadId, local, row, runId, events, session);
       written = true;
       if (work.save?.bundle) await this.workHere(hosted, row.space, thread, local, work.save, temp);
+      else await this.worktreeAt(thread, local, work.save?.base ?? null);
       const placed = threads.get(this.deps.db, threadId)!;
       if (session && placed.worktreePath)
         await this.deps.sessions.take({ id: threadId, agent: placed.agent, claudeAccountId: placed.claudeAccountId, children: [] }, session, placed.worktreePath, `cloud-${move.id}`);
@@ -263,9 +264,15 @@ export class CloudMoves {
     } finally {
       await rm(temp, { recursive: true, force: true });
     }
+    // Gone from the cloud: this Mac's list lets it go before the thread shows here, so no read of it goes there.
+    await this.listed(hosted, threadId, false);
     this.step(move, { phase: "done", step: null });
-    await hosted.threads.refresh?.();
-    this.deps.changed(threadId);
+  }
+
+  /** A thread whose cloud folder held nothing beyond its base works here from that base, in a worktree of its own. */
+  private async worktreeAt(thread: Thread, project: Project, base: string | null): Promise<void> {
+    const held = base !== null && (await git(project.rootPath, ["cat-file", "-e", `${base}^{commit}`], { okCodes: [0, 1, 128] })).code === 0;
+    await this.deps.workspaces.prepareThread(thread, project, held ? base : undefined);
   }
 
   /** Has the thread leave its machine with a save, as Bring does, and answers that save once it is current. */

@@ -18,7 +18,7 @@ import { MessageSquare, Orclings, Search } from "./icons";
 import { ProjectLogo } from "./ProjectIconPicker";
 import { StatusIcon } from "./status";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
-import { HostedPaletteUnavailable, useHostedPaletteSearch } from "./HostedPaletteSearch";
+import { HostedPaletteUnavailable, usePaletteSearch } from "./HostedPaletteSearch";
 import { HOSTED_REASONS } from "@openorc/protocol";
 
 /** Threads listed before a word is typed. */
@@ -49,9 +49,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   const organization = useOrganization();
   const mode = useUi((s) => s.paletteMode);
   const [query, setQuery] = useState("");
-  const search = useHostedPaletteSearch(open, query);
-  // Messages match by prefix from two characters on, across every thread's conversation.
-  const hits = useRpc("threads.search", { query, limit: 20 }, { enabled: search.enabled, staleTime: 5_000 });
+  const search = usePaletteSearch(open, query);
   useEffect(() => {
     if (!open) setQuery("");
   }, [open]);
@@ -77,11 +75,11 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             {search.reason ? (
               <HostedPaletteUnavailable label="Search messages" reason={search.reason} />
             ) : (
-              <Command.Empty className="px-3 py-6 text-center text-base text-ink-3">{emptySearchMessage(query, mode === "messages", hits.isFetching)}</Command.Empty>
+              <Command.Empty className="px-3 py-6 text-center text-base text-ink-3">{emptySearchMessage(query, mode === "messages", search.fetching)}</Command.Empty>
             )}
             {mode === "all" ? <PlaceGroups typed={typed} go={go} /> : null}
             {mode === "all" && typed ? <TeamChatPalette onOpened={() => onOpenChange(false)} /> : null}
-            <MessageHits hits={search.messagesAvailable ? (hits.data ?? []) : []} go={go} />
+            <MessageHits hits={search.hits} go={go} />
             <TeamChatSearchHits query={query} onOpened={() => onOpenChange(false)} />
             {mode === "all" && typed ? <ProjectGroup go={go} /> : null}
             {mode === "messages" ? null : (
@@ -89,7 +87,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                 {paletteActions
                   .filter((action) => (action.available?.() ?? true) && !(organization?.organization && action.label === "Add project"))
                   .map(({ label, icon: Icon, run }) =>
-                    search.reason && label === "New file" ? (
+                    search.cloudThread && label === "New file" ? (
                       <HostedPaletteUnavailable key={label} label={label} reason={HOSTED_REASONS.fileBrowser} />
                     ) : (
                       <Item key={label} onSelect={() => go(run)} icon={<Icon size={15} />} label={label} />

@@ -1,17 +1,24 @@
 import { Command } from "cmdk";
 import { HOSTED_REASONS } from "@openorc/protocol";
 import { useRpc } from "../lib/client";
-import { useOrganization } from "../lib/organization-context";
 import { useRouter } from "../lib/router";
 import { HostedControlReason } from "./HostedControlReason";
 
-export function useHostedPaletteSearch(open: boolean, query: string) {
+/**
+ * The palette's message search, of this Mac's threads and the space's cloud threads alike: the space's `threads.search`
+ * reaches both. `hits` are shown once the open thread's place is known. `reason` is why it could not search, when a
+ * cloud server without the search says so; `cloudThread` is
+ * an open cloud thread, whose files the palette does not make yet.
+ */
+export function usePaletteSearch(open: boolean, query: string) {
   const threadId = useRouter(({ route }) => (route.view === "thread" ? route.threadId : null));
   const thread = useRpc("threads.get", { id: threadId ?? "" }, { enabled: open && Boolean(threadId) });
-  const organization = useOrganization();
-  const hosted = thread.data?.owner?.brain === "hosted" || Boolean(organization?.organization);
   const ready = !threadId || thread.isSuccess;
-  return { reason: hosted ? HOSTED_REASONS.search : null, messagesAvailable: ready && !hosted, enabled: open && ready && !hosted && query.trim().length >= 2 };
+  // Messages match by prefix from two characters on, across every thread's conversation.
+  const hits = useRpc("threads.search", { query, limit: 20 }, { enabled: open && ready && query.trim().length >= 2, staleTime: 5_000 });
+  const reason = hits.error?.message === HOSTED_REASONS.search ? HOSTED_REASONS.search : null;
+  // Until the open thread's place is known, nothing found earlier is shown.
+  return { hits: ready && !reason ? (hits.data ?? []) : [], reason, cloudThread: thread.data?.owner?.brain === "hosted", fetching: hits.isFetching };
 }
 
 export function HostedPaletteUnavailable({ label, reason }: { label: string; reason: string }) {

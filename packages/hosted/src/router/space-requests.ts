@@ -34,9 +34,12 @@ export class SpaceRequests {
       case "threads.start":
         return this.start(request, rpcParams["threads.start"].parse(request.params), projects, local);
       case "threads.search": {
-        const { spaceId: _space, ...params } = rpcParams["threads.search"].parse(request.params);
+        const { spaceId, ...params } = rpcParams["threads.search"].parse(request.params);
         const ids = local.filter((id) => !params.projectId || id === params.projectId);
-        const pages = await Promise.all(ids.map((projectId) => this.read(request, "threads.search", { ...params, projectId })));
+        const place = this.deps.place();
+        // The space's cloud threads are searched where they are kept, as this Mac's are here.
+        const cloud = place?.active && place.search ? place.search(spaceId!, params) : Promise.resolve([]);
+        const pages = await Promise.all([...ids.map((projectId) => this.read(request, "threads.search", { ...params, projectId })), cloud]);
         return pages
           .flat()
           .sort((a, b) => b.ts - a.ts || a.messageId.localeCompare(b.messageId))

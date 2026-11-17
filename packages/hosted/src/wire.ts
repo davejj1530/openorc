@@ -290,6 +290,26 @@ export const ROUTES = {
   ready: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/ready`, null),
   answer: (askId: string) => route("POST", `/hosted/asks/${encodeURIComponent(askId)}/answer`, wireAnswered),
   stopCommand: (id: string, commandId: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/commands/${encodeURIComponent(commandId)}/stop`, null),
+  /** The person's cloud threads' messages in the space that hold the words, newest first. */
+  search: (q: string, limit: number) =>
+    route(
+      "GET",
+      `/hosted/search?${new URLSearchParams({ q, limit: String(limit) })}`,
+      z.object({
+        hits: z.array(
+          z.object({
+            threadId: z.string(),
+            title: z.string(),
+            projectId: z.string().nullable(),
+            messageId: z.string(),
+            turn: z.number().int().nonnegative(),
+            role: z.enum(["user", "assistant"]),
+            snippet: z.string(),
+            at: z.number(),
+          }),
+        ),
+      }),
+    ),
   /** One tool call's whole output, as the server kept it; null output for a call that never ended. */
   toolOutput: (id: string, toolCallId: string) => route("GET", `/hosted/threads/${encodeURIComponent(id)}/tool-calls/${encodeURIComponent(toolCallId)}/output`, z.object({ output: z.unknown() })),
   /** The agent folds the conversation between turns. Asking again with the same id is the same compaction. */

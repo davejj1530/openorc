@@ -22,6 +22,7 @@ import {
   type RoutedMethod,
   type RpcParams,
   type RpcResults,
+  type ThreadSearchHit,
   type ThreadSummary,
 } from "@openorc/protocol";
 import { z } from "zod";
@@ -339,6 +340,44 @@ export class Threads implements HostedThreads {
     const row = this.#rows().get(threadId);
     if (!row) throw new Error(GONE);
     return row;
+  }
+
+  /**
+   * The palette's search of a space's cloud threads (`threads.search`): the server's hits in the app's shape, each in a
+   * thread the account lists, under the project the sidebar shows it in. A server without the search says so in the
+   * app's words rather than finding nothing.
+   */
+  async search(spaceId: string, { query, projectId, limit = 30 }: Omit<RpcParams<"threads.search">, "spaceId">): Promise<ThreadSearchHit[]> {
+    const listed = new Map(this.#summaries(spaceId).map((summary) => [summary.id, summary]));
+    const found = await this.deps.session
+      .in(spaceId)
+      .request(ROUTES.search(query, projectId ? 100 : limit))
+      .catch((error: unknown) => {
+        if (error instanceof Refused && error.status === 404) throw new Refused(HOSTED_REASONS.search);
+        throw error;
+      });
+    return found.hits
+      .flatMap((hit): ThreadSearchHit[] => {
+        const thread = listed.get(hit.threadId);
+        if (!thread || (projectId && thread.projectId !== projectId)) return [];
+        return [
+          {
+            threadId: hit.threadId,
+            threadTitle: thread.title,
+            projectId: thread.projectId,
+            runId: hostedRunId(hit.threadId),
+            messageId: hit.messageId,
+            turn: hit.turn,
+            role: hit.role,
+            snippet: hit.snippet,
+            ts: hit.at,
+            taskId: null,
+            taskTitle: null,
+            member: null,
+          },
+        ];
+      })
+      .slice(0, limit);
   }
 
   /** Requests about a thread, made in its space; a rejection in words when the account no longer has it. */

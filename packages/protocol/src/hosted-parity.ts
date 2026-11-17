@@ -43,6 +43,8 @@ export const HostedCapabilities = z.object({
     compact: availability,
     /** One tool call's whole output, read from the server. */
     toolOutput: availability,
+    /** A search of the person's cloud threads' messages, as the palette searches a Mac's. */
+    search: availability,
     files: availability,
     nativeSubthreads: availability,
     personSubthreads: availability,

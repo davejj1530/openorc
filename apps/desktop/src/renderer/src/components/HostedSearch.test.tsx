@@ -28,44 +28,56 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
-it.each([true, false])("scopes message search to its execution place (cloud=%s)", async (cloud) => {
+it.each([true, false])("searches messages from a thread in either place, the cloud's too (cloud=%s)", async (cloud) => {
   const thread = cloud ? cloudReviewThread : localReviewThread;
   useRouter.setState({ route: { view: "thread", threadId: thread.id } });
   queryClient.setQueryData(["threads.get", { id: thread.id }], thread);
-  vi.spyOn(core, "call").mockImplementation((async (method: string) => (method === "threads.get" ? thread : [])) as typeof core.call);
+  const hit = {
+    threadId: thread.id,
+    threadTitle: "Example",
+    projectId: thread.projectId,
+    messageId: "m-1",
+    runId: cloud ? `hosted:${thread.id}` : "run-1",
+    role: "assistant",
+    snippet: "The example match",
+    ts: 1,
+    turn: 0,
+    taskId: null,
+    taskTitle: null,
+    member: null,
+  };
+  vi.spyOn(core, "call").mockImplementation((async (method: string) => (method === "threads.get" ? thread : method === "threads.search" ? [hit] : [])) as typeof core.call);
   render(
     <QueryClientProvider client={queryClient}>
       <CommandPalette open onOpenChange={() => {}} />
     </QueryClientProvider>,
   );
   fireEvent.change(screen.getByRole("combobox"), { target: { value: "example" } });
-  await act(async () => {});
-  if (cloud) {
-    const disabled = await screen.findByRole("button", { name: "Search messages" });
-    expect(disabled.hasAttribute("disabled")).toBe(true);
-    await act(async () => disabled.parentElement?.focus());
-    expect(await screen.findByText(HOSTED_REASONS.search)).toBeTruthy();
-    expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "threads.search")).toBe(false);
-    expect(screen.queryByText("Nothing matches.")).toBeNull();
-  } else await vi.waitFor(() => expect(core.call).toHaveBeenCalledWith("threads.search", expect.objectContaining({ query: "example" })));
+  await vi.waitFor(() => expect(core.call).toHaveBeenCalledWith("threads.search", expect.objectContaining({ query: "example" })));
+  expect(await screen.findByText("The example match")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Search messages" })).toBeNull();
 });
 
-it("does not show a cached local message result after opening search from a cloud thread", async () => {
+it("says a cloud server's own refusal where the hits would be, and shows none", async () => {
+  // The refusal is final: asked again it says the same.
+  queryClient.setQueryDefaults(["threads.search"], { retry: false });
   useRouter.setState({ route: { view: "thread", threadId: cloudReviewThread.id } });
   queryClient.setQueryData(["threads.get", { id: cloudReviewThread.id }], cloudReviewThread);
-  queryClient.setQueryData(
-    ["threads.search", { query: "example", limit: 20 }],
-    [{ threadId: "local", threadTitle: "Local", messageId: "local-message", runId: "local-run", role: "assistant", snippet: "A local-only match", ts: 1, turn: 0 }],
-  );
-  vi.spyOn(core, "call").mockImplementation((async (method: string) => (method === "threads.get" ? cloudReviewThread : [])) as typeof core.call);
+  vi.spyOn(core, "call").mockImplementation((async (method: string) => {
+    if (method === "threads.get") return cloudReviewThread;
+    if (method === "threads.search") throw new Error(HOSTED_REASONS.search);
+    return [];
+  }) as typeof core.call);
   render(
     <QueryClientProvider client={queryClient}>
       <CommandPalette open onOpenChange={() => {}} />
     </QueryClientProvider>,
   );
   fireEvent.change(screen.getByRole("combobox"), { target: { value: "example" } });
-  await screen.findByRole("button", { name: "Search messages" });
-  expect(screen.queryByText("A local-only match")).toBeNull();
+  const held = await screen.findByRole("button", { name: "Search messages" });
+  expect(held.hasAttribute("disabled")).toBe(true);
+  await act(async () => held.parentElement?.focus());
+  expect(await screen.findByText(HOSTED_REASONS.search)).toBeTruthy();
 });
 
 it("keeps cached message results private while the thread's place is still loading", async () => {

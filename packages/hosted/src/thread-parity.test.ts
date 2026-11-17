@@ -67,6 +67,20 @@ it("compacts through the server as the asker's own turn, the same request asked 
   await expect(hosted.threads.call("threads.compact", { id })).rejects.toThrow("Wait for the current turn to finish before compacting.");
 });
 
+it("searches the space's cloud threads in the app's shape, with the turn each message falls in", async () => {
+  stand.append(id, [
+    { type: "message.completed", ts: 70, role: "user", messageId: "ask-1", text: "Where is the lantern kept?" },
+    { type: "turn.completed", ts: 71, status: "success" },
+    { type: "message.completed", ts: 72, role: "assistant", messageId: "reply-9", text: "The LANTERN is in the shed" },
+    { type: "message.completed", ts: 73, role: "system", messageId: "line-1", text: "A lantern line the thread says itself" },
+  ]);
+  const hits = await hosted.threads.search!(hosted.threads.row!(id).space, { query: "lantern" });
+  expect(hits.map((hit) => [hit.messageId, hit.role, hit.turn, hit.runId, hit.threadTitle])).toEqual([
+    ["reply-9", "assistant", 1, `hosted:${id}`, "Example"],
+    ["ask-1", "user", 0, `hosted:${id}`, "Example"],
+  ]);
+});
+
 it("reads a tool call's whole output from a server that serves it", async () => {
   stand.threadFiles.capabilities = { toolOutput: { available: true } };
   const whole = "line of output\n".repeat(5_000);

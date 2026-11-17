@@ -30,6 +30,7 @@ import { StandInConnectors } from "./stand-in-connectors.js";
 import { StandInMachines } from "./stand-in-machines.js";
 import { StandInCheck } from "./stand-in-check.js";
 import { StandInMacWork } from "./stand-in-mac-work.js";
+import { StandInSearch } from "./stand-in-search.js";
 import { StandInTerminals } from "./stand-in-terminals.js";
 import type { StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInOrganizations } from "./stand-in-organizations.js";
@@ -457,6 +458,7 @@ function parityStandIns({
     check: new StandInCheck(),
     macWork: new StandInMacWork({ available: on("macCode"), messages: (threadId) => hosted.sent.filter((one) => one.threadId === threadId).length }),
     terminals: new StandInTerminals({ available: on("terminal"), readers: (threadId) => hosted.readersOf(threadId), peers, person }),
+    search: new StandInSearch(hosted),
   };
 }
 
@@ -467,7 +469,8 @@ function parityRoute(parity: ReturnType<typeof parityStandIns>, request: { metho
     parity.connectors.route(request, who, body) ??
     parity.machines.route(request, who) ??
     parity.check.route(request, who) ??
-    parity.terminals.route(request, who, body)
+    parity.terminals.route(request, who, body) ??
+    parity.search.route(request, who)
   );
 }
 

@@ -19,7 +19,7 @@ export interface Device {
 /** What a host did that a test reads: every log line, push and socket it opened, and every write in order. */
 export interface Seen {
   logs: string[];
-  pushes: unknown[];
+  pushes: Parameters<HostedDeps["push"]>[0][];
   notices: HostedNotice[];
   timeline: string[];
   sockets: { closed: boolean }[];

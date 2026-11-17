@@ -137,6 +137,48 @@ it("uses the exact requested space and refuses wrong-space and inaccessible proj
   await expect(b.tasks.get({ spaceId, id: made.task.id })).rejects.toThrow("isn't available");
   expect((await b.tasks.attention({ spaceId })).count).toBe(0);
 });
+it("keeps a person's Personal tasks theirs alone, and answers a wrong-space request with nothing", async () => {
+  const mine = `personal-${ADMIN}`;
+  const notes = stand.addProject(ADMIN, { name: "Notes", fullName: "alex/notes" });
+  const asked: string[] = [];
+  const a = await client(ADMIN);
+  const b = await client(MEMBER, {
+    fetch: async (input, init) => {
+      if (new URL(String(input)).pathname.startsWith("/tasks")) asked.push(new Headers(init?.headers).get("x-openorc-space") ?? "");
+      return fetch(input, init);
+    },
+  });
+  const own = (await a.hosted.tasks.create({ spaceId: mine, projectId: notes, requestId: randomUUID(), title: "Private notes", spec: "Only mine." })).task;
+  const shared = (await create(a.hosted.tasks)).task;
+
+  // Another person's app holds no such space, so it asks the server nothing about it.
+  const target = { spaceId: mine, id: own.id };
+  await expect(b.hosted.tasks.list({ spaceId: mine })).rejects.toThrow("isn't available");
+  await expect(b.hosted.tasks.get(target)).rejects.toThrow("isn't available");
+  await expect(b.hosted.tasks.update({ ...target, requestId: randomUUID(), ifRevision: own.revision, patch: { title: "Changed" } })).rejects.toThrow("isn't available");
+  await expect(b.hosted.tasks.delete({ ...target, requestId: randomUUID(), ifRevision: own.revision })).rejects.toThrow("isn't available");
+  expect(asked).toEqual([]);
+
+  // A task asked for in a space it isn't in answers nothing, either way round.
+  await expect(a.hosted.tasks.get({ spaceId, id: own.id })).rejects.toThrow("isn't available");
+  await expect(a.hosted.tasks.get({ spaceId: mine, id: shared.id })).rejects.toThrow("isn't available");
+  await expect(b.hosted.tasks.get({ spaceId, id: own.id })).rejects.toThrow("isn't available");
+  expect((await b.hosted.tasks.list({ spaceId })).tasks.map((task) => task.id)).toEqual([shared.id]);
+  expect(asked.every((space) => space === spaceId)).toBe(true);
+  expect((await a.hosted.tasks.get(target)).task).toMatchObject({ title: "Private notes", revision: own.revision });
+});
+it("reads a space's tasks again when a thread there changes, which a task's row shows, Personal as an organization", async () => {
+  const refreshed: string[][] = [];
+  const a = await client(ADMIN, { push: (push) => void (push.type === "invalidate" && refreshed.push(push.keys)) });
+  const own = stand.addThread(ADMIN, { projectId: null, title: "Notes" });
+  const shared = stand.addThread(ADMIN, { projectId, title: "Canvas" });
+  await vi.waitFor(() => expect(a.hosted.threads.holds({ thread: own }) && a.hosted.threads.holds({ thread: shared })).toBe(true));
+  refreshed.length = 0;
+  stand.set(own, { status: "working" });
+  await vi.waitFor(() => expect(refreshed).toContainEqual([`online-tasks:personal-${ADMIN}`]));
+  stand.set(shared, { status: "working" });
+  await vi.waitFor(() => expect(refreshed).toContainEqual([`online-tasks:${spaceId}`]));
+});
 it("blocks frozen writes, keeps frozen assignment, and permits Done during work", async () => {
   const a = await client(ADMIN),
     b = await client(MEMBER);

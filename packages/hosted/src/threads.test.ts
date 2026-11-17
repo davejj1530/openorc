@@ -105,18 +105,20 @@ describe("hosted threads", () => {
     const second = stand.addThread(ADA, { projectId: null, title: "Second report", status: "working" });
     for (const id of [first, second]) stand.append(id, [{ type: "turn.started", ts: 1, turnId: id }]);
     const { hosted, seen } = await host();
+    // The tasks of the thread's space refresh with it too (tasks.test.ts); these are the threads' own.
+    const pushes = () => seen.pushes.filter((push) => push.type !== "invalidate" || !push.keys.every((key) => key.startsWith("online-tasks:")));
     await signIn(hosted);
     await vi.waitFor(() => expect(hosted.threads.holds({ thread: first }) && hosted.threads.holds({ thread: second })).toBe(true));
     seen.pushes.length = 0;
     await hosted.threads.call("threads.update", { id: first, patch: { title: "Updated report" } });
-    expect(seen.pushes).toEqual([{ type: "invalidate", keys: ["threads"] }]);
+    expect(pushes()).toEqual([{ type: "invalidate", keys: ["threads"] }]);
     seen.pushes.length = 0;
     await hosted.threads.call("threads.update", { id: first, patch: { model: "sonnet" } });
-    expect(seen.pushes).toEqual([{ type: "invalidate", keys: ["threads", `runs:thread:${first}`] }]);
+    expect(pushes()).toEqual([{ type: "invalidate", keys: ["threads", `runs:thread:${first}`] }]);
     seen.pushes.length = 0;
     stand.endTurn(first);
     await vi.waitFor(async () => expect(await hosted.threads.call("runs.listForThread", { threadId: first })).toMatchObject([{ endedAt: expect.any(Number) }]));
-    expect(seen.pushes).toEqual([
+    expect(pushes()).toEqual([
       { type: "invalidate", keys: ["threads", `runs:thread:${first}`] },
       { type: "gap", runIds: [`hosted:${first}`] },
     ]);

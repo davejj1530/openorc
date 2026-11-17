@@ -3,6 +3,7 @@ import { type AccountStatus } from "@openorc/protocol";
 import { useEffect, useState } from "react";
 import { Button, TextButton } from "../components/ui";
 import { AccountFace } from "../components/AccountFace";
+import { AccountDeletionDialog } from "../dialogs/AccountDeletionDialog";
 import { ProfileDialog } from "../dialogs/ProfileDialog";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Failure } from "./settings-secret-field";
@@ -53,6 +54,7 @@ function SignIn({ status }: { status: SignedOut }) {
 /** Who is signed in, what they have and the ways to pay, and whether OpenOrc Cloud answers now, with Sign out beside the name. */
 function SignedInAccount({ account, active }: { account: SignedIn; active: boolean }) {
   const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const signOut = useRpcMutation("account.signOut");
   const open = useRpcMutation("account.billing.open");
   const live = account.reach === "live";
@@ -82,9 +84,15 @@ function SignedInAccount({ account, active }: { account: SignedIn; active: boole
         <SettingRow label="OpenOrc Cloud">
           <Status ok={live}>{live ? "Connected" : "Can't be reached"}</Status>
         </SettingRow>
+        <SettingRow label="Delete account">
+          <Button size="sm" variant="danger" disabled={!live} onClick={() => setDeleting(true)}>
+            Delete…
+          </Button>
+        </SettingRow>
         <Failure error={open.error ?? signOut.error ?? (account.error ? new Error(account.error) : null)} />
       </Section>
       {editing ? <ProfileDialog key={account.email} account={account} close={() => setEditing(false)} /> : null}
+      {deleting ? <AccountDeletionDialog onClose={() => setDeleting(false)} /> : null}
     </>
   );
 }

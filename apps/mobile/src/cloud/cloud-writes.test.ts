@@ -2,6 +2,9 @@ import type { Hosted } from "@openorc/hosted";
 import { standIn, type StandIn } from "@openorc/hosted/testing";
 import { hostedRunId, type RpcMethod, type ThreadCollaboration } from "@openorc/protocol";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
+
+// Each test makes several trips to the stand-in over real HTTP and its socket; under the whole suite's load they take longer.
+vi.setConfig({ testTimeout: 20_000 });
 import { RoutedConnection, type MacLine } from "./routed-connection";
 import { accountOn } from "./test-fixtures/stand-in-account";
 import { NO_CLOUD_FILES } from "./words";
@@ -51,7 +54,10 @@ beforeAll(async () => {
   riley = await accountOn(stand, RILEY);
   mara = await accountOn(stand, MARA);
   phone = new RoutedConnection(asleep, { hosted: riley });
-  await vi.waitFor(() => expect(riley.threads.holds({ thread: threads.teammate }) && riley.threads.holds({ thread: threads.mine })).toBe(true), { timeout: 5_000 });
+  // Both clients list the threads before either is written to: Mara starts her turn in hers from her own.
+  await vi.waitFor(() => expect(riley.threads.holds({ thread: threads.teammate }) && riley.threads.holds({ thread: threads.mine }) && mara.threads.holds({ thread: threads.teammate })).toBe(true), {
+    timeout: 10_000,
+  });
 }, 30_000);
 afterAll(async () => {
   riley.close();

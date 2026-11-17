@@ -69,6 +69,15 @@ it("exports the thread's newest session with the CLI's version, and nothing befo
   expect(await sessions().export(thread)).toBeNull();
 });
 
+it("exports the session Claude wrote under the real path of a thread's folder reached through a link", async () => {
+  await symlink(root, path.join(root, "linked"));
+  const through = threads.update(db, thread.id, { worktreePath: path.join(root, "linked", "worktree") });
+  // Claude names the folder from the real path; nowhere else at this home holds the session.
+  expect(existsSync(claudeSessionFile(mac, through.worktreePath!, ID))).toBe(false);
+  const packed = await sessions().export(through);
+  expect(packed!.parts[0]!.bytes.toString("utf8")).toBe(line(worktree, "Start on the Mac"));
+});
+
 it("takes a session where Claude looks for it in a folder reached through a link, its real path", async () => {
   const real = path.join(root, "data", "worktrees", "thread");
   await mkdir(real, { recursive: true });

@@ -68,7 +68,7 @@ export class BrowserSignInTrip {
   async #begin(): Promise<void> {
     const browser = this.deps.browser;
     if (!browser) return this.#settle(NO_BROWSER);
-    const verifier = randomBase64url(32);
+    const { verifier, challenge } = await signInVerifier();
     let live = true;
     this.#stop = () => void (live = false);
     try {
@@ -78,7 +78,6 @@ export class BrowserSignInTrip {
         live = false;
         waiting.close();
       };
-      const challenge = base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
       const start = await this.deps.session.anonymous(ROUTES.appSignInStart, { port: waiting.port, challenge, device: this.deps.deviceName }).catch((error: unknown) => {
         waiting.close();
         throw error;
@@ -143,6 +142,16 @@ function resultPage(address: string, failure?: string): string {
   url.searchParams.set("outcome", failure ? "failed" : "signed-in");
   if (failure) url.searchParams.set("message", failure.slice(0, 300));
   return url.toString();
+}
+
+/**
+ * The pair a sign-in is bound to: a verifier only this device holds, and its challenge (SHA-256, base64url), which the
+ * server keeps. Only the verifier finishes the sign-in, so a code caught on its way is of no use to anyone else.
+ */
+export async function signInVerifier(): Promise<{ verifier: string; challenge: string }> {
+  const verifier = randomBase64url(32);
+  const challenge = base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
+  return { verifier, challenge };
 }
 
 function randomBase64url(bytes: number): string {

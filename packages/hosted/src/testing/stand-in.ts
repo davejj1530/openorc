@@ -336,7 +336,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
       return /^\/(account|spaces|organization|invitations|projects|hosted|chat|tasks|uploads|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
     };
     const old = tooOld(request.headers["x-openorc-protocol"]) ? { status: 426, body: { statusCode: 426, message: APP_TOO_OLD } } : null;
-    const reply: Reply = old ?? (route ? route(body, token) : (appSignIns.route(method, path, body) ?? (await signedInRoute()))) ?? notFound(method, path);
+    const reply: Reply = old ?? (route ? route(body, token) : (appSignIns.route(method, path, body, who) ?? (await signedInRoute()))) ?? notFound(method, path);
     response.writeHead(reply.status, { "content-type": "application/json" });
     response.end(reply.body === null && reply.status !== 200 ? undefined : JSON.stringify(reply.body));
   }

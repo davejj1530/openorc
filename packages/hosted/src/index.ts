@@ -40,6 +40,7 @@ import { CloudMachines } from "./machines.js";
 import { CloudCheckRuns } from "./cloud-check.js";
 import { CloudMacProjects } from "./mac-projects.js";
 export { githubRepoOf } from "./translate.js";
+export { signInVerifier } from "./browser-sign-in.js";
 import type { HostedNotice } from "./notices.js";
 import { Session } from "./session.js";
 import { Threads } from "./threads.js";
@@ -133,6 +134,17 @@ export interface HostedAccount {
   cancelSigningIn(): void;
   /** Forgets the session and the kept answers first, then tells the server, so a server out of reach still signs out here. */
   signOut(): Promise<void>;
+  /**
+   * As the signed-in person, grants another of their devices, such as their phone, a session of its own: the server
+   * answers a one-time code for the challenge of a verifier only that device holds, which it trades with
+   * `signInWithGrant`. The code lasts `expiresInMs`. Refused in words when signed out.
+   */
+  grantSignIn(input: { challenge: string; device: string }): Promise<{ request: string; code: string; expiresInMs: number }>;
+  /**
+   * Signs this device in with a code another of the person's devices was granted for it, and the verifier behind that
+   * grant's challenge (`signInVerifier`). Nothing to do when signed in: the grant is given up.
+   */
+  signInWithGrant(input: { request: string; code: string; verifier: string }): Promise<void>;
   /** Saves and keeps the stored profile from the reply; subsequent reads cannot make this write fail. */
   updateProfile(input: RpcParams<"account.profile.update">): Promise<void>;
   /** Chooses the sandbox service the person's cloud threads run on; null leaves it to the server. */

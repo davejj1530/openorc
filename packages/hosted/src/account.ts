@@ -155,6 +155,19 @@ export class Account implements HostedAccount {
     this.#announce();
   }
 
+  grantSignIn(input: { challenge: string; device: string }): Promise<{ request: string; code: string; expiresInMs: number }> {
+    return this.deps.session.request(ROUTES.appSignInGrant, input);
+  }
+
+  async signInWithGrant({ request, code, verifier }: { request: string; code: string; verifier: string }): Promise<void> {
+    if (this.deps.session.state.signedIn) {
+      await this.deps.session.anonymous(ROUTES.appSignInCancel, { request, verifier }).catch(() => undefined);
+      return;
+    }
+    const { token } = await this.deps.session.anonymous(ROUTES.appSignInFinish, { request, code, verifier });
+    await this.deps.session.adopt(token);
+  }
+
   async updateProfile(input: RpcParams<"account.profile.update">): Promise<void> {
     const email = this.#signedInAs();
     const generation = this.deps.session.generation;

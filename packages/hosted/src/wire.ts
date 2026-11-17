@@ -207,6 +207,8 @@ export const wireRefusal = z.object({
 export const wireAppSignInStart = z.object({ request: z.string().min(1), url: z.url(), resultUrl: z.url(), expiresInMs: z.number() });
 /** The session's bearer token, given once, for the request the browser approved. */
 export const wireAppSignInFinish = z.object({ token: z.string().min(1) });
+/** A sign-in a signed-in device grants another of the person's devices: its request, and the one-time code that device finishes it with. */
+export const wireAppSignInGrant = z.object({ request: z.string().min(1), code: z.string().min(1), expiresInMs: z.number() });
 
 const route = <T = null>(method: Route<T>["method"], path: string, reply: z.ZodType<T> | null): Route<T> => ({ method, path, reply });
 
@@ -219,6 +221,8 @@ export const ROUTES = {
   appSignInFinish: route("POST", "/app-sign-in/finish", wireAppSignInFinish),
   /** Gives up a sign-in, proving ownership with the verifier; a missing request is already canceled. */
   appSignInCancel: route("POST", "/app-sign-in/cancel", null),
+  /** As the signed-in person, grants another of their devices a session of its own, for the challenge of a verifier only that device holds. */
+  appSignInGrant: route("POST", "/app-sign-in/grant", wireAppSignInGrant),
   signOut: route("POST", "/api/auth/sign-out", null),
   billing: route("GET", "/billing", wireBilling),
   offers: route("GET", "/billing/offers", wireOffers),

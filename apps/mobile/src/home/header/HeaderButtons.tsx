@@ -7,7 +7,8 @@ import { LinkDot } from "../../ui/LinkDot";
 import { Text } from "../../ui/Text";
 import { useMacLine } from "./MacLine";
 import type { HomeTab } from "../BottomBar";
-import { FILTER_CHOICES, filterChoice, useHomeFilter } from "../filter";
+import { filterLabel, MAC_SCOPE, useHomeFilter } from "../filter";
+import { useSpaces } from "../../spaces/use-spaces";
 
 /**
  * A header action, one of a family sized to the wordmark: a 40 pt circle on the plane fill with a 20 pt glyph, its fill
@@ -16,16 +17,20 @@ import { FILTER_CHOICES, filterChoice, useHomeFilter } from "../filter";
 const circle = "size-10 items-center justify-center rounded-full bg-surface active:bg-surface-3";
 const reach = 2;
 
-/** The filter's mark, as the sidebar's: pins show their own, inked while the list is narrowed. */
+/**
+ * The filter's mark, as the sidebar's: pins show their own, and the mark is inked while any filter narrows the list
+ * (the pins, one's own threads in an organization, an unticked workspace), as a chosen tab is.
+ */
 export function FilterButton() {
-  const choice = filterChoice(useHomeFilter());
-  const narrowed = choice !== "all";
-  const label = FILTER_CHOICES.find((item) => item.choice === choice)?.label;
+  const filter = useHomeFilter();
+  const account = useSpaces();
+  const space = account.state === "ready" ? account.current : null;
+  const { narrowed, label } = filterLabel(filter, space?.id ?? MAC_SCOPE, space?.kind === "organization");
+  const Mark = filter.pinnedOnly ? Pin : Funnel;
   return (
     <Link href="/filter" asChild>
-      <Pressable accessibilityRole="button" accessibilityLabel={narrowed ? `Show, ${label}` : "Show"} hitSlop={reach} className={circle}>
-        {choice === "pinned" ? <Pin size={20} className="text-ink" /> : null}
-        {choice === "all" ? <Funnel size={20} className="text-ink-3" /> : null}
+      <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={reach} className={circle}>
+        <Mark size={20} className={narrowed ? "text-ink" : "text-ink-3"} />
       </Pressable>
     </Link>
   );

@@ -95,6 +95,29 @@ it("lists Personal first, then the space the person chooses, every list naming i
   );
 });
 
+it("asks a space for the person's own threads once they choose Mine, and leaves out a workspace they unticked", async () => {
+  const { chooseOwnership, toggleWorkspace } = await import("../home/filter");
+  mac.phone!.shared.add("cloud-threads");
+  mac.status = ready([personal, birch]);
+  act(() => chooseSpace(birch.id));
+  const home = renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
+  await waitFor(() => expect(rows(home.result.current.items).sort()).toEqual(["cloud-thread:Canvas", "mac-thread:Canvas"]));
+  expect(
+    lists()
+      .filter((params) => params["spaceId"] === birch.id)
+      .every((params) => params["ownership"] === "everyone"),
+  ).toBe(true);
+  mac.calls.length = 0;
+  act(() => chooseOwnership(birch.id, "mine"));
+  await waitFor(() => expect(lists().some((params) => params["ownership"] === "mine")).toBe(true));
+  act(() => toggleWorkspace(birch.id, "canvas"));
+  await waitFor(() => expect(rows(home.result.current.items)).toEqual([]));
+  act(() => {
+    toggleWorkspace(birch.id, "canvas");
+    chooseOwnership(birch.id, "everyone");
+  });
+});
+
 it("shows Personal again when the space chosen on this phone is no longer the person's", async () => {
   mac.phone!.shared.add("cloud-threads");
   mac.status = ready([personal, birch]);

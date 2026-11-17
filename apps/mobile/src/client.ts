@@ -15,6 +15,7 @@ import { forgetDoorKey, keychainKeys, openSocket, phoneCrypto, reachesInternet, 
 import type { NetworkKind, SavedMac } from "./connection/saved-macs";
 import { createDemoMac, DEMO_MAC } from "./demo/demo-mac";
 import { forgetFolds } from "./home/fold-keys";
+import { forgetHidden } from "./home/filter-keys";
 import { spaceKey } from "./spaces/space-key";
 import { forgetLists, keepLists, restoreLists } from "./lists-cache";
 import { followMacLook } from "./look/look";
@@ -48,6 +49,7 @@ export const link = new ConnectionManager({
   forgetCache: (macId) => {
     forgetLists(storage, macId);
     forgetFolds(storage, macId);
+    forgetHidden(storage, macId);
     storage.remove(spaceKey(macId));
     assets.forget(macId);
   },

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { SharedValue } from "react-native-reanimated";
 import { afterEach, expect, it, vi } from "vitest";
@@ -13,6 +13,7 @@ vi.mock("../../client", async () => {
   const { ScratchStore } = await import("../../scratch-store");
   return {
     storage: new ScratchStore({ getString: () => undefined, set: () => undefined, remove: () => undefined }),
+    shownMacId: () => "studio",
     endDemo: () => void demo.ended++,
   };
 });
@@ -22,6 +23,8 @@ vi.mock("../../spaces/use-spaces", async (original) => ({ ...(await original<obj
 vi.mock("../../generated/icons", async (original) => ({
   ...(await original<object>()),
   Laptop: () => <span data-testid="laptop" />,
+  Funnel: ({ className }: { className?: string }) => <span data-testid="filter-mark" className={className} />,
+  Pin: ({ className }: { className?: string }) => <span data-testid="filter-mark" data-pin className={className} />,
 }));
 
 afterEach(() => {
@@ -123,6 +126,27 @@ it("titles Personal as OpenOrc, as the Mac's sidebar heads it, still opening the
   expect(screen.getByRole("button", { name: "OpenOrc, Personal space" })).toBeTruthy();
   expect(screen.getByText("OpenOrc")).toBeTruthy();
   expect(screen.queryByText("Personal")).toBeNull();
+});
+
+it("inks the filter's mark while a filter narrows the list, and names what does", async () => {
+  const { chooseFilter, chooseOwnership } = await import("../filter");
+  const birch = { id: "org-birch", kind: "organization", name: "Birch Studio", logo: null, memberId: "member", role: "member", memberCount: 2 } as const;
+  account.spaces = { state: "ready", spaces: [{ id: "personal-me", kind: "personal" }, birch], current: birch, access: null, offline: false };
+  const view = render(<HomeBar state={connected} />);
+  const mark = () => screen.getByTestId("filter-mark");
+  expect(screen.getByRole("button", { name: "Show" })).toBeTruthy();
+  expect(mark().className).toBe("text-ink-3");
+  act(() => chooseOwnership("org-birch", "mine"));
+  expect(screen.getByRole("button", { name: "Show, Mine" })).toBeTruthy();
+  expect(mark().className).toBe("text-ink");
+  act(() => chooseFilter("pinned"));
+  expect(screen.getByRole("button", { name: "Show, Pinned threads, Mine" })).toBeTruthy();
+  expect(mark().hasAttribute("data-pin")).toBe(true);
+  act(() => {
+    chooseFilter("all");
+    chooseOwnership("org-birch", "everyone");
+  });
+  view.unmount();
 });
 
 it("offers no filter where Home has no list, as for a space shut to the person", () => {

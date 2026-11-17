@@ -24,7 +24,7 @@ import { projectChoices } from "../projects";
 import { macScope, spaceScope } from "../spaces/list-scope";
 import { useSpaces } from "../spaces/use-spaces";
 import { homeItems, homeLayout, type HomeList, type HomeOptions } from "./home-items";
-import { useHomeFilter } from "./filter";
+import { hiddenIn, MAC_SCOPE, ownershipIn, pruneHidden, useHomeFilter } from "./filter";
 import { pruneMissingFolds, toggleFold, toggleThreadChildren, useFolds } from "./folds";
 
 /** How long rows a reader unfolds take to rise in. */
@@ -50,13 +50,18 @@ function useSelectedFamily(selected: ThreadSummary | null, filter: SidebarFilter
 }
 
 /** Whose threads Home lists: the space it shows, or the Mac alone, and whether reading that space's projects failed. */
-function useListScope() {
+export function useListScope() {
   const projects = useRpc("projects.list", {});
   const account = useSpaces();
   const space = account.state === "ready" ? account.current : null;
   const spaceProjects = useRpc("spaces.projects", { spaceId: space?.id ?? "" }, { enabled: space !== null });
   const scope = space ? spaceScope(space, spaceProjects.data) : macScope(projectChoices(projects.data));
-  return { projects, scope, inSpace: "spaceId" in scope.asks ? scope.asks : {}, failed: space !== null && spaceProjects.isError };
+  const key = space?.id ?? MAC_SCOPE;
+  const known = (space ? spaceProjects.isSuccess : projects.isSuccess) ? JSON.stringify(scope.groups.map((group) => group.id)) : null;
+  useEffect(() => {
+    if (known) pruneHidden(key, new Set(JSON.parse(known) as string[]));
+  }, [key, known]);
+  return { projects, scope, key, inSpace: "spaceId" in scope.asks ? scope.asks : {}, failed: space !== null && spaceProjects.isError };
 }
 
 /**
@@ -66,38 +71,44 @@ function useListScope() {
  * Resolved pages on request.
  */
 function useThreadList(connected: boolean, selectedId: string | undefined, resolvedOpen: boolean) {
-  const { projects, scope, inSpace, failed: spaceFailed } = useListScope();
-  const { pinnedOnly } = useHomeFilter();
+  const { projects, scope, key, inSpace, failed: spaceFailed } = useListScope();
+  const filter = useHomeFilter();
+  const hidden = hiddenIn(filter, key);
+  const { pinnedOnly } = filter;
   const [limit, setLimit] = useState(THREAD_PAGE);
   const [resolvedLimit, setResolvedLimit] = useState(THREAD_PAGE);
   const children = useChildThreadPages();
   const cache = useQueryClient();
-  const listed = { ...scope.asks, filter: "active" as const, orderBy: "activity" as const, includeChildren: true, ...children.params() };
+  const owned = "spaceId" in scope.asks ? { ownership: ownershipIn(filter, scope.asks.spaceId) } : {};
+  const listed = { ...scope.asks, ...owned, filter: "active" as const, orderBy: "activity" as const, includeChildren: true, ...children.params() };
   const params = [{ ...listed, pinnedOnly, limit: limit + 1 }];
   const lists = useRpcs("threads.list", params, { refetchInterval: 60_000 });
   const besides = { enabled: !pinnedOnly, refetchInterval: 60_000 };
   const pins = useRpc("threads.list", { ...listed, pinnedOnly: true }, besides);
   const needsYou = useRpc("threads.list", { ...listed, needsYou: true, limit: NEEDS_YOU_PAGE }, besides);
   const resolved = useRpc("threads.list", { ...listed, filter: "archived", limit: resolvedLimit + 1 }, { ...besides, enabled: besides.enabled && resolvedOpen });
-  const resolvedCount = useRpc("threads.resolvedCount", { ...inSpace, projectIds: scope.localIds, quietBefore: resolvedBefore(Date.now()) }, besides);
+  const resolvedCount = useRpc("threads.resolvedCount", { ...inSpace, ...owned, projectIds: scope.localIds, quietBefore: resolvedBefore(Date.now()) }, besides);
   const fetched = lists.map((list, index) => (list.data ? { rows: list.data, limit } : cachedListPage(cache, params[index]!)));
   const opened = useRpc("threads.get", { id: selectedId ?? "" }, { enabled: Boolean(selectedId) }).data;
   const selected = opened && scope.names.has(opened.projectId) ? opened : null;
   const listedIds = new Set([...fetched.flatMap((page) => page?.rows ?? []), ...(resolved.data ?? [])].map((thread) => thread.id));
   const family = useSelectedFamily(selected, selected?.archivedAt ? "archived" : "active", listedIds, children, inSpace);
   const now = useSidebarNow();
-  const withFamily = (rows: readonly ThreadSummary[] | undefined) => (rows ? [...new Map([...rows, ...(family ?? [])].map((thread) => [thread.id, thread])).values()] : rows);
+  // A workspace the person unticked leaves the list, its pins and Resolved included, until it is ticked again.
+  const inShown = <T extends readonly ThreadSummary[] | undefined>(rows: T): T =>
+    (hidden.length && rows ? rows.filter((row) => !hidden.includes(scope.groupOf.get(row.projectId) ?? row.projectId)) : rows) as T;
+  const withFamily = (rows: readonly ThreadSummary[] | undefined) => inShown(rows ? [...new Map([...rows, ...(family ?? [])].map((thread) => [thread.id, thread])).values()] : rows);
   const page = (rows: readonly ThreadSummary[] | undefined, filter: SidebarFilter, shown: number) =>
     sidebarThreadPage({ projectId: selected?.projectId ?? WORKSPACE_ID, fetched: withFamily(rows), selected, filter, limit: shown, now });
   const pages = fetched.map((fetchedPage) => page(fetchedPage?.rows, "active", fetchedPage?.limit ?? limit));
-  const apart = (rows: ThreadSummary[] | undefined) => sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: rows, selected: null, filter: "active", limit: Number.MAX_SAFE_INTEGER, now });
+  const apart = (rows: ThreadSummary[] | undefined) => sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: inShown(rows), selected: null, filter: "active", limit: Number.MAX_SAFE_INTEGER, now });
   const putRows = resolvedRows(resolvedOpen, resolved.data, selected);
   const resolvedPage = putRows && page(putRows, "archived", resolvedLimit);
   const days = sidebarDayList({ pages, pins: apart(pins.data), needsYou: apart(needsYou.data), resolved: resolvedPage, pinnedOnly, activeId: selectedId, now });
   const list: HomeList = {
     days,
     names: scope.names,
-    groups: scope.groups,
+    groups: scope.groups.filter((group) => !hidden.includes(group.id)),
     groupOf: scope.groupOf,
     failed: connected && (lists.some((each) => each.isError) || spaceFailed),
     listed: fetched.every(Boolean),

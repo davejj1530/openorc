@@ -33,15 +33,17 @@ function commitReason(reason: string | null, changes: HostedThreadChanges | unde
 function cloudPills(thread: ThreadSummary, state: HostedReviewState | undefined, changes: HostedThreadChanges | undefined, reason: string | null, review: Review): BarPill[] {
   const running = (kind: string) => review.pending && review.request?.kind === kind;
   const steps: Omit<BarPill, "ink">[] = [];
-  if (state?.work.uncommitted) steps.push({ action: "commit", label: running("commit") ? "Committing…" : "Commit", reason: commitReason(reason, changes), running: running("commit") });
-  if (state?.work.unpushed) {
-    const words = state.work.published ? { idle: "Push", running: "Pushing…" } : { idle: "Publish branch", running: "Publishing…" };
+  // An action under way keeps its pill, reading that it runs, though the state the server gives may already be past it.
+  if (state?.work.uncommitted || running("commit"))
+    steps.push({ action: "commit", label: running("commit") ? "Committing…" : "Commit", reason: commitReason(reason, changes), running: running("commit") });
+  if (state?.work.unpushed || running("push")) {
+    const words = state?.work.published ? { idle: "Push", running: "Pushing…" } : { idle: "Publish branch", running: "Publishing…" };
     steps.push({ action: "push", label: running("push") ? words.running : words.idle, reason, running: running("push") });
   }
   const existing = state?.pullRequest ?? (thread.prUrl && thread.prState ? { url: thread.prUrl, state: thread.prState } : null);
   const published = Boolean(state?.work.published && !state.work.unpushed && state.branch !== state.baseBranch);
   if (existing) steps.push({ action: "pr", label: pullWords[existing.state], reason: null, running: false });
-  else if (published) steps.push({ action: "pr", label: running("pull_request") ? "Opening…" : "PR", reason, running: running("pull_request") });
+  else if (published || running("pull_request")) steps.push({ action: "pr", label: running("pull_request") ? "Opening…" : "PR", reason, running: running("pull_request") });
   const inked = steps.findIndex((step) => !step.reason && !(step.action === "pr" && existing));
   const first = Math.max(0, inked);
   return steps.slice(first, first + 2).map((step, index) => ({ ...step, ink: index === 0 && inked >= 0 }));

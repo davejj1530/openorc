@@ -100,3 +100,15 @@ it("says only the server's reason where it does not serve a thread's changes, wi
   expect(screen.queryByText("Retry")).toBeNull();
   expect(screen.queryByText("src/export.ts")).toBeNull();
 });
+
+it("keeps a running push's pill, reading that it runs, though the server's state is already past it", async () => {
+  // The server already says the branch is on GitHub; the push asked from the phone still answers that it runs.
+  mac.state = state({ uncommitted: null, unpushed: null, published: true });
+  const running = { id: "x", kind: "push", requestedBy: null, state: "running", result: null, refusal: null, failure: null, line: null, createdAt: "2026-11-18T03:00:00.000Z", doneAt: null };
+  mac.answer = { accepted: true, action: running };
+  render(<CloudChangesScreen />, { wrapper: mac.phone!.wrapper });
+  await screen.findByText("src/export.ts");
+  const { startCloudReview } = await import("../cloud/cloud-review");
+  act(() => startCloudReview("t1", { kind: "push", id: "00000000-0000-4000-8000-000000000001" }));
+  expect(await screen.findByRole("button", { name: "Pushing…" })).toBeTruthy();
+});

@@ -3,6 +3,7 @@ import type { Hosted } from "@openorc/hosted";
 import { standIn, type StandIn } from "@openorc/hosted/testing";
 import { hostedRunId, type RpcMethod, type ThreadSummary } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { keptAnswers, type KeptAnswers } from "../lists-cache";
 import { RoutedConnection, type MacLine } from "./routed-connection";
 import { accountOn } from "./test-fixtures/stand-in-account";
 
@@ -56,7 +57,7 @@ function macLink(macRow: ThreadSummary) {
   return { at, line, push: (push: ClientPush) => listeners.forEach((listener) => listener(push)) };
 }
 
-async function routed(own: Hosted | null = hosted) {
+async function routed(own: Hosted | null = hosted, kept?: KeptAnswers) {
   const cloudRow = await vi.waitFor(() => {
     const row = (hosted.threads.listed("threads.list", {})?.rows ?? []).find((each) => each.id === cloudThread);
     if (!row) throw new Error("The cloud has not listed its thread yet.");
@@ -64,7 +65,7 @@ async function routed(own: Hosted | null = hosted) {
   });
   const macRow: ThreadSummary = { ...cloudRow, id: "mac-thread", title: "Export on the Mac", projectId: MAC_PROJECT, owner: undefined };
   const mac = macLink(macRow);
-  const connection = new RoutedConnection(mac.line, { hosted: own });
+  const connection = new RoutedConnection(mac.line, { hosted: own }, kept);
   connection.onPush((push) => void pushes.push(push));
   return { connection, mac, macRow };
 }
@@ -96,6 +97,24 @@ it("keeps listing, opening and paging the cloud's threads with the Mac asleep, t
   expect(await connection.call("events.page", { runId: hostedRunId(cloudThread), fromTurn: 0 })).toMatchObject({ events: expect.any(Array) });
   // The Mac's own thread waits for the Mac.
   await expect(connection.call("threads.get", { id: "mac-thread" })).rejects.toThrow("not connected");
+});
+
+it("lists the Mac's last rows after a relaunch with the Mac asleep, from the answers kept for it", async () => {
+  const saved = new Map<string, string>();
+  const storage = { getString: (key: string) => saved.get(key), set: (key: string, value: string) => void saved.set(key, value), remove: (key: string) => void saved.delete(key) };
+  const before = await routed(
+    hosted,
+    keptAnswers(storage, () => "studio"),
+  );
+  await before.connection.call("threads.list", { spaceId: birch });
+  // A new launch: a new router, the Mac asleep from the start.
+  const after = await routed(
+    hosted,
+    keptAnswers(storage, () => "studio"),
+  );
+  after.mac.at.down = true;
+  const list = await after.connection.call("threads.list", { spaceId: birch });
+  expect(list.map((row) => row.id).sort()).toEqual([cloudThread, "mac-thread"].sort());
 });
 
 it("answers the spaces and the person from its own session, as the Mac shaped them for a phone", async () => {

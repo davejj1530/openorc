@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, expect, it, vi } from "vitest";
-import { keepLists, restoreLists } from "./lists-cache";
+import { forgetLists, keepLists, keptAnswers, restoreLists } from "./lists-cache";
 
 afterEach(() => vi.useRealTimers());
 
@@ -70,4 +70,21 @@ it("keeps a list's last answer through a read that failed, as every read does wh
   const after = new QueryClient();
   expect(restoreLists(after, storage, "studio")).toBe(true);
   expect(after.getQueryData(["agents.availability", {}])).toEqual(harnesses);
+});
+
+it("keeps the Mac's last answers to the router's lists per Mac across launches, the newest twelve, until it is forgotten", () => {
+  const saved = new Map<string, string>();
+  const storage = { getString: (key: string) => saved.get(key), set: (key: string, value: string) => void saved.set(key, value), remove: (key: string) => void saved.delete(key) };
+  let shown: string | null = "studio";
+  const kept = keptAnswers(storage, () => shown);
+  for (let page = 0; page < 14; page++) kept.set(`threads.list ${page}`, [`row ${page}`]);
+  const relaunched = keptAnswers(storage, () => "studio");
+  expect(relaunched.get("threads.list 13")).toEqual(["row 13"]);
+  expect(relaunched.get("threads.list 1")).toBeUndefined();
+  expect(relaunched.get("threads.list 2")).toEqual(["row 2"]);
+  // Another Mac starts from its own answers, and a forgotten Mac's go with it.
+  shown = "laptop";
+  expect(kept.get("threads.list 13")).toBeUndefined();
+  forgetLists(storage, "studio");
+  expect(keptAnswers(storage, () => "studio").get("threads.list 13")).toBeUndefined();
 });

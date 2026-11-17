@@ -17,7 +17,7 @@ import { createDemoMac, DEMO_MAC } from "./demo/demo-mac";
 import { forgetFolds } from "./home/fold-keys";
 import { forgetHidden } from "./home/filter-keys";
 import { spaceKey } from "./spaces/space-key";
-import { forgetLists, keepLists, restoreLists } from "./lists-cache";
+import { forgetLists, keepLists, keptAnswers, restoreLists } from "./lists-cache";
 export { cloudFileUri, phoneFile } from "./cloud/cloud-file-cache";
 import { followMacLook } from "./look/look";
 import { PhoneAlerts } from "./notifications/alerts";
@@ -80,7 +80,11 @@ export const cloud = new PhoneCloud({
 });
 
 /** The cloud answers for its own threads while the phone holds a session of its own; the Mac, over the link, for the rest. */
-const routed = new RoutedConnection(link.connection, cloud);
+const routed = new RoutedConnection(
+  link.connection,
+  cloud,
+  keptAnswers(storage, () => shownMac),
+);
 
 /** A call outside the client's queries, routed as theirs are: to the phone's own cloud for its threads, else to the Mac. */
 export const call = <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => routed.call(method, params);

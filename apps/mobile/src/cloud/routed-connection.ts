@@ -1,5 +1,6 @@
 import type { ClientPush, CoreConnection } from "@openorc/client";
 import type { Hosted, HostedDeps } from "@openorc/hosted";
+import type { KeptAnswers } from "../lists-cache";
 import { PlaceRouter } from "@openorc/hosted/router";
 import type { RpcMethod, RpcParams, RpcReply, RpcRequest, RpcResults, SpacesStatus } from "@openorc/protocol";
 
@@ -27,11 +28,11 @@ export class RoutedConnection implements CoreConnection {
   private readonly listeners = new Set<(push: ClientPush) => void>();
   private readonly router: PlaceRouter;
   /** The Mac's last answer to each list and count the router asked of it. */
-  private readonly lastHeard = new Map<string, unknown>();
-
   constructor(
     private readonly mac: MacLine,
     private readonly cloud: { readonly hosted: Hosted | null },
+    /** The Mac's last answers to its lists, kept across launches by the app; in memory alone by default. */
+    private readonly lastHeard: KeptAnswers = new Map(),
   ) {
     this.router = new PlaceRouter({
       place: () => this.signedIn()?.threads ?? null,

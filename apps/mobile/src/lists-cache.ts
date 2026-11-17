@@ -37,6 +37,56 @@ export function restoreLists(client: QueryClient, storage: Storage, macId: strin
 
 export function forgetLists(storage: Storage, macId: string): void {
   storage.remove(storageKey(macId));
+  storage.remove(answersKey(macId));
+}
+
+/** Answers kept by what was asked: the router's word for what the Mac last said of a list it cannot answer now. */
+export interface KeptAnswers {
+  get(key: string): unknown;
+  set(key: string, value: unknown): void;
+}
+
+const answersKey = (macId: string) => `answers.v1.${macId}`;
+/** The newest few answers a Mac gave, so a cold start with it asleep still lists its threads. */
+const ANSWERS_KEPT = 12;
+
+/**
+ * The Mac's last answers to the lists the router asks of it, kept per shown Mac across launches, the newest
+ * `ANSWERS_KEPT`: a phone opened with the Mac asleep lists its threads as the Mac last said them, as before a relaunch.
+ */
+export function keptAnswers(storage: Storage, shownMac: () => string | null): KeptAnswers {
+  let heldFor: string | null = null;
+  let held = new Map<string, unknown>();
+  const current = () => {
+    const macId = shownMac();
+    if (macId !== heldFor) {
+      heldFor = macId;
+      held = new Map(macId ? readAnswers(storage, macId) : []);
+    }
+    return macId;
+  };
+  return {
+    get(key) {
+      current();
+      return held.get(key);
+    },
+    set(key, value) {
+      const macId = current();
+      if (!macId) return;
+      held.delete(key);
+      held.set(key, value);
+      while (held.size > ANSWERS_KEPT) held.delete(held.keys().next().value!);
+      storage.set(answersKey(macId), JSON.stringify([...held]));
+    },
+  };
+}
+
+function readAnswers(storage: Storage, macId: string): [string, unknown][] {
+  try {
+    return JSON.parse(storage.getString(answersKey(macId)) ?? "[]") as [string, unknown][];
+  } catch {
+    return [];
+  }
 }
 
 /** Saves the shown Mac's lists a moment after they change. */

@@ -30,20 +30,25 @@ function commitReason(reason: string | null, changes: HostedThreadChanges | unde
  * once the branch is on GitHub. At most two, from the first that can go, which is in ink; a pull request that exists
  * stays plain, as it leaves the app.
  */
+/** A pill for an action that reads that it runs while it does: its idle words, else its running words. */
+const actionPill = (action: BarPill["action"], [idle, busy]: readonly [string, string], reason: string | null, running: boolean): Omit<BarPill, "ink"> => ({
+  action,
+  label: running ? busy : idle,
+  reason,
+  running,
+});
+
 function cloudPills(thread: ThreadSummary, state: HostedReviewState | undefined, changes: HostedThreadChanges | undefined, reason: string | null, review: Review): BarPill[] {
-  const running = (kind: string) => review.pending && review.request?.kind === kind;
+  const running = (kind: string) => Boolean(review.pending && review.request?.kind === kind);
+  const work = state?.work;
   const steps: Omit<BarPill, "ink">[] = [];
   // An action under way keeps its pill, reading that it runs, though the state the server gives may already be past it.
-  if (state?.work.uncommitted || running("commit"))
-    steps.push({ action: "commit", label: running("commit") ? "Committing…" : "Commit", reason: commitReason(reason, changes), running: running("commit") });
-  if (state?.work.unpushed || running("push")) {
-    const words = state?.work.published ? { idle: "Push", running: "Pushing…" } : { idle: "Publish branch", running: "Publishing…" };
-    steps.push({ action: "push", label: running("push") ? words.running : words.idle, reason, running: running("push") });
-  }
+  if (work?.uncommitted || running("commit")) steps.push(actionPill("commit", ["Commit", "Committing…"], commitReason(reason, changes), running("commit")));
+  if (work?.unpushed || running("push")) steps.push(actionPill("push", work?.published ? ["Push", "Pushing…"] : ["Publish branch", "Publishing…"], reason, running("push")));
   const existing = state?.pullRequest ?? (thread.prUrl && thread.prState ? { url: thread.prUrl, state: thread.prState } : null);
-  const published = Boolean(state?.work.published && !state.work.unpushed && state.branch !== state.baseBranch);
+  const published = Boolean(work?.published && !work.unpushed && state?.branch !== state?.baseBranch);
   if (existing) steps.push({ action: "pr", label: pullWords[existing.state], reason: null, running: false });
-  else if (published || running("pull_request")) steps.push({ action: "pr", label: running("pull_request") ? "Opening…" : "PR", reason, running: running("pull_request") });
+  else if (published || running("pull_request")) steps.push(actionPill("pr", ["PR", "Opening…"], reason, running("pull_request")));
   const inked = steps.findIndex((step) => !step.reason && !(step.action === "pr" && existing));
   const first = Math.max(0, inked);
   return steps.slice(first, first + 2).map((step, index) => ({ ...step, ink: index === 0 && inked >= 0 }));

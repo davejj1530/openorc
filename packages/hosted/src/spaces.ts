@@ -1,7 +1,7 @@
 import type { OrganizationPeople, ReceivedInvitation, SpaceProject, SpacesStatus } from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedDeps, HostedSpaces } from "./index.js";
-import { Refused, type Session, type SessionChange } from "./session.js";
+import { Refused, SESSION_CHANGED, Superseded, type Session, type SessionChange } from "./session.js";
 import { scopedProject, spaceProjects, type ScopedProject } from "./space-projects.js";
 import { ROUTES, SOCKET, wireTopics } from "./wire.js";
 import { OrganizationSetup } from "./organization-setup.js";
@@ -226,6 +226,8 @@ export class Spaces implements HostedSpaces {
   }
 
   #require(spaceId: string): Snapshot {
+    // Asked after the session ended (a sign-out, a deleted account): the window is moving on, so it is no refusal.
+    if (!this.deps.session.state.signedIn) throw new Superseded(SESSION_CHANGED);
     const heard = this.#snapshot;
     if (!heard?.index.spaces.some((space) => space.id === spaceId)) throw new Refused("You're not in this organization.");
     return heard;

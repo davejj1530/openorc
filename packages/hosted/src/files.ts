@@ -1,6 +1,6 @@
 import { HOSTED_FILES_UNAVAILABLE, type HostedAvailability, type TeamChatFile } from "@openorc/protocol";
 import type { HostedDeps } from "./index.js";
-import { Refused, Superseded, Unreadable, type Session } from "./session.js";
+import { Refused, SESSION_CHANGED, Superseded, Unreadable, type Session } from "./session.js";
 import type { Spaces } from "./spaces.js";
 import { FILE_ROUTES, type UploadPlan } from "./wire-files.js";
 import { putFilePart, type FileByteSource } from "./file-transfer.js";
@@ -19,7 +19,6 @@ export interface CloudFileReference {
   name: string;
 }
 type Dependencies = Pick<HostedDeps, "fetch" | "push"> & { session: Session; spaces: Spaces };
-const SESSION_CHANGED = "Your OpenOrc session changed. Try again.";
 
 /** Shared upload and authorized-read transport. The host owns durable source bytes and draft state. */
 export class Files {

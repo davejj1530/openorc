@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { isSuperseded } from "@openorc/protocol";
 import { createHosted, type Hosted, type HostedDeps } from "./index.js";
 import { hostDeps, newDevice, signInAs, type Device } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
@@ -121,6 +122,14 @@ it("retains cached space facts on an outage and clears them on sign-out", async 
   await hosted.account.signOut();
   expect(hosted.spaces.status()).toEqual({ state: "signed-out" });
   expect(device.spaces).toBeNull();
+});
+
+it("answers a space read asked after sign-out as superseded, and one for a space the person isn't in as refused", async () => {
+  const organization = stand.addTeam("Birch Studio", [ADMIN]);
+  const { hosted } = await host();
+  await expect(hosted.spaces.projects("elsewhere")).rejects.toThrow("You're not in this organization.");
+  await hosted.account.signOut();
+  await expect(hosted.spaces.projects(organization)).rejects.toSatisfy(isSuperseded);
 });
 
 it("discards a late roster response after signing in as a different account", async () => {

@@ -65,6 +65,8 @@ export type SessionChange = "connected" | "changed";
 /** The header a request names its space in, by the space's id. */
 const SPACE_HEADER = "x-openorc-space";
 const SIGN_IN_FIRST = "Sign in to OpenOrc first.";
+/** What a superseded read says: what it asked about belongs to a session that has since changed or ended. */
+export const SESSION_CHANGED = "Your OpenOrc session changed. Try again.";
 const ENDED = "Your OpenOrc session ended. Sign in again.";
 const NOT_SIGNED_IN = "OpenOrc Cloud didn't sign you in. Try again.";
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -180,7 +182,7 @@ export class Session {
     }
     if (this.#held !== held || this.#closed) {
       await response.body?.cancel();
-      throw new Refused("Your OpenOrc session changed. Try again.");
+      throw new Refused(SESSION_CHANGED);
     }
     if (!response.ok) await this.#parse(route, response);
     return response;

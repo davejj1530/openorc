@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { SessionRefused, sessionId, slotFor, type HostHome, type PackedSession, type SavedSession, type SessionId, type SessionSlot } from "@openorc/agents";
-import { claudeAccounts, runs, subagents, type Db } from "@openorc/db";
+import { claudeAccounts, projects, runs, subagents, type Db } from "@openorc/db";
 import { harnessCatalog, type HarnessId, type Thread } from "@openorc/protocol";
 
 /*
@@ -49,9 +49,11 @@ export class AgentSessions {
   async export(thread: Thread): Promise<PackedSession | null> {
     const slot = slotFor(thread.agent);
     const id = this.sessionOf(thread);
-    if (!slot || !id || !thread.worktreePath) return null;
+    // A thread in the project's checkout ran its agent there.
+    const folder = thread.worktreePath ?? projects.get(this.deps.db, thread.projectId)?.rootPath;
+    if (!slot || !id || !folder) return null;
     const home = this.deps.homes.here(owner(thread, slot));
-    const saved = await slot.export(home, { sessionId: id, cwd: await home.realpath(thread.worktreePath), children: this.children(thread.id) });
+    const saved = await slot.export(home, { sessionId: id, cwd: await home.realpath(folder), children: this.children(thread.id) });
     return saved && { ...saved, cliVersion: await slot.version(home) };
   }
 

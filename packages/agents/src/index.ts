@@ -67,5 +67,6 @@ export {
   type SessionSlot,
 } from "./session-slot.js";
 export { sessionSlots, slotFor } from "./session-slots.js";
+export { packSession, unpackSession } from "./session-pack.js";
 export { hostHome } from "./host-home.js";
 export { claudeSessionFile } from "./claude/session-slot.js";

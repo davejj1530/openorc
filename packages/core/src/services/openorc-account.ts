@@ -1,7 +1,7 @@
 /** Mounts `@openorc/hosted` in the Mac's core: hands it what only this Mac has. Handlers call the package's own account. */
 import { macOrigins } from "./mac-projects.js";
 import { packProject, uploadOf } from "./mac-work.js";
-import { projects, settings, type Db } from "@openorc/db";
+import { cloudMoves, projects, settings, type Db } from "@openorc/db";
 import { createHosted, type Hosted, type OwnSkills } from "@openorc/hosted";
 import { liveSocketOf } from "@openorc/hosted/socket";
 import { randomUUID } from "node:crypto";
@@ -82,6 +82,7 @@ function createAccount(deps: AccountDeps): Hosted {
       const origins = macOrigins(deps.db);
       return projects.list(deps.db).map((project) => ({ id: project.id, name: project.name, remote: project.gitRemote, cloudProjectId: origins.get(project.id)?.hostedProjectId ?? null }));
     },
+    moving: (threadId) => cloudMoves.moving(deps.db, threadId),
     macWork: async (projectId, include) => {
       const pack = await packProject(deps.db, projectId, include);
       return pack ? uploadOf(pack) : null;

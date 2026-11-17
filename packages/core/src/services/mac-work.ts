@@ -8,14 +8,17 @@ import type { MacStartPlan } from "@openorc/protocol";
 import { macOrigins } from "./mac-projects.js";
 
 /**
- * A project folder's work for a cloud thread started from it (cloud parity unit 5a), packed here before anything leaves:
+ * A project folder's work for a cloud thread started from it (cloud parity unit 5a), or a thread's own folder as it moves
+ * to the cloud (CloudMoves), packed here before anything leaves:
  * what goes beyond GitHub's copy of the folder's base branch, as git's `packMacWork` decides it. Null when the folder
  * holds nothing GitHub lacks.
  */
-export async function packProject(db: Db, projectId: string, include: readonly string[]): Promise<MacWorkPack | null> {
+export async function packProject(db: Db, projectId: string, include: readonly string[], folder?: string): Promise<MacWorkPack | null> {
   const project = projects.get(db, projectId);
   if (!project) throw new Error("That project isn't on this Mac.");
-  const pack = await packMacWork(project.rootPath, { baseRef: await baseRefOf(db, projectId, project.rootPath), include });
+  // A thread moving to the cloud packs its own folder: its worktree, or the checkout it works in.
+  const at = folder ?? project.rootPath;
+  const pack = await packMacWork(at, { baseRef: await baseRefOf(db, projectId, at), include });
   if (pack.commits.length || pack.changed.length || pack.added.length || pack.held.length) return pack;
   await removePack(pack);
   return null;

@@ -1,8 +1,9 @@
 import { AcpAdapter, captureLaunchEnvironment, ClaudeAdapter, CodexAdapter, PiAdapter, listOmpModels, ompAcp, cursorAcp, antigravityAcp, fxAcp, type AgentLaunchEnvironment } from "@openorc/agents";
-import { completedToolCall, digestedEvent, plans, runs, subagents, tasks, type Db, type LedgerWriter } from "@openorc/db";
+import { cloudMoves, completedToolCall, digestedEvent, plans, runs, subagents, tasks, type Db, type LedgerWriter } from "@openorc/db";
 import { UserInput, type OpenOrcMcpServer, type TaskCard, type UserInputResult } from "@openorc/mcp";
 import {
   isHarnessId,
+  MOVING_TO_CLOUD,
   normalizeModelSettings,
   type AgentEvent,
   type AgentKind,
@@ -544,6 +545,8 @@ export class RunService {
   async start(input: StartRunInput): Promise<Run> {
     this.catalog.assertEnabled(input.agent);
     if (input.scope.thread) this.subagents.assertExecutable({ threadId: input.scope.thread.id });
+    // A thread moving to the cloud takes no turn here: its conversation and work are on their way there.
+    if (input.scope.thread && cloudMoves.open(this.db, input.scope.thread.id)?.direction === "to-cloud") throw new Error(MOVING_TO_CLOUD);
     input = normalizeModelSettings(input);
     // Only user input resets the chain of messages sent between conversations.
     if ((input.promptRole ?? "user") === "user" && input.scope.thread) this.agentHops.delete(input.scope.thread.id);

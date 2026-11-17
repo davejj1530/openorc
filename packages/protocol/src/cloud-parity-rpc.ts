@@ -4,6 +4,7 @@ import { hostedMachinesRpcParams, type HostedMachinesRpcResults } from "./hosted
 import { hostedCheckRpcParams, type HostedCheckRpcResults } from "./hosted-check.js";
 import { hostedMacProjectsRpcParams, type HostedMacProjectsRpcResults } from "./hosted-mac-projects.js";
 import { hostedSkillsCloudRpcParams, type HostedSkillsCloudRpcResults } from "./hosted-skills-cloud.js";
+import { cloudMovesRpcParams, type CloudMovesRpcResults } from "./cloud-moves.js";
 
 /** Window-only reads of what a cloud thread brings from this Mac: the person's connectors, a folder's work, the skills that go and the ones left out, the machines awake for them, the cloud check. */
 export const cloudParityRpcParams = {
@@ -13,6 +14,7 @@ export const cloudParityRpcParams = {
   ...hostedMachinesRpcParams,
   ...hostedCheckRpcParams,
   ...hostedMacProjectsRpcParams,
+  ...cloudMovesRpcParams,
 };
 export interface CloudParityRpcResults
-  extends HostedConnectorsRpcResults, HostedMacStartRpcResults, HostedSkillsCloudRpcResults, HostedMachinesRpcResults, HostedCheckRpcResults, HostedMacProjectsRpcResults {}
+  extends HostedConnectorsRpcResults, HostedMacStartRpcResults, HostedSkillsCloudRpcResults, HostedMachinesRpcResults, HostedCheckRpcResults, HostedMacProjectsRpcResults, CloudMovesRpcResults {}

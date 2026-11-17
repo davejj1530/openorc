@@ -1,4 +1,4 @@
-import { subagents, tasks, threadQueue, type Db } from "@openorc/db";
+import { cloudMoves, subagents, tasks, threadQueue, type Db } from "@openorc/db";
 import type { Thread, ThreadSummary } from "@openorc/protocol";
 import type { RunService } from "./runs.js";
 
@@ -16,6 +16,7 @@ export function summarizeThread({ db, runs }: SummaryDeps, t: Thread): ThreadSum
     subagent: runs.subagents.summary(t.id),
     hasStarted: Boolean(db.stmt("SELECT 1 FROM runs WHERE thread_id = ? LIMIT 1").get(t.id)),
     teamInstanceId: null,
+    moving: cloudMoves.moving(db, t.id),
     agents: [t.agent],
     activity,
     backgroundCommands: runs.threadBackgroundCommands(t.id),

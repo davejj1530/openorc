@@ -79,7 +79,7 @@ type Heard = z.infer<typeof keptThreads>;
 
 type ThreadsDeps = { session: Session; spaces: Spaces; follower: Follower; account: Pick<Account, "status" | "refused">; skills: Pick<Skills, "bring"> } & Pick<
   HostedDeps,
-  "server" | "kept" | "projects" | "macWork" | "push" | "notify" | "nameThread" | "now" | "log"
+  "server" | "kept" | "projects" | "macWork" | "moving" | "push" | "notify" | "nameThread" | "now" | "log"
 >;
 
 export class Threads implements HostedThreads {
@@ -286,6 +286,12 @@ export class Threads implements HostedThreads {
   }
 
   /** Whether a cloud thread of this Mac project may start from its folder: the project is on OpenOrc Cloud and its server takes one. */
+  /** The cloud project a Mac project is, where a new cloud thread of it starts; null when none is in reach. */
+  cloudProjectFor(macProjectId: string, spaceId?: string): { id: string; space: string } | null {
+    const project = this.#projectFor(macProjectId, spaceId);
+    return project && { id: project.id, space: project.space };
+  }
+
   async macStartOffered(macProjectId: string, spaceId?: string): Promise<boolean> {
     const project = this.#projectFor(macProjectId, spaceId);
     return project ? macStartServed(this.deps.session.in(project.space)) : false;
@@ -688,7 +694,9 @@ export class Threads implements HostedThreads {
           now: this.deps.now(),
         });
         const native = withNativeSummary(summary, row);
-        return here?.draft ? { ...native, draft: here.draft } : native;
+        const moving = this.deps.moving?.(row.id) ?? null;
+        const moved = moving ? { ...native, moving } : native;
+        return here?.draft ? { ...moved, draft: here.draft } : moved;
       });
   }
 }

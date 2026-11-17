@@ -121,6 +121,9 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   // This Mac's own: its folder takes the thread's work (core's macProjects).
   "macProjects.bringState": NOT_ASKED,
   "macProjects.bring": NOT_ASKED,
+  // This Mac moves a thread to and from the cloud (core's CloudMoves).
+  "threads.moveCheck": NOT_ASKED,
+  "threads.move": NOT_ASKED,
   "tasks.get": NOT_ASKED,
   "tasks.update": NOT_ASKED,
   "tasks.delete": NOT_ASKED,

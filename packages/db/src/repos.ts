@@ -355,7 +355,9 @@ export interface ThreadInsert {
 }
 
 /** Raw rows remain available internally; user inventories exclude retired records. */
-const VISIBLE = `id NOT IN (${retiredThreadIds})`;
+/** A thread coming here from OpenOrc Cloud is its cloud thread's until it is whole here (thread-relocations.ts). */
+const ARRIVING = "SELECT thread_id FROM thread_relocations WHERE role = 'coordinator' AND direction = 'to-mac' AND phase IN ('asking', 'received')";
+const VISIBLE = `id NOT IN (${retiredThreadIds}) AND id NOT IN (${ARRIVING})`;
 
 export const threads = {
   /**

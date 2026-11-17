@@ -8,6 +8,7 @@ export { extractionJobs, ftsQuery, memories, settings, summaries, vectors, type 
 export { redact, redactJson, redactValue, type RedactResult, type RedactValueResult } from "./redact.js";
 export { audit, comments, projects, runs, snapshots, tasks, threads, type ReviewCommentScope, type TaskPatch, type ThreadInsert, type ThreadListFilter, type ThreadPatch } from "./repos.js";
 export { runCosts } from "./run-costs.js";
+export { cloudMoves, type CloudMove, type MoveDirection, type MovePhase } from "./thread-relocations.js";
 export { usageHistory } from "./usage-history.js";
 export { projectActivity } from "./project-activity.js";
 export { scheduleFirings, schedules, type SchedulePatch } from "./schedules.js";

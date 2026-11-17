@@ -25,6 +25,7 @@ import type {
   RoutedMethod,
   RpcParams,
   RpcResults,
+  ThreadMoving,
   ThreadSummary,
 } from "@openorc/protocol";
 import { Account } from "./account.js";
@@ -41,11 +42,12 @@ import { CloudConnectors } from "./connectors.js";
 import { CloudMachines } from "./machines.js";
 import { CloudCheckRuns } from "./cloud-check.js";
 import { CloudMacProjects } from "./mac-projects.js";
+import { CloudMoves } from "./moves.js";
 export { githubRepoOf } from "./translate.js";
 export { signInVerifier } from "./browser-sign-in.js";
 import type { HostedNotice } from "./notices.js";
 import { Session } from "./session.js";
-import { Threads } from "./threads.js";
+import { Threads, type HeardRow } from "./threads.js";
 import { Spaces } from "./spaces.js";
 import { OnlineTasks } from "./tasks.js";
 
@@ -54,6 +56,7 @@ export type { CloudFileScope, CloudFileReference, FileDestination } from "./file
 export type { FileByteSource } from "./file-transfer.js";
 export type { UploadPlan, UploadedFile } from "./wire-files.js";
 export type { OwnSkill, OwnSkills } from "./skills.js";
+export type { ArrivalLine, ArrivalSettings } from "./moves.js";
 
 /** The server's push socket, as little of it as the package uses. The desktop core builds one from `socket.io-client`. */
 export interface LiveSocket {
@@ -90,6 +93,8 @@ export interface HostedDeps {
    * lacks. `include` names held-back files to send after all.
    */
   macWork?(projectId: string, include: readonly string[]): Promise<MacWorkUpload | null>;
+  /** Where a cloud thread is moving, or why its last move to this Mac stopped (core's CloudMoves journal); absent: never. */
+  moving?(threadId: string): ThreadMoving | null;
   fetch: typeof fetch;
   /** Opens the socket with the token. Called again after each sign-in and each early reconnect; it retries by itself in between. */
   connect(url: string, token: string): LiveSocket;
@@ -241,7 +246,13 @@ export interface HostedThreads {
   /** Whether a thread, run or project is the account's. A lookup in what the server listed; never a request. */
   holds(ref: { thread: string } | { run: string } | { project: string }): boolean;
   /** A thread the account has, as last heard: its id, its space, and its cloud project. Rejects in words for one it lacks. */
-  row?(threadId: string): { id: string; space: string; projectId: string | null };
+  row?(threadId: string): Pick<HeardRow, "id" | "space" | "projectId" | "title" | "settings">;
+  /** The cloud project a Mac project is, where a new cloud thread of it starts; null when none is in reach. */
+  cloudProjectFor?(macProjectId: string, spaceId?: string): { id: string; space: string } | null;
+  /** A thread it holds, in the app's shape. */
+  summary?(threadId: string): ThreadSummary;
+  /** Reads the server's list again. */
+  refresh?(): Promise<void>;
   /** The threads the account has of one cloud project, as last heard. */
   rowsOfProject?(projectId: string): { id: string; space: string; projectId: string | null }[];
   /** One of the app's calls about something it holds, in the app's shapes. Rejects with words for the person. */
@@ -274,6 +285,8 @@ export interface Hosted {
   readonly check: CloudCheckRuns;
   /** Personal projects from a folder of this Mac with no remote, and their threads' work for the folder. */
   readonly macProjects: CloudMacProjects;
+  /** A thread moving between this Mac and the cloud, the server's half (core's CloudMoves). */
+  readonly moves: CloudMoves;
   /** Reads the stored session and the kept answers, and connects when signed in. Never rejects: no session is signed out. */
   start(): Promise<void>;
   /** The device woke or the network came back: connect now instead of at the next retry. */
@@ -282,13 +295,14 @@ export interface Hosted {
 }
 
 /** What a cloud thread brings from this Mac and what runs for the person there, each over the session alone. */
-function parityServices(session: Session, now: HostedDeps["now"]): Pick<Hosted, "environment" | "connectors" | "machines" | "check" | "macProjects"> {
+function parityServices(session: Session, now: HostedDeps["now"]): Pick<Hosted, "environment" | "connectors" | "machines" | "check" | "macProjects" | "moves"> {
   return {
     environment: new ProjectEnvironment({ session, now }),
     connectors: new CloudConnectors({ session }),
     machines: new CloudMachines({ session }),
     check: new CloudCheckRuns({ session }),
     macProjects: new CloudMacProjects({ session }),
+    moves: new CloudMoves({ session }),
   };
 }
 

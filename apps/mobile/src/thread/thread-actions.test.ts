@@ -89,7 +89,7 @@ describe("a thread's menu on the phone", () => {
 
   it("offers no move for a thread an older Mac runs in a sandbox, brought from its brain or sent there", () => {
     const sandboxed = { ...thread("t-settings"), activity: "idle" as const, cloud: { provider: "vercel" as const, state: "ready" as const, step: null, setup: true, error: null } };
-    for (const each of [sandboxed, { ...sandboxed, moving: { to: "mac" as const, since: 1 } }, { ...sandboxed, moving: { to: "cloud" as const, since: 1 } }]) {
+    for (const each of [sandboxed, { ...sandboxed, moving: { to: "mac" as const, failed: null } }, { ...sandboxed, moving: { to: "cloud" as const, failed: null } }]) {
       const header = outline(threadMenu(each, "header", wednesday, { uncommitted: null, preview: null }));
       expect(header).toEqual(outline(threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: null, preview: null })));
       expect(header.flat().filter((label) => /Cloud|Mac/.test(label))).toEqual([]);

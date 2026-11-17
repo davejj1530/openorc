@@ -4,6 +4,7 @@ import { ActivityRecovery, AgentKind, BackgroundCommand, SubagentStatus, Usage }
 import { ExecutionTarget } from "./execution-target.js";
 import { HarnessId } from "./harness.js";
 import { ThreadOwner } from "./thread-owner.js";
+import { ThreadMoving } from "./cloud-moves.js";
 
 /** Domain records as the renderer sees them. Columns are nullable, not optional. */
 
@@ -237,6 +238,8 @@ export const ThreadSummary = Thread.extend({
   queued: z.array(QueuedMessage),
   /** Where a row another place holds lives; absent on this Mac's own. */
   owner: ThreadOwner.optional(),
+  /** Moving between this Mac and OpenOrc Cloud, or why its last move stopped; absent when neither (core `CloudMoves`). */
+  moving: ThreadMoving.nullish(),
   /**
    * When the agent on this thread's active run last produced an event, epoch ms.
    * Null when no run is live, because a thread that is not running cannot stall.

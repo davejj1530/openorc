@@ -26,6 +26,10 @@ import { HostedSkills } from "./services/hosted-skills.js";
 import { createHostedSkillsCloudHandlers } from "./handlers/hosted-skills-cloud.js";
 import { createMacProjectsHandlers } from "./handlers/mac-projects.js";
 import { MacProjects } from "./services/mac-projects.js";
+import { createCloudMovesHandlers } from "./handlers/cloud-moves.js";
+import { CloudMoves } from "./services/cloud-moves.js";
+import { AgentSessions } from "./services/agent-sessions.js";
+import { agentHomes } from "./services/agent-homes.js";
 import { PlaceRouter } from "@openorc/hosted/router";
 import { rememberedConnectors } from "./services/remembered-connectors.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
@@ -172,6 +176,7 @@ export class OpenOrc {
   /** The environment agents launch with. Runs capture `current()` at admission; Rescan calls `refresh()`. */
   readonly claudeAccounts: ClaudeAccountService;
   private connectorService: ConnectorService | null = null;
+  private cloudMoveService: CloudMoves | null = null;
   readonly environment: ShellEnvironment;
   readonly providerUsage: ProviderUsageService;
   private readonly claudeAccountSwitch: ClaudeAccountSwitch;
@@ -338,6 +343,32 @@ export class OpenOrc {
     return { ...owner, ...(await account.account.grantSignIn(input)) };
   }
 
+  /** Threads moving between this Mac and OpenOrc Cloud, made on first use. */
+  get cloudMoves(): CloudMoves {
+    this.cloudMoveService ??= new CloudMoves({
+      db: this.db,
+      hosted: () => this.account,
+      sessions: new AgentSessions({
+        db: this.db,
+        dataDir: this.options.dataDir,
+        homes: agentHomes({
+          environment: () => this.environment.current(),
+          claudeFolder: (accountId) => {
+            const id = accountId ?? this.claudeAccounts.defaultId();
+            return storedClaudeAccounts.get(this.db, id) ? this.claudeAccounts.configDirectory(id) : null;
+          },
+        }),
+      }),
+      ledger: this.ledger,
+      workspaces: this.workspaces,
+      deleteThread: (id) => this.threads.delete(id),
+      changed: (id) => this.options.transport.push({ type: "invalidate", keys: ["threads", `thread:${id}`] }),
+      machine: process.platform === "darwin" ? "this Mac" : "this computer",
+      log: this.log,
+    });
+    return this.cloudMoveService;
+  }
+
   get account(): Hosted | null {
     if (this.hosted === undefined)
       this.hosted = accountFor(
@@ -481,7 +512,11 @@ export class OpenOrc {
     core.threads.recoverQueue();
     core.upkeep.start();
     if (!options.ephemeral) core.agentUpdates.start();
-    void core.account?.start();
+    // Moves between this Mac and the cloud that a quit cut short are finished or undone once the account is heard.
+    void core.account
+      ?.start()
+      .then(() => core.cloudMoves.resume())
+      .catch((error: unknown) => core.log.warn(`moves between this Mac and OpenOrc Cloud couldn't be picked up: ${error instanceof Error ? error.message : String(error)}`));
     void core.devices.reapStale();
     // Embed any memories that predate the vector index, off the startup path.
     void core.memory.backfillVectors().catch(() => undefined);
@@ -676,6 +711,7 @@ export class OpenOrc {
       createClaudeAccountHandlers(this.claudeAccounts),
       createHostedHandlers(this.account, this.hostedFiles, this.db),
       createHostedSkillsCloudHandlers(() => this.hostedSkills, this.settings),
+      createCloudMovesHandlers(() => this.cloudMoves),
       createMacProjectsHandlers(new MacProjects({ db: this.db, hosted: () => this.account, changed: () => this.options.transport.push({ type: "invalidate", keys: ["macProjects"] }) })),
       hostedParityHandlers,
       threadCollaborationHandlers,

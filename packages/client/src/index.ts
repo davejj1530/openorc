@@ -212,6 +212,7 @@ export { subagentGroups, subagentStatusLabel, type SubagentCard } from "./transc
 export { activityBlockId, activityIdOf, emptyRun, type Block, type RunTranscript } from "./transcript.js";
 export { turnReply, turnStatus, turnStatusWords, useTicking, useTurnModel, type TurnStatus } from "./turn-model.js";
 export { turnShowsSender, turnShowsVoice, type TurnVoice } from "./turn-voice.js";
+export { compareVersions, whatsNewDue } from "./whats-new.js";
 export {
   visualizationColors,
   visualizationContextScript,

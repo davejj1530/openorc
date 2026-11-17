@@ -1,6 +1,6 @@
 import { relativeTime, untilTime } from "@openorc/client";
 import { harnessName, type ModelOption, type Schedule } from "@openorc/protocol";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowUpRight, CalendarClock, RefreshCw, Trash2, Zap } from "../components/icons";
 import { Button, IconButton, StatusDot, Switch, Tooltip } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -8,6 +8,7 @@ import { cn } from "../lib/cn";
 import { modelLabel } from "../lib/model-effort-label";
 import { openThread, useRouter } from "../lib/router";
 import { beginScheduleTrigger, finishScheduleTrigger, readScheduleTrigger } from "../lib/schedule-draft";
+import { useMounted } from "../lib/use-mounted";
 import "./schedules.css";
 
 export const intervals: { label: string; minutes: number }[] = [
@@ -54,14 +55,8 @@ function useRunNow(id: string) {
   });
   const [pendingKey, setPendingKey] = useState(recovery.key);
   const [error, setError] = useState<string | null>(recovery.error);
-  const mounted = useRef(true);
+  const mounted = useMounted();
   const requesting = useRef(false);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
   const runNow = async () => {
     if (requesting.current) return;
     requesting.current = true;

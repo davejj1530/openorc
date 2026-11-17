@@ -2,7 +2,7 @@ import { spaceNavigation } from "../lib/space-navigation";
 import { useSpaceThread } from "../lib/space-queries";
 import { offeredAccount, projectAccountChoice, type ModelChoice } from "@openorc/client";
 import { executionMode, placeOf, PLACES, type ThreadSummary } from "@openorc/protocol";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Composer } from "../components/Composer";
 import { DitherBackdrop } from "../components/DitherBackdrop";
 import { ComposerModelPicker, ModelPicker } from "../components/ModelPicker";
@@ -16,6 +16,7 @@ import { readDraft, writeDraft } from "../lib/drafts";
 import { openThread, useRouter } from "../lib/router";
 import { useComposerSuggestions } from "../lib/connector-mentions";
 import { useNewThreadFiles } from "../lib/new-thread-files";
+import { useMounted } from "../lib/use-mounted";
 
 const draftKey = (parentId: string) => `subthread.${parentId}`;
 
@@ -51,13 +52,7 @@ function SubthreadComposer({ parent }: { parent: ThreadSummary }) {
   const { files, picker: accountPicker, claudeAccountId, missing } = useSubthreadPlace(parent, start.isPending, () => start.reset());
   const accountsMissing = choice?.agent === "claude" ? missing : null;
   const suggestions = useComposerSuggestions({ kind: "thread", id: parent.id }, choice?.agent, executionMode(mode, permission), claudeAccountId);
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
+  const mounted = useMounted();
   const changePrompt = (text: string) => {
     setPrompt(text);
     writeDraft(draftKey(parent.id), { prompt: text });

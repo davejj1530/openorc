@@ -22,7 +22,7 @@ import { useNewAction } from "./new-action";
 import { TabLayers } from "./TabLayers";
 import { HOME_BAR_HEIGHT, HomeBar } from "./header/HomeBar";
 import type { HomeScroll } from "./header/MacLine";
-import { ProjectLabel, RetryRow, SectionToggle, ShowMore, ShowMoreChildren, ShowMoreInGroup, type HeadingRoom } from "./HomeHeading";
+import { NoThreadsYet, ProjectLabel, RetryRow, SectionToggle, ShowMore, ShowMoreChildren, ShowMoreInGroup, type HeadingRoom } from "./HomeHeading";
 import type { HomeItem } from "./home-items";
 import { refreshHome } from "./refresh";
 import { ThreadRow } from "./ThreadRow";
@@ -70,6 +70,8 @@ function HomeRow({ item, home, index, motion, fold }: { item: HomeItem; home: Ho
       return <ShowMoreChildren item={item} motion={motion} onPress={() => home.showMoreChildren(item.tree.thread.projectId, item.tree.thread.id)} />;
     case "retry":
       return <RetryRow projects={item.projects} onPress={() => home.retry(item.projects)} />;
+    case "empty":
+      return <NoThreadsYet />;
   }
 }
 

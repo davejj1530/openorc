@@ -18,8 +18,8 @@ const circle = "size-10 items-center justify-center rounded-full bg-surface acti
 const reach = 2;
 
 /**
- * The filter's mark, as the sidebar's: pins show their own, and the mark is inked while any filter narrows the list
- * (the pins, one's own threads in an organization, an unticked workspace), as a chosen tab is.
+ * The filter's mark, as the sidebar's: pins show their own, and the mark takes the accent while any filter narrows the
+ * list (the pins, one's own threads in an organization, an unticked workspace), as the desktop's filter does.
  */
 export function FilterButton() {
   const filter = useHomeFilter();
@@ -30,7 +30,7 @@ export function FilterButton() {
   return (
     <Link href="/filter" asChild>
       <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={reach} className={circle}>
-        <Mark size={20} className={narrowed ? "text-ink" : "text-ink-3"} />
+        <Mark size={20} className={narrowed ? "text-accent-ink" : "text-ink-3"} />
       </Pressable>
     </Link>
   );

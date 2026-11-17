@@ -77,6 +77,11 @@ it("says why a Mac went, with no dot, when the person did not forget it", () => 
   expect(screen.queryByTestId("link-dot")).toBeNull();
 });
 
+it("edges the bar with the hairline the app's other bars use once the list scrolls under it", () => {
+  bar(connected);
+  expect(screen.getByTestId("scroll-edge")).toBeTruthy();
+});
+
 it("offers only Settings in the bar with no Mac, with no connection, status or hairline, as nothing scrolls", () => {
   render(<HomeBar state={{ kind: "unpaired", lost: { why: "removed", macName: "Studio" } }} />);
   expect(circles()).toEqual(["Settings"]);
@@ -128,7 +133,7 @@ it("titles Personal as OpenOrc, as the Mac's sidebar heads it, still opening the
   expect(screen.queryByText("Personal")).toBeNull();
 });
 
-it("inks the filter's mark while a filter narrows the list, and names what does", async () => {
+it("marks the filter in the accent while a filter narrows the list, and names what does", async () => {
   const { chooseFilter, chooseOwnership } = await import("../filter");
   const birch = { id: "org-birch", kind: "organization", name: "Birch Studio", logo: null, memberId: "member", role: "member", memberCount: 2 } as const;
   account.spaces = { state: "ready", spaces: [{ id: "personal-me", kind: "personal" }, birch], current: birch, access: null, offline: false };
@@ -138,7 +143,7 @@ it("inks the filter's mark while a filter narrows the list, and names what does"
   expect(mark().className).toBe("text-ink-3");
   act(() => chooseOwnership("org-birch", "mine"));
   expect(screen.getByRole("button", { name: "Show, Mine" })).toBeTruthy();
-  expect(mark().className).toBe("text-ink");
+  expect(mark().className).toBe("text-accent-ink");
   act(() => chooseFilter("pinned"));
   expect(screen.getByRole("button", { name: "Show, Pinned threads, Mine" })).toBeTruthy();
   expect(mark().hasAttribute("data-pin")).toBe(true);

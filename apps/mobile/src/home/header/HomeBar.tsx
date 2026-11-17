@@ -5,7 +5,7 @@ import { ChevronDown } from "../../generated/icons";
 import { SpaceMark } from "../../spaces/SpaceMark";
 import { spaceName, titleName, useSpaces } from "../../spaces/use-spaces";
 import { LinkDot } from "../../ui/LinkDot";
-import { TopFade } from "../../ui/ScrollFade";
+import { ScrollEdge } from "../../ui/ScrollEdge";
 import { Wordmark, WORDMARK_MAX_SCALE } from "../../ui/Wordmark";
 import type { HomeTab } from "../BottomBar";
 import { HeaderButtons } from "./HeaderButtons";
@@ -58,9 +58,9 @@ function Title() {
 
 /**
  * Home's first row, pinned as an opaque bar over the status bar's room so rows never show sliced under the clock: the
- * wordmark on the grid's lead and text columns, the header circles trailing (the connection among them), and a fade
- * rows pass into once they scroll under it. While the link is not healthy, the bar says so after the wordmark, which
- * never moves. With no Mac nothing scrolls, so there is no fade or status to show.
+ * wordmark on the grid's lead and text columns, the header circles trailing (the connection among them), and the hairline
+ * that comes in once rows scroll under it, as the thread screen's bar and the sheets draw their edge. While the link is not healthy, the bar says so after the wordmark, which
+ * never moves. With no Mac nothing scrolls, so there is no hairline or status to show.
  */
 export function HomeBar({ state, scroll, tab, listed }: { state: LinkState; scroll?: HomeScroll; tab?: HomeTab; listed?: boolean }) {
   return (
@@ -71,7 +71,7 @@ export function HomeBar({ state, scroll, tab, listed }: { state: LinkState; scro
         <View className="flex-1" />
         <HeaderButtons state={state} tab={tab} listed={listed} />
       </View>
-      {scroll ? <TopFade scrollY={scroll.scrollY} /> : null}
+      {scroll ? <ScrollEdge scrollY={scroll.scrollY} /> : null}
     </View>
   );
 }

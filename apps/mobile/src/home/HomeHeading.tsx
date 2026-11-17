@@ -174,3 +174,12 @@ export function RetryRow({ projects, onPress }: { projects: boolean; onPress: ()
     </ListPressable>
   );
 }
+
+/** A space whose only project holds no threads yet: the quiet words the app's empty lists use, under its label. */
+export function NoThreadsYet() {
+  return (
+    <View className="items-center px-8 pt-24">
+      <Text className="text-lg text-ink-2">No threads yet</Text>
+    </View>
+  );
+}

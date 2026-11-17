@@ -56,7 +56,9 @@ export type HomeItem =
   | { kind: "group-more"; key: string; projectId: string; count: number }
   | { kind: "children-more"; key: string; tree: ThreadTreeRow; count: number }
   /** A list the host could not give: the projects, or the threads. */
-  | { kind: "retry"; key: string; projects: boolean };
+  | { kind: "retry"; key: string; projects: boolean }
+  /** Under a space's only project when it holds no threads yet. */
+  | { kind: "empty"; key: string };
 
 export interface HomeOptions {
   now: number;
@@ -165,6 +167,7 @@ function groupItems(list: HomeList, options: HomeOptions): HomeItem[] {
         { kind: "project", key, project, open, waiting: waitingRoots(roots, list.days.all) } as const,
         ...treeRows(shown.rows, list, options, { named: false, arriving: options.opened === key, cloudLabel: Boolean(project.cloud) }),
         ...(shown.hidden ? [{ kind: "group-more", key: `group-more:${project.id}`, projectId: project.id, count: shown.hidden } as const] : []),
+        ...(roots.length || list.days.pinned.length || list.failed || !list.listed ? [] : [{ kind: "empty", key: "empty" } as const]),
       ];
     });
 }

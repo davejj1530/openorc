@@ -12,6 +12,7 @@ const outline = (items: HomeItem[]) =>
     if (item.kind === "children-more") return `more ${item.count} in ${item.tree.thread.id}`;
     if (item.kind === "more") return "more";
     if (item.kind === "retry") return `retry ${item.projects ? "projects" : "threads"}`;
+    if (item.kind === "empty") return "no threads yet";
     return item.project ? `${item.thread.id} @ ${item.project}` : item.thread.id;
   });
 /** The project labels and their rows alone. */
@@ -128,7 +129,9 @@ describe("homeItems", () => {
   it("leaves out a project with nothing in it, unless it is the only one", () => {
     expect(groups(items(list([quiet("o", "openorc", 5)]))).filter((line) => line.startsWith("#"))).toEqual(["# openorc"]);
     const alone = outline(items(list([], { groups: [{ id: "website", name: "website" }] })));
-    expect(alone).toContain("# website");
+    expect(alone.slice(0, 2)).toEqual(["# website", "no threads yet"]);
+    // Not while the threads are still being read, nor where a pin stands.
+    expect(outline(homeItems({ ...list([], { groups: [{ id: "website", name: "website" }] }), listed: false }, options(list([]))))).not.toContain("no threads yet");
   });
 
   it("counts on a label what waits on the person: a question or a failure, never a teammate's ask or an unread result", () => {

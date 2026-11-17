@@ -1,9 +1,9 @@
 import { StyleSheet } from "react-native";
-import Animated, { Extrapolation, interpolate, useAnimatedStyle, type SharedValue } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useColors } from "./mode";
 
-/** Points over which content fades into the ground at a pinned edge, and of scroll over which the top one comes in. */
+/** Points over which content fades into the ground at a pinned edge. */
 export const FADE = 16;
 
 function Ramp({ id, stops }: { id: string; stops: readonly [offset: number, opacity: number][] }) {
@@ -19,25 +19,6 @@ function Ramp({ id, stops }: { id: string; stops: readonly [offset: number, opac
       </Defs>
       <Rect width="100%" height="100%" fill={`url(#${id})`} />
     </Svg>
-  );
-}
-
-/**
- * Where content passes under a pinned bar it fades into the ground instead of meeting a divider. The fade hangs under
- * the bar and comes in once the content scrolls under it, as iOS draws a bar's edge.
- */
-export function TopFade({ scrollY }: { scrollY: SharedValue<number> }) {
-  const shown = useAnimatedStyle(() => ({ opacity: interpolate(scrollY.value, [0, FADE], [0, 1], Extrapolation.CLAMP) }));
-  return (
-    <Animated.View testID="scroll-edge" pointerEvents="none" className="absolute inset-x-0" style={[{ bottom: -FADE, height: FADE }, shown]}>
-      <Ramp
-        id="top-fade"
-        stops={[
-          [0, 1],
-          [1, 0],
-        ]}
-      />
-    </Animated.View>
   );
 }
 

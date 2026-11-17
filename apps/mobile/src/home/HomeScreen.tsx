@@ -5,7 +5,7 @@ import type { LegendListRef } from "@legendapp/list/react-native";
 import { Pressable, RefreshControl, View } from "react-native";
 import { LinearTransition, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { link, queryClient, teamChat, useLinkState } from "../client";
+import { link, queryClient, teamChat, useLinkState, whatsNew } from "../client";
 import { ChatList } from "../chat/ChatList";
 import { useChatLease } from "../chat/lease";
 import type { LinkState } from "../connection/manager";
@@ -185,6 +185,10 @@ function PairedHome({ state }: { state: Paired }) {
   const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
   const scroll = useMemo(() => ({ scrollY }), [scrollY]);
+  // Over Home, once a launch: the steps on what the update brought, when they are due.
+  useEffect(() => {
+    if (whatsNew.take()) router.push("/whats-new");
+  }, []);
   const orclings = useOrclingChats();
   const faces = useOrclingFaces();
   const tasks = useTaskBoard().available;

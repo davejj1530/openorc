@@ -8,6 +8,7 @@ export const requestPermissionsAsync = async () => ({ status: "undetermined" });
 export const getDevicePushTokenAsync = () => new Promise(() => undefined);
 export const addPushTokenListener = () => ({ remove: () => undefined });
 export const getIosPushNotificationServiceEnvironmentAsync = async () => null;
+export const nativeApplicationVersion: string | null = null;
 export const getPresentedNotificationsAsync = async () => [];
 export const dismissNotificationAsync = async () => undefined;
 export const setNotificationCategoryAsync = async () => undefined;

@@ -71,6 +71,7 @@ export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<
       call: connection.call,
       /** The phone's own OpenOrc Cloud, as its alerts know it: the sender its sealed alerts come from. */
       cloudAlerts: { senderKey: () => "cloud-sender" },
+      whatsNew: { take: () => false, close: () => undefined },
     },
   };
 }

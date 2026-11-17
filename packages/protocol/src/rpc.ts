@@ -246,6 +246,22 @@ export const rpcParams = {
       settings: z.object({ agent: AgentKind, model: z.string().nullable(), effort: z.string().nullable(), mode: RunMode, permissionMode: PermissionPreset }).partial().optional(),
     })
     .strict(),
+  /**
+   * The person began writing the first message of a new thread on OpenOrc Cloud, with the start it would make: the
+   * machine it will run on wakes, and the project's folder is made ready there, so the start finds both.
+   */
+  "threads.readyStart": z
+    .object({
+      projectId: z.string(),
+      spaceId: SpaceId.optional(),
+      agent: AgentKind.optional(),
+      executionTarget: ExecutionTarget.optional(),
+      model: z.string().optional(),
+      effort: z.string().optional(),
+      mode: RunMode,
+      permissionMode: PermissionPreset,
+    })
+    .strict(),
   "subagents.stop": z.object({ threadId: z.string(), expectedRunId: z.string().optional() }),
   "threads.checkpoints": z.object({ id: z.string() }),
   /** What the turn that saved a checkpoint changed, against the checkpoint before it. */
@@ -660,6 +676,7 @@ export interface RpcResults
   "threads.sendQueued": QueuedMessage[];
   "threads.stopCommand": null;
   "threads.ready": null;
+  "threads.readyStart": null;
   "subagents.stop": null;
   "threads.checkpoints": ThreadCheckpoint[];
   "threads.turnChanges": TurnFileChanges;

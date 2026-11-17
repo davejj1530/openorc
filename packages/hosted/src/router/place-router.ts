@@ -61,12 +61,13 @@ export class PlaceRouter {
     if (refusal) return Promise.resolve({ type: "rpc.error", id: request.id, message: refusal });
     const chat = this.deps.chat?.();
     if (chat && isTeamChatMethod(method) && !runsOrcling(method, params)) return this.chatted(teamChatCalls(chat, noOrclingRunner), request, method, params);
-    if (typeof params["spaceId"] === "string" && ["threads.list", "threads.resolvedCount", "threads.search", "threads.start", "tasks.list"].includes(method))
+    if (typeof params["spaceId"] === "string" && ["threads.list", "threads.resolvedCount", "threads.search", "threads.start", "threads.readyStart", "tasks.list"].includes(method))
       return this.scoped.handle(request, params["spaceId"]);
     if (method.startsWith("hosted.")) return this.hostedRequest(place, request, method as RoutedMethod, params);
     if (!place?.active) return this.deps.next(request);
     if (method === "projects.get" && place.holds({ project: String(params["id"]) })) return Promise.resolve(result(request, place.project(String(params["id"]))));
     if (method === "threads.start" && params["hosted"]) return this.asked(place, request, "threads.start", params);
+    if (method === "threads.readyStart") return this.readyStart(place, request, params as RpcParams<"threads.readyStart">);
     return this.routed(place, request, method, params);
   }
 
@@ -100,6 +101,12 @@ export class PlaceRouter {
       default:
         return this.deps.next(request);
     }
+  }
+
+  /** A new cloud thread's first message is being written: the place readies its machine, and the answer waits on none of it. */
+  private readyStart(place: HostedThreads, request: RpcRequest, params: RpcParams<"threads.readyStart">): Promise<RpcReply> {
+    void place.readyStart?.(params).catch(() => undefined);
+    return Promise.resolve(result(request, null));
   }
 
   /** A team chat call as a reply, with the chat's words when it refuses. */

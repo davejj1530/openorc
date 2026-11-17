@@ -15,6 +15,7 @@ import {
   HOSTED_REASONS,
   harnessShortName,
   hostedRunId,
+  hostedSendBlock,
   hostedThreadOf,
   isHostedAgent,
   type AccountReach,
@@ -242,6 +243,27 @@ export class Threads implements HostedThreads {
     heard.here[threadId] = { ...here, nativeStop: { id, expectedRunId } };
     this.#save();
     return id;
+  }
+
+  /**
+   * threads.readyStart: the person began writing a new cloud thread's first message in the project. The machine it will
+   * run on is made ready, with the person's skills on the server first, at most once a minute for the project, and
+   * never for an agent that doesn't run on OpenOrc Cloud or a start the account would refuse. Nothing comes back of
+   * it: the start says what went wrong.
+   */
+  async readyStart(params: RpcParams<"threads.readyStart">): Promise<void> {
+    const settings = startSettings(params);
+    if (!isHostedAgent(settings.agent)) return;
+    const project = this.#projectFor(params.projectId, params.spaceId);
+    if (!project || hostedSendBlock(this.calls.account(), settings, false)) return;
+    const key = `${project.space}/${project.id}`;
+    if (this.calls.now() - (this.readied.get(key) ?? Number.NEGATIVE_INFINITY) < sends.READY_AGAIN_MS) return;
+    this.readied.set(key, this.calls.now());
+    await this.deps.skills.bring(project.space, settings.agent).catch(() => undefined);
+    await this.deps.session
+      .in(project.space)
+      .request(ROUTES.readyMachine, { projectId: project.id, settings })
+      .catch(() => undefined);
   }
 
   /**
@@ -763,7 +785,7 @@ function defined<T extends Record<string, unknown>>(fields: T): Partial<T> {
 }
 
 /** The settings a start runs with, as the server names them: its execution target's model, or the fields older callers send. */
-function startSettings(params: RpcParams<"threads.start">): {
+function startSettings(params: Pick<RpcParams<"threads.start">, "agent" | "executionTarget" | "model" | "effort" | "mode" | "permissionMode">): {
   agent: HostedAgentOrOther;
   model: string | null;
   effort: string | null;

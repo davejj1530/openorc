@@ -46,7 +46,7 @@ export interface Calls {
 
 const GONE = "That conversation isn't on OpenOrc Cloud.";
 /** How often the person writing may ask the thread to be ready: a thread's machine rests two minutes before it sleeps. */
-const READY_AGAIN_MS = 60_000;
+export const READY_AGAIN_MS = 60_000;
 
 const threadOf = (runId: string): string => {
   const threadId = hostedThreadOf(runId);

@@ -317,3 +317,24 @@ describe("a team's threads", () => {
     });
   });
 });
+
+describe("a new cloud thread made ready as its first message is begun", () => {
+  it("asks the server once a minute a project, and never for an agent that doesn't run there", async () => {
+    stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    stand.setBilling(ADA, { pro: true, standing: "live", at: new Date(Date.now() + 20 * 86_400_000).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
+    stand.setSignIns(ADA, [{ agent: "claude" }]);
+    const { hosted } = await host();
+    await signIn(hosted);
+    const readies = () => stand.requests.filter((request) => request.method === "POST" && request.path === "/hosted/machines/ready");
+    const start = { projectId: "mac-openorc", mode: "act", permissionMode: "autonomous" } as const;
+    // Asked until the account's projects are heard: an ask for a project it doesn't know yet asks nothing.
+    await vi.waitFor(async () => {
+      await hosted.threads.readyStart!({ ...start, agent: "claude" });
+      expect(readies()).toHaveLength(1);
+    });
+    await hosted.threads.readyStart!({ ...start, agent: "claude" });
+    expect(readies(), "again within the minute asks nothing").toHaveLength(1);
+    await hosted.threads.readyStart!({ ...start, projectId: "openorc-workspace", agent: "cursor" });
+    expect(readies()).toHaveLength(1);
+  });
+});

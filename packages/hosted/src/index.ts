@@ -264,6 +264,8 @@ export interface HostedThreads {
   refresh?(): Promise<void>;
   /** The threads the account has of one cloud project, as last heard. */
   rowsOfProject?(projectId: string): { id: string; space: string; projectId: string | null }[];
+  /** The person began writing a new cloud thread's first message: the machine it will run on is made ready. Never rejects. */
+  readyStart?(params: RpcParams<"threads.readyStart">): Promise<void>;
   /** One of the app's calls about something it holds, in the app's shapes. Rejects with words for the person. */
   call<M extends RoutedMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]>;
   /** A project only the server has, as a window reads a project. */

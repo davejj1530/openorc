@@ -9,7 +9,7 @@ type Dependencies = {
 export function createThreadMessagesHandlers({
   db,
   threadService,
-}: Dependencies): Pick<Handlers, "threads.compact" | "threads.queue" | "threads.unqueue" | "threads.sendQueued" | "threads.stopCommand" | "threads.send" | "threads.ready"> {
+}: Dependencies): Pick<Handlers, "threads.compact" | "threads.queue" | "threads.unqueue" | "threads.sendQueued" | "threads.stopCommand" | "threads.send" | "threads.ready" | "threads.readyStart"> {
   return {
     "threads.compact": async ({ id }) => {
       await threadService.compact(id);
@@ -24,6 +24,7 @@ export function createThreadMessagesHandlers({
     },
     // An agent on this Mac starts in moments, and nothing here sleeps: there is nothing to make ready ahead.
     "threads.ready": () => null,
+    "threads.readyStart": () => null,
     "threads.send": async ({ id, text, fromThreadId }) => {
       await threadService.send(id, text, fromThreadId ? threads.get(db, fromThreadId) : null);
       return null;

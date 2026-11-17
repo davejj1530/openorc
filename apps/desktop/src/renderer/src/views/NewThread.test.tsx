@@ -12,6 +12,7 @@ let projects: Project[];
 /** The project list's first answer has not arrived. */
 let listLoading = false;
 let models: RpcResults["agents.models"];
+let cloudModels: RpcResults["cloudModels.catalog"];
 let system: RpcResults["system.info"];
 let branches: Record<string, string | null | undefined>;
 let branchError: boolean;
@@ -39,6 +40,7 @@ vi.mock("../lib/client", async (original) => ({
       "workspace.get": undefined,
       "system.info": system,
       "agents.models": models,
+      "cloudModels.catalog": cloudModels,
       "app.settings.get": settings,
       "account.status": account,
       "orchestration.availability": { enabled: true, reason: null, maxHierarchyDepth: 3 },
@@ -125,6 +127,7 @@ beforeEach(() => {
   account = undefined;
   mutated.length = 0;
   models = [{ id: "codex-model", label: "Codex", agent: "codex", isDefault: true, efforts: ["medium"], defaultEffort: "medium" }];
+  cloudModels = null;
   system = {
     dataDir: "/data",
     harnesses: harnessIds.map((id) => ({ id, state: id === "codex" ? "ready" : "sign_in", path: `/bin/${id}`, version: "1", revision: 1 })),
@@ -404,6 +407,28 @@ describe("NewThread", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", hosted: true, prompt: "Add a health check" })));
     expect(start).toHaveBeenCalledWith(expect.not.objectContaining({ workspaceMode: expect.anything() }));
+  });
+
+  it("starts a cloud-only project's thread on a model OpenOrc Cloud runs, though this Mac has none", async () => {
+    account = openOrcCloud("added");
+    models = [];
+    cloudModels = { models: [{ id: "", label: "Codex default", agent: "codex", isDefault: true, efforts: [], defaultEffort: null }], providers: [] };
+    projects = [{ ...makeProject("p1"), rootPath: "" }];
+    spaceNavigation
+      .getState()
+      .initialize("scoped", "personal", [
+        {
+          id: "personal",
+          personal: true,
+          projects: [{ key: "p1", name: "Canvas", repo: "example/canvas", localProjectId: null, hostedProjectId: "cloud-project", connected: true }],
+          threads: [],
+          taskIds: [],
+        },
+      ]);
+    writeNewThreadDraft({ ...readNewThreadDraft("p1"), prompt: "Add a health check" });
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", hosted: true, agent: "codex", model: "" })));
   });
 
   it.each([false, true])("offers only OpenOrc Cloud for a scoped cloud-only project without requiring a local sign-in (account loading: %s)", async (loading) => {

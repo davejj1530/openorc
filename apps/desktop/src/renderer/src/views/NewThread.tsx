@@ -20,7 +20,7 @@ import { ClaudeAccountScope } from "../lib/claude-account";
 import { usePermissionSelection, useRpc, useRpcMutation } from "../lib/client";
 import { useNewThreadHosted } from "../lib/cloud-offered";
 import { CLOUD_MODEL_LIMITS } from "../lib/cloud-model-limits";
-import { useCloudRunChoice } from "../lib/cloud-run-choice";
+import { cloudRunChoice, useCloudModels } from "../lib/cloud-run-choice";
 import { useCloudStartReady } from "../lib/use-cloud-start-ready";
 import { useMounted } from "../lib/use-mounted";
 import { usePublishComposerAccount } from "../lib/composer-account";
@@ -189,15 +189,18 @@ function NewThreadProject({
   // On OpenOrc Cloud the thread runs on the person's cloud sign-in, so this Mac's own agents and accounts never hold it.
   const onCloud = workspaceMode === "hosted";
   const files = useNewThreadFiles(projectId, onCloud);
+  const cloudModels = useCloudModels(onCloud);
   // The model the start runs; on OpenOrc Cloud, one the cloud runs.
-  const choice = useCloudRunChoice(picked, onCloud);
+  const choice = cloudRunChoice(picked, onCloud ? cloudModels : undefined);
   const runDraft: NewThreadDraft = choice && target.kind === "model" ? { ...draft, target: { kind: "model", choice } } : draft;
 
   useEffect(() => {
-    if (target.kind !== "model" || target.choice || !models.data || defaultHarness === undefined) return;
-    const initial = initialThreadChoice(models.data, defaultHarness, info.data, onCloud);
+    // A start on OpenOrc Cloud begins on a model the cloud runs, whatever agents this Mac has.
+    const offered = (onCloud && cloudModels) || models.data;
+    if (target.kind !== "model" || target.choice || !offered || defaultHarness === undefined) return;
+    const initial = initialThreadChoice(offered, defaultHarness, info.data, onCloud);
     if (initial) changeDraft({ target: { kind: "model", choice: initial } });
-  }, [target, models.data, info.data, defaultHarness, onCloud]);
+  }, [target, models.data, cloudModels, info.data, defaultHarness, onCloud]);
   usePublishComposerAccount(choice?.agent, claudeAccountId, choice?.model);
 
   const {

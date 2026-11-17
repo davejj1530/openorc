@@ -14,7 +14,6 @@ import {
   type HarnessId,
   type ModelOption,
   type Orcling,
-  type SystemInfo,
 } from "@openorc/protocol";
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { useComposerControl } from "./composer-read-only";
@@ -124,14 +123,14 @@ function moveRowFocusIn(event: KeyboardEvent<HTMLButtonElement>, results: HTMLEl
 function useProviderTabChoice({
   list,
   value,
-  system,
+  runs,
   locked,
   select,
   results,
 }: {
   list: ModelOption[];
   value: ModelChoice | null;
-  system: SystemInfo | undefined;
+  runs: (agent: HarnessId) => boolean;
   locked: boolean;
   select: (choice: ModelChoice) => void;
   results: RefObject<HTMLDivElement | null>;
@@ -144,9 +143,7 @@ function useProviderTabChoice({
     results.current?.querySelector("[data-model-row][aria-pressed='true']")?.scrollIntoView?.({ block: "nearest" });
   }, [value?.agent, value?.model, results]);
   return (next: PickerSection) => {
-    if (!isHarnessId(next) || next === value?.agent || locked) return;
-    const status = system ? harnessInfo(system, next) : null;
-    if (!status || !harnessLoggedIn(status)) return;
+    if (!isHarnessId(next) || next === value?.agent || locked || !runs(next)) return;
     if (value) earlier.current.set(value.agent, value);
     const choice = providerChoice(list, next, earlier.current.get(next));
     if (!choice) return;
@@ -201,7 +198,9 @@ function ModelBrowser({
   const orclingSettings = Boolean(orclings?.selectedId);
   const harness = isHarnessId(section) ? section : null;
   const provider = harness && system.data ? harnessInfo(system.data, harness) : null;
-  const ready = !harness || Boolean(provider && harnessLoggedIn(provider));
+  // OpenOrc Cloud runs its agents with the person's sign-ins there; this Mac runs those it is signed in to.
+  const runs = (agent: HarnessId) => Boolean(cloud) || Boolean(system.data && harnessLoggedIn(harnessInfo(system.data, agent)));
+  const ready = !harness || runs(harness);
   const { legacy, searching, visible, multiProvider } = browserModels({ list, section: harness, query });
   const {
     efforts: effortOptions,
@@ -213,7 +212,7 @@ function ModelBrowser({
     fastBlocked,
     fastHint,
   } = pickerSettings({ model: current, value, loading: models.isPending, failed: models.isError });
-  const selectProvider = useProviderTabChoice({ list, value, system: system.data, locked: orclingSettings || Boolean(disabled), select: onSelectModel, results });
+  const selectProvider = useProviderTabChoice({ list, value, runs, locked: orclingSettings || Boolean(disabled), select: onSelectModel, results });
 
   const switchSection = (next: PickerSection) => {
     setSection(next);
@@ -346,9 +345,11 @@ function ModelBrowser({
               {visible.length === 0 && !models.isFetching && !models.isError ? (
                 <p className="model-picker-message">{searching ? "No models match." : `${harnessName(harness)} listed no models.`}</p>
               ) : null}
-              <button type="button" className="model-picker-text-action model-picker-manage" onClick={() => useRouter.getState().navigate({ view: "settings" })}>
-                <Plus size={14} /> Add providers
-              </button>
+              {cloud ? null : (
+                <button type="button" className="model-picker-text-action model-picker-manage" onClick={() => useRouter.getState().navigate({ view: "settings" })}>
+                  <Plus size={14} /> Add providers
+                </button>
+              )}
             </>
           ) : null}
         </div>

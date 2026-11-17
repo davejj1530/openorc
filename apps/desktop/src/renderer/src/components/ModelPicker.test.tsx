@@ -59,6 +59,29 @@ describe("ModelPicker", () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ agent: "codex", model: "gpt" }));
   });
 
+  it("offers a turn on OpenOrc Cloud every agent it runs, whatever this Mac is signed in to", async () => {
+    mocks.call.mockImplementation(async (method) => (method === "cloudModels.catalog" ? { models, providers: [] } : method === "agents.modelCatalog" ? { models: [], providers: [] } : info));
+    const onChange = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ModelPicker
+          value={{ agent: "claude", model: "sonnet", effort: null }}
+          onChange={onChange}
+          limits={{ harnesses: ["claude", "codex"], fast: false, cloud: true }}
+          ariaLabel="Reviewer"
+          showEffort={false}
+        />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Reviewer" }));
+    const sonnet = await screen.findByRole("button", { name: /^Sonnet/ });
+    expect((sonnet as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByText(/Sign in to Claude Code/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Add providers/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Codex" }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ agent: "codex", model: "gpt" }));
+  });
+
   it.each([false, true])("selects OpenCode variants and resets to Default in both picker layouts (composer=%s)", async (composer) => {
     const model: ModelOption = { ...models[2]!, efforts: ["low", "high", "deep-analysis", "default"], defaultEffort: "default" };
     mocks.call.mockImplementation(async (method) => (method === "agents.modelCatalog" ? { models: [model], providers: [] } : info));

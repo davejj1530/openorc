@@ -21,9 +21,9 @@ export function messageOf(message: Message) {
   };
 }
 
-/** A tool call's whole output, as its `tool.call.completed` kept it; null for a call that never ended. */
+/** A tool call's whole output, as its `tool.completed` kept it; null for a call that never ended. */
 export const toolOutputOf = (thread: Thread, toolCallId: string) => ({
-  output: thread.events.findLast((stored) => stored.event["type"] === "tool.call.completed" && stored.event["toolCallId"] === toolCallId)?.event["output"] ?? null,
+  output: thread.events.findLast((stored) => stored.event["type"] === "tool.completed" && stored.event["toolCallId"] === toolCallId)?.event["output"] ?? null,
 });
 
 /** A stretch of the log: from a turn, or after a seq, at most `limit` events, with the head. */

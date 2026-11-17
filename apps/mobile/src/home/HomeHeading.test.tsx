@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import { CloudOutOfReach } from "../spaces/cloud-reach";
+import { nativeProps } from "../test-fixtures/react-native";
 import { ProjectLabel, SectionToggle } from "./HomeHeading";
 
 afterEach(cleanup);
@@ -27,4 +29,22 @@ it("heads a project's group with its name and, at the end, what waits on the per
   cleanup();
   const quiet = render(<ProjectLabel group={{ kind: "project", key: "project:p", project: { id: "p", name: "notes-app", cloud: true }, open: false, waiting: 0 }} motion={{}} onToggle={toggled} />);
   expect(quiet.getByRole("button", { name: "notes-app" }).getAttribute("aria-expanded")).toBe("false");
+});
+
+it("dims a cloud group's cloud while OpenOrc Cloud is out of reach, as its rows, which leave the cloud to it, cannot", () => {
+  const faded = (view: ReturnType<typeof render>) => Array.from(view.container.querySelectorAll("div")).some((element) => /opacity-40/.test(String(nativeProps.get(element)?.className)));
+  const group = { kind: "project" as const, key: "project:p", project: { id: "p", name: "notes-app", cloud: true as const }, open: true, waiting: 0 };
+  expect(faded(render(<ProjectLabel group={group} motion={{}} onToggle={() => undefined} />))).toBe(false);
+  cleanup();
+  expect(faded(render(<ProjectLabel group={{ ...group, offline: true }} motion={{}} onToggle={() => undefined} />))).toBe(true);
+  cleanup();
+  const out = render(
+    <CloudOutOfReach.Provider value>
+      <ProjectLabel group={group} motion={{}} onToggle={() => undefined} />
+    </CloudOutOfReach.Provider>,
+  );
+  expect(faded(out)).toBe(true);
+  cleanup();
+  // A folder never fades.
+  expect(faded(render(<ProjectLabel group={{ ...group, project: { id: "p", name: "openorc" } }} motion={{}} onToggle={() => undefined} />))).toBe(false);
 });

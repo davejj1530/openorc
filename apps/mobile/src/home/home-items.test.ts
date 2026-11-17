@@ -126,6 +126,26 @@ describe("homeItems", () => {
     expect(groups(items(moved, { previous: kept })).filter((line) => line.startsWith("#"))).toEqual(["# immaculate", "# openorc", "# website"]);
   });
 
+  it("leaves a cloud project's rows to its label's cloud, which goes out of reach only when none of its threads is reached", () => {
+    const cloud = { id: "notes", name: "notes-app", cloud: true as const };
+    const hosted = (id: string, reach: "live" | "offline") => ({ ...quiet(id, "notes", 5), owner: { brain: "hosted" as const, reach, heardAt: 1 } });
+    const shown = (threads: ThreadSummary[]) => items(list(threads, { groups: [cloud, ...projects] }));
+    const label = (all: HomeItem[]) => all.find((item) => item.kind === "project" && item.project.id === "notes");
+    const live = shown([hosted("a", "live"), hosted("b", "offline"), quiet("o", "openorc", 5)]);
+    expect(
+      live
+        .filter((item) => item.kind === "thread")
+        .map((item) => item.kind === "thread" && [item.thread.id, item.cloudLabel ?? false])
+        .sort(),
+    ).toEqual([
+      ["a", true],
+      ["b", true],
+      ["o", false],
+    ]);
+    expect(label(live)).not.toHaveProperty("offline");
+    expect(label(shown([hosted("a", "offline"), hosted("b", "offline")]))).toMatchObject({ offline: true });
+  });
+
   it("leaves out a project with nothing in it, unless it is the only one", () => {
     expect(groups(items(list([quiet("o", "openorc", 5)]))).filter((line) => line.startsWith("#"))).toEqual(["# openorc"]);
     const alone = outline(items(list([], { groups: [{ id: "website", name: "website" }] })));

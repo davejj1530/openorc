@@ -125,6 +125,20 @@ it("keeps a parent's disclosure on its own row, beside the link that opens the t
   expect(onFold).toHaveBeenLastCalledWith(parent.id, true);
 });
 
+it("leaves the cloud to a group label that wears it, and keeps the age and the mark at their columns with the cloud or without", () => {
+  const plan = { ...fixtureThreads.find((thread) => thread.id === "t-plan")!, branch: null, prUrl: null, lastActivityAt: Date.now() - 12 * 60_000 };
+  const cloud = { ...plan, id: "cloud", unread: true, owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 1 } };
+  for (const cloudLabel of [true, false]) {
+    const view = render(<ThreadRow thread={cloud} project={null} cloudLabel={cloudLabel} arriving={false} />);
+    expect(view.queryByLabelText("Cloud glyph") === null).toBe(cloudLabel);
+    expect(flatStyle(nativeProps.get(view.getByText("12m"))!.style).width).toBe(32);
+    expect(Array.from(view.container.querySelectorAll("div")).filter((element) => /\bw-7\b/.test(String(nativeProps.get(element)?.className)))).toHaveLength(1);
+    // The label still says where it lives.
+    expect(label(view)).toContain("OpenOrc Cloud");
+    cleanup();
+  }
+});
+
 it("marks an OpenOrc Cloud thread with the cloud and the face of the teammate who started it, says where in its label, and leaves its menu to the Mac", () => {
   const mine = { ...fixtureThreads.find((thread) => thread.id === "t-plan")!, branch: null, prUrl: null };
   const cloud = { ...mine, id: "cloud", owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 1, startedBy: { name: "Mara Okafor", image: null } } };

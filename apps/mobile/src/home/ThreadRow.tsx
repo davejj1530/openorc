@@ -82,13 +82,16 @@ function StarterFace({ name, image }: { name: string; image: string | null }) {
 
 /**
  * A root row's facts, as the desktop's row packs them before its state: who started it when it is someone else, its
- * pull request in its state's tone, and the cloud for an OpenOrc Cloud thread, dimmed while out of reach. Each sits in
- * a 16 pt slot; absent facts leave their room to the title. What they say is in the row's label.
+ * pull request in its state's tone, and the cloud for an OpenOrc Cloud thread whose group's label does not wear it,
+ * dimmed while out of reach. Each sits in a 16 pt slot; absent facts leave their room to the title, while the age and
+ * the mark keep their columns. What they say is in the row's label.
  */
-function FactSlots({ thread }: { thread: ThreadSummary }) {
+function FactSlots({ thread, cloudLabel }: { thread: ThreadSummary; cloudLabel: boolean }) {
   const starter = rowStarter(thread);
   const pull = pullRequestMark(thread);
-  const cloud = cloudPlace(thread, null, useCloudOutOfReach());
+  const place = cloudPlace(thread, null, useCloudOutOfReach());
+  // Under a group whose label wears the cloud, the label says it, and dims for its rows while out of reach.
+  const cloud = cloudLabel ? null : place;
   const PullIcon = pull ? pullIcons[pull.state] : null;
   if (!starter && !pull && !cloud) return null;
   return (
@@ -119,13 +122,13 @@ function FactSlots({ thread }: { thread: ThreadSummary }) {
  * the list. A parent's disclosure holds the action column, so its facts, age and mark step left of it as one, as the
  * desktop's do. Words the row once said under its title (where it works, what it is doing) are in its label.
  */
-function RootLine({ thread, mark, working, parent }: { thread: ThreadSummary; mark: ThreadMark | null; working: boolean; parent: boolean }) {
+function RootLine({ thread, mark, working, parent, cloudLabel }: { thread: ThreadSummary; mark: ThreadMark | null; working: boolean; parent: boolean; cloudLabel: boolean }) {
   const age = rowAge(latestActivity(thread), useSidebarNow());
   const scale = Math.min(useWindowDimensions().fontScale, CHROME_SCALE);
   return (
     <View className="flex-row items-center gap-3">
       <SweepText text={thread.title} className="flex-1 text-xl text-ink" sweeping={working} />
-      <FactSlots thread={thread} />
+      <FactSlots thread={thread} cloudLabel={cloudLabel} />
       <View className="flex-row items-center gap-1">
         <Text numberOfLines={1} className="text-right text-detail tabular-nums text-ink-4" style={{ width: AGE_WIDTH * scale }}>
           {age}
@@ -192,12 +195,15 @@ export const ThreadRow = memo(
     arriving,
     tree,
     motion = STILL,
+    cloudLabel = false,
     onFold,
   }: {
     thread: ThreadSummary;
     project: string | null;
     arriving: boolean;
     tree?: ThreadTreeRow;
+    /** Its group's label wears the cloud, so its row need not. */
+    cloudLabel?: boolean;
     motion?: RowMotion;
     /** Opens or folds a parent's sub threads: its id, and whether to open them. */
     onFold?: (id: string, open: boolean) => void;
@@ -228,7 +234,11 @@ export const ThreadRow = memo(
         : { state: status?.label, about: [headline?.text, detail, pullRequestMark(thread)?.label] },
       facts,
     );
-    const lines = compact ? <ThreadRowHeading thread={thread} mark={mark} /> : <RootLine thread={thread} mark={mark} working={working} parent={Boolean(tree?.hasChildren && onFold)} />;
+    const lines = compact ? (
+      <ThreadRowHeading thread={thread} mark={mark} />
+    ) : (
+      <RootLine thread={thread} mark={mark} working={working} parent={Boolean(tree?.hasChildren && onFold)} cloudLabel={cloudLabel} />
+    );
     // A root row's own tree line drops from under its title's first letters.
     const node = compact ? undefined : { mid: titleMid(false, fontScale) + 12 * Math.min(fontScale, CHROME_SCALE), reach: 0 };
     const toggle = <TreeToggle tree={tree} open={open} compact={compact} onFold={onFold} />;
@@ -254,6 +264,7 @@ export const ThreadRow = memo(
   (before, next) =>
     before.thread === next.thread &&
     before.project === next.project &&
+    before.cloudLabel === next.cloudLabel &&
     before.arriving === next.arriving &&
     before.motion === next.motion &&
     before.onFold === next.onFold &&

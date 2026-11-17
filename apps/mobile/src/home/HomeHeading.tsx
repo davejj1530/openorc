@@ -6,6 +6,7 @@ import type { ComponentType } from "react";
 import type { IconProps } from "../ui/icon";
 import { cn } from "../ui/cn";
 import { ListPressable } from "../ui/ListPressable";
+import { useCloudOutOfReach } from "../spaces/cloud-reach";
 import { useReducedMotion } from "../ui/reduced-motion";
 import { turn } from "../ui/motion";
 import { Text } from "../ui/Text";
@@ -39,6 +40,7 @@ const partMarks: Record<Section["part"], ComponentType<IconProps>> = { pinned: P
  */
 function FoldLabel({
   mark: Mark,
+  dim = false,
   words,
   spoken,
   count,
@@ -48,6 +50,8 @@ function FoldLabel({
   onToggle,
 }: {
   mark: ComponentType<IconProps>;
+  /** The mark fades, as a cloud does while OpenOrc Cloud is out of reach. */
+  dim?: boolean;
   words: string;
   spoken: string;
   count?: number;
@@ -66,7 +70,10 @@ function FoldLabel({
       className={cn("mx-3 min-h-touch flex-row items-center gap-2 rounded-lg pr-5 active:bg-surface-2", rooms[room])}
       style={{ paddingLeft: LABEL_PAD }}
     >
-      <Mark size={16} className="text-ink-3" />
+      {/* The glyph takes its ink from its class; its fade is the view's. */}
+      <View className={cn(dim && "opacity-40")}>
+        <Mark size={16} className="text-ink-3" />
+      </View>
       <Text numberOfLines={1} className="shrink text-detail text-ink-3">
         {words}
       </Text>
@@ -101,12 +108,17 @@ export function projectMark(project: { id: string; cloud?: true }): ComponentTyp
   return project.id === WORKSPACE_ID ? Globe : Folder;
 }
 
-/** A project's label over its threads: its mark (a folder, or the cloud for a project only OpenOrc Cloud has), its name, and what in it waits on the person. */
+/**
+ * A project's label over its threads: its mark (a folder, or the cloud for a project only OpenOrc Cloud has), its name,
+ * and what in it waits on the person. Its rows leave the cloud to it, so its cloud dims for them while out of reach.
+ */
 export function ProjectLabel({ group, room = "after-rows", motion, onToggle }: { group: Group; room?: HeadingRoom; motion: RowMotion; onToggle: () => void }) {
   const mark = projectMark(group.project);
+  const outOfReach = useCloudOutOfReach();
   return (
     <FoldLabel
       mark={mark}
+      dim={Boolean(group.project.cloud && (group.offline || outOfReach))}
       words={group.project.name}
       spoken={group.waiting ? `${group.project.name}, ${group.waiting} need you` : group.project.name}
       waiting={group.waiting}

@@ -48,7 +48,7 @@ export function ChatList({ lease, top, bottom }: { lease: TeamChatLease; top: nu
     setFailure(null);
     try {
       const conversation = row.conversation ?? (await call("teamChat.openDm", { spaceId: lease.spaceId, userIds: [row.id] }));
-      router.push({ pathname: "/chat/[id]", params: { id: conversation.id, title: row.title } });
+      router.push({ pathname: "/chat/[id]", params: { id: conversation.id } });
     } catch (error) {
       setFailure(failureMessage(error));
     }

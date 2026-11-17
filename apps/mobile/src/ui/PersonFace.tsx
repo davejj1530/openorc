@@ -7,6 +7,7 @@ import { Text } from "./Text";
 const FACES = {
   sm: { box: "size-3.5", type: { fontSize: 7, lineHeight: 9 } },
   md: { box: "size-5", type: { fontSize: 9, lineHeight: 12 } },
+  lg: { box: "size-7", type: { fontSize: 11, lineHeight: 14 } },
 } as const;
 
 /** A person's face, as the desktop's: their picture, else their initials on a quiet fill. */

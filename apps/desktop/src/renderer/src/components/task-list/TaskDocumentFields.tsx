@@ -86,11 +86,11 @@ export function TaskDocumentFields({
         imageUnavailableReason={imageUnavailableReason}
       />
       <div className="flex flex-wrap items-center gap-3 mt-6 text-sm text-ink-3">
-        <label className="flex min-w-0 items-center gap-2">
+        <label className="flex min-w-0 flex-1 items-center gap-2">
           <span>Labels</span>
           <input
             aria-label="Labels"
-            className="bg-transparent py-1 text-ink-2 placeholder:text-ink-4"
+            className="min-w-0 flex-1 bg-transparent py-1 text-ink-2 placeholder:text-ink-4"
             placeholder="Add labels, comma separated"
             value={draft.labels}
             readOnly={disabled}

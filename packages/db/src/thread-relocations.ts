@@ -24,6 +24,8 @@ export interface CloudMove {
   step: string | null;
   /** Why it stopped, for "Didn't move"; null while under way and once done. */
   error: string | null;
+  /** A folder here that stopped it, for its card to open; null otherwise. */
+  folder: string | null;
   projectId: string | null;
   createdAt: number;
   updatedAt: number;
@@ -38,6 +40,7 @@ interface Row {
   phase: MovePhase;
   step: string | null;
   error: string | null;
+  folder: string | null;
   project_id: string | null;
   created_at: number;
   updated_at: number;
@@ -50,6 +53,7 @@ const fromRow = (row: Row): CloudMove => ({
   phase: row.phase,
   step: row.step,
   error: row.error,
+  folder: row.folder,
   projectId: row.project_id,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -80,19 +84,20 @@ export const cloudMoves = {
     const id = randomUUID();
     const phase: MovePhase = move.direction === "to-cloud" ? "frozen" : "asking";
     db.stmt(
-      "INSERT INTO thread_relocations (id, thread_id, role, direction, phase, project_id, error, cleanup, step, created_at, updated_at) VALUES (?, ?, 'coordinator', ?, ?, ?, NULL, NULL, NULL, ?, ?)",
+      "INSERT INTO thread_relocations (id, thread_id, role, direction, phase, project_id, error, cleanup, step, folder, created_at, updated_at) VALUES (?, ?, 'coordinator', ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?)",
     ).run(id, move.threadId, move.direction, phase, move.projectId, now, now);
     return cloudMoves.open(db, move.threadId)!;
   },
 
-  /** Moves a move on: its phase, its step, or the words it stopped with. */
-  set(db: Db, id: string, patch: { phase?: MovePhase; step?: string | null; error?: string | null }, now = Date.now()): void {
+  /** Moves a move on: its phase, its step, or the words it stopped with and the folder that stopped it. */
+  set(db: Db, id: string, patch: { phase?: MovePhase; step?: string | null; error?: string | null; folder?: string | null }, now = Date.now()): void {
     const row = db.stmt("SELECT * FROM thread_relocations WHERE id = ?").get(id) as unknown as Row | undefined;
     if (!row) return;
-    db.stmt("UPDATE thread_relocations SET phase = ?, step = ?, error = ?, updated_at = ? WHERE id = ?").run(
+    db.stmt("UPDATE thread_relocations SET phase = ?, step = ?, error = ?, folder = ?, updated_at = ? WHERE id = ?").run(
       patch.phase ?? row.phase,
       patch.step === undefined ? row.step : patch.step,
       patch.error === undefined ? row.error : patch.error,
+      patch.folder === undefined ? row.folder : patch.folder,
       now,
       id,
     );
@@ -104,11 +109,11 @@ export const cloudMoves = {
   },
 
   /** Where the thread is moving, or why its last move stopped; null when neither. What its summary says. */
-  moving(db: Db, threadId: string): { to: "cloud" | "mac"; failed: string | null } | null {
+  moving(db: Db, threadId: string): { to: "cloud" | "mac"; failed: string | null; folder?: string } | null {
     const move = cloudMoves.latest(db, threadId);
     if (!move || move.phase === "done") return null;
     const to = move.direction === "to-cloud" ? "cloud" : "mac";
-    if (move.phase === "abandoned") return move.error ? { to, failed: move.error } : null;
+    if (move.phase === "abandoned") return move.error ? { to, failed: move.error, ...(move.folder && { folder: move.folder }) } : null;
     return { to, failed: null };
   },
 

@@ -17,9 +17,10 @@ describe("this Mac's journal of a thread moving to and from the cloud", () => {
     cloudMoves.set(db, move.id, { phase: "sending", step: "history" }, 20);
     expect(cloudMoves.open(db, "t1")).toMatchObject({ phase: "sending", step: "history", updatedAt: 20 });
     expect(cloudMoves.allOpen(db).map((each) => each.threadId)).toEqual(["t1"]);
-    cloudMoves.set(db, move.id, { phase: "abandoned", step: null, error: "The server didn't answer." }, 30);
+    cloudMoves.set(db, move.id, { phase: "abandoned", step: null, error: "Its folder holds other work.", folder: "/Users/ada/worktrees/fix" }, 30);
     expect(cloudMoves.open(db, "t1")).toBeNull();
-    expect(cloudMoves.latest(db, "t1")).toMatchObject({ phase: "abandoned", error: "The server didn't answer." });
+    expect(cloudMoves.latest(db, "t1")).toMatchObject({ phase: "abandoned", error: "Its folder holds other work." });
+    expect(cloudMoves.moving(db, "t1")).toEqual({ to: "cloud", failed: "Its folder holds other work.", folder: "/Users/ada/worktrees/fix" });
     // A move again, the other way, once none is under way.
     const back = cloudMoves.begin(db, { threadId: "t1", direction: "to-mac", projectId: null }, 40);
     expect(back.phase).toBe("asking");

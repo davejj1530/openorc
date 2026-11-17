@@ -26,6 +26,7 @@ import { remotePushTargetMigration } from "./remote-push-target-schema.js";
 import { cloudWorkspaceMigration, cloudWorkspaceMirrorHeadMigration, cloudWorkspaceRemovedMigration } from "./cloud-workspace-schema.js";
 import { parentThreadMigration, startedByAgentMigration, subagentMigration, subagentIdentityMigration, subagentObservationMigration } from "./subagent-schema.js";
 import { cloudBrainMigrations } from "./cloud-brain-schema.js";
+import { relocationFolderMigration } from "./relocation-schema.js";
 import { usageHistoryMigration } from "./usage-history-schema.js";
 import { threadsMigration } from "./thread-schema.js";
 /**
@@ -732,4 +733,5 @@ export const migrations: Migration[] = [
   orclingTalkMigration,
   orclingFollowupMigration,
   reactionKindsMigration,
+  relocationFolderMigration,
 ];

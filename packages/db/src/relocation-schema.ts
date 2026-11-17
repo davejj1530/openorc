@@ -36,5 +36,11 @@ function relocationStepMigration(raw: DatabaseSync): void {
   if (!columns.some((column) => column.name === "step")) raw.exec("ALTER TABLE thread_relocations ADD COLUMN step TEXT");
 }
 
+/** A folder on this Mac that stopped a move, apart from the words why, for its card to show and open. */
+export function relocationFolderMigration(raw: DatabaseSync): void {
+  const columns = raw.prepare("PRAGMA table_info(thread_relocations)").all() as { name: string }[];
+  if (!columns.some((column) => column.name === "folder")) raw.exec("ALTER TABLE thread_relocations ADD COLUMN folder TEXT");
+}
+
 /** The journal's migrations, in order. */
 export const relocationMigrations = [relocationMigration, relocationStepMigration];

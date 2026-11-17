@@ -1,5 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from "react";
-import { PULL_REVIEW_NEEDS_FOLDER, type PullRequestDetail, type PullRequestReview } from "@openorc/protocol";
+import type { PullRequestDetail, PullRequestReview } from "@openorc/protocol";
 import type { CommentDraft } from "../components/DiffView";
 import { ExternalLink, RefreshCw } from "../components/icons";
 import { PageCrumbs } from "../components/PageTitle";
@@ -55,7 +55,7 @@ function PullRequestHeading({ pull }: { pull: PullRequestDetail }) {
  * The diff with the draft review's comments on it. A comment is on the commit whose diff it was started on, even when
  * the diff refreshes to newer commits while it is being written.
  */
-function PullRequestChanges({ projectId, pull, review, held }: { projectId: string; pull: PullRequestDetail; review: PullRequestReview | null; held: boolean }) {
+function PullRequestChanges({ projectId, pull, review }: { projectId: string; pull: PullRequestDetail; review: PullRequestReview | null }) {
   const key = { projectId, number: pull.number };
   const diff = useRpc("pulls.diff", key);
   const models = useModelCatalog();
@@ -92,7 +92,7 @@ function PullRequestChanges({ projectId, pull, review, held }: { projectId: stri
             comments={comments}
             commentRanges
             draft={draft?.location ?? null}
-            onRequestComment={held ? undefined : (location) => setDraft({ location, commitId: headSha })}
+            onRequestComment={(location) => setDraft({ location, commitId: headSha })}
             onSubmitDraft={submitDraft}
             onCancelDraft={() => setDraft(null)}
             onRemoveComment={(id) => removeComment.mutate({ ...key, id })}
@@ -128,8 +128,6 @@ export function PullRequestView({ projectId, number }: { projectId: string; numb
   const navigate = useRouter((s) => s.navigate);
   const pull = useRpc("pulls.get", { projectId, number });
   const review = useRpc("pulls.review.get", { projectId, number });
-  // A project only OpenOrc Cloud has has no folder here: its pull requests are read, and reviewed elsewhere.
-  const held = useRpc("projects.get", { id: projectId }).data?.rootPath === "" ? PULL_REVIEW_NEEDS_FOLDER : null;
   const [section, setSection] = useState<Section>("changes");
   const detail = pull.data;
 
@@ -147,10 +145,10 @@ export function PullRequestView({ projectId, number }: { projectId: string; numb
         <PullRequestHeading pull={detail} />
         <div className="sub-header py-2">
           <Segmented label="Pull request section" value={section} onChange={setSection} options={sections} />
-          <PullRequestReviewer projectId={projectId} pull={detail} review={review.data ?? null} held={held} />
+          <PullRequestReviewer projectId={projectId} pull={detail} review={review.data ?? null} />
         </div>
-        {section === "changes" ? <PullRequestChanges projectId={projectId} pull={detail} review={review.data ?? null} held={held !== null} /> : <PullRequestDescription body={detail.body} />}
-        {held ? null : <PullRequestReviewBar projectId={projectId} pull={detail} review={review.data ?? null} />}
+        {section === "changes" ? <PullRequestChanges projectId={projectId} pull={detail} review={review.data ?? null} /> : <PullRequestDescription body={detail.body} />}
+        <PullRequestReviewBar projectId={projectId} pull={detail} review={review.data ?? null} />
       </>
     );
   }

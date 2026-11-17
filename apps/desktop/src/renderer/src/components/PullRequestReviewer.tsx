@@ -53,20 +53,8 @@ function ReviewConversationLink({ conversation, models }: { conversation: Thread
  * model starts it reviewing in a conversation of its own, and its comments
  * join the same draft. Either way, only you post to GitHub.
  */
-export function PullRequestReviewer({ projectId, pull, review, held = null }: { projectId: string; pull: PullRequestDetail; review: PullRequestReview | null; held?: string | null }) {
-  if (held) return <HeldReview reason={held} />;
+export function PullRequestReviewer({ projectId, pull, review }: { projectId: string; pull: PullRequestDetail; review: PullRequestReview | null }) {
   return <Reviewer projectId={projectId} pull={pull} review={review} />;
-}
-
-/** Review, held, saying why on demand: a project with no folder on this Mac is read here, not reviewed. */
-function HeldReview({ reason }: { reason: string }) {
-  return (
-    <div className="ml-auto flex items-center">
-      <Button size="sm" disabled data-tip={reason}>
-        <Wand size={12} /> {startLabel(false, false)}
-      </Button>
-    </div>
-  );
 }
 
 function Reviewer({ projectId, pull, review }: { projectId: string; pull: PullRequestDetail; review: PullRequestReview | null }) {

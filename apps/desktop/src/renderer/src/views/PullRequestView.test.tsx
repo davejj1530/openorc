@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { PULL_REVIEW_NEEDS_FOLDER, type PullRequestDetail, type RpcMethod, type RpcParams, type RpcResults } from "@openorc/protocol";
+import type { PullRequestDetail, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import type { CommentDraft, CommentLocation } from "../components/DiffView";
 import { core } from "../lib/rpc";
 import { invalidateTags, queryClient } from "../lib/client";
@@ -17,10 +17,10 @@ vi.mock("../components/DiffView", () => ({
     return <div data-testid="diff" />;
   },
 }));
-const reviewer = vi.hoisted(() => ({ held: undefined as string | null | undefined }));
+const reviewer = vi.hoisted(() => ({ shown: false }));
 vi.mock("../components/PullRequestReviewer", () => ({
-  PullRequestReviewer: (props: { held?: string | null }) => {
-    reviewer.held = props.held;
+  PullRequestReviewer: () => {
+    reviewer.shown = true;
     return null;
   },
 }));
@@ -78,7 +78,7 @@ it("comments on the commit whose diff the comment was started on, after the diff
   );
 });
 
-it("reads a pull request of a project only the cloud has, with its diff, and drafts no review of it here", async () => {
+it("reviews a pull request of a project only the cloud has as any other: its diff, Review, and comments on its lines", async () => {
   vi.mocked(core.call).mockImplementation(async <M extends RpcMethod>(method: M): Promise<RpcResults[M]> => {
     if (method === "pulls.get") return pull as RpcResults[M];
     if (method === "pulls.diff") return { patch: patchAt("a"), headSha: commit("a") } as RpcResults[M];
@@ -92,6 +92,6 @@ it("reads a pull request of a project only the cloud has, with its diff, and dra
     </QueryClientProvider>,
   );
   await screen.findByTestId("diff");
-  await waitFor(() => expect(reviewer.held).toBe(PULL_REVIEW_NEEDS_FOLDER));
-  expect(viewer.props!.onRequestComment).toBeUndefined();
+  await waitFor(() => expect(reviewer.shown).toBe(true));
+  expect(viewer.props!.onRequestComment).toBeTypeOf("function");
 });

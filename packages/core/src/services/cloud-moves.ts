@@ -54,7 +54,7 @@ class FolderInTheWay extends Error {
 
 /** How long a move to this Mac waits for the thread to leave its cloud machine with a save. */
 const CURRENT_MS = 3 * 60_000;
-/** How long a move waits for this Mac's list of cloud threads to take the thread in, or let it go. */
+/** How long a move to the cloud waits for this Mac's list of cloud threads to take the thread in. */
 const HEARD_MS = 30_000;
 
 const words = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -78,9 +78,13 @@ export interface CloudMovesDeps {
   workspaces: WorkspaceService;
   /** Deletes the thread here as Delete does, its worktree's changes kept on its branch. */
   deleteThread(threadId: string): Promise<void>;
-  /** The thread's place changed: its lists and its own view read it again. */
+  /** Where the thread's move stands changed: its lists and its own view read it again. */
   changed(threadId: string): void;
-  /** This Mac's name, for what a move to it says. */
+  /**
+   * The thread is read at another place from now on: every window reads it again where it is, and lets go of what it
+   * read where it was.
+   */
+  placed(threadId: string): void;
   /** What the app calls this computer, in the words a move says. */
   here: ComputerNames;
   now?: () => number;
@@ -222,19 +226,20 @@ export class CloudMoves {
     }
     // The commit point is passed: the cloud thread is whole. Let the Mac's go once the cloud's is heard, so the thread is
     // never in neither list.
-    await this.listed(hosted, thread.id, true);
+    await this.heard(hosted, thread.id);
+    this.deps.placed(thread.id);
     this.step(move, { phase: "done", step: null });
     await this.deps.deleteThread(thread.id).catch((error: unknown) => this.deps.log.warn(`thread ${thread.id} moved to OpenOrc Cloud and its copy here couldn't be deleted: ${words(error)}`));
     this.deps.changed(thread.id);
   }
 
-  /** Waits a while for this Mac's list of cloud threads to hold the thread, or to let it go, reading the server again meanwhile. */
-  private async listed(hosted: Hosted, threadId: string, held: boolean): Promise<void> {
+  /** Waits a while for this Mac's list of cloud threads to hold the thread it just made, reading the server again meanwhile. */
+  private async heard(hosted: Hosted, threadId: string): Promise<void> {
     const until = (this.deps.now ?? Date.now)() + HEARD_MS;
-    const settled = () => hosted.threads.holds({ thread: threadId }) === held;
-    while (!settled() && (this.deps.now ?? Date.now)() < until) {
+    const known = () => hosted.threads.holds({ thread: threadId });
+    while (!known() && (this.deps.now ?? Date.now)() < until) {
       await hosted.threads.refresh?.().catch(() => undefined);
-      if (!settled()) await new Promise((resolve) => setTimeout(resolve, 500));
+      if (!known()) await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }
 
@@ -312,6 +317,7 @@ export class CloudMoves {
     const row = hosted.threads.row!(threadId);
     const temp = await mkdtemp(path.join(os.tmpdir(), "openorc-move-"));
     let written = false;
+    let switched = false;
     try {
       this.step(move, { step: "saving" });
       const work = await this.current(hosted, row.space, threadId);
@@ -329,20 +335,26 @@ export class CloudMoves {
       const placed = threads.get(this.deps.db, threadId)!;
       if (session && placed.worktreePath)
         await this.deps.sessions.take({ id: threadId, agent: placed.agent, claudeAccountId: placed.claudeAccountId, children: [] }, session, placed.worktreePath, `cloud-${move.id}`);
-      this.step(move, { phase: "received", step: null });
-      await hosted.moves.movedAway(row.space, threadId);
-      // Gone from the server: this Mac's list lets it go at once, so the thread's reads come here from now on.
+      // Whole here, its reads come here from now on, while the server still has it, so none is caught between the two:
+      // this Mac's list lets it go and every window reads it here. Then the server lets it go.
+      cloudMoves.set(this.deps.db, move.id, { phase: "received", step: null });
       hosted.threads.letGo?.(threadId);
+      switched = true;
+      this.deps.placed(threadId);
+      await hosted.moves.movedAway(row.space, threadId);
     } catch (error) {
       if (written) await this.deps.deleteThread(threadId).catch(() => undefined);
+      // Still the cloud's: this Mac hears it again, and every window reads it there again.
+      if (switched) {
+        await hosted.threads.refresh?.().catch(() => undefined);
+        this.deps.placed(threadId);
+      }
       this.step(move, { phase: "abandoned", step: null, error: words(error), folder: error instanceof FolderInTheWay ? error.folder : null });
       this.deps.log.warn(`thread ${threadId} didn't move to ${this.deps.here.thisComputer}: ${words(error)}`);
       return;
     } finally {
       await rm(temp, { recursive: true, force: true });
     }
-    // Gone from the cloud: this Mac's list lets it go before the thread shows here, so no read of it goes there.
-    await this.listed(hosted, threadId, false);
     this.step(move, { phase: "done", step: null });
   }
 

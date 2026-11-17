@@ -73,11 +73,12 @@ function account() {
     undone: [] as string[],
     away: [] as string[],
   };
-  const fail = { history: null as Error | null };
+  const fail = { history: null as Error | null, movedAway: null as Error | null };
   type Row = { id: string; space: string; projectId: string; title: string; settings: { agent: "claude"; model: null; effort: null; mode: "act"; permissionMode: "trusted" } };
   const rows = new Map<string, Row>();
   const made = new Map<string, Row>();
   const leaving = new Set<string>();
+  const dropped = new Map<string, Row>();
   const cloud = {
     save: null as null | { branch: string; head: string; base: string; bundle: boolean; uncommitted: boolean; savedAt: string },
     bundle: "",
@@ -103,9 +104,14 @@ function account() {
       // The Mac hears a thread made on the server once it reads the server again.
       refresh: async () => {
         made.forEach((row, id) => rows.set(id, row));
+        // A thread let go here that the server still has comes back with its list.
+        dropped.forEach((row, id) => (leaving.has(id) ? undefined : rows.set(id, row)));
         if (!cloud.slowToHear) leaving.forEach((id) => rows.delete(id));
       },
-      letGo: (id: string) => void rows.delete(id),
+      letGo: (id: string) => {
+        if (rows.has(id)) dropped.set(id, rows.get(id)!);
+        rows.delete(id);
+      },
     },
     moves: {
       arrive: async (space: string, input: { id: string; projectId: string }) => (sent.arrived.push({ space, id: input.id, projectId: input.projectId }), { id: input.id }),
@@ -134,6 +140,7 @@ function account() {
       },
       savedSession: async () => (cloud.session ? new Response(new Uint8Array(cloud.session)) : new Response(null, { status: 404 })),
       movedAway: async (_space: string, id: string) => {
+        if (fail.movedAway) throw fail.movedAway;
         sent.away.push(id);
         leaving.add(id);
       },
@@ -147,7 +154,7 @@ function account() {
   return { hosted, sent, fail, rows, cloud };
 }
 
-function moves(hosted: Hosted, deleted: string[] = [], changed: (id: string) => void = () => {}, platform = "darwin") {
+function moves(hosted: Hosted, deleted: string[] = [], changed: (id: string) => void = () => {}, platform = "darwin", placed: (id: string) => void = () => {}) {
   return new CloudMoves({
     db,
     hosted: () => hosted,
@@ -159,6 +166,7 @@ function moves(hosted: Hosted, deleted: string[] = [], changed: (id: string) => 
       threads.delete(db, id);
     },
     changed,
+    placed,
     here: computerNames(platform),
     log: quiet,
   });
@@ -256,6 +264,21 @@ describe("a thread moving from this Mac to OpenOrc Cloud", () => {
     });
     expect(childTurn).toMatchObject({ kind: "turn", thread: child.id, events: [{ type: "message.completed", role: "assistant", text: "In src/auth/login.ts" }] });
     expect(sent.done).toEqual([thread.id]);
+  });
+
+  it("reads the thread in the cloud once the cloud holds it, before its copy here goes", async () => {
+    const { thread } = await macThread();
+    const { hosted } = account();
+    const told: { cloudHolds: boolean; here: boolean }[] = [];
+    await moves(
+      hosted,
+      [],
+      () => {},
+      "darwin",
+      (id) => told.push({ cloudHolds: hosted.threads.holds({ thread: id }), here: threads.get(db, id) !== null }),
+    ).move(thread.id, false);
+    await settled(thread.id);
+    expect(told).toEqual([{ cloudHolds: true, here: true }]);
   });
 
   it("waits while a subagent of the thread is still working", async () => {
@@ -444,6 +467,39 @@ describe("a cloud thread moving to this Mac", () => {
     });
     const [run] = runs.listForThread(db, child);
     expect(listEvents(db, run!.id).map((event) => (event.type === "message.completed" ? event.text : event.type))).toEqual(["After 30 days"]);
+  });
+
+  it("reads the thread here once it is whole here, before the server lets it go, and back there when the server won't", async () => {
+    const project = projects.insert(db, { name: "App", rootPath: folder, gitRemote: "https://github.com/acme/app.git", defaultBranch: "main", settings: {} });
+    const made = account();
+    const id = await cloudThread(made, project);
+    // When every window is told to read it at its new place: whether the cloud list still holds it, whether the server
+    // was told yet, and whether the thread here is the journal's received one.
+    const told: { cloudHolds: boolean; serverTold: boolean; here: boolean }[] = [];
+    const placed = (thread: string) =>
+      told.push({ cloudHolds: made.hosted.threads.holds({ thread }), serverTold: made.sent.away.includes(thread), here: cloudMoves.cameHere(db, thread) && threads.get(db, thread) !== null });
+    await moves(made.hosted, [], () => {}, "darwin", placed).move(id, false);
+    await settled(id);
+    expect(told).toEqual([{ cloudHolds: false, serverTold: false, here: true }]);
+  });
+
+  it("reads the thread back in the cloud when the server won't let it go", async () => {
+    const project = projects.insert(db, { name: "App", rootPath: folder, gitRemote: "https://github.com/acme/app.git", defaultBranch: "main", settings: {} });
+    const made = account();
+    const id = await cloudThread(made, project);
+    made.fail.movedAway = new Error("OpenOrc Cloud can't be reached.");
+    const holds: boolean[] = [];
+    await moves(
+      made.hosted,
+      [],
+      () => {},
+      "darwin",
+      (thread) => holds.push(made.hosted.threads.holds({ thread })),
+    ).move(id, false);
+    await settled(id);
+    expect(cloudMoves.moving(db, id)).toMatchObject({ to: "mac", failed: "OpenOrc Cloud can't be reached." });
+    expect(threads.get(db, id)).toBeNull();
+    expect(holds, "here, then the cloud's again").toEqual([false, true]);
   });
 
   it("reads the thread here the moment the server lets it go, without waiting to hear of it", async () => {

@@ -378,6 +378,7 @@ export class OpenOrc {
       workspaces: this.workspaces,
       deleteThread: (id) => this.threads.delete(id),
       changed: (id) => this.options.transport.push({ type: "invalidate", keys: ["threads", `thread:${id}`] }),
+      placed: (id) => this.options.transport.push({ type: "invalidate", keys: ["threads", `thread:${id}`, `place:${id}`] }),
       here: computerNames(process.platform),
       log: this.log,
     });

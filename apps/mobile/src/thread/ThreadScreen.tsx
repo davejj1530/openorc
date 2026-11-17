@@ -20,7 +20,7 @@ import { OrclingChatPane } from "../orclings/OrclingChatPane";
 import { OrclingHeader } from "../orclings/OrclingHeader";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
-import { NO_CLOUD_FILES } from "../cloud/words";
+import { CloudFileScopeContext, useThreadFiles } from "../cloud/cloud-files";
 import { threadTogetherOf, TogetherContext, turnSeen } from "./cloud-together";
 import { createDisclosure, DisclosureContext } from "./disclosure";
 import { useMarkSeen } from "./mark-seen";
@@ -200,8 +200,6 @@ function submitRequest(input: {
   };
 }
 
-/** A phone's images are files of its Mac, which an OpenOrc Cloud thread cannot read. */
-
 /**
  * The conversation: a thread of this Mac or of OpenOrc Cloud, its transcript and its composer. Covering Home keeps the
  * list's own reads asleep; the header's More menu organizes a thread of this Mac; marking it unread goes back to Home,
@@ -225,6 +223,7 @@ export function ThreadScreen() {
   const authors = useThreadAuthors(thread, together);
   const linkState = useLinkState();
   const ownCloud = useOwnCloud();
+  const files = useThreadFiles(cloud ? id : null);
   const chat = chatFor(useOrclingChats().chats, id);
   useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
   const { canSteer } = processFit({ live, activeRun, choice: settings.choice, mode: settings.mode, permission: settings.permission, compacting: false });
@@ -237,23 +236,25 @@ export function ThreadScreen() {
         <AuthorsContext.Provider value={authors}>
           <TogetherContext.Provider value={together}>
             <VoicesContext.Provider value={voices}>
-              {thread ? (
-                <ConversationPane
-                  chat={chat}
-                  threadId={id}
-                  thread={thread}
-                  runs={runs}
-                  loading={runsQuery.isLoading}
-                  failed={Boolean(runsQuery.error)}
-                  retry={() => void runsQuery.refetch()}
-                  onActivity={setActivity}
-                  composerInset={room.composerInset}
-                  listRef={room.listRef}
-                  followKey={room.sends}
-                />
-              ) : (
-                <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <Spinner /> : <Text className="text-ink-4">Thread not found</Text>}</View>
-              )}
+              <CloudFileScopeContext.Provider value={files.readable}>
+                {thread ? (
+                  <ConversationPane
+                    chat={chat}
+                    threadId={id}
+                    thread={thread}
+                    runs={runs}
+                    loading={runsQuery.isLoading}
+                    failed={Boolean(runsQuery.error)}
+                    retry={() => void runsQuery.refetch()}
+                    onActivity={setActivity}
+                    composerInset={room.composerInset}
+                    listRef={room.listRef}
+                    followKey={room.sends}
+                  />
+                ) : (
+                  <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <Spinner /> : <Text className="text-ink-4">Thread not found</Text>}</View>
+                )}
+              </CloudFileScopeContext.Provider>
             </VoicesContext.Provider>
           </TogetherContext.Provider>
         </AuthorsContext.Provider>
@@ -278,7 +279,8 @@ export function ThreadScreen() {
               onSent={room.follow}
               to={chat?.name}
               turnSeen={turnSeen(together)}
-              attachRefusal={cloud ? NO_CLOUD_FILES : null}
+              attachTo={files.attachTo}
+              attachRefusal={files.attachRefusal}
             />
           )}
         </View>

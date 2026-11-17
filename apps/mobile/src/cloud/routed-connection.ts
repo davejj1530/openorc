@@ -2,27 +2,11 @@ import type { ClientPush, CoreConnection } from "@openorc/client";
 import type { Hosted, HostedDeps } from "@openorc/hosted";
 import { PlaceRouter } from "@openorc/hosted/router";
 import type { RpcMethod, RpcParams, RpcReply, RpcRequest, RpcResults, SpacesStatus } from "@openorc/protocol";
-import { NO_CLOUD_FILES } from "./words";
 
 /** What a phone may not do with a space here, as the Mac shapes it for a phone: no invitations, no new organization. */
 function phoneStatus(status: SpacesStatus): SpacesStatus {
   if (status.state !== "ready") return status;
   return { ...status, apiOrigin: "", invitations: [], create: { allowed: false, reason: "Create an organization in OpenOrc on your Mac." } };
-}
-
-/** A call that brings files: a start, a send or a queued message with attachments. */
-const carriesFiles = (params: unknown): boolean => {
-  const attachments = (params as { attachments?: unknown } | null)?.attachments;
-  return Array.isArray(attachments) && attachments.length > 0;
-};
-
-/** Whether a call goes to the phone's own cloud: a thread or run it holds, or a start that asks for it. */
-function toCloud(hosted: Hosted, params: unknown): boolean {
-  const asked = (params ?? {}) as { threadId?: unknown; id?: unknown; runId?: unknown; hosted?: unknown };
-  if (asked.hosted === true) return true;
-  const thread = [asked.threadId, asked.id].find((each): each is string => typeof each === "string");
-  if (thread && hosted.threads.holds({ thread })) return true;
-  return typeof asked.runId === "string" && hosted.threads.holds({ run: asked.runId });
 }
 
 /** What the router asks the Mac for a space's list: answered from the Mac's last word while it cannot answer. */
@@ -62,7 +46,6 @@ export class RoutedConnection implements CoreConnection {
     if (!hosted) return this.mac.call(method, params);
     const own = this.own(hosted, method, params);
     if (own) return own as Promise<RpcResults[M]>;
-    if (carriesFiles(params) && toCloud(hosted, params)) return Promise.reject(new Error(NO_CLOUD_FILES));
     return this.router.handle({ type: "rpc", id: ++this.nextId, method, params }).then((reply) => {
       if (reply.type === "rpc.error") throw new Error(reply.message);
       return reply.result as RpcResults[M];

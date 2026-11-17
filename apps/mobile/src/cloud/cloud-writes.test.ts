@@ -1,13 +1,13 @@
 import type { Hosted } from "@openorc/hosted";
 import { standIn, type StandIn } from "@openorc/hosted/testing";
-import { hostedRunId, type RpcMethod, type ThreadCollaboration } from "@openorc/protocol";
+import { hostedFileReference, hostedRunId, type RpcMethod, type ThreadCollaboration } from "@openorc/protocol";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 
 // Each test makes several trips to the stand-in over real HTTP and its socket; under the whole suite's load they take longer.
 vi.setConfig({ testTimeout: 20_000 });
 import { RoutedConnection, type MacLine } from "./routed-connection";
 import { accountOn } from "./test-fixtures/stand-in-account";
-import { NO_CLOUD_FILES } from "./words";
+import { cloudFileScope, uploadToCloud } from "./cloud-upload";
 
 /*
  * With the Mac asleep, the phone writes in OpenOrc Cloud threads from its own session, as A4 proved it could through the
@@ -158,12 +158,26 @@ it("starts a cloud thread in a space's project and keeps its own pin as the read
   await vi.waitFor(async () => expect(await call("threads.get", { id: threads.mine })).toMatchObject({ pinnedAt: expect.any(Number) }));
 });
 
-it("refuses a phone's files for a cloud thread before the server hears of them", async () => {
+it("sends a file from the phone with a message to a cloud thread, through its own session, and its path into the log", async () => {
+  stand.threadFiles.capabilities = { files: { available: true } };
+  const threadId = threads.mine;
+  const scope = cloudFileScope(riley, { threadId })!;
+  expect(scope.destination).toMatchObject({ kind: "hosted", threadId });
+  const bytes = new TextEncoder().encode("Pinned notes stay on top.");
+  const path = await uploadToCloud(riley, scope, { name: "notes.txt", source: { bytes: bytes.length, read: async (offset, length) => bytes.subarray(offset, offset + length) } });
+  expect(hostedFileReference(path)).toMatchObject({ name: "notes.txt" });
+  const before = sentTo(threadId).length;
+  await call("threads.queue", { id: threadId, text: "Look at this.", attachments: [path] });
+  expect(sentTo(threadId).slice(before)).toEqual([expect.objectContaining({ body: expect.objectContaining({ text: "Look at this.", fileIds: [hostedFileReference(path)!.id] }) })]);
+});
+
+it("refuses a file of the Mac's for a cloud thread in words before the server takes a message, and says the server's own words while files are off", async () => {
   const threadId = threads.mine;
   const before = sentTo(threadId).length;
   const image = ["/Users/riley/Library/OpenOrc/attachments/shot.png"];
-  expect(await refusal(call("runs.start", { threadId, ...settings, prompt: "Look at this.", attachments: image }))).toBe(NO_CLOUD_FILES);
-  expect(await refusal(call("threads.queue", { id: threadId, text: "Look at this.", attachments: image }))).toBe(NO_CLOUD_FILES);
-  expect(await refusal(call("runs.send", { runId: hostedRunId(threadId), text: "Look.", attachments: image }))).toBe(NO_CLOUD_FILES);
+  stand.threadFiles.capabilities = { files: { available: true } };
+  expect(await refusal(call("threads.queue", { id: threadId, text: "Look at this.", attachments: image }))).toBe("This file isn't available in this space.");
+  stand.threadFiles.capabilities = { files: { available: false, reason: "Files can't be sent to OpenOrc Cloud yet." } };
+  expect(await refusal(call("runs.send", { runId: hostedRunId(threadId), text: "Look.", attachments: image }))).toBe("Files can't be sent to OpenOrc Cloud yet.");
   expect(sentTo(threadId).length).toBe(before);
 });

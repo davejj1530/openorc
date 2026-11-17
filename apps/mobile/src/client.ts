@@ -18,6 +18,7 @@ import { forgetFolds } from "./home/fold-keys";
 import { forgetHidden } from "./home/filter-keys";
 import { spaceKey } from "./spaces/space-key";
 import { forgetLists, keepLists, restoreLists } from "./lists-cache";
+export { cloudFileUri, phoneFile } from "./cloud/cloud-file-cache";
 import { followMacLook } from "./look/look";
 import { PhoneAlerts } from "./notifications/alerts";
 import { oncePerNotice, presentationFor } from "./notifications/foreground";

@@ -2,6 +2,7 @@ import { expect, it, vi } from "vitest";
 import { memoryKeys, memoryMacs } from "./connection/test-fixtures/fake-mac";
 
 vi.mock("expo-constants", () => ({ default: { deviceName: "Test iPhone" } }));
+vi.mock("./cloud/cloud-file-cache", () => ({ cloudFileUri: async () => "", phoneFile: () => undefined }));
 vi.mock("expo-network", () => ({
   NetworkStateType: { NONE: "NONE", UNKNOWN: "UNKNOWN", CELLULAR: "CELLULAR", WIFI: "WIFI", ETHERNET: "ETHERNET" },
   getNetworkStateAsync: () => new Promise(() => undefined),

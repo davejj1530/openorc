@@ -1,7 +1,10 @@
 import type { AssetRef } from "@openorc/protocol";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useContext, useEffect, useState } from "react";
 import { Image, Keyboard, Pressable, View } from "react-native";
-import { assetUri, useLinkRead } from "../client";
+import { assetUri, cloud, cloudFileUri, useLinkRead } from "../client";
+import { CloudFileScopeContext } from "../cloud/cloud-files";
+import { useOwnCloud } from "../cloud/use-own-cloud";
 import { OLDER_MAC_IMAGE } from "../connection/link-connection";
 import { Text } from "../ui/Text";
 import { ImageViewer } from "./ImageViewer";
@@ -41,7 +44,26 @@ function useAspect(uri: string | null): number | null {
  * agent's image takes the column's width.
  */
 export function ImageTile({ asset, label, compact = false }: { asset: AssetRef; label: string; compact?: boolean }) {
-  const loaded = useLinkRead(JSON.stringify(asset), readAsset);
+  return <Tile loaded={useLinkRead(JSON.stringify(asset), readAsset)} label={label} compact={compact} />;
+}
+
+/** An image a cloud thread's message carries, read through the phone's own session once and kept; as `ImageTile`. */
+export function CloudImageTile({ path, label, compact = false }: { path: string; label: string; compact?: boolean }) {
+  const scope = useContext(CloudFileScopeContext);
+  const hosted = useOwnCloud() ? cloud.hosted : null;
+  const read = useQuery({ queryKey: ["cloud.file", scope?.spaceId, path], queryFn: () => cloudFileUri(hosted!, scope!, path), enabled: Boolean(hosted && scope), staleTime: Infinity });
+  return <Tile loaded={cloudLoaded(read.data, Boolean(read.error || !hosted || !scope))} label={label} compact={compact} />;
+}
+
+type Loaded = { state: "ready"; value: string } | { state: "failed"; reason?: string } | { state: "loading" };
+
+/** Where a cloud file's read stands: its cached copy, a read that cannot go or failed, or one on its way. */
+function cloudLoaded(uri: string | undefined, failed: boolean): Loaded {
+  if (uri) return { state: "ready", value: uri };
+  return failed ? { state: "failed" } : { state: "loading" };
+}
+
+function Tile({ loaded, label, compact }: { loaded: Loaded; label: string; compact: boolean }) {
   const [open, setOpen] = useState(false);
   const aspect = useAspect(loaded.state === "ready" ? loaded.value : null);
   // A prompt's thumbnail is a 72 pt square; an agent's image takes the column at its own shape, within reason.

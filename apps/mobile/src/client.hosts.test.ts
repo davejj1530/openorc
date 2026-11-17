@@ -9,6 +9,7 @@ const BRAIN = "BBBB";
 const world = vi.hoisted(() => ({}) as { mac: FakeMac; saved: ReturnType<typeof memoryMacs>; keys: ReturnType<typeof memoryKeys>; doorKeys: Map<string, string> });
 
 vi.mock("expo-constants", () => ({ default: { deviceName: "Test iPhone" } }));
+vi.mock("./cloud/cloud-file-cache", () => ({ cloudFileUri: async () => "", phoneFile: () => undefined }));
 vi.mock("expo-network", () => ({
   NetworkStateType: { NONE: "NONE", UNKNOWN: "UNKNOWN", CELLULAR: "CELLULAR", WIFI: "WIFI", ETHERNET: "ETHERNET" },
   getNetworkStateAsync: () => new Promise(() => undefined),

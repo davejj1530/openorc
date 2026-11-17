@@ -7,6 +7,7 @@ import { useDimReason } from "../composer/dim-reason";
 import { useNewThreadClaudeAccount } from "../composer/claude-account";
 import type { ComposerSettings } from "../composer/settings-bridge";
 import { useEmptiedPrompt } from "../composer/keyboard-leftover";
+import { useCloudFiles } from "../cloud/cloud-files";
 import { useImageAttach } from "../composer/use-image-attach";
 import { failureMessage } from "../failure";
 import { haptic } from "../ui/haptics";
@@ -40,7 +41,11 @@ export function useNewThread(project: ProjectChoice) {
     setDraft((current) => ({ ...current, ...patch }));
     setError(null);
   };
-  const { uploading, chooseImages } = useImageAttach({ onImage: (image) => setDraft((current) => ({ ...current, images: [...current.images, image] })), onError: setError });
+  // A cloud project's images go to OpenOrc Cloud through the phone's own session, where the server takes files.
+  const files = useCloudFiles(project.cloud ? { projectKey: project.id, spaceId: project.cloud.spaceId } : null);
+  const attach = useImageAttach({ onImage: (image) => setDraft((current) => ({ ...current, images: [...current.images, image] })), onError: setError, cloud: files.scope });
+  const uploading = attach.uploading;
+  const chooseImages = project.cloud && !files.scope ? () => void (files.refusal && setError(files.refusal)) : attach.chooseImages;
 
   const claudeAccountId = useNewThreadClaudeAccount(projectId, draft.claudeAccountId);
   const settings: ComposerSettings = {

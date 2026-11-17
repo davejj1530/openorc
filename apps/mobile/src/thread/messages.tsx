@@ -1,9 +1,10 @@
+import { hostedFileReference } from "@openorc/protocol";
 import { memo, useMemo } from "react";
 import { Pressable, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { FileText, WorkMessage } from "../generated/icons";
 import { Text } from "../ui/Text";
-import { attachmentRef, ImageTile, isImagePath } from "./images";
+import { attachmentRef, CloudImageTile, ImageTile, isImagePath } from "./images";
 import { client } from "../client";
 import { runBlock, useRunRead } from "../run-read";
 import { useOpen } from "./disclosure";
@@ -17,6 +18,12 @@ import { useOtherAuthor } from "./thread-authors";
 function attachmentName(path: string): string {
   const stored = path.split(/[\\/]/).pop() ?? path;
   return /^[a-f0-9-]{36}-/.test(stored) ? stored.slice(37) : stored;
+}
+
+/** An image a person attached: one of the Mac's, or one a cloud thread's message carries, read from OpenOrc Cloud. */
+function AttachedImage({ path }: { path: string }) {
+  if (hostedFileReference(path)) return <CloudImageTile path={path} label="Attached image" compact />;
+  return <ImageTile asset={attachmentRef(path)} label="Attached image" compact />;
 }
 
 /**
@@ -33,7 +40,7 @@ export const Prompt = memo(function Prompt({ block }: { block: MessageBlock }) {
         <View className="flex-row flex-wrap justify-end gap-2">
           {attachments.map((path) =>
             isImagePath(path) ? (
-              <ImageTile key={path} asset={attachmentRef(path)} label="Attached image" compact />
+              <AttachedImage key={path} path={path} />
             ) : (
               <View key={path} className="h-control-row max-w-56 flex-row items-center gap-2 rounded-lg bg-surface-2 px-3">
                 <FileText size={16} className="text-ink-4" />

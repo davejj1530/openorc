@@ -10,6 +10,8 @@
  *      the person did not choose.
  */
 import type { HostedSpaces, HostedThreads } from "../index.js";
+import type { TeamChat } from "../chat.js";
+import { isTeamChatMethod, noOrclingRunner, runsOrcling, teamChatCalls, type TeamChatCalls } from "../chat-calls.js";
 import {
   mergeThreadPages,
   ownerRoute,
@@ -29,6 +31,11 @@ export interface PlaceRouterDeps {
   /** The place, or null while there is none (no account server). */
   place(): HostedThreads | null;
   spaces?(): Pick<HostedSpaces, "status" | "projects" | "people"> | null;
+  /**
+   * A phone's own team chat, which answers every chat call but one that runs an Orcling: that goes to `next`, the Mac
+   * holding the person's Orclings. The Mac's windows leave it unset; their core answers chat itself.
+   */
+  chat?(): TeamChat | null;
   /** What answers a call no place holds: this Mac's own dispatch. */
   next(request: RpcRequest): Promise<RpcReply>;
   /** Whether a thread came from the cloud to this Mac keeping its id, so its id is this Mac's own (core's CloudMoves). */
@@ -52,6 +59,8 @@ export class PlaceRouter {
     const params = parsed.data as Record<string, unknown>;
     const refusal = this.hostedOwnership.refusal(place, method, params);
     if (refusal) return Promise.resolve({ type: "rpc.error", id: request.id, message: refusal });
+    const chat = this.deps.chat?.();
+    if (chat && isTeamChatMethod(method) && !runsOrcling(method, params)) return this.chatted(teamChatCalls(chat, noOrclingRunner), request, method, params);
     if (typeof params["spaceId"] === "string" && ["threads.list", "threads.resolvedCount", "threads.search", "threads.start", "tasks.list"].includes(method))
       return this.scoped.handle(request, params["spaceId"]);
     if (method.startsWith("hosted.")) return this.hostedRequest(place, request, method as RoutedMethod, params);
@@ -90,6 +99,15 @@ export class PlaceRouter {
       }
       default:
         return this.deps.next(request);
+    }
+  }
+
+  /** A team chat call as a reply, with the chat's words when it refuses. */
+  private async chatted(chat: TeamChatCalls, request: RpcRequest, method: keyof TeamChatCalls, params: Record<string, unknown>): Promise<RpcReply> {
+    try {
+      return result(request, await (chat[method] as (params: unknown) => unknown)(params));
+    } catch (error) {
+      return { type: "rpc.error", id: request.id, message: error instanceof Error ? error.message : String(error) };
     }
   }
 

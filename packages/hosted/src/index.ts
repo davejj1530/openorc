@@ -55,6 +55,7 @@ import { Spaces } from "./spaces.js";
 import { OnlineTasks } from "./tasks.js";
 
 export { OnlineTasks } from "./tasks.js";
+export { isTeamChatMethod, noOrclingRunner, runsOrcling, teamChatCalls, type TeamChatCalls, type TeamChatMethod, type TeamChatOrclingRunner } from "./chat-calls.js";
 export type { CloudFileScope, CloudFileReference, FileDestination } from "./files.js";
 export type { FileByteSource } from "./file-transfer.js";
 export type { UploadPlan, UploadedFile } from "./wire-files.js";

@@ -85,6 +85,28 @@ const cloudReplies: { [M in CloudRemoteMethod]: Reply<M> } = {
   // Who can be tagged, as the server gives them to everyone in the thread: an address only beside a name two people share.
   "threads.people": same,
   "threads.postNote": same,
+  // Team chat as the server gives it to every member who may read it: people by id, name and picture, never an address.
+  "teamChat.state": same,
+  "teamChat.openDm": same,
+  "teamChat.conversation": same,
+  "teamChat.createChannel": same,
+  "teamChat.joinChannel": same,
+  "teamChat.leaveChannel": same,
+  "teamChat.addMembers": same,
+  "teamChat.removeMember": same,
+  "teamChat.timeline": same,
+  "teamChat.watch": same,
+  "teamChat.unwatch": same,
+  "teamChat.send": same,
+  "teamChat.react": same,
+  "teamChat.pins": same,
+  "teamChat.pin": same,
+  "teamChat.search": same,
+  "teamChat.seen": same,
+  "teamChat.unreadSpaces": same,
+  "teamChat.presence": same,
+  "teamChat.orclingCall": same,
+  "teamChat.retryOrclingCall": same,
 };
 
 export function cloudReply<M extends CloudRemoteMethod>(method: M, result: RpcResults[M], context: PhoneShaping): RpcResults[M] {

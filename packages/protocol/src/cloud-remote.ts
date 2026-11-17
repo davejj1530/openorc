@@ -72,6 +72,29 @@ export const CLOUD_REMOTE_METHODS = [
   "threads.readNotes",
   "threads.people",
   "threads.postNote",
+  // The organization's team chat, as the person's own window has it. The server decides each call; a message that calls
+  // the person's Orcling runs it on this Mac, which holds it.
+  "teamChat.state",
+  "teamChat.openDm",
+  "teamChat.conversation",
+  "teamChat.createChannel",
+  "teamChat.joinChannel",
+  "teamChat.leaveChannel",
+  "teamChat.addMembers",
+  "teamChat.removeMember",
+  "teamChat.timeline",
+  "teamChat.watch",
+  "teamChat.unwatch",
+  "teamChat.send",
+  "teamChat.react",
+  "teamChat.pins",
+  "teamChat.pin",
+  "teamChat.search",
+  "teamChat.seen",
+  "teamChat.unreadSpaces",
+  "teamChat.presence",
+  "teamChat.orclingCall",
+  "teamChat.retryOrclingCall",
 ] as const satisfies readonly RpcMethod[];
 export type CloudRemoteMethod = (typeof CLOUD_REMOTE_METHODS)[number];
 

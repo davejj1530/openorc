@@ -86,7 +86,8 @@ interface AccessSetting {
 }
 
 /** What a phone reads under: its lists, a thread's runs and who wrote in it, the spaces and their projects. Billing, people, invitations, repositories, tasks and files are not a phone's yet. */
-const cloudKey = (key: string): boolean => ["threads", "spaces", "projects"].includes(key) || /^(?:runs:thread|authors|access):/.test(key);
+const cloudKey = (key: string): boolean =>
+  ["threads", "spaces", "projects", "team-chat", "team-chat-unread"].includes(key) || /^(?:runs:thread|authors|access|team-chat|team-chat-presence):/.test(key);
 
 type State = { state: "off" } | { state: "on"; listener: Listener; keys: KeyPair } | { state: "failed"; reason: string };
 

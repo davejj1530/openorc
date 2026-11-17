@@ -2,7 +2,8 @@ import type { AgentEvent, BackgroundCommand, Usage } from "@openorc/protocol";
 import { claudeFastModeReason } from "./fast-mode.js";
 import { ClaudeWorkflows } from "./workflows.js";
 import { ClaudeSubagents } from "./subagents.js";
-import { isRecord, num, sessionId, str } from "./stream-values.js";
+import { ClaudeCompactions } from "./compactions.js";
+import { isRecord, num, protocolError, sessionId, str } from "./stream-values.js";
 
 /**
  * Background tasks that are the agent's own work, which report back when they finish. Anything else Claude Code runs
@@ -75,17 +76,7 @@ export class ClaudeStreamParser {
   private requests = 0;
   /** The thinking block in progress, keyed by its message; `index` is its content block when streamed. */
   private thinking: { messageId: string; index: number | null } | null = null;
-  /** Context compaction in progress, from the compacting status to its boundary. */
-  private compaction: { id: string; manual: boolean } | null = null;
-  private compactions = 0;
-  private manualCompactionRequested = false;
-  /** A manual compaction ends with an empty result line that is not a turn. */
-  private swallowEmptyResult = false;
-  /**
-   * A /compact the app asked for that Claude Code declined: it announces the session again, says why in a synthetic
-   * reply and ends with a result, none of which is a turn.
-   */
-  private declined = false;
+  private readonly compactions: ClaudeCompactions;
   /** Whether the session currently asks for Fast, so its state lines are worth a notice. */
   private fastMode: boolean;
   /** The last Fast state reported for a run that asked for Fast, with its reason when off. */
@@ -98,6 +89,7 @@ export class ClaudeStreamParser {
     private readonly runId: string,
     options: { fastMode?: boolean; resumedSubagents?: import("@openorc/protocol").RunSpec["resumedSubagents"] } = {},
   ) {
+    this.compactions = new ClaudeCompactions(runId);
     this.fastMode = Boolean(options.fastMode);
     this.subagents = new ClaudeSubagents(runId);
     this.subagents.restore(options.resumedSubagents ?? []);
@@ -112,7 +104,7 @@ export class ClaudeStreamParser {
 
   /** The next compaction was asked for by the app, not started by the CLI on its own. */
   expectManualCompaction(): void {
-    this.manualCompactionRequested = true;
+    this.compactions.expectManual();
   }
 
   /** Background work the session has running, such as a subagent, by id, so a stop can end it. */
@@ -172,7 +164,7 @@ export class ClaudeStreamParser {
         this.streamEvent(msg, now, out);
         break;
       case "assistant":
-        if (this.declined && isRecord(msg["message"]) && msg["message"]["model"] === "<synthetic>") break;
+        if (this.compactions.declinedReply(msg)) break;
         if (this.accountSignedOut(msg)) this.signInNeeded(msg, now, out);
         else this.assistant(msg, now, out);
         break;
@@ -445,15 +437,8 @@ export class ClaudeStreamParser {
   /** A result settles the current request, then accounts for the turn and Fast state. */
   private result(msg: Record<string, unknown>, now: number, out: AgentEvent[]): void {
     const modelTurns = num(msg["num_turns"]) ?? 0;
-    if (this.declined) {
-      this.declined = false;
-      return;
-    }
     // A manual compaction ends with a result of its own, which answered nothing.
-    if (this.swallowEmptyResult) {
-      this.swallowEmptyResult = false;
-      if (modelTurns === 0) return;
-    }
+    if (this.compactions.ownsResult(modelTurns)) return;
     this.settleRequest(now, out);
     this.finishThinking(now, out);
     const subtype = str(msg["subtype"]) ?? "success";
@@ -510,7 +495,7 @@ export class ClaudeStreamParser {
         });
       }
       // Compaction re-announces the session without a prompt; that is not a turn, nor is a declined one's.
-      if (!this.compaction && !this.declined) {
+      if (!this.compactions.quiet()) {
         this.starts += 1;
         out.push({ type: "turn.started", runId: this.runId, ts: now, turnId: str(msg["uuid"]) ?? `turn-${this.starts}` });
       }
@@ -530,41 +515,11 @@ export class ClaudeStreamParser {
         this.requests += 1;
         this.requesting = `request-${this.requests}`;
         out.push({ type: "activity.updated", runId: this.runId, ts: now, activityId: this.requesting, label: "Waiting for Claude", status: "running" });
-      } else if (status === "compacting") {
-        if (this.compaction) return;
-        this.compactions += 1;
-        this.compaction = { id: `compaction-${this.compactions}`, manual: this.manualCompactionRequested };
-        this.manualCompactionRequested = false;
-        out.push({
-          type: "activity.updated",
-          runId: this.runId,
-          ts: now,
-          activityId: this.compaction.id,
-          label: "Compacting context",
-          status: "running",
-          detail: { mode: this.compaction.manual ? "manual" : "automatic" },
-        });
-      } else if (msg["compact_result"] !== undefined && this.compaction) {
-        const result = str(msg["compact_result"]);
-        if (result !== "success") {
-          out.push({
-            type: "activity.updated",
-            runId: this.runId,
-            ts: now,
-            activityId: this.compaction.id,
-            label: "Compacting context",
-            status: "error",
-            // Claude Code says why in `compact_error`, as "Not enough messages to compact." for a conversation already folded.
-            text: str(msg["compact_error"]) ?? str(msg["error"]) ?? `Compaction ${result ?? "failed"}.`,
-          });
-          this.declined = this.compaction.manual;
-          this.compaction = null;
-        } else if (this.compaction.manual) this.swallowEmptyResult = true;
-      }
+      } else this.compactions.status(msg, now, out);
       return;
     }
     if (subtype === "compact_boundary") {
-      this.compactBoundary(msg, now, out);
+      this.compactions.boundary(msg, now, out);
       return;
     }
     if (subtype === "thinking_tokens") {
@@ -616,30 +571,6 @@ export class ClaudeStreamParser {
    * context's new fill, reported ahead of the activity so the ring reads it as the compaction settles; no model request
    * reports it, since the result that follows a manual compaction spends nothing and is no turn.
    */
-  private compactBoundary(msg: Record<string, unknown>, now: number, out: AgentEvent[]): void {
-    const rawMeta = msg["compact_metadata"];
-    if (rawMeta !== undefined && !isRecord(rawMeta)) {
-      out.push(protocolError(this.runId, now, "Expected compact_metadata to be an object"));
-      return;
-    }
-    const meta = rawMeta as Record<string, unknown> | undefined;
-    const pre = num(meta?.["pre_tokens"]);
-    const post = num(meta?.["post_tokens"]);
-    if (post !== undefined) out.push({ type: "context.updated", runId: this.runId, ts: now, contextTokens: post });
-    const text = pre !== undefined && post !== undefined ? `${pre.toLocaleString()} tokens folded into ${post.toLocaleString()}.` : undefined;
-    const trigger = str(meta?.["trigger"]);
-    out.push({
-      type: "activity.updated",
-      runId: this.runId,
-      ts: now,
-      activityId: this.compaction?.id ?? `compaction-${++this.compactions}`,
-      label: "Compacting context",
-      status: "success",
-      ...(text ? { text } : {}),
-      detail: { mode: trigger === "manual" || this.compaction?.manual ? "manual" : "automatic" },
-    });
-    this.compaction = null;
-  }
 
   private trackStandaloneTask(msg: Record<string, unknown>, taskId: string | null, toolCallId: string | null): boolean {
     const place = taskId ? this.taskPlaces.get(taskId) : undefined;
@@ -781,9 +712,6 @@ function isString(v: unknown): v is string {
   return typeof v === "string";
 }
 
-function protocolError(runId: string, ts: number, message: string): AgentEvent {
-  return { type: "error", runId, ts, message: `Malformed Claude stream line: ${message}`, fatal: false };
-}
 /**
  * An assistant line's usage is one request, so what the model read is the size
  * of the conversation. A result line sums every request of the turn, which says

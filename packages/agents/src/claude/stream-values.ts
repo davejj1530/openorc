@@ -1,4 +1,4 @@
-import { SESSION_ID } from "@openorc/protocol";
+import { SESSION_ID, type AgentEvent } from "@openorc/protocol";
 
 export function str(value: unknown): string | null {
   return typeof value === "string" ? value : null;
@@ -28,4 +28,9 @@ export function contentText(content: unknown): string {
           .join("\n")
       : "")
   );
+}
+
+/** A stream line not in the shape Claude Code writes, said and passed over. */
+export function protocolError(runId: string, ts: number, message: string): AgentEvent {
+  return { type: "error", runId, ts, message: `Malformed Claude stream line: ${message}`, fatal: false };
 }

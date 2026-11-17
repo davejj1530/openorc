@@ -38,6 +38,7 @@ import { billingState, leftSeconds, StandInPayments, type StandInBilling, type S
 import { StandInThreads, type Admit, type StandInThreadSeed } from "./stand-in-threads.js";
 import type { StandInPeer } from "./stand-in-peer.js";
 import { presenceOf } from "./stand-in-presence.js";
+import { StandInPush } from "./stand-in-push.js";
 import type { StandInCollaboration } from "./stand-in-collaboration.js";
 
 export interface StandIn {
@@ -129,6 +130,11 @@ export interface StandIn {
   spaces: StandInSpaces;
   /** Whether someone is at one of the person's computers, as the server asks before an alert: their own live sockets, a second at most. */
   presence(email: string, ms?: number): Promise<boolean>;
+  /**
+   * Phones registered for alerts about cloud threads, the server's sender state and key, and Apple, which records what
+   * `alert` hands it: as the server alerts at an ask or a turn's end, once `sender` is "ready".
+   */
+  push: Pick<StandInPush, "sender" | "publicKey" | "pushed" | "devices" | "alert">;
   close(): Promise<void>;
 }
 
@@ -227,6 +233,11 @@ function accounts(options: StandInOptions) {
     codes.delete(email);
     return null;
   };
+  /** The person and session a signed token names; null as for `holder`. */
+  const caller = (token: string | null): { who: string; session: string } | null => {
+    const who = holder(token);
+    return who && token ? { who, session: token.split(".")[0]! } : null;
+  };
   /** A new session for the person, as its signed token. */
   const session = (email: string): string => {
     const id = randomUUID().replaceAll("-", "");
@@ -276,11 +287,11 @@ function accounts(options: StandInOptions) {
   };
   // The sign-in page mails the code as the apps ask for it, and the person reads it.
   const mail = (who: string): Reply & { code?: string } => ({ ...routes["POST /api/auth/email-otp/send-verification-otp"]!({ email: who, type: "sign-in" }, null), code: codes.get(who)?.code });
-  return { codes, sessions, billing, people, sandboxes, signIns, admit, holder, routes, checkCode, session, mail };
+  return { codes, sessions, billing, people, sandboxes, signIns, admit, holder, caller, routes, checkCode, session, mail };
 }
 
 export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
-  const { sessions, billing, people, sandboxes, signIns, admit: admitTurn, holder, routes, checkCode, session, mail } = accounts(options);
+  const { sessions, billing, people, sandboxes, signIns, admit: admitTurn, holder, caller, routes, checkCode, session, mail } = accounts(options);
   const appSignIns = new StandInAppSignIns({ web: () => `http://127.0.0.1:${port}`, session, checkCode, mail });
   const requests: StandIn["requests"] = [];
   const connections = new Set<Socket>();
@@ -315,6 +326,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   hosted.files.uploads = uploads;
   const parity = parityStandIns({ spaces, hosted, peers: () => [...peers, ...sockets], person });
   const answerSocket = withTerminals(socketAnswers(hosted, chat), parity.terminals);
+  const presence = presenceOf(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets]);
+  const push = new StandInPush({ caller, live: (id) => sessions.has(id), presence });
 
   const server = transportServer({ connections, requests, holder, sockets, answerSocket, answer });
 
@@ -340,7 +353,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
       return /^\/(account|spaces|organization|invitations|projects|hosted|chat|tasks|uploads|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
     };
     const old = tooOld(request.headers["x-openorc-protocol"]) ? { status: 426, body: { statusCode: 426, message: APP_TOO_OLD } } : null;
-    const reply: Reply = old ?? (route ? route(body, token) : (appSignIns.route(method, path, body, who) ?? (await signedInRoute()))) ?? notFound(method, path);
+    const reply = old ?? (route ? route(body, token) : (appSignIns.route(method, path, body, who) ?? push.route(method, path, body, token) ?? (await signedInRoute()))) ?? notFound(method, path);
     response.writeHead(reply.status, { "content-type": "application/json" });
     response.end(reply.body === null && reply.status !== 200 ? undefined : JSON.stringify(reply.body));
   }
@@ -358,8 +371,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     chat,
     uploads,
     ...parity,
-    signInPage: (url, email) => appSignIns.signInPage(url, email.toLowerCase()),
-    appSignIns,
+    ...appSignInsFace(appSignIns),
     ...paymentsFace(billing, payments),
     setPerson: (email, person) => void people.set(email.toLowerCase(), person),
     sandboxes,
@@ -369,14 +381,27 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     organizations,
     addTeam: teamAdder(spaces),
     addProject: (email, project, space) => spaces.addProject(email.toLowerCase(), project, space),
-    setSignIns: (email, rows) => void signIns.set(email.toLowerCase(), rows),
-    approveDevice: (email) => signInWrites.approveDevice(email.toLowerCase()),
-    signInSecrets: signInWrites.secrets,
+    ...agentSignInsFace(signIns, signInWrites),
     revoke: () => sessions.clear(),
     requests,
     ...lifetime,
     connect: (_url, token) => inProcessSocket(token, { holder, peers, admit, serving: isServing, answer: answerSocket }),
-    presence: presenceOf(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets]),
+    presence,
+    push,
+  };
+}
+
+/** The stand-in's face for sign-ins through the browser: the page the person signs in on, and the requests. */
+function appSignInsFace(appSignIns: StandInAppSignIns): Pick<StandIn, "signInPage" | "appSignIns"> {
+  return { signInPage: (url, email) => appSignIns.signInPage(url, email.toLowerCase()), appSignIns };
+}
+
+/** The stand-in's face for the person's agent sign-ins on the server: set, approved on the vendor's page, and the secrets it was handed. */
+function agentSignInsFace(signIns: Map<string, StandInSignIn[]>, writes: StandInSignIns): Pick<StandIn, "setSignIns" | "approveDevice" | "signInSecrets"> {
+  return {
+    setSignIns: (email, rows) => void signIns.set(email.toLowerCase(), rows),
+    approveDevice: (email) => writes.approveDevice(email.toLowerCase()),
+    signInSecrets: writes.secrets,
   };
 }
 

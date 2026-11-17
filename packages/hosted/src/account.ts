@@ -10,7 +10,18 @@
  *
  * `status()` is computed from these and the session each time it is asked. Nothing stores an AccountStatus.
  */
-import { openCodeProvider, type AccountProject, type BillingOffers, type BillingPage, type AccountStatus, type HostedAgent, type HostedRefusal, type RpcParams } from "@openorc/protocol";
+import {
+  openCodeProvider,
+  type AccountProject,
+  type BillingOffers,
+  type BillingPage,
+  type AccountStatus,
+  type HostedAgent,
+  type HostedRefusal,
+  type PushRegistration,
+  type PushSenderState,
+  type RpcParams,
+} from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedAccount, HostedDeps } from "./index.js";
 import { OutOfReach, Refused, type Session, type SessionChange } from "./session.js";
@@ -166,6 +177,15 @@ export class Account implements HostedAccount {
     }
     const { token } = await this.deps.session.anonymous(ROUTES.appSignInFinish, { request, code, verifier });
     await this.deps.session.adopt(token);
+  }
+
+  registerDevice(id: string, registration: PushRegistration): Promise<{ sender: PushSenderState; publicKey: string }> {
+    // The server keeps a phone only under its own key, so the key is sent as the id names it.
+    return this.deps.session.request(ROUTES.registerDevice(id), { ...registration, publicKey: id });
+  }
+
+  async removeDevice(id: string): Promise<void> {
+    await this.deps.session.request(ROUTES.removeDevice(id));
   }
 
   async updateProfile(input: RpcParams<"account.profile.update">): Promise<void> {

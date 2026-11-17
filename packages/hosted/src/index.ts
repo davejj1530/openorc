@@ -20,6 +20,8 @@ import type {
   HostedTerminalPush,
   OwnerReach,
   Project,
+  PushRegistration,
+  PushSenderState,
   RoutedMethod,
   RpcParams,
   RpcResults,
@@ -150,6 +152,14 @@ export interface HostedAccount {
    * grant's challenge (`signInVerifier`). Nothing to do when signed in: the grant is given up.
    */
   signInWithGrant(input: { request: string; code: string; verifier: string }): Promise<void>;
+  /**
+   * Registers this phone for alerts about the person's cloud threads, under `id`, the public half of the X25519 key it
+   * made for this server, replacing what it registered before. Answers whether the server can send to the phone's
+   * environment, and the server's own public key, which every alert from it is sealed with.
+   */
+  registerDevice(id: string, registration: PushRegistration): Promise<{ sender: PushSenderState; publicKey: string }>;
+  /** Stops alerts to the phone `id`; one already gone is the same. */
+  removeDevice(id: string): Promise<void>;
   /** Saves and keeps the stored profile from the reply; subsequent reads cannot make this write fail. */
   updateProfile(input: RpcParams<"account.profile.update">): Promise<void>;
   /** Chooses the sandbox service the person's cloud threads run on; null leaves it to the server. */

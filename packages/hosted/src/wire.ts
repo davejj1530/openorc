@@ -210,6 +210,10 @@ export const wireAppSignInFinish = z.object({ token: z.string().min(1) });
 /** A sign-in a signed-in device grants another of the person's devices: its request, and the one-time code that device finishes it with. */
 export const wireAppSignInGrant = z.object({ request: z.string().min(1), code: z.string().min(1), expiresInMs: z.number() });
 
+/** Whether the server can alert a phone on its environment, and the server's static public key, which seals each alert. */
+export const wirePushDevice = z.object({ sender: z.enum(["ready", "no-key", "refused"]), publicKey: z.string() });
+export type WirePushDevice = z.infer<typeof wirePushDevice>;
+
 const route = <T = null>(method: Route<T>["method"], path: string, reply: z.ZodType<T> | null): Route<T> => ({ method, path, reply });
 
 /** Every route the app calls, in one list. The stand-in server in testing/ serves exactly these. */
@@ -223,6 +227,10 @@ export const ROUTES = {
   appSignInCancel: route("POST", "/app-sign-in/cancel", null),
   /** As the signed-in person, grants another of their devices a session of its own, for the challenge of a verifier only that device holds. */
   appSignInGrant: route("POST", "/app-sign-in/grant", wireAppSignInGrant),
+  /** Registers the phone under its own public key for alerts about the person's cloud threads, replacing what it registered before. */
+  registerDevice: (id: string) => route("PUT", `/devices/${encodeURIComponent(id)}`, wirePushDevice),
+  /** Takes the phone off; one already gone answers the same. */
+  removeDevice: (id: string) => route("DELETE", `/devices/${encodeURIComponent(id)}`, null),
   signOut: route("POST", "/api/auth/sign-out", null),
   billing: route("GET", "/billing", wireBilling),
   offers: route("GET", "/billing/offers", wireOffers),

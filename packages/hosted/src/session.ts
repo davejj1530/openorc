@@ -40,6 +40,11 @@ export class Refused extends Error {
   }
 }
 
+/** A read its session or space moved on from while it ran; the app reads again under the new one, so it isn't a failure. */
+export class Superseded extends Refused {
+  readonly superseded = true;
+}
+
 /** The server answered in a shape this build does not read. */
 export class Unreadable extends Error {
   constructor() {

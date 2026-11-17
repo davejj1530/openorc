@@ -1,6 +1,6 @@
 import { HOSTED_FILES_UNAVAILABLE, type HostedAvailability, type TeamChatFile } from "@openorc/protocol";
 import type { HostedDeps } from "./index.js";
-import { Refused, Unreadable, type Session } from "./session.js";
+import { Refused, Superseded, Unreadable, type Session } from "./session.js";
 import type { Spaces } from "./spaces.js";
 import { FILE_ROUTES, type UploadPlan } from "./wire-files.js";
 import { putFilePart, type FileByteSource } from "./file-transfer.js";
@@ -133,14 +133,14 @@ export class Files {
 
   #assert(scope: CloudFileScope, generation = this.deps.session.generation): number {
     const state = this.deps.spaces.status();
-    if (this.#closed || !this.deps.session.state.signedIn || generation !== this.deps.session.generation || state.state !== "ready") throw new Refused(SESSION_CHANGED);
-    if (state.userId !== scope.accountId || state.apiOrigin !== scope.apiOrigin) throw new Refused(SESSION_CHANGED);
+    if (this.#closed || !this.deps.session.state.signedIn || generation !== this.deps.session.generation || state.state !== "ready") throw new Superseded(SESSION_CHANGED);
+    if (state.userId !== scope.accountId || state.apiOrigin !== scope.apiOrigin) throw new Superseded(SESSION_CHANGED);
     if (!state.spaces.some((space) => space.id === scope.spaceId)) throw new Refused("You're not in this organization.");
     return generation;
   }
 
   #abort(kind?: "read" | "upload"): void {
-    for (const [control, active] of this.#active) if (!kind || kind === active) control.abort(new Refused(SESSION_CHANGED));
+    for (const [control, active] of this.#active) if (!kind || kind === active) control.abort(new Superseded(SESSION_CHANGED));
   }
 }
 

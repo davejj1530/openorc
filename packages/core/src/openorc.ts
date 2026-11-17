@@ -7,6 +7,7 @@ import {
   harnessAvailability,
   harnessInfo,
   harnessLoggedIn,
+  isSuperseded,
   rpcParams,
   type CloudSessionGrant,
   type CloudSessionOwner,
@@ -657,6 +658,8 @@ export class OpenOrc {
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
       const message = method.startsWith("slack.") ? redact(detail).text : detail;
+      // A read whose session or space moved on is followed by a fresh one; it isn't a failure.
+      if (isSuperseded(e)) return { type: "rpc.error", id, message, superseded: true };
       this.log.error(`${method}: ${message}`);
       return { type: "rpc.error", id, message };
     }

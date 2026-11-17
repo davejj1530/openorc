@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
+import { isSuperseded } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { createHosted, type CloudFileScope, type Hosted } from "./index.js";
 import { hostDeps, newDevice, signInAs } from "./test-fixtures/host.js";
@@ -197,10 +198,16 @@ it("discards protected bytes if sign-out happens before their consumer completes
     await waiting;
     return bytes;
   });
-  const result = expect(reading).rejects.toThrow("Your OpenOrc session changed. Try again.");
+  const failure = reading.then(
+    () => null,
+    (error: unknown) => error,
+  );
   await started;
   await host.account.signOut();
   release();
-  await result;
+  const error = await failure;
+  expect(error).toMatchObject({ message: "Your OpenOrc session changed. Try again." });
+  // The app reads again under the new session, so the core doesn't log it as a failure.
+  expect(isSuperseded(error)).toBe(true);
   expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["hostedFiles", "hostedAssets"] });
 });

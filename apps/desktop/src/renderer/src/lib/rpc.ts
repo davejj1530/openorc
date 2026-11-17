@@ -137,7 +137,7 @@ class CoreClient implements CoreConnection {
         const p = this.pending.get(msg.id);
         if (!p) return;
         this.pending.delete(msg.id);
-        console.error(`rpc ${msg.id} failed: ${msg.message}`);
+        if (!msg.superseded) console.error(`rpc ${msg.id} failed: ${msg.message}`);
         p.reject(new Error(msg.message));
         return;
       }

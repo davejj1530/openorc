@@ -761,7 +761,8 @@ export const CorePush = z.discriminatedUnion("type", [
   z.object({ type: z.literal("startup"), message: z.string() }),
   z.object({ type: z.literal("ready"), pid: z.number(), mcpPort: z.number() }),
   z.object({ type: z.literal("rpc.result"), id: z.number().int(), result: z.unknown() }),
-  z.object({ type: z.literal("rpc.error"), id: z.number().int(), message: z.string() }),
+  // `superseded`: a read whose session or space moved on while it ran; a fresh read follows, so it is no failure to log.
+  z.object({ type: z.literal("rpc.error"), id: z.number().int(), message: z.string(), superseded: z.literal(true).optional() }),
   z.object({ type: z.literal("frame"), frame: Frame }),
   /** Cache keys whose data changed. The renderer refetches. */
   z.object({ type: z.literal("invalidate"), keys: z.array(z.string()) }),
@@ -789,3 +790,8 @@ export const CorePush = z.discriminatedUnion("type", [
 export type CorePush = z.infer<typeof CorePush>;
 /** The answer to one request: its result or its error, sent back to the one caller that asked. */
 export type RpcReply = Extract<CorePush, { type: "rpc.result" | "rpc.error" }>;
+
+/** Whether an error is a read its session or space moved on from while it ran, which a fresh read follows. */
+export function isSuperseded(error: unknown): boolean {
+  return error instanceof Error && (error as { superseded?: unknown }).superseded === true;
+}

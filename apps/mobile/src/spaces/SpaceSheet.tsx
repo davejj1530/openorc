@@ -8,11 +8,12 @@ import { haptic } from "../ui/haptics";
 import { Text } from "../ui/Text";
 import { chooseSpace } from "./space-choice";
 import { SpaceMark } from "./SpaceMark";
-import { spaceName, useSpaces } from "./use-spaces";
+import { titleName, useSpaces } from "./use-spaces";
 
 /**
- * Which space Home shows, from the bar's title: Personal, then the person's organizations, as the Mac's space menu
- * lists them. Closes on a pick, as the Show sheet does. The choice is this phone's own.
+ * Which space Home shows, from the bar's title: the person's own, called OpenOrc as the bar calls it, then their
+ * organizations, in the order the Mac's space menu lists them. Closes on a pick, as the Show sheet does. The choice is
+ * this phone's own.
  */
 export function SpaceSheet() {
   const insets = useSafeAreaInsets();
@@ -20,7 +21,7 @@ export function SpaceSheet() {
   const spaces = account.state === "ready" ? account.spaces : [];
   const current = account.state === "ready" ? account.current.id : null;
   const person = useRpc("account.person", {}, { enabled: account.state === "ready" }).data?.name;
-  /** Under a space's name, as the Mac's menu has it: whose Personal it is, and how many people an organization has. */
+  /** Under a space's name, as the Mac's menu has it: whose own it is, and how many people an organization has. */
   const detail = (space: Space) => {
     if (space.kind === "personal") return person ?? null;
     return space.memberCount === 1 ? "1 person" : `${space.memberCount} people`;
@@ -35,7 +36,7 @@ export function SpaceSheet() {
           key={space.id}
           accessibilityRole="radio"
           accessibilityState={{ checked: space.id === current }}
-          accessibilityLabel={spaceName(space)}
+          accessibilityLabel={titleName(space)}
           onPress={() => {
             if (space.id !== current) {
               haptic.select();
@@ -48,7 +49,7 @@ export function SpaceSheet() {
           <SpaceMark space={space} size={28} />
           <View className="flex-1">
             <Text numberOfLines={1} className="text-md">
-              {spaceName(space)}
+              {titleName(space)}
             </Text>
             {detail(space) ? (
               <Text numberOfLines={1} className="text-sm text-ink-4">

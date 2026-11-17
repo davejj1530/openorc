@@ -1,9 +1,9 @@
 import { activityIdOf, approvalDetail, approvalSummary, type Block, isImageGeneration, type Question, readQuestions } from "@openorc/client";
-import { harnessShortName, isHarnessId } from "@openorc/protocol";
+import { harnessShortName, hostedThreadOf, isHarnessId } from "@openorc/protocol";
 import { createContext, memo, useContext, useEffect, useRef, useState } from "react";
 import { Pressable, TextInput, useWindowDimensions, View, type FocusEvent, type HostInstance, type LayoutChangeEvent } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
-import { client, shownMacId, useRpcMutation } from "../client";
+import { client, cloudAlerts, shownMacId, useRpcMutation } from "../client";
 import { AlertCircle, Check, Hammer, Image as ImageIcon, Terminal, X } from "../generated/icons";
 import { takeQueued, useQueuedAnswer } from "../notifications/answers";
 import { askSeen, askStanding, useTogether } from "./cloud-together";
@@ -111,8 +111,8 @@ async function stillOpen(runs: typeof client.runs, runId: string, approvalId: st
  * taken in the commit that sends it: a card that leaves the screen before its effects run leaves it to the next card.
  */
 function useAlertAnswer(runId: string, block: ApprovalBlock, send: (decision: Decision) => void) {
-  // Alerts queue an answer under the Mac that sent them.
-  const macId = shownMacId();
+  // Alerts queue an answer under the Mac that sent them; a cloud thread's, under the phone's own OpenOrc Cloud.
+  const macId = hostedThreadOf(runId) === null ? shownMacId() : cloudAlerts.senderKey();
   const { approvalId } = block;
   const waiting = useQueuedAnswer(macId ? { macId, runId, approvalId } : null);
   const open = !block.decision;

@@ -80,13 +80,26 @@ describe("opening what was tapped", () => {
     expect(queued()).toBeNull();
   });
 
-  it("opens an alert from the phone's own cloud on its thread, choosing no Mac and answering nothing", async () => {
-    await openTap(tap({ route: { macId: "cloud-server-key", id: "n9", kind: "approval", threadId: "cloud-thread", runId: "r", approvalId: "a" }, answer: "allow" }), deps);
+  it("opens an alert from the phone's own cloud on its thread, choosing no Mac, its answer waiting under the cloud that sealed it", async () => {
+    const cloud = nobleCrypto.generateKeyPair();
+    const cloudId = toBase64Url(cloud.publicKey);
+    const fromCloud = sealPush(nobleCrypto, pushKeys(nobleCrypto, cloud, iphone.publicKey, "mac").seal, cloud.publicKey, {
+      id: "n9",
+      kind: "approval",
+      threadId: "cloud-thread",
+      ...text,
+      approval: { runId: "hosted:cloud-thread", approvalId: "a7" },
+    });
+    const cloudDeps = { ...deps, cloudSender: () => cloudId, open: noticeOpener(nobleCrypto, async (id) => (id === cloudId ? iphone.privateKey : null)) };
+    await openTap(tap({ route: { macId: cloudId, id: "n9", kind: "approval", threadId: "cloud-thread", runId: "hosted:cloud-thread", approvalId: "a7", o: fromCloud }, answer: "deny" }), cloudDeps);
     expect(steps).toEqual(["open cloud-thread"]);
-    expect(takeQueued({ macId: "cloud-server-key", runId: "r", approvalId: "a" }, 1_000)).toBeNull();
+    expect(takeQueued({ macId: cloudId, runId: "hosted:cloud-thread", approvalId: "a7" }, 1_000)).toBe("deny");
+    // A route that names the cloud but carries no sealed notice answers nothing.
+    await openTap(tap({ route: { macId: cloudId, id: "n9", kind: "approval", threadId: "cloud-thread", runId: "hosted:cloud-thread", approvalId: "a7" }, answer: "allow" }), cloudDeps);
+    expect(takeQueued({ macId: cloudId, runId: "hosted:cloud-thread", approvalId: "a7" }, 1_000)).toBeNull();
     // Once the phone takes no cloud alerts, the same sender is one it does not know: Home stays.
     steps.length = 0;
-    await openTap(tap({ route: { macId: "cloud-server-key", id: "n9", kind: "finished", threadId: "cloud-thread" }, answer: null }), { ...deps, cloudSender: () => null });
+    await openTap(tap({ route: { macId: cloudId, id: "n9", kind: "finished", threadId: "cloud-thread" }, answer: null }), { ...cloudDeps, cloudSender: () => null });
     expect(steps).toEqual([]);
   });
 

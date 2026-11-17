@@ -118,3 +118,11 @@ it("asks the Mac again before sending, and sends nothing when it was answered th
   expect(mac.resolved).toEqual([]);
   release();
 });
+
+it("sends an answer chosen on a cloud thread's alert, which waits under the phone's own cloud, never under the Mac", async () => {
+  const runId = "hosted:t1";
+  queueAnswer(answerFor(runId, "a1", "mac-1"), "deny", Date.now());
+  queueAnswer(answerFor(runId, "a1", "cloud-sender"), "allow", Date.now());
+  render(card(block(), runId), { wrapper: mac.phone!.wrapper });
+  await waitFor(() => expect(mac.resolved).toEqual([expect.objectContaining({ runId, approvalId: "a1", decision: "allow" })]));
+});

@@ -91,15 +91,12 @@ const showed = (notice: PushNotice, shown: Shown) => (shown.title ?? "") === not
  * Shows the Mac that sent the alert, then its thread. An answer chosen on the alert waits for the approval's card only
  * when this phone's key opens the notice and iOS showed its text, so it is always for the approval the person read. An
  * alert from a Mac this phone forgot stays on Home. An alert from the phone's own OpenOrc Cloud opens its thread from
- * there, whichever Mac is shown; it carries no answer yet.
+ * there, whichever Mac is shown, and its answer waits under the cloud that sealed it.
  */
 export async function openTap({ route, answer, shown }: NoticeTap, effects: TapEffects): Promise<void> {
-  if (route.macId === effects.cloudSender()) {
-    if (route.threadId) effects.openThread(route.threadId);
-    return;
-  }
-  if (!effects.macs().some((mac) => mac.id === route.macId)) return;
-  effects.select(route.macId);
+  const cloud = route.macId === effects.cloudSender();
+  if (!cloud && !effects.macs().some((mac) => mac.id === route.macId)) return;
+  if (!cloud) effects.select(route.macId);
   if (route.threadId) effects.openThread(route.threadId);
   if (!answer || !route.o) return;
   const notice = await effects.open(route.macId, route.o);

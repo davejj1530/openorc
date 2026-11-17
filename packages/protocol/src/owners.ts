@@ -182,6 +182,7 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "macProjects.bring": here,
   "threads.moveCheck": here,
   "threads.move": here,
+  "threads.moveDismiss": here,
 };
 
 export function ownerRoute(method: RpcMethod): OwnerRoute<RpcMethod> | undefined {

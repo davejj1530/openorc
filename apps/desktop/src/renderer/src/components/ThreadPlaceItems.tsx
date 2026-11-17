@@ -1,6 +1,7 @@
 import { threadPlace } from "@openorc/client";
 import type { ThreadSummary, WorktreeBlock } from "@openorc/protocol";
-import { HOSTED_REASONS, placeOf, WORKSPACE_ID, WORKTREE_BLOCK_WORDS } from "@openorc/protocol";
+import { HOSTED_REASONS, movingHold, placeOf, WORKSPACE_ID, WORKTREE_BLOCK_WORDS } from "@openorc/protocol";
+import { useCloudMove } from "./CloudMoveDialog";
 import { HostedMenuReason } from "./HostedMenuReason";
 import type { ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
@@ -15,30 +16,65 @@ import { machine, revealLabel } from "../lib/this-computer";
 /**
  * The top of a thread's menu: where it works. Its branch, in a worktree or the checkout, then OpenOrc Cloud for a
  * thread there. Each row's submenu holds the moves away from there, so the menu below is only about the conversation.
+ * A thread moving between this computer and the cloud says where it is going, and nothing else, until it is there.
  */
 export function ThreadPlaceItems({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
   const branch = thread.projectId !== WORKSPACE_ID;
   const hosted = thread.owner?.brain === "hosted";
+  const moving = movingHold(thread.moving, machine);
   if (!branch && !hosted) return null;
   return (
     <>
-      {branch ? <BranchRow thread={thread} parts={M} /> : null}
-      {hosted ? <HostedPlaceRow parts={M} /> : null}
+      {moving ? (
+        <M.Item className={menuItem} disabled>
+          {thread.moving?.to === "cloud" ? <Cloud size={13} /> : <Laptop size={13} />} {moving}
+        </M.Item>
+      ) : (
+        <>
+          {branch ? <BranchRow thread={thread} parts={M} /> : null}
+          {hosted ? <HostedPlaceRow thread={thread} parts={M} /> : null}
+        </>
+      )}
       <M.Separator className={menuSeparator} />
     </>
   );
 }
 
-function HostedPlaceRow({ parts: M }: { parts: MenuParts }) {
+function HostedPlaceRow({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
   return (
     <PlaceRow parts={M} icon={<Cloud size={13} />} label="OpenOrc Cloud">
-      <HostedMenuReason parts={M} reason={HOSTED_REASONS.moveToMac}>
-        <Laptop size={13} /> Bring to {machine}
-      </HostedMenuReason>
+      <CloudMoveItem thread={thread} parts={M} />
       <HostedMenuReason parts={M} reason={HOSTED_REASONS.macCode}>
         <Folder size={13} /> Open on {machine}
       </HostedMenuReason>
     </PlaceRow>
+  );
+}
+
+/** Moves the thread between this computer and OpenOrc Cloud, by way of one confirm; held, with why, when it can't go now. */
+function CloudMoveItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+  const offer = useCloudMove(thread);
+  const hosted = thread.owner?.brain === "hosted";
+  if (!offer && !hosted) return null;
+  const label = hosted ? (
+    <>
+      <Laptop size={13} /> Move to {machine}
+    </>
+  ) : (
+    <>
+      <Cloud size={13} /> Move to OpenOrc Cloud
+    </>
+  );
+  if (offer?.held)
+    return (
+      <HostedMenuReason parts={M} reason={offer.held}>
+        {label}
+      </HostedMenuReason>
+    );
+  return (
+    <M.Item className={menuItem} disabled={!offer} onClick={() => useUi.getState().setCloudMove(thread.id)}>
+      {label}
+    </M.Item>
   );
 }
 
@@ -99,6 +135,7 @@ function BranchRow({ thread, parts: M }: { thread: ThreadSummary; parts: MenuPar
       {here && above ? <M.Separator className={menuSeparator} /> : null}
       {here ? <MoveFolderItem thread={thread} parts={M} /> : null}
       {here && thread.workspaceMode === "worktree" && thread.worktreePath && thread.parentRelation !== "subagent" ? <RemoveWorktreeItem thread={thread} parts={M} /> : null}
+      {here ? <CloudMoveItem thread={thread} parts={M} /> : null}
     </PlaceRow>
   );
 }

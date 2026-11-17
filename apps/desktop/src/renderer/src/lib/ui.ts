@@ -14,6 +14,8 @@ interface UiState {
   deleteThreadId: string | null;
   /** The conversation whose move to or from a worktree is being confirmed. */
   moveThreadId: string | null;
+  /** The thread whose move between this computer and OpenOrc Cloud is being confirmed. */
+  cloudMoveThreadId: string | null;
   /** The conversation whose worktree removal is being confirmed. */
   removeWorktreeThreadId: string | null;
   /** The folder New file is asking a path for. */
@@ -25,6 +27,7 @@ interface UiState {
   setThreadOrder: (ids: string[]) => void;
   setDeleteThread: (id: string | null) => void;
   setMoveThread: (id: string | null) => void;
+  setCloudMove: (id: string | null) => void;
   setRemoveWorktree: (id: string | null) => void;
   setNewFile: (scope: FileScope | null) => void;
 }
@@ -38,10 +41,12 @@ export const useUi = create<UiState>((set, get) => ({
   threadOrder: [],
   deleteThreadId: null,
   moveThreadId: null,
+  cloudMoveThreadId: null,
   removeWorktreeThreadId: null,
   newFile: null,
   setDeleteThread: (deleteThreadId) => set({ deleteThreadId }),
   setMoveThread: (moveThreadId) => set({ moveThreadId }),
+  setCloudMove: (cloudMoveThreadId) => set({ cloudMoveThreadId }),
   setRemoveWorktree: (removeWorktreeThreadId) => set({ removeWorktreeThreadId }),
   setNewFile: (newFile) => set({ newFile }),
   openNewTask: (projectId, threadId) => useRouter.getState().navigate({ view: "newtask", ...(projectId ? { projectId } : {}), ...(threadId ? { threadId } : {}) }),

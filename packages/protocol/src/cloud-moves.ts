@@ -12,6 +12,12 @@ export const MOVING_TO_CLOUD = "Moving to OpenOrc Cloud";
 export const ThreadMoving = z.object({ to: z.enum(["cloud", "mac"]), failed: z.string().nullable() });
 export type ThreadMoving = z.infer<typeof ThreadMoving>;
 
+/** What a thread under way to `machine` or the cloud says where it would take a message or another move; null otherwise. */
+export function movingHold(moving: ThreadMoving | null | undefined, machine: string): string | null {
+  if (!moving || moving.failed !== null) return null;
+  return moving.to === "cloud" ? MOVING_TO_CLOUD : `Moving to ${machine}`;
+}
+
 /**
  * Whether the thread can move from where it is now and where it would land, or why it cannot, held with the reason.
  * `space` is where a move to the cloud lands: a thread in an organization's space is read by its teammates there.
@@ -29,8 +35,11 @@ const id = z.string().min(1).max(200);
 export const cloudMovesRpcParams = {
   "threads.moveCheck": z.object({ threadId: id }).strict(),
   "threads.move": z.object({ threadId: id, endsOk: z.boolean() }).strict(),
+  /** Puts away why the thread's last move stopped. */
+  "threads.moveDismiss": z.object({ threadId: id }).strict(),
 };
 export interface CloudMovesRpcResults {
   "threads.moveCheck": CloudMoveCheck;
   "threads.move": CloudMoveStart;
+  "threads.moveDismiss": null;
 }

@@ -17,11 +17,13 @@ import {
   type SendBlockAction,
   type SendPayer,
 } from "@openorc/client";
-import { HOSTED_AGENTS, type HarnessId, type PermissionPreset, type RunMode, type ThreadSummary } from "@openorc/protocol";
+import { HOSTED_AGENTS, movingHold, type HarnessId, type PermissionPreset, type RunMode, type ThreadSummary } from "@openorc/protocol";
 import type { ReactNode, RefObject } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
 import { useRouter } from "../lib/router";
+import { machine, thisComputer } from "../lib/this-computer";
+import { useUi } from "../lib/ui";
 import type { ComposerHandle } from "./Composer";
 import type { ModelChoice } from "./ModelPicker";
 import { Button } from "./ui";
@@ -48,6 +50,9 @@ const CLOUD_LIMITS: CloudComposerLimits = { accounts: undefined, attachmentsDisa
  *              others are in, only once there are words, never on focus alone
  *   shown      the composer's error line, without a refusal the card already says in the same words
  *   hosted     a cloud thread runs elsewhere, so this Mac's skills and connectors are not offered in it
+ *
+ * A thread moving between this computer and the cloud, from either side, takes no message until it is there, and one
+ * whose move stopped says why above its composer, with the move again.
  *
  * The block is derived once from `account.status`, the read Settings makes, so when a sign-in or a purchase lands the
  * card goes by itself. The thread is made ready when the message box takes focus, and when a draft starts from empty;
@@ -76,7 +81,9 @@ export function useHostedComposer(
 } {
   const hosted = thread?.owner?.brain === "hosted";
   const writeBlock = threadTogether(thread) ? threadWriteBlock(thread) : null;
-  const limits = { ...(hosted ? CLOUD_LIMITS : {}), readOnlyReason: threadTogether(thread) ? writeBlock : threadReadOnlyReason(thread) };
+  const moving = movingHold(thread?.moving, machine);
+  const limits = { ...(hosted ? CLOUD_LIMITS : {}), readOnlyReason: moving ?? (threadTogether(thread) ? writeBlock : threadReadOnlyReason(thread)) };
+  const moveFailed = thread?.moving?.failed ? <MoveFailedCard threadId={thread.id} to={thread.moving.to} words={thread.moving.failed} /> : null;
   const account = useRpc("account.status", {}, { enabled: hosted });
   const ready = useRpcMutation("threads.ready");
   const blocked = sendsBlocked(thread);
@@ -96,11 +103,11 @@ export function useHostedComposer(
     const { choice, mode, permission } = settings;
     ready.mutate({ id: thread.id, settings: { ...(choice && { agent: choice.agent, model: choice.model, effort: choice.effort ?? null }), mode, permissionMode: permission } });
   };
-  if (!hosted) return { hosted, notice: null, blocked: null, limits, shown: (error) => error };
+  if (!hosted) return { hosted, notice: moveFailed, blocked: null, limits, shown: (error) => error };
   Object.assign(limits, together);
   return {
     hosted,
-    notice: hostedNotice({ block: block && !blocked ? block : null, ...reachableBlock(thread, writeBlock), composer, draft }),
+    notice: moveFailed ?? hostedNotice({ block: block && !blocked ? block : null, ...reachableBlock(thread, writeBlock), composer, draft }),
     blocked: blocked ?? block?.words ?? null,
     limits,
     shown: (error) => (error === block?.words ? undefined : error),
@@ -192,6 +199,26 @@ function SendBlockCard({ words, action }: { words: string; action: SendBlockActi
           {action.label}
         </Button>
       ) : null}
+    </section>
+  );
+}
+
+/** Why the thread's last move between this computer and OpenOrc Cloud stopped, where it left it, with the move again. */
+function MoveFailedCard({ threadId, to, words }: { threadId: string; to: "cloud" | "mac"; words: string }) {
+  const dismiss = useRpcMutation("threads.moveDismiss");
+  return (
+    <section role="status" aria-label="Move" data-plane className={cn(card, "flex flex-wrap items-center justify-between gap-x-3")}>
+      <div className="min-w-0 py-1.5 text-ink break-words">
+        Didn't move to {to === "cloud" ? "OpenOrc Cloud" : thisComputer}. {dismiss.error?.message ?? words}
+      </div>
+      <div className="flex gap-2">
+        <Button variant="ghost" disabled={dismiss.isPending} onClick={() => dismiss.mutate({ threadId })}>
+          Dismiss
+        </Button>
+        <Button variant="secondary" onClick={() => useUi.getState().setCloudMove(threadId)}>
+          Try again
+        </Button>
+      </div>
     </section>
   );
 }

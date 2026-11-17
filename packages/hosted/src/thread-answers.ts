@@ -124,6 +124,7 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   // This Mac moves a thread to and from the cloud (core's CloudMoves).
   "threads.moveCheck": NOT_ASKED,
   "threads.move": NOT_ASKED,
+  "threads.moveDismiss": NOT_ASKED,
   "tasks.get": NOT_ASKED,
   "tasks.update": NOT_ASKED,
   "tasks.delete": NOT_ASKED,

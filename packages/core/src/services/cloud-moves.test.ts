@@ -203,6 +203,8 @@ describe("a thread moving from this Mac to OpenOrc Cloud", () => {
     expect(deleted).toEqual([]);
     expect(threads.get(db, thread.id)).not.toBeNull();
     expect(cloudMoves.moving(db, thread.id)).toEqual({ to: "cloud", failed: "This thread holds a bogus.event event OpenOrc Cloud doesn't read yet." });
+    service.dismiss(thread.id);
+    expect(cloudMoves.moving(db, thread.id)).toBeNull();
   });
 
   it("holds a thread that isn't the account's to move, with why", async () => {

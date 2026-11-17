@@ -10,6 +10,7 @@ import { OrganizationWorkGate } from "./components/OrganizationWorkGate";
 import { useOrganization } from "./lib/organization-context";
 import { DeleteThreadDialog } from "./components/ThreadActions";
 import { ThreadMoveDialog } from "./components/ThreadMoveDialog";
+import { CloudMoveDialog } from "./components/CloudMoveDialog";
 import { RemoveWorktreeDialog } from "./components/RemoveWorktreeDialog";
 import { ThreadWorkspace } from "./components/ThreadWorkspace";
 import { TooltipProvider } from "./components/ui";
@@ -111,6 +112,7 @@ function DesktopApp() {
       <DeleteThreadDialog />
 
       <ThreadMoveDialog />
+      <CloudMoveDialog />
       <RemoveWorktreeDialog />
       <NewFileDialog />
     </div>

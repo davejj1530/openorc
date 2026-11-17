@@ -18,7 +18,7 @@ function broughtLine({ branch, commits, uncommitted }: Extract<BringResult, { br
 }
 
 /** Names what would end, as "pnpm dev and a terminal". */
-const listed = (ends: readonly string[]) => (ends.length < 2 ? (ends[0] ?? "") : `${ends.slice(0, -1).join(", ")} and ${ends.at(-1)}`);
+export const listed = (ends: readonly string[]) => (ends.length < 2 ? (ends[0] ?? "") : `${ends.slice(0, -1).join(", ")} and ${ends.at(-1)}`);
 
 /**
  * Brings the thread's newest commits into the folder its project came from, as the thread's branch. Held, with why on

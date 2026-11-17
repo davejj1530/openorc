@@ -24,18 +24,7 @@ import { packSession, SessionRefused, unpackSession, type PackedSession } from "
 import { cloudMoves, listEvents, orclings, projects, runs, threads, type CloudMove, type Db, type LedgerWriter } from "@openorc/db";
 import { bringIntoFolder, git } from "@openorc/git";
 import type { ArrivalLine, ArrivalSettings, Hosted } from "@openorc/hosted";
-import {
-  harnessShortName,
-  isHostedAgent,
-  MOVING_TO_CLOUD,
-  WORKSPACE_ID,
-  type AgentEvent,
-  type CloudMoveCheck,
-  type CloudMoveStart,
-  type Project,
-  type Thread,
-  type ThreadMoving,
-} from "@openorc/protocol";
+import { harnessShortName, isHostedAgent, movingHold, WORKSPACE_ID, type AgentEvent, type CloudMoveCheck, type CloudMoveStart, type Project, type Thread, type ThreadMoving } from "@openorc/protocol";
 import type { AgentSessions } from "./agent-sessions.js";
 import { packProject, uploadOf } from "./mac-work.js";
 import type { WorkspaceService } from "./workspace.js";
@@ -79,6 +68,13 @@ export class CloudMoves {
     return cloudMoves.moving(this.deps.db, threadId);
   }
 
+  /** Puts away why the thread's last move stopped; a move under way goes on. */
+  dismiss(threadId: string): void {
+    if (cloudMoves.open(this.deps.db, threadId)) return;
+    cloudMoves.forget(this.deps.db, threadId);
+    this.deps.changed(threadId);
+  }
+
   /** Whether the thread can move from where it is now, and where it would land, or why not. */
   async check(threadId: string): Promise<CloudMoveCheck> {
     const hosted = this.deps.hosted();
@@ -86,7 +82,8 @@ export class CloudMoves {
     const thread = threads.get(this.deps.db, threadId);
     if (!thread || thread.projectId === WORKSPACE_ID || thread.parentRelation === "subagent" || this.ofTask(threadId) || orclings.forThread(this.deps.db, threadId)) return { to: "none" };
     const held = (reason: string): CloudMoveCheck => ({ to: "cloud", can: false, reason });
-    if (cloudMoves.open(this.deps.db, threadId)) return held(MOVING_TO_CLOUD);
+    const moving = movingHold(this.moving(threadId), this.deps.machine);
+    if (moving) return held(moving);
     if (!hosted || hosted.spaces.status().state !== "ready") return held(SIGN_IN);
     if (!isHostedAgent(thread.agent)) return held(`${harnessShortName(thread.agent)} doesn't run on OpenOrc Cloud.`);
     if (runs.listForThread(this.deps.db, threadId).some((run) => run.state === "starting" || run.state === "running")) return held(WORKING);
@@ -100,7 +97,8 @@ export class CloudMoves {
     const held = (reason: string): CloudMoveCheck => ({ to: "mac", can: false, reason });
     const row = hosted.threads.row!(threadId);
     const status = hosted.spaces.status();
-    if (cloudMoves.open(this.deps.db, threadId)) return held(`Moving to ${this.deps.machine}`);
+    const moving = movingHold(this.moving(threadId), this.deps.machine);
+    if (moving) return held(moving);
     if (status.state !== "ready" || row.space !== status.personalSpaceId) return held(ONLY_OWN_SPACE);
     const local = this.localProjectOf(hosted, threadId);
     if (!local) return held(NOT_HERE);

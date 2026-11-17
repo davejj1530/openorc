@@ -133,7 +133,7 @@ it("does not open a local interactive tool app for a hosted run", async () => {
   expect(core.call).not.toHaveBeenCalled();
 });
 
-it("keeps cloud relocation and code-copy controls disabled in the place menu", async () => {
+it("keeps the code-copy control disabled in the place menu", async () => {
   mount(
     <Menu.Root open>
       <Menu.Portal>
@@ -147,9 +147,8 @@ it("keeps cloud relocation and code-copy controls disabled in the place menu", a
     </Menu.Root>,
   );
   fireEvent.click(screen.getByText("OpenOrc Cloud"));
-  const bring = await screen.findByRole("menuitem", { name: /Bring to Mac/ });
-  expect(bring.getAttribute("aria-disabled")).toBe("true");
-  await act(async () => bring.focus());
-  expect(await screen.findByText(HOSTED_REASONS.moveToMac)).toBeTruthy();
-  expect(screen.getByRole("menuitem", { name: /Open on Mac/ }).getAttribute("aria-disabled")).toBe("true");
+  const open = await screen.findByRole("menuitem", { name: /Open on Mac/ });
+  expect(open.getAttribute("aria-disabled")).toBe("true");
+  await act(async () => open.focus());
+  expect(await screen.findByText(HOSTED_REASONS.macCode)).toBeTruthy();
 });

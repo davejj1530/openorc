@@ -36,7 +36,7 @@ export class HostedCallGuard {
  * This Mac's own answers about a cloud thread: its work brought into the folder its project came from (core's
  * macProjects), and the thread itself moved here (core's CloudMoves). They read the thread on the server and write only this Mac's folder, so they are never the place's.
  */
-const FOR_THIS_MAC: ReadonlySet<RpcMethod> = new Set(["macProjects.bringState", "macProjects.bring", "threads.moveCheck", "threads.move"]);
+const FOR_THIS_MAC: ReadonlySet<RpcMethod> = new Set(["macProjects.bringState", "macProjects.bring", "threads.moveCheck", "threads.move", "threads.moveDismiss"]);
 
 /** A here-routed operation still cannot substitute this Mac's files for a hosted conversation. */
 export function heldHereCall(place: HostedThreads, method: RpcMethod, params: Record<string, unknown>): boolean {

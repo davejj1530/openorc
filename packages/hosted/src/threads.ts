@@ -48,7 +48,7 @@ import { firstMessage } from "./first-message.js";
 import { macStartServed, packedFor, startWith } from "./mac-start.js";
 import { nativeRowFields } from "./wire-subthreads.js";
 import { readNativeRows } from "./subthreads.js";
-import { nativeRowsFromEvents, withNativeSummary } from "./translate-subthreads.js";
+import { nativeRowsFromEvents, withNativeSummary, withSubthreads } from "./translate-subthreads.js";
 import { assertNativeCall } from "./subthread-calls.js";
 import { ThreadVoices } from "./thread-voices.js";
 import { toCollaboration } from "./wire-collaboration.js";
@@ -232,11 +232,7 @@ export class Threads implements HostedThreads {
   letGo(threadId: string): void {
     const heard = this.#heard;
     if (!heard) return;
-    const gone = new Set([threadId]);
-    for (let grew = true; grew; ) {
-      grew = false;
-      for (const row of heard.rows) if (row.parentId && gone.has(row.parentId) && !gone.has(row.id)) grew = Boolean(gone.add(row.id));
-    }
+    const gone = withSubthreads(heard.rows, threadId);
     heard.rows = heard.rows.filter((row) => !gone.has(row.id));
     for (const id of gone) {
       this.#tickets.delete(id);

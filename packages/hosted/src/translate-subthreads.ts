@@ -71,3 +71,13 @@ function provisionalChild(parent: NativeThread, id: string, event: Record<string
     nativeReadFailed: true,
   };
 }
+
+/** A thread's id and every subthread's under it, however deep, among `rows`. */
+export function withSubthreads(rows: readonly { id: string; parentId?: string | null }[], threadId: string): Set<string> {
+  const ids = new Set([threadId]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const row of rows) if (row.parentId && ids.has(row.parentId) && !ids.has(row.id)) grew = Boolean(ids.add(row.id));
+  }
+  return ids;
+}

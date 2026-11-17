@@ -1,5 +1,5 @@
 import { answeredName, answeredOf, personFirst, stretchTime, teamConversationTitle, type TeamChatLease, type TeamChatTarget } from "@openorc/client";
-import { TeamChatReaction, type TeamChatAnswered, type TeamConversation, type TeamMessage } from "@openorc/protocol";
+import { TeamChatReaction, type TeamChatAnswered, type TeamConversation, type TeamMessage, type TeamOrclingCall } from "@openorc/protocol";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActionSheetIOS, Pressable, TextInput, View, type ScrollViewInstance } from "react-native";
@@ -14,6 +14,7 @@ import { cn } from "../ui/cn";
 import { Text } from "../ui/Text";
 import { openInApp } from "../ui/web";
 import { chatItems, type ChatItem } from "./chat-items";
+import { CallLine } from "./CallLine";
 import { ChatFiles, ChatFileScopeContext, chatFileScope } from "./ChatFiles";
 import { useChatLease } from "./lease";
 import { useMessageReveal, type ChatJump } from "./reveal";
@@ -71,9 +72,14 @@ function Quote({ answered, self, mine }: { answered: TeamChatAnswered; self: str
   );
 }
 
-/** What a long press on a message offers: a reaction, Reply where the server takes replies, Pin or Unpin for a member. */
+/**
+ * What the reader can do with a message: a long press offers a reaction, Reply where the server takes replies, and Pin
+ * or Unpin for a member; the owner of an Orcling it called tries the call again.
+ */
 interface MessageMoves {
+  lease: TeamChatLease;
   self: string;
+  retryCall: (call: TeamOrclingCall) => void;
   react: (message: TeamMessage, emoji: TeamChatReaction) => void;
   reply: ((message: TeamMessage) => void) | null;
   pin: ((message: TeamMessage) => void) | null;
@@ -106,6 +112,7 @@ function Mine({ message, moves }: { message: TeamMessage; moves: MessageMoves })
         </View>
       </Body>
       <ChatFiles files={message.files} mine />
+      <CallLine lease={moves.lease} call={message.call} mine onRetry={moves.retryCall} />
       <Reactions message={message} self={moves.self} mine onReact={(emoji) => moves.react(message, emoji)} />
       {message.pinned ? <Text className="pr-1 text-xs text-ink-4">Pinned</Text> : null}
     </Pressable>
@@ -134,6 +141,7 @@ function Theirs({ item, moves }: { item: Extract<ChatItem, { kind: "theirs" }>; 
           </View>
         </Body>
         <ChatFiles files={message.files} mine={false} />
+        <CallLine lease={moves.lease} call={message.call} mine={false} onRetry={moves.retryCall} />
         <Reactions message={message} self={moves.self} mine={false} onReact={(emoji) => moves.react(message, emoji)} />
         {message.pinned ? <Text className="pl-1 text-xs text-ink-4">Pinned</Text> : null}
       </Pressable>
@@ -248,7 +256,9 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
   const [failure, setFailure] = useState<string | null>(null);
   const send = (message: PendingTeamMessage) => void teamChat.send(lease, target, message).catch(() => undefined);
   const moves: MessageMoves = {
+    lease,
     self: lease.accountId,
+    retryCall: (call) => void teamChat.retryCall(lease, target, call).catch((error: Error) => setFailure(error.message)),
     react: (message, emoji) => void teamChat.react(lease, target, message, emoji).catch((error: Error) => setFailure(error.message)),
     reply: chat?.features.includes("replies") ? (message) => teamChat.drafts.reply(target, answeredOf(message)) : null,
     pin: chat?.features.includes("pins") && joined ? (message) => void teamChat.pin(lease, target, message, !message.pinned).catch((error: Error) => setFailure(error.message)) : null,

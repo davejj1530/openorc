@@ -39,15 +39,18 @@ export interface HomeList {
 /** A part of the list that folds under its label: Pinned, Snoozed or Resolved. */
 export type HomePart = "pinned" | "snoozed" | "resolved";
 
+/** The room above a label: a little at the list's top, none right under another label, so a run of folded groups stacks tight. */
+export type HeadingRoom = "first" | "after-rows" | "after-heading";
+
 /** One row of Home's list. Labels and threads share one flat list so the virtualizer can recycle by kind. */
 export type HomeItem =
   /** Pinned, Snoozed or Resolved's label. `count` where it is the part's whole. */
-  | { kind: "section"; key: string; part: HomePart; label: string; count?: number; open: boolean }
+  | { kind: "section"; key: string; part: HomePart; label: string; count?: number; open: boolean; room?: HeadingRoom }
   /**
    * A project's label over its threads, with how many of them wait on the person. `offline` when it is a cloud project
    * none of whose threads OpenOrc Cloud reaches now: its rows leave the cloud to its label, which dims.
    */
-  | { kind: "project"; key: string; project: HomeProject; open: boolean; waiting: number; offline?: true }
+  | { kind: "project"; key: string; project: HomeProject; open: boolean; waiting: number; offline?: true; room?: HeadingRoom }
   /**
    * `project` is the name a root row's label says, outside its project's group; rows in their group, and sub threads,
    * say none. `cloudLabel` when its group's label wears the cloud already. `arriving` rises it in.
@@ -185,7 +188,7 @@ function groupItems(list: HomeList, options: HomeOptions): HomeItem[] {
  */
 export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {
   const { days } = list;
-  return [
+  return withRooms([
     ...(options.projectsFailed ? [{ kind: "retry", key: "retry:projects", projects: true } as const] : []),
     ...partItems({ part: "pinned", label: "Pinned", roots: days.pinned, counted: true, more: options.pinnedOnly && days.hasMore }, list, options),
     ...(options.pinnedOnly ? [] : groupItems(list, options)),
@@ -203,7 +206,20 @@ export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {
       list,
       options,
     ),
-  ];
+  ]);
+}
+
+/**
+ * Each label with the room above it, read from the row before it as the list is made: a row drawn later never looks at
+ * its neighbours, which a list that just shrank may no longer hold.
+ */
+function withRooms(items: HomeItem[]): HomeItem[] {
+  return items.map((item, index) => {
+    if (item.kind !== "section" && item.kind !== "project") return item;
+    const before = items[index - 1]?.kind;
+    if (!before) return { ...item, room: "first" };
+    return { ...item, room: before === "section" || before === "project" ? "after-heading" : "after-rows" };
+  });
 }
 
 /** Something in Home's groups that calls the person, and the item that stands for it: its row, or its folded project's label. */

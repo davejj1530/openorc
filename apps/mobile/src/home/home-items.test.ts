@@ -84,6 +84,15 @@ describe("homeCalls", () => {
 });
 
 describe("homeItems", () => {
+  it("gives each label its room as the list is made: a little at the top, none under another label, more after rows", () => {
+    const made = items(list());
+    const rooms = made.flatMap((item, index) => (item.kind === "section" || item.kind === "project" ? [[made[index - 1]?.kind ?? null, item.room]] : []));
+    expect(rooms[0]).toEqual([null, "first"]);
+    for (const [before, room] of rooms.slice(1)) expect(room).toBe(before === "section" || before === "project" ? "after-heading" : "after-rows");
+    // Some label stands after rows.
+    expect(rooms.map(([, room]) => room)).toContain("after-rows");
+  });
+
   it("lists Pinned first, then each project's group in the space's order with the rest newest first, then Snoozed and Resolved", () => {
     const lines = outline(items(list()));
     expect(lines.slice(0, 3)).toEqual(["§ Pinned 2", "t-notes @ openorc", "t-headline @ openorc"]);

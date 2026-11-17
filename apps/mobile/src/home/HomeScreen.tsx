@@ -22,7 +22,7 @@ import { useNewAction } from "./new-action";
 import { TabLayers } from "./TabLayers";
 import { HOME_BAR_HEIGHT, HomeBar } from "./header/HomeBar";
 import type { HomeScroll } from "./header/MacLine";
-import { NoThreadsYet, ProjectLabel, RetryRow, SectionToggle, ShowMore, ShowMoreChildren, ShowMoreInGroup, type HeadingRoom } from "./HomeHeading";
+import { NoThreadsYet, ProjectLabel, RetryRow, SectionToggle, ShowMore, ShowMoreChildren, ShowMoreInGroup } from "./HomeHeading";
 import type { HomeItem } from "./home-items";
 import { refreshHome } from "./refresh";
 import { ThreadRow } from "./ThreadRow";
@@ -47,19 +47,12 @@ type Fold = (key: string, open: boolean) => void;
 /** Rows slide to their new places as a fold opens or closes, over the desktop's resize time. */
 const slide = LinearTransition.duration(motion.duration.resize).easing(ease.outTiming);
 
-/** The room above the label at `index`: none right under another, so a run of folded groups stacks tight. */
-function headingRoom(items: readonly HomeItem[], index: number): HeadingRoom {
-  if (index === 0) return "first";
-  const before = items[index - 1]!.kind;
-  return before === "section" || before === "project" ? "after-heading" : "after-rows";
-}
-
-function HomeRow({ item, home, index, motion, fold }: { item: HomeItem; home: Home; index: number; motion: RowMotion; fold: Fold }) {
+function HomeRow({ item, home, motion, fold }: { item: HomeItem; home: Home; motion: RowMotion; fold: Fold }) {
   switch (item.kind) {
     case "project":
-      return <ProjectLabel group={item} room={headingRoom(home.items, index)} motion={motion} onToggle={() => fold(item.key, !(item.open && !motion.folding))} />;
+      return <ProjectLabel group={item} room={item.room} motion={motion} onToggle={() => fold(item.key, !(item.open && !motion.folding))} />;
     case "section":
-      return <SectionToggle section={item} room={headingRoom(home.items, index)} motion={motion} onToggle={() => fold(item.key, !(item.open && !motion.folding))} />;
+      return <SectionToggle section={item} room={item.room} motion={motion} onToggle={() => fold(item.key, !(item.open && !motion.folding))} />;
     case "thread":
       return <ThreadRow thread={item.thread} project={item.project} arriving={item.arriving} tree={item.tree} cloudLabel={item.cloudLabel} motion={motion} onFold={fold} />;
     case "more":
@@ -158,7 +151,7 @@ function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; heade
         recycleItems
         itemLayoutAnimation={still ? undefined : slide}
         extraData={folds.motions}
-        renderItem={({ item, index }) => <HomeRow item={item} home={home} index={index} motion={rowMotion(folds.motions, item.key)} fold={folds.toggle} />}
+        renderItem={({ item }) => <HomeRow item={item} home={home} motion={rowMotion(folds.motions, item.key)} fold={folds.toggle} />}
         ListHeaderComponent={
           <View onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
             {header}

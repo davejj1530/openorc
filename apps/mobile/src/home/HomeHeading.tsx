@@ -12,7 +12,7 @@ import { turn } from "../ui/motion";
 import { Text } from "../ui/Text";
 import Animated from "react-native-reanimated";
 import { movingStyle, type RowMotion } from "./fold-motion";
-import type { HomeItem } from "./home-items";
+import type { HeadingRoom, HomeItem } from "./home-items";
 import { MARGIN, ROW_INSET, TEXT_X, titleMid } from "./grid";
 import { ThreadBranch, treeIndent } from "./ThreadBranch";
 
@@ -23,7 +23,6 @@ type Group = Extract<HomeItem, { kind: "project" }>;
 const LABEL_PAD = MARGIN - ROW_INSET;
 
 /** The room above a heading or part: the most after rows end one, none at the top past the bar's own. */
-export type HeadingRoom = "first" | "after-rows" | "after-heading";
 const rooms: Record<HeadingRoom, string> = { first: "mt-1", "after-rows": "mt-3", "after-heading": "" };
 
 /** A row the fold motion moves: rising in as its fold opens, fading as it closes. */

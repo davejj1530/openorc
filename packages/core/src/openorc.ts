@@ -2,7 +2,7 @@ import { captureLaunchEnvironment, claudeConfigDir, recoverAgentProcesses } from
 import { claudeAccounts as storedClaudeAccounts, Db, LedgerWriter, plans, redact, settings as storedSettings } from "@openorc/db";
 import type { Hosted, HostedThreads, OwnSkills } from "@openorc/hosted";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
-import { harnessAvailability, harnessInfo, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
+import { harnessAvailability, harnessInfo, harnessLoggedIn, rpcParams, type CloudSessionGrant, type CloudSessionOwner, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -77,7 +77,7 @@ import { OnlineTaskTools } from "./services/online-task-tools.js";
 import { createThreadsHost } from "./mcp-host/threads.js";
 import type { OpenOrcOptions } from "./options.js";
 import { phoneCloudPlace } from "./remote/cloud-policy.js";
-import { RemoteAccess } from "./remote/remote-access.js";
+import { NO_CLOUD_SESSION, RemoteAccess } from "./remote/remote-access.js";
 import { requestOrigin, type RequestOrigin } from "./request-origin.js";
 import { guardContext } from "./remote/policy.js";
 import { AgentUpdateService } from "./services/agent-updates.js";
@@ -244,6 +244,7 @@ export class OpenOrc {
       pushSecrets: options.pushSecrets,
       presence: options.presence,
       preview: options.preview,
+      cloudSession: { owner: () => this.cloudOwner(), grant: (input) => this.cloudGrant(input) },
     });
     this.settings = new AppSettingsService(db);
     this.environment = new ShellEnvironment({ probe: options.shellProbe ?? (options.ephemeral ? inheritedProbe() : undefined), ...(options.shellEnv ? { env: options.shellEnv } : {}) });
@@ -322,6 +323,21 @@ export class OpenOrc {
   }
 
   /** The OpenOrc account; null in a core given no account server. Made at its first use. */
+  /** Whose OpenOrc Cloud this Mac is signed in to, for a phone that would have a session of its own of it. */
+  private cloudOwner(): CloudSessionOwner | null {
+    const server = this.options.accountServer;
+    const status = server ? this.account?.account.status() : undefined;
+    return server && status?.state === "signed-in" ? { server, email: status.email } : null;
+  }
+
+  /** A one-time code for a phone's own session of the person's OpenOrc Cloud, bound to the phone's challenge. */
+  private async cloudGrant(input: { challenge: string; device: string }): Promise<CloudSessionGrant> {
+    const owner = this.cloudOwner();
+    const account = this.account;
+    if (!owner || !account) throw new Error(NO_CLOUD_SESSION);
+    return { ...owner, ...(await account.account.grantSignIn(input)) };
+  }
+
   get account(): Hosted | null {
     if (this.hosted === undefined)
       this.hosted = accountFor(

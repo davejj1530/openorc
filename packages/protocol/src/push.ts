@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { CloudSessionGrant, CloudSessionOwner } from "./cloud-remote.js";
 import type { Task } from "./domain.js";
 import type { CorePush } from "./rpc.js";
 
@@ -50,6 +51,18 @@ export const deviceRpcParams = {
    * shows no task list.
    */
   "tasks.board": z.object({}).strict(),
+  /**
+   * A session of OpenOrc Cloud of the phone's own, for the person signed in on this Mac: a one-time code bound to the
+   * phone's PKCE `challenge`, under the phone's `device` name. Only for a session that shares `cloud-session`.
+   */
+  "cloud.session.grant": z
+    .object({
+      challenge: z.string().regex(/^[A-Za-z0-9_-]{43,128}$/),
+      device: z.string().min(1).max(80),
+    })
+    .strict(),
+  /** Whose OpenOrc Cloud this Mac is signed in to now; null with nobody. Only for a session that shares `cloud-session`. */
+  "cloud.session.owner": z.object({}).strict(),
 };
 export type DeviceMethod = keyof typeof deviceRpcParams;
 export type DeviceParams<M extends DeviceMethod> = z.infer<(typeof deviceRpcParams)[M]>;
@@ -58,6 +71,8 @@ export interface DeviceRpcResults {
   "push.register": PushSenderStates;
   "brains.removed": string[];
   "tasks.board": TaskBoard;
+  "cloud.session.grant": CloudSessionGrant;
+  "cloud.session.owner": CloudSessionOwner | null;
 }
 
 /** A task as a phone's list shows it: nothing about folders or branches on the host. */

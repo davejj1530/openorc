@@ -10,6 +10,29 @@ import type { RpcMethod } from "./rpc.js";
 export const CLOUD_THREADS = "cloud-threads";
 export const supportsCloudThreads = (capabilities: readonly string[] = []): boolean => capabilities.includes(CLOUD_THREADS);
 
+/**
+ * A Mac that shares it gets a phone a session of OpenOrc Cloud of its own, for the person signed in on that Mac, and
+ * tells the phone when that changes (`CLOUD_SESSION_TAG`): the phone then reads the cloud itself, not through the Mac.
+ */
+export const CLOUD_SESSION = "cloud-session";
+export const supportsCloudSession = (capabilities: readonly string[] = []): boolean => capabilities.includes(CLOUD_SESSION);
+
+/** Invalidated, for sessions that share `CLOUD_SESSION` only, when the person signed in on the Mac signs out or changes. */
+export const CLOUD_SESSION_TAG = "cloud.session";
+
+/** Whose OpenOrc Cloud the Mac is signed in to: its server, and the account by its address. */
+export interface CloudSessionOwner {
+  server: string;
+  email: string;
+}
+
+/** A one-time code for the phone's own session, bound to the challenge it sent; it finishes it with its verifier. */
+export interface CloudSessionGrant extends CloudSessionOwner {
+  request: string;
+  code: string;
+  expiresInMs: number;
+}
+
 /** Who is signed in on the Mac a phone reads OpenOrc Cloud through: their name and picture, and nothing else of the account. */
 export interface AccountPerson {
   /** Null until the server first answers with it. */

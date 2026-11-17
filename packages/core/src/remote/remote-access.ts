@@ -2,7 +2,10 @@ import { projects, remoteDevices, remotePushTargets, settings, type Db, type Led
 import { acceptLink, encodePairingUrl, fromBase64Url, LinkCloseCode, toBase64Url, type Admission, type ClosingReason, type KeyPair, type LinkSocket, type PhoneHello } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import {
+  CLOUD_SESSION_TAG,
   PUSH_SENDER_TAG,
+  type CloudSessionGrant,
+  type CloudSessionOwner,
   type CorePush,
   type DeviceMethod,
   type DeviceParams,
@@ -63,7 +66,18 @@ export interface RemoteAccessOptions {
   presence?: () => Promise<boolean>;
   /** The Mac's Preview, which a phone may watch. Without it, a watch reads as closed. */
   preview?: PreviewHost;
+  /** The person's OpenOrc Cloud on this Mac, which gets a phone a session of its own. Without it, there is none to give. */
+  cloudSession?: CloudSessionSource;
 }
+
+/** Whose OpenOrc Cloud this Mac is signed in to, and a one-time code for a phone's own session of it. */
+export interface CloudSessionSource {
+  owner(): CloudSessionOwner | null;
+  grant(input: { challenge: string; device: string }): Promise<CloudSessionGrant>;
+}
+
+/** What a phone hears when this Mac has no one signed in to OpenOrc Cloud to get it a session of. */
+export const NO_CLOUD_SESSION = "Sign in to OpenOrc Cloud on your Mac first.";
 
 interface AccessSetting {
   enabled: boolean;
@@ -187,7 +201,8 @@ export class RemoteAccess {
     switch (method) {
       case "push.register": {
         const { db } = this.options;
-        if (params.registration) remotePushTargets.set(db, deviceId, params.registration, Date.now());
+        const { registration } = params as DeviceParams<"push.register">;
+        if (registration) remotePushTargets.set(db, deviceId, registration, Date.now());
         else remotePushTargets.remove(db, deviceId);
         this.options.invalidate(["remote"]);
         return { sandbox: this.senderState("sandbox"), production: this.senderState("production") };
@@ -197,6 +212,14 @@ export class RemoteAccess {
         return removedBrains(this.options.db);
       case "tasks.board":
         return taskBoard(this.options.db);
+      case "cloud.session.owner":
+        return this.options.cloudSession?.owner() ?? null;
+      // The code is bound to the phone's challenge, so only that phone can finish it, and the session it makes is its own.
+      case "cloud.session.grant": {
+        const source = this.options.cloudSession;
+        if (!source?.owner()) throw new Error(NO_CLOUD_SESSION);
+        return source.grant(params as DeviceParams<"cloud.session.grant">);
+      }
     }
   }
 
@@ -246,6 +269,7 @@ export class RemoteAccess {
    * changed. Nothing else of the account's transport passes. Never throws into the core.
    */
   publishCloud(push: Broadcast): void {
+    this.tellOwnSessions(push);
     const sessions = [...this.sessions].filter((session) => session.sharesCloud);
     if (sessions.length === 0) return;
     try {
@@ -262,6 +286,12 @@ export class RemoteAccess {
     } catch (error) {
       this.options.log.warn(`phone access dropped a cloud push: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  /** A phone with a session of OpenOrc Cloud of its own hears only that the account here changed, and asks again whose it is. */
+  private tellOwnSessions(push: Broadcast): void {
+    if (push.type !== "invalidate" || !push.keys.includes("account")) return;
+    for (const session of this.sessions) if (session.sharesCloudSession) session.push({ type: "invalidate", keys: [CLOUD_SESSION_TAG] });
   }
 
   private deliver(push: Broadcast): void {

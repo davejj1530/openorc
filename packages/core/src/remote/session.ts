@@ -3,6 +3,7 @@ import {
   deviceRpcParams,
   isCloudRemoteMethod,
   isDeviceMethod,
+  supportsCloudSession,
   isRemoteMethod,
   isSessionMethod,
   PHONE_CAPABILITIES,
@@ -112,6 +113,11 @@ export class RemoteSession {
     return this.interest.has(runId);
   }
 
+  /** Whether the phone asked this session for a session of OpenOrc Cloud of its own, and so may ask for one and hear when it changes. */
+  get sharesCloudSession(): boolean {
+    return supportsCloudSession(this.capabilities);
+  }
+
   /** Whether the phone asked for OpenOrc Cloud threads on this session, and so may hear and ask of them. */
   get sharesCloud(): boolean {
     return supportsCloudThreads(this.capabilities);
@@ -214,6 +220,7 @@ export class RemoteSession {
   /** A method about this phone is answered for its own device id, so it can never name another; the rest goes to the core. */
   private async reply(id: number, method: string, params: unknown): Promise<RpcReply> {
     if (isDeviceMethod(method)) {
+      if (method.startsWith("cloud.session.") && !this.sharesCloudSession) return { type: "rpc.error", id, message: "This is not available from a phone." };
       const parsed = deviceRpcParams[method].safeParse(params ?? {});
       if (!parsed.success) return { type: "rpc.error", id, message: invalidParamsMessage(method, parsed.error.message) };
       return { type: "rpc.result", id, result: await this.deps.device(this.deviceId, method, parsed.data) };

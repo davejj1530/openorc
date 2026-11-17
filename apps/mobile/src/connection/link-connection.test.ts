@@ -41,7 +41,7 @@ describe("calls over the link", () => {
     expect(declaration).toMatchObject({
       t: "rpc",
       method: "session.negotiate",
-      params: { capabilities: ["subagent-threads", "reply-images", "skill-lists", "orclings", "task-details", "subthread-starts", "orcling-edits", "cloud-threads"] },
+      params: { capabilities: ["subagent-threads", "reply-images", "skill-lists", "orclings", "task-details", "subthread-starts", "orcling-edits", "cloud-threads", "cloud-session"] },
     });
     if (declaration?.t !== "rpc") throw new Error("no capability declaration");
     mac.send({ t: "rpc.error", id: declaration.id, message: "This is not available from a phone." });

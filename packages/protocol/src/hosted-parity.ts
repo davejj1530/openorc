@@ -41,9 +41,9 @@ export const HostedCapabilities = z.object({
     changes: availability,
     publishing: availability,
     /** Compact: the agent folds the conversation between turns, as the asker's own turn. */
+    compact: availability,
     /** One tool call's whole output, read from the server. */
     toolOutput: availability,
-    compact: availability,
     files: availability,
     nativeSubthreads: availability,
     personSubthreads: availability,

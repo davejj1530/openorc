@@ -37,3 +37,18 @@ it("keeps the last usage a host reported, so Settings has it on a cold start whi
   expect(restoreLists(after, storage, "studio")).toBe(true);
   expect(after.getQueryData(["providers.limits", {}])).toEqual(limits);
 });
+
+it("keeps the Mac's agents' models, so a cloud thread's composer has a model to send with while the Mac is asleep", () => {
+  vi.useFakeTimers({ now: 1_000_000 });
+  const saved = new Map<string, string>();
+  const storage = { getString: (key: string) => saved.get(key), set: (key: string, value: string) => void saved.set(key, value), remove: (key: string) => void saved.delete(key) };
+  const before = new QueryClient();
+  const stop = keepLists(before, storage, () => "studio");
+  const models = [{ agent: "claude", id: "claude-opus-5-5", label: "Opus 5.5" }];
+  before.setQueryData(["agents.models", {}], models);
+  vi.advanceTimersByTime(1_000);
+  stop();
+  const after = new QueryClient();
+  expect(restoreLists(after, storage, "studio")).toBe(true);
+  expect(after.getQueryData(["agents.models", {}])).toEqual(models);
+});

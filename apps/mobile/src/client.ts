@@ -215,5 +215,15 @@ function heldChanged(): void {
   void client.queryClient.invalidateQueries();
 }
 cloud.subscribe(heldChanged);
+
+// The Mac's agents' models on every session with it, kept with the lists, so a cloud thread's composer has a model to
+// send with while the Mac is asleep, even when no composer was opened while it was awake.
+let modelsRead: number | null = null;
+link.subscribe(() => {
+  const state = link.getState();
+  if (state.kind !== "connected" || showsDemo(state) || state.serial === modelsRead) return;
+  modelsRead = state.serial;
+  void client.queryClient.prefetchQuery({ queryKey: ["agents.models", {}], queryFn: () => link.connection.call("agents.models", {}), staleTime: 5 * 60_000 });
+});
 alerts.subscribe(() => void cloudAlerts.sync());
 void cloud.start().then(() => followMac(link, cloud, (message) => console.warn(`[OpenOrc] ${message}`)));

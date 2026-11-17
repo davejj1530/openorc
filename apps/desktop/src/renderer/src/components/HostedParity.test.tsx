@@ -114,14 +114,12 @@ it("starts a subthread under a cloud thread once its server says it may, as unde
   expect(screen.getByRole("menuitem", { name: /^Fork$/ }).getAttribute("aria-disabled")).toBe("true");
 });
 
-it("does not fetch omitted hosted tool output on hover or focus", async () => {
+it("reads an omitted cloud tool output when its row opens, as a Mac one's", async () => {
+  vi.mocked(core.call).mockImplementation((async (method: string) => (method === "events.toolOutput" ? { output: "the whole cloud output" } : undefined)) as never);
   mount(<ToolRow block={{ id: "tool-1", kind: "tool", name: "Read", input: { path: "example.ts" }, outputOmitted: true, done: true, runId: "hosted:example-thread" }} />);
-  const row = screen.getByRole("button");
-  fireEvent.pointerEnter(row);
-  fireEvent.focus(row);
-  fireEvent.click(row);
-  expect(await screen.findByRole("button", { name: "Full output" })).toBeTruthy();
-  expect(vi.mocked(core.call)).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button"));
+  await vi.waitFor(() => expect(core.call).toHaveBeenCalledWith("events.toolOutput", { runId: "hosted:example-thread", toolCallId: "tool-1" }));
+  expect(await screen.findByText(/the whole cloud output/)).toBeTruthy();
 });
 
 it("does not open a local interactive tool app for a hosted run", async () => {

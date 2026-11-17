@@ -31,7 +31,7 @@ import { docHref } from "../../data/docs";
         </tbody>
       </table>
     </div>
-    <p>All agents can be controlled from a paired phone while the connected computer is available. Cloud support means the agent can also run in an OpenOrc cloud workspace. Oh My Pi uses provider API keys in the cloud.</p>
+    <p>All agents can be controlled from a paired phone while the connected computer is available. Cloud support means the agent can also run in a cloud thread on <a href={docHref("cloud")}>OpenOrc Cloud</a>, on a sign-in made for the cloud.</p>
     <p>Cursor queues messages until its current turn ends. fx accepts text steering; images wait for a new turn. Other messages may wait while an agent is asking a question, awaiting approval, or compacting.</p>
     <p>Codex, Claude Code, OpenCode, Oh My Pi, and Pi support native manual compaction. With Cursor, Antigravity, and fx, <strong>Compact context</strong> starts a fresh session with a short handover brief. It preserves less context than native compaction.</p>
     <p>Terminal session import is available for Codex and Claude Code. Those two also support background memory summaries; other agents can use shared memory directly, or you can choose a supported summary provider in Settings.</p>

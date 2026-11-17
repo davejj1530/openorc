@@ -38,17 +38,17 @@ export const questions: Question[] = [
     id: "phone",
     question: "Can I use OpenOrc from my phone?",
     answer:
-      "Yes. OpenOrc for iPhone pairs with OpenOrc on your computer and connects to it directly, over your network or Tailscale, encrypted end to end. Follow and answer threads, start new ones, and ship their changes. The agents still run on your computer, unless you run a thread in the cloud.",
+      "Yes. OpenOrc for iPhone pairs with OpenOrc on your computer and connects to it directly, over your network or Tailscale, encrypted end to end. Follow and answer threads, start new ones, and ship their changes. The agents still run on your computer. Cloud threads on OpenOrc Cloud keep working, and the phone can follow them, while your computer sleeps.",
   },
   {
     id: "while-closed",
     question: "Does scheduled or Slack work run while OpenOrc is closed?",
-    answer: "No. Schedules and Slack run on your computer, so keep OpenOrc open and your computer awake for them. The phone app needs your computer too, unless it reaches a cloud brain.",
+    answer: "No. Schedules and Slack run on your computer, so keep OpenOrc open and your computer awake for them. The phone app needs your computer too, except for cloud threads on OpenOrc Cloud.",
   },
   {
     id: "cloud",
     question: "Can agents keep working while my computer sleeps?",
     answer:
-      "Yes, with Codex, Claude Code, OpenCode, or Oh My Pi in a cloud thread. Cursor, Pi, Antigravity, and fx run on your connected computer. A cloud thread runs in a sandbox on your own Vercel or Agent37 account, which bills you for it, and its changes sync back to a worktree on your computer. Set up the cloud brain too, and your phone can follow and start cloud threads while the computer sleeps.",
+      "Yes, with Codex, Claude Code, or OpenCode in a cloud thread on OpenOrc Cloud, a paid service that runs the agent on a machine in the cloud. Your phone can follow, answer, and start cloud threads while the computer sleeps. Other agents run on your computer. Pro and cloud hours are described in the docs under OpenOrc Cloud.",
   },
 ];

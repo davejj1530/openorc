@@ -42,7 +42,7 @@ export const agents = [
     modes: "All four",
     steering: "Yes",
     forks: true,
-    cloud: true,
+    cloud: false,
   },
   {
     id: "cursor",

@@ -12,7 +12,7 @@ import { docHref } from "../../data/docs";
     <ol class="docs-steps">
       <li>Click <strong>New thread</strong> at the right end of the row above the thread list, or press <kbd>⌘N</kbd>. (On Windows and Linux, use <kbd>Ctrl</kbd> wherever this page shows <kbd>⌘</kbd>.)</li>
       <li>The page asks <strong>What should we work on in</strong> and names a project. Click the project's name to pick another one, or choose <strong>Add project</strong> at the bottom of the list.</li>
-      <li>Under the composer, a line says where the thread works, such as <strong>Works in the local checkout on main</strong>. Click it to choose <strong>Local checkout</strong> for the repository as it is now, <strong>Worktree</strong> for a branch and folder of its own, or <strong>Cloud</strong> for a sandbox on your cloud account. In the Workspace, <strong>Choose folder</strong> picks the folder instead. See <a href={docHref("cloud")}>Cloud threads</a>.</li>
+      <li>Under the composer, a line says where the thread works, such as <strong>Works in the local checkout on main</strong>. Click it to choose <strong>Local checkout</strong> for the repository as it is now, <strong>Worktree</strong> for a branch and folder of its own, or <strong>OpenOrc Cloud</strong> for a machine in the cloud that keeps working while your Mac sleeps. In the Workspace, <strong>Choose folder</strong> picks the folder instead. See <a href={docHref("cloud-threads")}>Cloud threads</a>.</li>
       <li>In the composer's bottom row, choose the agent and model, and the mode. For a Claude model, the Claude account to use is at the end of the line under the composer.</li>
       <li>Type your request and press <kbd>Enter</kbd>.</li>
     </ol>
@@ -180,7 +180,7 @@ import { docHref } from "../../data/docs";
     <h3>Projects</h3>
     <p>You switch projects from the New thread page. Click the project's name in <strong>What should we work on in</strong> to see every project. There you can pick a project, change its icon, or choose <strong>Add project</strong>. To take a project off the list, right-click it and choose <strong>Remove project…</strong>. Its files, worktrees, and history are kept.</p>
     <h3>Thread actions</h3>
-    <p>Right-click a thread, or open <strong>Thread actions</strong> (⋯) in its header. A right-click starts with <strong>New subthread</strong> and the ways to open the thread. Then comes where the thread works: its branch, marked <strong>Worktree</strong> or <strong>Checkout</strong>, then <strong>This Mac</strong> or <strong>Cloud</strong> when cloud threads are set up. Point at either one for the moves from there. The header's menu starts with where the thread works and leaves out the choices that only apply to a thread you aren't looking at.</p>
+    <p>Right-click a thread, or open <strong>Thread actions</strong> (⋯) in its header. A right-click starts with <strong>New subthread</strong> and the ways to open the thread. Then comes where the thread works: its branch, marked <strong>Worktree</strong> or <strong>Checkout</strong>, then <strong>OpenOrc Cloud</strong> for a cloud thread. Point at either one for the moves from there. The header's menu starts with where the thread works and leaves out the choices that only apply to a thread you aren't looking at.</p>
     <div class="docs-table">
       <table>
         <thead>
@@ -195,8 +195,8 @@ import { docHref } from "../../data/docs";
             <td><strong>Show in Finder</strong> opens the thread's folder, <strong>Copy branch name</strong> copies the branch, and <strong>Move to a worktree</strong> or <strong>Move to the checkout</strong> moves a project thread and its uncommitted changes, and <strong>Remove worktree</strong> frees a worktree's folder and keeps its branch. A thread in the checkout shows the branch the checkout is on now. See <a href={docHref("git")}>Git and worktrees</a>.</td>
           </tr>
           <tr>
-            <td><strong>This Mac</strong> or <strong>Cloud</strong></td>
-            <td><strong>Move to cloud</strong> moves the thread, between turns, to a sandbox of its own, or to your cloud brain if you set one up. A thread on the cloud brain has <strong>Bring to Mac</strong> and <strong>Open on Mac</strong> instead. See <a href={docHref("cloud") + "#move"}>Cloud threads</a>.</td>
+            <td><strong>OpenOrc Cloud</strong></td>
+            <td>The moves for a cloud thread. One that isn't available yet is dimmed and says why. To bring a cloud thread's commits into a folder on your Mac, use the <strong>Commits</strong> panel. See <a href={docHref("cloud-threads") + "#bring"}>Bring the work to your Mac</a>.</td>
           </tr>
           <tr>
             <td><strong>Open beside</strong></td>
@@ -236,7 +236,7 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td><strong>Delete</strong></td>
-            <td>Removes the conversation, and its worktree if it has one. Uncommitted work in the worktree is first committed to the thread's branch, which stays. Tasks the thread created stay too. A cloud thread's sandbox is deleted.</td>
+            <td>Removes the conversation, and its worktree if it has one. Uncommitted work in the worktree is first committed to the thread's branch, which stays. Tasks the thread created stay too. Deleting a cloud thread deletes it from OpenOrc Cloud.</td>
           </tr>
         </tbody>
       </table>

@@ -58,8 +58,9 @@ const CURRENT_MS = 3 * 60_000;
 const HEARD_MS = 30_000;
 
 const words = (error: unknown) => (error instanceof Error ? error.message : String(error));
+/** The words, and for the log what lies behind them (a CLI's path and what it said). */
+const logged = (error: unknown) => (error instanceof Error && error.cause !== undefined ? `${words(error)} (${String(error.cause)})` : words(error));
 
-/** How a run here ended, as the cloud keeps a turn's outcome; a run still going reads as one that ended well. */
 /** A subagent's status as the cloud keeps a finished one: one still marked running here was stopped by the move's wait. */
 const CHILD_STATUS: Record<SubagentRecord["status"], "completed" | "failed" | "stopped"> = {
   running: "stopped",
@@ -68,6 +69,7 @@ const CHILD_STATUS: Record<SubagentRecord["status"], "completed" | "failed" | "s
   stopped: "stopped",
   no_updates: "completed",
 };
+/** How a run here ended, as the cloud keeps a turn's outcome; a run still going reads as one that ended well. */
 const OUTCOMES: Partial<Record<string, "error" | "cancelled">> = { error: "error", cancelled: "cancelled" };
 
 export interface CloudMovesDeps {
@@ -221,7 +223,7 @@ export class CloudMoves {
     } catch (error) {
       if (made) await hosted.moves.undo(space, thread.id).catch(() => undefined);
       this.step(move, { phase: "abandoned", step: null, error: words(error) });
-      this.deps.log.warn(`thread ${thread.id} didn't move to OpenOrc Cloud: ${words(error)}`);
+      this.deps.log.warn(`thread ${thread.id} didn't move to OpenOrc Cloud: ${logged(error)}`);
       return;
     }
     // The commit point is passed: the cloud thread is whole. Let the Mac's go once the cloud's is heard, so the thread is
@@ -350,7 +352,7 @@ export class CloudMoves {
         this.deps.placed(threadId);
       }
       this.step(move, { phase: "abandoned", step: null, error: words(error), folder: error instanceof FolderInTheWay ? error.folder : null });
-      this.deps.log.warn(`thread ${threadId} didn't move to ${this.deps.here.thisComputer}: ${words(error)}`);
+      this.deps.log.warn(`thread ${threadId} didn't move to ${this.deps.here.thisComputer}: ${logged(error)}`);
       return;
     } finally {
       await rm(temp, { recursive: true, force: true });
@@ -527,7 +529,7 @@ export class CloudMoves {
           cloudMoves.set(this.deps.db, move.id, { phase: "abandoned", step: null, error: reason });
         }
       } catch (error) {
-        this.deps.log.warn(`a move of thread ${move.threadId} couldn't be picked up: ${words(error)}`);
+        this.deps.log.warn(`a move of thread ${move.threadId} couldn't be picked up: ${logged(error)}`);
       }
       this.deps.changed(move.threadId);
     }

@@ -1,15 +1,18 @@
-import { personFirst } from "@openorc/client";
-import { placeOf, type ThreadAuthors, type ThreadSummary } from "@openorc/protocol";
-import { createContext, useContext } from "react";
+import { personFirst, withOthers } from "@openorc/client";
+import { placeOf, type ThreadAuthors, type ThreadCollaboration, type ThreadSummary } from "@openorc/protocol";
+import { createContext, useContext, useMemo } from "react";
 import { useRpc } from "../client";
+import { threadSenders, type ThreadSenders } from "./senders";
 
-/** Who wrote what in the open thread, as OpenOrc Cloud tells it; null for a thread of this Mac, which only its person writes in. */
-export const AuthorsContext = createContext<ThreadAuthors | null>(null);
+export const AuthorsContext = createContext<ThreadSenders | null>(null);
 
 /** An OpenOrc Cloud thread's senders and authors, read again as its log is and as someone new writes. */
-export function useThreadAuthors(thread: ThreadSummary | null): ThreadAuthors | null {
+export function useThreadAuthors(thread: ThreadSummary | null, together: ThreadCollaboration | null): ThreadSenders | null {
   const cloud = thread !== null && placeOf(thread).elsewhere;
-  return useRpc("threads.authors", { threadId: thread?.id ?? "" }, { enabled: cloud }).data ?? null;
+  const authors = useRpc("threads.authors", { threadId: thread?.id ?? "" }, { enabled: cloud }).data;
+  const others = withOthers(thread);
+  const live = together?.live?.sender;
+  return useMemo(() => (authors ? threadSenders(authors, others, live) : null), [authors, others, live]);
 }
 
 /**
@@ -22,4 +25,4 @@ export function otherAuthor(authors: ThreadAuthors | null, messageId: string): s
   return author && author.id === authors.viewer?.id ? null : personFirst(author);
 }
 
-export const useOtherAuthor = (messageId: string): string | null => otherAuthor(useContext(AuthorsContext), messageId);
+export const useOtherAuthor = (messageId: string): string | null => otherAuthor(useContext(AuthorsContext)?.authors ?? null, messageId);

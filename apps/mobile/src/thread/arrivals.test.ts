@@ -7,7 +7,17 @@ import { activity, finishedTurn, runStore } from "./test-fixtures/run-store";
 
 const prompt = (id: string): Row => ({ kind: "prompt", key: `prompt:${id}`, gap: 24, block: { id, kind: "message", role: "user", text: id, streaming: false } });
 const piece = (id: string, index: number): Row => ({ kind: "reply", key: `reply:${id}:${index}`, gap: 14, text: "", streaming: false, source: { runId: "r", blockId: id, index } });
-const actions = (id: string): Row => ({ kind: "actions", key: `actions:${id}`, gap: 10, text: "" });
+const end = (id: string, live: boolean): Row => ({
+  kind: "end",
+  key: `end:${id}`,
+  gap: 10,
+  live,
+  writing: false,
+  startedAt: 0,
+  durationMs: live ? undefined : 9_000,
+  outcome: live ? undefined : "success",
+  text: live ? null : "",
+});
 /** The agent's presence, which ends every transcript with a turn in it. */
 const presence: Row = { kind: "presence", key: "presence", gap: 14, working: false };
 
@@ -32,10 +42,16 @@ describe("newArrivals", () => {
     expect(newArrivals([prompt("a"), piece("a", 0), piece("a", 1), presence], known)).toEqual([]);
   });
 
-  it("lets every piece of a reply that lands whole arrive, and leaves a finished turn's actions still", () => {
+  it("lets every piece of a reply that lands whole arrive, and leaves a finished turn's end still", () => {
     const known = new Set<string>();
     newArrivals([prompt("a"), presence], known);
-    expect(newArrivals([prompt("a"), piece("a", 0), piece("a", 1), actions("a"), presence], known)).toEqual(["reply:a:0", "reply:a:1"]);
+    expect(newArrivals([prompt("a"), piece("a", 0), piece("a", 1), end("a", false), presence], known)).toEqual(["reply:a:0", "reply:a:1"]);
+  });
+
+  it("lets a turn's end rise in with a turn that starts here", () => {
+    const known = new Set<string>();
+    newArrivals([prompt("a"), presence], known);
+    expect(newArrivals([prompt("a"), end("a", true), presence], known)).toEqual(["end:a"]);
   });
 
   it("lets a turn sent after the first page arrive, though the agent's presence stays below it", () => {
@@ -49,7 +65,7 @@ describe("newArrivals", () => {
       { type: "message.completed", messageId: "ask-2", role: "user", text: "And the tests?" },
       { type: "message.delta", messageId: "reply-2", role: "assistant", text: "All pass" },
     );
-    expect(newArrivals(transcriptRows(run.blocks, activity(run), "r", memo), known)).toEqual(["prompt:ask-2", expect.stringMatching(/^head:/), "reply:reply-2:0"]);
+    expect(newArrivals(transcriptRows(run.blocks, activity(run), "r", memo), known)).toEqual(["prompt:ask-2", "reply:reply-2:0", expect.stringMatching(/^end:/)]);
   });
 });
 

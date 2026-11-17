@@ -1,7 +1,7 @@
 import type { LegendListRef } from "@legendapp/list/react-native";
 import { KeyboardAwareLegendList } from "@legendapp/list/keyboard";
 import type { Block } from "@openorc/client";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from "react";
+import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from "react";
 import { Pressable, View } from "react-native";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import Animated, { useAnimatedStyle, useReducedMotion, type SharedValue } from "react-native-reanimated";
@@ -16,10 +16,12 @@ import { countArrivals } from "./perf-probe";
 import { Card, RevealCard } from "./cards";
 import { Notice, Prompt, Reply } from "./messages";
 import { emptyRowMemo, endMark, fixedHeight, isNews, transcriptRows, unsentRows, withWaitingApprovals, type EndMark, type Row } from "./rows";
-import { TurnActions } from "./TurnActions";
+import { AuthorsContext } from "./thread-authors";
+import { TurnEnd } from "./TurnEnd";
 import { TurnHead, WaitingHead } from "./TurnHead";
 import { WebKitWarmUp } from "./VisualizationFrame";
 import { VisualizationRow } from "./VisualizationRow";
+import { VoicesContext } from "./voices";
 import { FrameWindowContext, useFramePlacement } from "./visualization-window";
 import type { WaitingApproval } from "./waiting-approvals";
 import { WorkRow } from "./WorkRow";
@@ -51,8 +53,8 @@ function RowView({ row }: { row: Row }): ReactElement | null {
       return <SubagentCards blocks={row.blocks} />;
     case "visualization":
       return <VisualizationRow row={row} />;
-    case "actions":
-      return <TurnActions row={row} />;
+    case "end":
+      return <TurnEnd row={row} />;
     case "presence":
       return <AgentPresence working={row.working} />;
   }
@@ -156,7 +158,9 @@ const NOTHING_WAITING: readonly WaitingApproval[] = [];
  */
 export function Transcript({ blocks, live, working, runId, hasOlder, loadOlder, filled, composerInset, listRef, onFollow, following, followKey, waiting = NOTHING_WAITING }: TranscriptProps) {
   const memo = useRef(emptyRowMemo());
-  const conversation = useMemo(() => transcriptRows(blocks, { live, working }, runId, memo.current), [blocks, live, working, runId]);
+  const voices = useContext(VoicesContext);
+  const senders = useContext(AuthorsContext);
+  const conversation = useMemo(() => transcriptRows(blocks, { live, working }, runId, memo.current, { voices, senders }), [blocks, live, working, runId, voices, senders]);
   const rows = useMemo(() => withWaitingApprovals(conversation, waiting), [conversation, waiting]);
   const { frames, place, placeAtRest, warm } = useFramePlacement(rows, listRef, hasOlder);
   const arrivals = useArrivals(rows, filled);

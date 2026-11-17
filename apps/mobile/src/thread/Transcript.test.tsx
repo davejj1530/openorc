@@ -86,7 +86,7 @@ it("shows what waits outside the loaded conversation after it, under its task's 
   const asked = { id: "a", kind: "approval", approvalId: "a", approvalKind: "user_input", input: { questions: [{ id: "target", question: "Which environment?" }] } } as const;
   render(
     <QueryClientProvider client={client.queryClient}>
-      <VoicesContext.Provider value={new Map([["lead", { agent: "codex", model: null }]])}>
+      <VoicesContext.Provider value={{ runs: new Map([["lead", { agent: "codex", model: null }]]), own: undefined }}>
         <Transcript
           blocks={run.blocks}
           {...activity(run)}

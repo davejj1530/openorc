@@ -1,22 +1,125 @@
 import { liveHeadline, workEntries } from "@openorc/client";
 import { describe, expect, it } from "vitest";
-import { emptyRowMemo, endMark, fixedHeight, isNews, newestRow, transcriptRows, unsentRows, withWaitingApprovals, type Row } from "./rows";
+import { emptyRowMemo, endMark, fixedHeight, isNews, newestRow, transcriptRows, unsentRows, withWaitingApprovals, type Row, type TurnNames } from "./rows";
+import { threadSenders } from "./senders";
 import { activity, finishedTurn, runStore, type Draft } from "./test-fixtures/run-store";
 
 const outline = (rows: Row[]) => rows.map((row) => row.key);
 
 describe("transcriptRows", () => {
-  it("reads a turn as prompt, head, folded work and reply", () => {
+  it("reads a turn as prompt, folded work, reply and its end", () => {
     const { frame } = runStore();
     const run = frame(...finishedTurn);
     expect(outline(transcriptRows(run.blocks, activity(run), "r", emptyRowMemo()))).toEqual([
       "prompt:ask-1",
-      expect.stringMatching(/^head:/),
       expect.stringMatching(/^work:/),
       "reply:reply-1:0",
-      expect.stringMatching(/^actions:/),
+      expect.stringMatching(/^end:/),
       "presence",
     ]);
+  });
+
+  const codex = (model: string) => ({ agent: "codex", model });
+  const voices = (own: string, runs: [string, string][]): TurnNames => ({ voices: { runs: new Map(runs.map(([run, model]) => [run, codex(model)])), own: codex(own) }, senders: null });
+  /** Two finished turns, the second in a run of its own. */
+  function twoRuns() {
+    const { frame } = runStore();
+    frame(...finishedTurn);
+    const run = frame(
+      { type: "turn.started", turnId: "t2" },
+      { type: "message.completed", messageId: "ask-2", role: "user", text: "And again" },
+      { type: "message.completed", messageId: "reply-2", role: "assistant", text: "Again." },
+      { type: "turn.completed", turnId: "t2", status: "success", durationMs: 500 },
+    );
+    const second = run.blocks.findIndex((block) => block.id === "ask-2");
+    return { run, blocks: run.blocks.map((block, index) => (index >= second ? { ...block, runId: "r2" } : block)) };
+  }
+  const heads = (rows: Row[]) => rows.flatMap((row) => (row.kind === "head" ? [[row.key, row.voice, row.sender]] : []));
+
+  it("names the agent and model on no turn while they stay the thread's own, and on each turn where they change", () => {
+    const { run, blocks } = twoRuns();
+    expect(
+      heads(
+        transcriptRows(
+          blocks,
+          activity(run),
+          "r",
+          emptyRowMemo(),
+          voices("GPT-5.5", [
+            ["r", "GPT-5.5"],
+            ["r2", "GPT-5.5"],
+          ]),
+        ),
+      ),
+    ).toEqual([]);
+    // The first turn against the thread's own, which its composer names; the next against the turn before.
+    expect(
+      heads(
+        transcriptRows(
+          blocks,
+          activity(run),
+          "r",
+          emptyRowMemo(),
+          voices("GPT-5.5", [
+            ["r", "GPT-5"],
+            ["r2", "GPT-5"],
+          ]),
+        ),
+      ),
+    ).toEqual([[expect.stringMatching(/^head:r:0\//), codex("GPT-5"), undefined]]);
+    const switched = transcriptRows(
+      blocks,
+      activity(run),
+      "r",
+      emptyRowMemo(),
+      voices("GPT-5.5", [
+        ["r", "GPT-5.5"],
+        ["r2", "GPT-5.4"],
+      ]),
+    );
+    expect(heads(switched)).toEqual([[expect.stringContaining("ask-2"), codex("GPT-5.4"), undefined]]);
+    expect(switched.map((row) => [row.kind, row.gap]).slice(4, 7)).toEqual([
+      ["prompt", 24],
+      ["head", 28],
+      ["reply", 14],
+    ]);
+  });
+
+  it("gives a turn its head once its voice is known, and keeps the rows of turns whose names did not change", () => {
+    const { run, blocks } = twoRuns();
+    const memo = emptyRowMemo();
+    const unnamed = transcriptRows(blocks, activity(run), "r", memo);
+    const named = transcriptRows(
+      blocks,
+      activity(run),
+      "r",
+      memo,
+      voices("GPT-5.5", [
+        ["r", "GPT-5.5"],
+        ["r2", "GPT-5.4"],
+      ]),
+    );
+    expect(named.slice(0, 4)).toEqual(unnamed.slice(0, 4));
+    expect(named[0]).toBe(unnamed[0]);
+    expect(named[5]).toMatchObject({ kind: "head", voice: codex("GPT-5.4") });
+  });
+
+  it("names who sent a turn, in a cloud thread others are in, only where its prompt does not already name them", () => {
+    const { run } = twoRuns();
+    const riley = { id: "u-riley", name: "Riley Chen", image: null };
+    const mara = { id: "u-mara", name: "Mara Okafor", image: null };
+    // Mara sent both turns: she wrote the first prompt, and Riley's message joined her second turn.
+    const authors = { viewer: riley, turnOf: { "ask-1": "turn-1", "ask-2": "turn-2" }, senders: { "turn-1": mara, "turn-2": mara }, authors: { "ask-1": mara, "ask-2": riley } };
+    const names: TurnNames = { voices: { runs: new Map(), own: undefined }, senders: threadSenders(authors, false, undefined) };
+    expect(heads(transcriptRows(run.blocks, activity(run), "r", emptyRowMemo(), names))).toEqual([[expect.stringContaining("ask-2"), null, mara]]);
+    // Someone whose account is gone is still named, as a former member.
+    const gone = { ...authors, senders: { "turn-1": mara, "turn-2": null } };
+    expect(heads(transcriptRows(run.blocks, activity(run), "r", emptyRowMemo(), { ...names, senders: threadSenders(gone, false, undefined) }))).toEqual([
+      [expect.stringContaining("ask-2"), null, null],
+    ]);
+    // A thread nobody else is in names nobody.
+    const alone = { viewer: riley, turnOf: authors.turnOf, senders: { "turn-1": riley, "turn-2": riley }, authors: { "ask-1": riley, "ask-2": riley } };
+    expect(heads(transcriptRows(run.blocks, activity(run), "r", emptyRowMemo(), { ...names, senders: threadSenders(alone, false, undefined) }))).toEqual([]);
   });
 
   it("places a visualization after the turn's work and before its reply, as the desktop does, and keeps its row as the reply streams", () => {
@@ -32,7 +135,7 @@ describe("transcriptRows", () => {
     );
     const memo = emptyRowMemo();
     const rows = transcriptRows(run.blocks, activity(run), "r", memo);
-    expect(outline(rows).slice(-4)).toEqual([expect.stringMatching(/^head:/), "visualization:viz", "reply:reply-2:0", "presence"]);
+    expect(outline(rows).slice(-4)).toEqual(["visualization:viz", "reply:reply-2:0", expect.stringMatching(/^end:/), "presence"]);
     const drawn = rows.find((row) => row.kind === "visualization");
     expect(drawn).toMatchObject({ kind: "visualization", runId: "r", visualization: input });
     run = frame({ type: "message.delta", messageId: "reply-2", role: "assistant", text: "above." });
@@ -54,7 +157,7 @@ describe("transcriptRows", () => {
     run = frame({ type: "message.delta", messageId: "reply-2", role: "assistant", text: "tests pass." });
     const after = transcriptRows(run.blocks, activity(run), "r", memo);
     expect(after).toBe(before);
-    expect(after.at(-2)).toMatchObject({ kind: "reply", streaming: true, source: { runId: "r", blockId: "reply-2", index: 0 } });
+    expect(after.findLast((row) => row.kind === "reply")).toMatchObject({ kind: "reply", streaming: true, source: { runId: "r", blockId: "reply-2", index: 0 } });
     run = frame({ type: "message.completed", messageId: "reply-2", role: "assistant", text: "All tests pass." }, { type: "turn.completed", turnId: "t2", status: "success", durationMs: 900 });
     const done = transcriptRows(run.blocks, activity(run), "r", memo);
     expect(done.findLast((row) => row.kind === "reply")).toMatchObject({ kind: "reply", text: "All tests pass.", streaming: false });
@@ -165,7 +268,7 @@ describe("transcriptRows", () => {
     });
   });
 
-  it("changes only the work row while a step runs, and the head once the turn ends", () => {
+  it("changes only the work row while a step runs, and the end once the turn ends, in place", () => {
     const { frame } = runStore();
     frame(...finishedTurn);
     let run = frame(
@@ -184,7 +287,8 @@ describe("transcriptRows", () => {
     );
     const ended = transcriptRows(run.blocks, activity(run), "r", memo);
     expect(ended.slice(0, 4)).toEqual(progressed.slice(0, 4));
-    expect(ended.filter((row, i) => row !== progressed[i]).map((row) => row.kind)).toEqual(["head", "work", "presence"]);
+    expect(ended.filter((row, i) => row !== progressed[i]).map((row) => row.kind)).toEqual(["work", "end", "presence"]);
+    expect(ended.map((row) => row.key)).toEqual(progressed.map((row) => row.key));
   });
 
   it("spaces turns in the desktop's rhythm: 28 under a prompt, 14 between a turn's parts, 24 before the next turn, the work's receipt keeping its own 14 around it", () => {
@@ -199,19 +303,17 @@ describe("transcriptRows", () => {
     const rows = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
     expect(rows.map((row) => [row.kind, row.gap])).toEqual([
       ["prompt", 24],
-      ["head", 28],
-      ["work", 0],
+      ["work", 14],
       ["reply", 0],
-      ["actions", 10],
+      ["end", 10],
       ["prompt", 24],
-      ["head", 28],
-      ["reply", 14],
-      ["actions", 10],
+      ["reply", 28],
+      ["end", 10],
       ["presence", 14],
     ]);
   });
 
-  it("lets the space under a turn's work be its receipt's, so the next turn and the agent's presence sit their usual distance below", () => {
+  it("lets the space under a turn's work be its receipt's, so its end and the next turn sit their usual distance below", () => {
     const { frame } = runStore();
     const run = frame(
       { type: "session.started", agent: "codex", externalSessionId: "s", model: "gpt", tools: [] },
@@ -227,12 +329,12 @@ describe("transcriptRows", () => {
     const rows = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
     expect(rows.map((row) => [row.kind, row.gap])).toEqual([
       ["prompt", 24],
-      ["head", 28],
-      ["work", 0],
-      ["prompt", 10],
-      ["head", 28],
-      ["work", 0],
-      ["presence", 0],
+      ["work", 14],
+      ["end", 0],
+      ["prompt", 24],
+      ["work", 14],
+      ["end", 0],
+      ["presence", 14],
     ]);
   });
 
@@ -250,8 +352,8 @@ describe("transcriptRows", () => {
       { type: "turn.completed", turnId: "t2", status: "cancelled", durationMs: 26_000 },
     );
     const rows = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
-    expect(outline(rows).slice(5)).toEqual(["prompt:ask-2", "prompt:steer", "head:r:1/ask-2", "reply:reply-2:0", "actions:r:1/ask-2", "presence"]);
-    expect(rows.find((row) => row.key === "head:r:1/ask-2")).toMatchObject({ outcome: "cancelled", durationMs: 26_000 });
+    expect(outline(rows).slice(4)).toEqual(["prompt:ask-2", "prompt:steer", "reply:reply-2:0", "end:r:1/ask-2", "presence"]);
+    expect(rows.find((row) => row.key === "end:r:1/ask-2")).toMatchObject({ outcome: "cancelled", durationMs: 26_000, text: "Sentence one. Sentence two." });
   });
 
   it("sets a turn that answers a prompt sent as a turn of its own 28 below it, as the desktop does", () => {
@@ -268,7 +370,7 @@ describe("transcriptRows", () => {
     const rows = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
     expect(rows.slice(0, 2).map((row) => [row.kind, row.gap])).toEqual([
       ["prompt", 24],
-      ["head", 28],
+      ["reply", 28],
     ]);
   });
 
@@ -293,15 +395,15 @@ describe("transcriptRows", () => {
     const memo = emptyRowMemo();
     // The first page holds only the answer; the older page keeps its blocks' objects when it lands.
     const answer = run.blocks.slice(run.blocks.findIndex((block) => block.id === "reply"));
-    expect(transcriptRows(answer, activity(run), "r", memo)[0]).toMatchObject({ kind: "head", gap: 24 });
+    expect(transcriptRows(answer, activity(run), "r", memo)[0]).toMatchObject({ kind: "reply", gap: 24 });
     const rows = transcriptRows(run.blocks, activity(run), "r", memo);
     expect(rows.slice(0, 2).map((row) => [row.kind, row.gap])).toEqual([
       ["prompt", 24],
-      ["head", 28],
+      ["reply", 28],
     ]);
   });
 
-  it("offers a finished reply's actions, and keeps the agent's presence at the end, working while the turn runs", () => {
+  it("ends a running turn on where it stands and a finished one on Copy for its reply, and keeps the agent's presence last, working while the turn runs", () => {
     const { frame } = runStore();
     frame(...finishedTurn);
     const memo = emptyRowMemo();
@@ -311,20 +413,36 @@ describe("transcriptRows", () => {
       { type: "message.delta", messageId: "reply-2", role: "assistant", text: "Wor" },
     );
     let rows = transcriptRows(run.blocks, activity(run), "r", memo);
-    expect(rows.filter((row) => row.kind === "actions").map((row) => row.kind === "actions" && row.text)).toEqual(["Done."]);
+    expect(rows.filter((row) => row.kind === "end").map((row) => row.kind === "end" && [row.live, row.writing, row.text])).toEqual([
+      [false, false, "Done."],
+      [true, true, null],
+    ]);
     expect(rows.at(-1)).toMatchObject({ kind: "presence", working: true });
     run = frame({ type: "message.completed", messageId: "reply-2", role: "assistant", text: "Working." }, { type: "turn.completed", turnId: "t2", status: "success", durationMs: 500 });
     rows = transcriptRows(run.blocks, activity(run), "r", memo);
-    expect(rows.filter((row) => row.kind === "actions").map((row) => row.kind === "actions" && row.text)).toEqual(["Done.", "Working."]);
+    expect(rows.filter((row) => row.kind === "end").map((row) => row.kind === "end" && row.text)).toEqual(["Done.", "Working."]);
     expect(rows.at(-1)).toMatchObject({ kind: "presence", working: false });
   });
 
-  it("names the newest row above the agent's presence, so what lands while the reader is up is news", () => {
+  it("ends a turn that failed on the provider's error without Copy for the error, which reads as a card", () => {
+    const { frame } = runStore();
+    const run = frame(
+      { type: "turn.started", turnId: "t1" },
+      { type: "message.completed", messageId: "ask", role: "user", text: "Retry" },
+      { type: "message.completed", messageId: "api", role: "assistant", text: "API Error: 529 Overloaded." },
+      { type: "turn.completed", turnId: "t1", status: "error", durationMs: 48_000 },
+    );
+    const rows = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
+    expect(rows.map((row) => row.kind)).toEqual(["prompt", "card", "end", "presence"]);
+    expect(rows[2]).toMatchObject({ outcome: "error", durationMs: 48_000, text: null });
+  });
+
+  it("names the newest row above the agent's presence and a running turn's end, so what lands while the reader is up is news", () => {
     const { frame } = runStore();
     frame(...finishedTurn);
     const memo = emptyRowMemo();
     let run = frame({ type: "turn.started", turnId: "t2" }, { type: "message.completed", messageId: "ask-2", role: "user", text: "More" });
-    expect(newestRow(transcriptRows(run.blocks, activity(run), "r", memo))?.kind).toBe("head");
+    expect(newestRow(transcriptRows(run.blocks, activity(run), "r", memo))?.key).toBe("prompt:ask-2");
     run = frame({ type: "message.delta", messageId: "reply-2", role: "assistant", text: "Wor" });
     const rows = transcriptRows(run.blocks, activity(run), "r", memo);
     expect(rows.at(-1)?.kind).toBe("presence");
@@ -357,10 +475,9 @@ describe("transcriptRows", () => {
     const heights = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo()).map((row) => [row.kind, fixedHeight(row)]);
     expect(heights).toEqual([
       ["prompt", undefined],
-      ["head", 28 + 16],
       ["work", undefined],
       ["reply", undefined],
-      ["actions", 10 + 30],
+      ["end", 10 + 30],
       ["presence", 14 + 36],
     ]);
   });
@@ -375,8 +492,8 @@ describe("transcriptRows", () => {
       { type: "approval.requested", approvalId: "ap", kind: "command", toolName: "Bash", input: { command: "rm -rf dist" }, reason: "Deletes files" },
     );
     const rows = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
-    expect(rows.at(-2)).toMatchObject({ kind: "card", runId: "r", block: { kind: "approval", approvalId: "ap" } });
-    expect(rows.find((row) => row.kind === "head")).toMatchObject({ live: true, writing: false });
+    expect(rows.at(-3)).toMatchObject({ kind: "card", runId: "r", block: { kind: "approval", approvalId: "ap" } });
+    expect(rows.at(-2)).toMatchObject({ kind: "end", live: true, writing: false });
   });
 
   it("puts the work after an answered question below its card, where the newest step stays in view", () => {
@@ -392,7 +509,7 @@ describe("transcriptRows", () => {
       { type: "tool.started", toolCallId: "test", name: "shell", input: { command: "pnpm test" }, parentToolCallId: null },
     );
     const rows = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
-    expect(outline(rows)).toEqual(["prompt", "head", "work", "card:approval-q", ":1", "presence"].map((key) => expect.stringContaining(key)));
+    expect(outline(rows)).toEqual(["prompt", "work", "card:approval-q", ":1", "end", "presence"].map((key) => expect.stringContaining(key)));
     const works = rows.filter((row) => row.kind === "work");
     expect(works.map((row) => [row.live, row.work.map((block) => block.id)])).toEqual([
       [false, [expect.stringContaining("ls")]],

@@ -1,7 +1,23 @@
-import { isLive, reasoningSections, subagentGroups, turnReply, visualizationFromTool, workParts, workTiming, workTurns, type Block } from "@openorc/client";
-import type { Visualization } from "@openorc/protocol";
+import {
+  isLive,
+  reasoningSections,
+  subagentGroups,
+  turnReply,
+  turnShowsSender,
+  turnStatus,
+  turnStatusWords,
+  turnShowsVoice,
+  visualizationFromTool,
+  workParts,
+  workTiming,
+  workTurns,
+  type Block,
+} from "@openorc/client";
+import type { ThreadPerson, Visualization } from "@openorc/protocol";
 import { height } from "../generated/tokens";
 import { messagePieces } from "./markdown-chunks";
+import { messageAuthor, turnSender, type ThreadSenders } from "./senders";
+import { NO_VOICES, voiceOf, type Voice, type Voices } from "./voices";
 import type { WaitingApproval } from "./waiting-approvals";
 
 export type MessageBlock = Extract<Block, { kind: "message" }>;
@@ -12,14 +28,18 @@ export type WorkNow = Block | "reply" | null;
 
 /**
  * One row of the phone transcript: the units a turn reads as on the desktop, in its order. A person's message, then the
- * turn's head, its folded work, what follows the work (the reply, an approval, a question, an error) and the finished
- * reply's actions; the agent's presence ends the transcript. `gap` is the space above the row.
+ * turn's head where it has one, its folded work, what follows the work (the reply, an approval, a question, an error)
+ * and the turn's end; the agent's presence ends the transcript. `gap` is the space above the row.
  */
 export type Row = { key: string; gap: number } & (
   | { kind: "prompt"; block: MessageBlock }
   | { kind: "notice"; block: MessageBlock }
-  /** The head's words are worked out from primitives, so a streaming reply leaves the head alone. */
-  | { kind: "head"; runId: string; live: boolean; writing: boolean; startedAt: number | undefined; durationMs: number | undefined; outcome: string | undefined }
+  /**
+   * A turn's head, only where it has something to say: the agent and model where they changed from the turn before
+   * (`voice`), and in a cloud thread others are in, who sent the turn where its prompt does not already name them
+   * (`sender`; null: a former member).
+   */
+  | { kind: "head"; voice: Voice | null; sender: ThreadPerson | null | undefined }
   | { kind: "work"; turnId: string; runId: string; work: Block[]; live: boolean; now: WorkNow }
   /**
    * A piece of a reply: long replies are drawn a piece per row, so the list lays them out a piece at a time. The piece
@@ -32,16 +52,29 @@ export type Row = { key: string; gap: number } & (
   | { kind: "waiting"; runId: string; title: string | null }
   /** An explanation the agent drew with the visualize tool, in a web view of its own. */
   | { kind: "visualization"; runId: string; block: ToolBlock; visualization: Visualization }
-  /** Copy for a finished turn's reply. */
-  | { kind: "actions"; text: string }
+  /**
+   * Where a turn stands, "Working 12s" while it runs and "Worked for 41s" once done, then Copy for its reply once done:
+   * one row from the turn's start to its end, so finishing swaps words in place and moves nothing. Its words are worked
+   * out from primitives, so a streaming reply leaves the row alone.
+   */
+  | {
+      kind: "end";
+      live: boolean;
+      writing: boolean;
+      startedAt: number | undefined;
+      durationMs: number | undefined;
+      outcome: string | undefined;
+      /** The reply Copy copies, once the turn is done. */
+      text: string | null;
+    }
   | { kind: "presence"; working: boolean }
 );
 
 /**
  * The desktop's rhythm (conversation.css): a turn's parts 14 apart, a prompt 28 above what follows it, a new turn 24
- * below the last. The actions row tucks 4 closer, as the desktop's does.
+ * below the last. The end row tucks 4 closer, as the desktop's does.
  */
-const GAP = { part: 14, prompt: 28, turn: 24, actions: 10 };
+const GAP = { part: 14, prompt: 28, turn: 24, end: 10 };
 /**
  * The work's receipt is a 44 pt touch row on a 16 pt line, so the work row keeps this much inside itself above the
  * line and below what it shows; the gaps beside it give that back.
@@ -60,7 +93,7 @@ export interface PieceSource {
 
 /** What the previous pass made of each turn, so turns and rows that did not change keep their objects. */
 export interface RowMemo {
-  turns: Map<string, { blocks: Block[]; live: boolean; opening: number; rows: Row[] }>;
+  turns: Map<string, { blocks: Block[]; live: boolean; opening: number; names: HeadNames; rows: Row[] }>;
   /** The last pass's rows, handed back whole when no row changed. */
   rows: Row[];
 }
@@ -102,7 +135,12 @@ function drawnSame(a: Block, b: Block): boolean {
 
 const sameNow = (a: WorkNow, b: WorkNow) => a === b || (typeof a === "object" && typeof b === "object" && a !== null && b !== null && drawnSame(a, b));
 
-/** When two rows with one key show the same thing, per kind: same blocks, same words for the head, same piece. */
+const sameVoice = (a: Voice | null, b: Voice | null) => a === b || (a !== null && b !== null && a.agent === b.agent && a.model === b.model);
+const samePerson = (a: ThreadPerson | null | undefined, b: ThreadPerson | null | undefined) => a === b || (Boolean(a && b) && a?.id === b?.id && a?.name === b?.name);
+
+const sameHeadNames = (a: HeadNames, b: HeadNames) => a.senders === b.senders && sameVoice(a.voice, b.voice);
+
+/** When two rows with one key show the same thing, per kind: same blocks, same names for the head, same piece. */
 const sameAs: { [K in RowKind]: (a: RowOf<K>, b: RowOf<K>) => boolean } = {
   prompt: sameBlock,
   notice: sameBlock,
@@ -110,9 +148,9 @@ const sameAs: { [K in RowKind]: (a: RowOf<K>, b: RowOf<K>) => boolean } = {
   subagents: (a, b) => sameItems(a.blocks, b.blocks),
   waiting: (a, b) => a.runId === b.runId && a.title === b.title,
   visualization: sameBlock,
-  actions: (a, b) => a.text === b.text,
+  end: (a, b) => a.live === b.live && a.writing === b.writing && a.startedAt === b.startedAt && a.durationMs === b.durationMs && a.outcome === b.outcome && a.text === b.text,
   presence: (a, b) => a.working === b.working,
-  head: (a, b) => a.live === b.live && a.writing === b.writing && a.startedAt === b.startedAt && a.durationMs === b.durationMs && a.outcome === b.outcome && a.runId === b.runId,
+  head: (a, b) => sameVoice(a.voice, b.voice) && samePerson(a.sender, b.sender),
   // A streamed delta the row does not draw keeps the row, so the list and the open steps card hold still.
   work: (a, b) => a.live === b.live && a.runId === b.runId && sameNow(a.now, b.now) && a.work.length === b.work.length && a.work.every((block, i) => drawnSame(block, b.work[i]!)),
   // A streaming piece reads its own words, so only a change of shape makes it a new row.
@@ -144,8 +182,11 @@ function replyRows(block: MessageBlock, runId: string): Unspaced[] {
   }));
 }
 
+/** A provider's error the agent passed on as its words: drawn as an error card, not as the reply. */
+const providerError = (block: Block) => block.kind === "message" && block.role === "assistant" && /^API Error:/.test(block.text);
+
 function afterRows(block: Block, runId: string): Unspaced[] {
-  if (block.kind === "message" && block.role === "assistant" && !/^API Error:/.test(block.text)) return replyRows(block, runId);
+  if (block.kind === "message" && block.role === "assistant" && !providerError(block)) return replyRows(block, runId);
   if (block.kind === "message" && block.role === "system") return [{ kind: "notice", key: `notice:${block.id}`, block }];
   const visualization = block.kind === "tool" ? visualizationFromTool(block) : null;
   if (block.kind === "tool" && visualization) return [{ kind: "visualization", key: `visualization:${block.id}`, runId, block, visualization }];
@@ -173,18 +214,35 @@ function afterTurnRows(after: Block[], runId: string): Unspaced[] {
   return rows;
 }
 
-/** A turn's rows, in the desktop's order: before the work, the head and the work, then what follows it. */
-function turnParts(turn: { id: string; blocks: Block[] }, live: boolean, fallbackRunId: string): Unspaced[] {
+/**
+ * What the open thread knows of who speaks in it, for the turn heads: each run's agent and model and the thread's own,
+ * and in a cloud thread, who sent each turn and wrote each prompt.
+ */
+export interface TurnNames {
+  voices: Voices;
+  senders: ThreadSenders | null;
+}
+
+export const NO_NAMES: TurnNames = { voices: NO_VOICES, senders: null };
+
+/** What a turn's head may name: its voice where it changed from the turn before, and the thread's senders. */
+interface HeadNames {
+  voice: Voice | null;
+  senders: ThreadSenders | null;
+}
+
+/** A turn's rows, in the desktop's order: before the work, the head where it has one and the work, what follows it, the end. */
+function turnParts(turn: { id: string; blocks: Block[] }, live: boolean, fallbackRunId: string, names: HeadNames): Unspaced[] {
   const runId = runOf(turn.blocks, fallbackRunId);
   const timing = workTiming(turn.blocks, live);
   const { before, work, after } = workParts(turn.blocks, timing.live);
   const rows: Unspaced[] = before.flatMap((block) => beforeRows(block, runId));
   const ended = timing.outcome === "error" || timing.outcome === "cancelled";
   const spoke = Boolean(work.length || after.length || timing.live || ended);
-  if (spoke) {
-    const writing = after.some((block) => block.kind === "message" && block.role === "assistant" && block.streaming);
-    rows.push({ kind: "head", key: `head:${turn.id}`, runId, live: timing.live, writing, startedAt: timing.startedAt, durationMs: timing.durationMs, outcome: timing.outcome });
-  }
+  const sender = turnSender(names.senders, turn.blocks, timing.live);
+  const prompt = before.findLast((block) => block.kind === "message" && block.role === "user")?.id;
+  const sent = turnShowsSender(sender, messageAuthor(names.senders, prompt)) ? sender : undefined;
+  if (spoke && (names.voice || sent !== undefined)) rows.push({ kind: "head", key: `head:${turn.id}`, voice: names.voice, sender: sent });
   const cards = after.filter((block) => block.kind === "approval");
   const segments = workSegments(turn.blocks, work, cards);
   const last = segments.findLastIndex((segment) => segment.length > 0);
@@ -199,8 +257,11 @@ function turnParts(turn: { id: string; blocks: Block[] }, live: boolean, fallbac
   });
   const rest = after.filter((block) => block.kind !== "approval");
   rows.push(...afterTurnRows(rest, runId));
-  const reply = turnReply(after);
-  if (spoke && !timing.live && reply) rows.push({ kind: "actions", key: `actions:${turn.id}`, text: reply.text });
+  const reply = turnReply(after.filter((block) => !providerError(block)));
+  const writing = after.some((block) => block.kind === "message" && block.role === "assistant" && block.streaming);
+  const end = { live: timing.live, writing, startedAt: timing.startedAt, durationMs: timing.durationMs, outcome: timing.outcome };
+  // A finished turn that neither took a time nor said anything to copy has nothing to end on.
+  if (spoke && (turnStatusWords(turnStatus(end, 0)) || reply)) rows.push({ kind: "end", key: `end:${turn.id}`, ...end, text: !timing.live && reply ? reply.text : null });
   return rows;
 }
 
@@ -233,15 +294,14 @@ function workNow(blocks: Block[], after: Block[], live: boolean): WorkNow {
 
 /** The space above a row in a turn, by the row above it; the turn's first row takes `opening`. */
 function gapAbove(row: Unspaced, above: Unspaced | undefined, opening: number): number {
-  if (!above) return opening;
-  if (row.kind === "actions") return GAP.actions;
-  if (row.kind === "work") return GAP.part - WORK_SPACE;
-  return (above.kind === "prompt" ? GAP.prompt : GAP.part) - spaceBelow(above);
+  if (row.kind === "end") return Math.max(0, GAP.end - spaceBelow(above));
+  const space = above ? (above.kind === "prompt" ? GAP.prompt : GAP.part) - spaceBelow(above) : opening;
+  return Math.max(0, row.kind === "work" ? space - WORK_SPACE : space);
 }
 
 /** A turn's rows with the space above each; `opening` is the space above its first. */
-function turnRows(turn: { id: string; blocks: Block[] }, live: boolean, fallbackRunId: string, opening: number): Row[] {
-  return turnParts(turn, live, fallbackRunId).map((row, index, rows) => ({ ...row, gap: gapAbove(row, rows[index - 1], opening) }) as Row);
+function turnRows(turn: { id: string; blocks: Block[] }, live: boolean, fallbackRunId: string, opening: number, names: HeadNames): Row[] {
+  return turnParts(turn, live, fallbackRunId, names).map((row, index, rows) => ({ ...row, gap: gapAbove(row, rows[index - 1], opening) }) as Row);
 }
 
 /**
@@ -259,26 +319,31 @@ export interface TranscriptActivity {
  * array back. So a streamed word changes no row at all (the streaming piece reads its words itself), and a frame that
  * updates a step hands the list that one new row.
  */
-export function transcriptRows(blocks: Block[], { live, working }: TranscriptActivity, runId: string, memo: RowMemo): Row[] {
+export function transcriptRows(blocks: Block[], { live, working }: TranscriptActivity, runId: string, memo: RowMemo, { voices, senders }: TurnNames = NO_NAMES): Row[] {
   const turns = workTurns(blocks);
   const next: RowMemo["turns"] = new Map();
   const rows: Row[] = [];
+  // Each turn names its agent and model only where they changed from the turn before; the first, from the thread's own.
+  let spoken = voices.own;
   turns.forEach((turn, index) => {
     const turnLive = live && index === turns.length - 1;
+    const voice = voiceOf(voices, runOf(turn.blocks, runId));
+    const names = { voice: voice && turnShowsVoice(voice, spoken) ? voice : null, senders };
+    spoken = voice;
     // A prompt whose answer came as a turn of its own still sits 28 above it.
     const opening = (rows.at(-1)?.kind === "prompt" ? GAP.prompt : GAP.turn) - spaceBelow(rows.at(-1));
     const previous = memo.turns.get(turn.id);
-    if (previous && previous.live === turnLive && previous.opening === opening && sameItems(previous.blocks, turn.blocks)) {
+    if (previous && previous.live === turnLive && previous.opening === opening && sameHeadNames(previous.names, names) && sameItems(previous.blocks, turn.blocks)) {
       next.set(turn.id, previous);
       rows.push(...previous.rows);
       return;
     }
     const kept = new Map(previous?.rows.map((row) => [row.key, row]));
-    const fresh = turnRows(turn, turnLive, runId, opening).map((row) => {
+    const fresh = turnRows(turn, turnLive, runId, opening, names).map((row) => {
       const before = kept.get(row.key);
       return before && sameRow(row, before) ? before : row;
     });
-    next.set(turn.id, { blocks: turn.blocks, live: turnLive, opening, rows: fresh });
+    next.set(turn.id, { blocks: turn.blocks, live: turnLive, opening, names, rows: fresh });
     rows.push(...fresh);
   });
   memo.turns = next;
@@ -311,8 +376,11 @@ function presenceRow(memo: RowMemo, working: boolean, gap: number): Row {
   return last?.kind === "presence" && last.working === working && last.gap === gap ? last : { kind: "presence", key: "presence", gap, working };
 }
 
-/** The newest row, the one the New chip watches: the agent's presence always ends the list, so it is not news. */
-export const newestRow = (rows: Row[]): Row | null => rows.findLast((row) => row.kind !== "presence") ?? null;
+/**
+ * The newest row, the one the New chip watches: the agent's presence always ends the list, and a running turn's end
+ * stays below what the turn adds, so neither is news; a turn that finished is.
+ */
+export const newestRow = (rows: Row[]): Row | null => rows.findLast((row) => row.kind !== "presence" && !(row.kind === "end" && row.live)) ?? null;
 
 /** What the end of the conversation holds: its newest row, and how much the newest reply has said so far. */
 export interface EndMark {
@@ -335,10 +403,11 @@ export function unsentRows(rows: Row[]): string[] {
 }
 
 /**
- * Rows that are always this tall below their gap, so the list places them exactly before they draw: a head, a waiting
- * run's head, the actions (one control) and the agent's presence. Their views take these heights from here.
+ * Rows that are always this tall below their gap, so the list places them exactly before they draw: a turn's head where
+ * it keeps one, a waiting run's head, a turn's end (one control, live or done) and the agent's presence. Their views
+ * take these heights from here.
  */
-export const FIXED_HEIGHT = { head: 16, waiting: 16, actions: height["control-md"], presence: 36 } as const satisfies Partial<Record<RowKind, number>>;
+export const FIXED_HEIGHT = { head: 16, waiting: 16, end: height["control-md"], presence: 36 } as const satisfies Partial<Record<RowKind, number>>;
 
 export function fixedHeight(row: Row): number | undefined {
   const fixed: number | undefined = (FIXED_HEIGHT as Partial<Record<RowKind, number>>)[row.kind];

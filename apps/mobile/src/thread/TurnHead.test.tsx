@@ -1,35 +1,25 @@
 // @vitest-environment jsdom
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
-import { nativeProps } from "../test-fixtures/react-native";
-import { arrive } from "../ui/motion";
-import type { Row } from "./rows";
+import { flatStyle, nativeProps } from "../test-fixtures/react-native";
+import { FIXED_HEIGHT, type Row } from "./rows";
 import { TurnHead } from "./TurnHead";
 
 afterEach(cleanup);
 
-const head = (turn: string, live: boolean): Extract<Row, { kind: "head" }> => ({
-  kind: "head",
-  key: `head:${turn}`,
-  gap: 24,
-  runId: "r",
-  live,
-  writing: false,
-  startedAt: 1_000,
-  durationMs: live ? undefined : 9_000,
-  outcome: live ? undefined : "success",
+const head = (row: Partial<Extract<Row, { kind: "head" }>>): Extract<Row, { kind: "head" }> => ({ kind: "head", key: "head:t", gap: 24, voice: null, sender: undefined, ...row });
+
+it("names the agent and its model, at the height the list places it", () => {
+  const view = render(<TurnHead row={head({ voice: { agent: "codex", model: "GPT-5.5" } })} />);
+  expect(screen.getByText("Codex")).toBeTruthy();
+  expect(screen.getByText("GPT-5.5")).toBeTruthy();
+  expect(flatStyle(nativeProps.get(view.container.firstElementChild!)!.style).height).toBe(FIXED_HEIGHT.head);
 });
 
-/** Whether the head's status is rising in. */
-const rising = () => Array.from(document.querySelectorAll("div")).some((element) => nativeProps.get(element)?.style === arrive);
-
-it("swaps a head's status in as its turn finishes, but not in a view the list hands from a live turn to a finished one", () => {
-  const view = render(<TurnHead row={head("live", true)} />);
-  view.rerender(<TurnHead row={head("live", false)} />);
-  expect(rising()).toBe(true);
-
-  view.rerender(<TurnHead row={head("next", true)} />);
-  expect(rising()).toBe(false);
-  view.rerender(<TurnHead row={head("history", false)} />);
-  expect(rising()).toBe(false);
+it("names who sent a turn by first name alone where the agent did not change, and a former member as one", () => {
+  const view = render(<TurnHead row={head({ sender: { id: "u-mara", name: "Mara Okafor", image: null } })} />);
+  expect(screen.getByText("Mara")).toBeTruthy();
+  expect(screen.queryByText("Assistant")).toBeNull();
+  view.rerender(<TurnHead row={head({ sender: null })} />);
+  expect(screen.getByText("Former member")).toBeTruthy();
 });

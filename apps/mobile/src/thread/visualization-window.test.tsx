@@ -58,7 +58,9 @@ it("tells only the rows whose frame came or went, and keeps what each frame last
 function transcript(...framed: number[]) {
   const rows = Array.from({ length: 30 }, (_, index): Row => {
     const key = `visualization:${index}`;
-    return framed.includes(index) ? ({ kind: "visualization", key, gap: 14 } as Row) : ({ kind: "actions", key: `actions:${index}`, gap: 10, text: "" } as Row);
+    return framed.includes(index)
+      ? ({ kind: "visualization", key, gap: 14 } as Row)
+      : ({ kind: "end", key: `end:${index}`, gap: 10, live: false, writing: false, startedAt: 0, durationMs: 1_000, outcome: "success", text: "" } as Row);
   });
   const list = { window: { start: 20, end: 26, startBuffered: 16, endBuffered: 29 } as ListWindow, isAtEnd: true };
   const listRef = { current: { getState: () => ({ ...list.window, isAtEnd: list.isAtEnd }) } as unknown as LegendListRef };

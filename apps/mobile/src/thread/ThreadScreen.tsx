@@ -33,20 +33,19 @@ import { ThreadTitle } from "./ThreadHeader";
 import { useThreadHeaderMenu } from "./ThreadMenu";
 import { Transcript } from "./Transcript";
 import { useThreadActions } from "./use-thread-actions";
-import { VoicesContext, type Voice } from "./voices";
+import { VoicesContext, type Voice, type Voices } from "./voices";
 import { useWaitingApprovals } from "./waiting-approvals";
 
 const NO_RUNS: Run[] = [];
 const goBack = () => router.back();
 
-/** Each run's agent and model for the turn heads, named as the catalog names the model. */
-function useVoices(runs: Run[]): ReadonlyMap<string, Voice> {
+/** Each run's agent and model for the turn heads, and the thread's own, named as the catalog names the model. */
+function useVoices(runs: Run[], thread: ThreadSummary | null): Voices {
   const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
-  return useMemo(
-    () =>
-      new Map(runs.map((run) => [run.id, { agent: run.agent, model: run.model ? (models.data?.find((option) => option.agent === run.agent && option.id === run.model)?.label ?? run.model) : null }])),
-    [runs, models.data],
-  );
+  return useMemo(() => {
+    const named = (agent: string, model: string | null): Voice => ({ agent, model: model ? (models.data?.find((option) => option.agent === agent && option.id === model)?.label ?? model) : null });
+    return { runs: new Map(runs.map((run) => [run.id, named(run.agent, run.model)])), own: thread ? named(thread.agent, thread.model) : undefined };
+  }, [runs, thread, models.data]);
 }
 
 type Activity = ReturnType<typeof conversationActivity>;
@@ -218,12 +217,12 @@ export function ThreadScreen() {
   const together = threadTogetherOf(thread);
   useMarkSeen(thread);
   useCoverHome();
-  const voices = useVoices(runs);
+  const voices = useVoices(runs, thread);
   const [disclosure] = useState(createDisclosure);
   const [{ live, working, generatingImage }, setActivity] = useState(IDLE);
   const actions = useThreadActions(thread, { onUnread: goBack });
   const menu = useThreadHeaderMenu(cloud ? null : thread, useSnoozeClock(), actions.run);
-  const authors = useThreadAuthors(thread);
+  const authors = useThreadAuthors(thread, together);
   const linkState = useLinkState();
   const ownCloud = useOwnCloud();
   const chat = chatFor(useOrclingChats().chats, id);

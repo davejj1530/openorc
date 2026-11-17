@@ -6,12 +6,12 @@ import { replyKey, type Row } from "./rows";
  * The rows that arrive live in this pass, adding every row to `known`: a row new since the last pass that comes after
  * every row already known, so an older page landing above never arrives. The agent's presence stays at the end, below
  * what arrives, so it does not count. A reply's next piece is its words carrying on, so it arrives only with the
- * reply's first; a finished turn's actions come in still, as on the desktop.
+ * reply's first; a turn's end rises in with a turn that starts here, and comes in still on a turn that finished.
  */
 export function newArrivals(rows: Row[], known: Set<string>): string[] {
   const lastKnown = rows.findLastIndex((row) => row.kind !== "presence" && known.has(row.key));
   const arrived = rows.flatMap((row, index) => {
-    if (index <= lastKnown || known.has(row.key) || row.kind === "actions") return [];
+    if (index <= lastKnown || known.has(row.key) || (row.kind === "end" && !row.live)) return [];
     if (row.kind === "reply" && row.source.index > 0 && known.has(replyKey(row.source.blockId, 0))) return [];
     return [row.key];
   });

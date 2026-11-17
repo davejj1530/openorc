@@ -99,6 +99,33 @@ it("reads a steer the turn ends without answering with the turn it steered, unde
   expect(workTiming(turns[0]!.blocks, false)).toMatchObject({ durationMs: 26000, outcome: "cancelled" });
 });
 
+it("starts a person's message after a compaction and a line outside any turn as its own turn, not a steer", () => {
+  // As a cloud thread's server writes them: a compaction opens and closes no turn, nor does a commit's line.
+  const run = "hosted:thread";
+  runs.applyFrame({
+    runId: run,
+    seq: 1,
+    events: [
+      { type: "message.completed", ts: 1000, runId: run, messageId: "ask", role: "user", text: "Keep me posted" },
+      { type: "turn.started", ts: 1100, runId: run, turnId: "one" },
+      { type: "message.completed", ts: 1200, runId: run, messageId: "answer", role: "assistant", text: "Done" },
+      { type: "turn.completed", ts: 1300, runId: run, turnId: "one", status: "success", durationMs: 200 },
+      { type: "activity.updated", ts: 2000, runId: run, activityId: "fold", label: "Compacting context", status: "success", text: "Folded" },
+      { type: "message.completed", ts: 2100, runId: run, messageId: "compacted", role: "system", text: "Context compacted." },
+      { type: "message.completed", ts: 3000, runId: run, messageId: "committed", role: "system", text: "Ana Rivera committed 5968e6f" },
+      { type: "message.completed", ts: 4000, runId: run, messageId: "next", role: "user", text: "Start slowly" },
+      { type: "turn.started", ts: 4100, runId: run, turnId: "two" },
+      { type: "turn.completed", ts: 5100, runId: run, turnId: "two", status: "cancelled", durationMs: 1000 },
+    ] as AgentEvent[],
+  });
+  const turns = workTurns(runs.get(run)!.blocks);
+  const next = turns.findIndex((turn) => turn.blocks.some((block) => block.id === "next"));
+  const compacted = turns.findIndex((turn) => turn.blocks.some((block) => block.id === "compacted"));
+  expect(next).toBeGreaterThan(compacted);
+  expect(turns[next]!.blocks[0]!.id).toBe("next");
+  expect(turns[compacted]!.blocks.map((block) => block.id)).not.toContain("next");
+});
+
 it("gives a steer the agent answered the rest of the turn and its outcome", () => {
   const blocks: Block[] = [
     { ...reply, id: "ask", role: "user", turnKey: "run:0" },

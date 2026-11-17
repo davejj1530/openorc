@@ -25,7 +25,10 @@ export type Block = { at?: number; turnKey?: string; runId?: string; seq?: numbe
       runId?: string;
       /** Sent from this window and shown at once; the core has not recorded it yet. */
       pending?: boolean;
-      /** A notice said while a turn ran, such as who stopped it: it reads under that turn's head, never as its opening. */
+      /**
+       * Said while a turn ran. A notice, such as who stopped it, reads under that turn's head, never as its opening; a
+       * person's message steers that turn.
+       */
       inTurn?: boolean;
     }
   | { id: string; kind: "thinking"; text: string; startedAt: number; endedAt: number | null; explicit?: boolean; status?: ActivityStatus }
@@ -197,8 +200,23 @@ function approvalBlock(ev: Extract<AgentEvent, { type: "approval.requested" }>):
 type Handler<T extends AgentEventType> = (run: RunTranscript, ev: Extract<AgentEvent, { type: T }>) => void;
 const ignore = () => {};
 
-/** A notice said while the run's turn is open belongs to that turn, after its head. */
-const inTurn = (run: RunTranscript, role: string, existing: { inTurn?: boolean } | undefined) => (role === "system" && (existing?.inTurn || run.turnOpen) ? { inTurn: true } : {});
+/**
+ * A notice said while the run's turn is open belongs to that turn, after its head. A person's message steers a turn the
+ * agent is working in: its reply streams, or the open turn already holds its work.
+ */
+function inTurn(run: RunTranscript, role: string, existing: { inTurn?: boolean } | undefined): { inTurn?: true } {
+  if (existing?.inTurn) return { inTurn: true };
+  if (role === "system") return run.turnOpen ? { inTurn: true } : {};
+  return role === "user" && steers(run) ? { inTurn: true } : {};
+}
+function steers(run: RunTranscript): boolean {
+  const open = `${run.runId}:${run.turnsCompleted}`;
+  return run.blocks.some(
+    (block) =>
+      (block.kind === "message" && block.role === "assistant" && block.streaming) ||
+      (run.turnOpen && block.turnKey === open && block.kind !== "status" && !(block.kind === "message" && block.role !== "assistant")),
+  );
+}
 
 /** What each event does to a run. Total over event types, so a new one does not compile until it has a decision. */
 const handlers: { [T in AgentEventType]: Handler<T> } = {

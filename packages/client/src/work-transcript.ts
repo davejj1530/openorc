@@ -16,13 +16,15 @@ function fromAgent(block: Block): boolean {
 }
 
 /**
- * Where a block opens a new turn: "turn" when its persisted turn differs, "steer" when a person speaks after the agent
- * did something, so what the agent does next reads below the message.
+ * Where a block opens a new turn: "turn" when its persisted turn differs, or when a person speaks after work that closed
+ * or opened no turn, such as a compaction or a line people's actions leave; "steer" when they speak into the turn that
+ * runs, so what the agent does next reads below the message.
  */
 function startsTurn(current: WorkTurn, block: Block): "turn" | "steer" | null {
   const key = current.blocks[0]?.turnKey;
   if (block.turnKey && key && block.turnKey !== key) return "turn";
-  return block.kind === "message" && block.role === "user" && current.blocks.some(fromAgent) ? "steer" : null;
+  if (block.kind !== "message" || block.role !== "user" || !current.blocks.some(fromAgent)) return null;
+  return block.inTurn ? "steer" : "turn";
 }
 
 /**

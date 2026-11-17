@@ -23,6 +23,8 @@ const fileReadRules: { [M in FileReadMethod]: Rule<M> } = {
 
 const readRules: Rules = {
   ...fileReadRules,
+  // A cloud thread's copy is made again as its files change (core's CloudCopies).
+  "threads.cloudCopy": () => ["files"],
   "organization.repositories": ({ spaceId }) => [`repositories:${spaceId}`, "spaces"],
   "organization.people": ({ spaceId }) => [`people:${spaceId}`, "spaces"],
   "organization.invitations": ({ spaceId }) => [`invitations:${spaceId}`, "spaces"],

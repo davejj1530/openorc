@@ -29,7 +29,7 @@ export function HostedCommitsPanel({ thread }: { thread: ThreadSummary }) {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   });
-  if (read.error?.message === HOSTED_REASONS.publishing) return <HostedUnavailablePanel title="Commits" control="publishing" />;
+  if (read.error?.message === HOSTED_REASONS.publishing) return <HostedUnavailablePanel title="Commits" reason={HOSTED_REASONS.publishing} />;
   if (open?.threadId === thread.id) return <HostedCommitView threadId={thread.id} commit={open.commit} onBack={() => setOpen(null)} />;
   const listed = commits.data;
   return (

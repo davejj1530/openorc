@@ -54,10 +54,16 @@ export const cloudMovesRpcParams = {
   "threads.moveDismiss": z.object({ threadId: id }).strict(),
   /** The thread's reading copy on this computer, made again when its save moved on. */
   "threads.cloudCopy": z.object({ threadId: id }).strict(),
+  /**
+   * The file browser's Refresh: the thread's machine leaves with its newer work first. When that would end something
+   * running there, the answer names what (`confirm`) unless `endsOk`.
+   */
+  "threads.cloudCopyRefresh": z.object({ threadId: id, endsOk: z.boolean() }).strict(),
 };
 export interface CloudMovesRpcResults {
   "threads.moveCheck": CloudMoveCheck;
   "threads.move": CloudMoveStart;
   "threads.moveDismiss": null;
   "threads.cloudCopy": CloudCopy;
+  "threads.cloudCopyRefresh": { copy: CloudCopy } | { confirm: string[] };
 }

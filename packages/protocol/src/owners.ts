@@ -185,6 +185,7 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "threads.move": here,
   "threads.moveDismiss": here,
   "threads.cloudCopy": here,
+  "threads.cloudCopyRefresh": here,
 };
 
 export function ownerRoute(method: RpcMethod): OwnerRoute<RpcMethod> | undefined {

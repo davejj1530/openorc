@@ -13,6 +13,7 @@ export const HOSTED_REASONS = {
   commitHistory: "Commit history isn't available in this cloud thread yet.",
   comments: "Review comments aren't available in this cloud thread yet.",
   fileBrowser: "Browsing this cloud workspace's files isn't available yet.",
+  fileWrite: "Editing this cloud workspace's files isn't available yet.",
   instructions: "Editing this cloud workspace's instructions isn't available yet.",
   previewServer: "Previewing a server in this cloud workspace isn't available yet.",
   memory: "Memory isn't available in this cloud thread yet.",
@@ -48,6 +49,8 @@ export const HostedCapabilities = z.object({
     search: availability,
     /** Each person's agent sign-in usage, as the cloud's CLI last read it after their turn. */
     agentUsage: availability,
+    /** A thread's newest work save, for this Mac to browse a copy of its files. */
+    fileBrowser: availability,
     files: availability,
     nativeSubthreads: availability,
     personSubthreads: availability,

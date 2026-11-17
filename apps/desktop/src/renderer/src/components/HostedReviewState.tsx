@@ -14,7 +14,7 @@ export function HostedReviewState({
   retry: () => void;
   unavailable?: boolean;
 }) {
-  if (unavailable || error?.message === HOSTED_REASONS.changes) return <HostedUnavailableContent title="Changes" control="changes" />;
+  if (unavailable || error?.message === HOSTED_REASONS.changes) return <HostedUnavailableContent title="Changes" reason={HOSTED_REASONS.changes} />;
   if (error)
     return (
       <Empty title="Could not read changes">

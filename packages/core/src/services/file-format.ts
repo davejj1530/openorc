@@ -109,8 +109,8 @@ const LANGUAGES: readonly Language[] = [
   { extensions: [".rs"], project: ["rustfmt"], bundled: false },
 ];
 
-/** Pull request copies contain unreviewed code. Their tools never run. */
-const UNVETTED: ReadonlySet<FolderKind> = new Set(["review"]);
+/** Pull request copies and cloud threads' copies hold code made elsewhere. Their tools never run. */
+const UNVETTED: ReadonlySet<FolderKind> = new Set(["review", "cloud"]);
 
 /** A project's formatter, ready to run in the folder that declared it. */
 interface Command {

@@ -5,7 +5,8 @@ import { inUnvettedCopy } from "./review-copies.js";
 import { directory, executionProject, workspaceHome } from "./workspace-home.js";
 
 /** What kind of folder a conversation works in. It decides who may edit there. */
-export type FolderKind = "checkout" | "worktree" | "workspace" | "review";
+/** `cloud` is a cloud thread's reading copy (cloud-folders.ts), read-only here. */
+export type FolderKind = "checkout" | "worktree" | "workspace" | "review" | "cloud";
 
 export interface ConversationFolder {
   /** Real path, symlinks resolved. File paths are checked against it, and caches are keyed by it. */

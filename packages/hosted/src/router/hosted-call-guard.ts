@@ -10,6 +10,9 @@ function threadOf(method: RpcMethod, params: Record<string, unknown>): string | 
   return typeof id === "string" ? id : null;
 }
 
+/** A cloud thread's files read on this Mac, from the copy of its newest save (core's CloudCopies). */
+const READ_HERE: ReadonlySet<RpcMethod> = new Set(["files.list", "files.search", "files.read", "files.find", "editor.query"]);
+
 /**
  * Ownership outlives access. A withdrawn cloud id must never become a request against this Mac, unless the thread came
  * to this Mac by a move, keeping its id (`movedHere`): then the id is this Mac's own.
@@ -21,7 +24,8 @@ export class HostedCallGuard {
   refusal(place: HostedThreads | null, method: RpcMethod, params: Record<string, unknown>): string | null {
     const held = this.check(place, method, params);
     if (held === "unavailable") return "That conversation isn't available on OpenOrc Cloud.";
-    return held === "held" && !ownerRoute(method) ? HOSTED_REASONS.fileBrowser : null;
+    if (held !== "held" || ownerRoute(method) || READ_HERE.has(method)) return null;
+    return method.startsWith("files.") ? HOSTED_REASONS.fileWrite : HOSTED_REASONS.fileBrowser;
   }
 
   private check(place: HostedThreads | null, method: RpcMethod, params: Record<string, unknown>): "held" | "unavailable" | null {
@@ -44,7 +48,15 @@ export class HostedCallGuard {
  * This Mac's own answers about a cloud thread: its work brought into the folder its project came from (core's
  * macProjects), and the thread itself moved here (core's CloudMoves). They read the thread on the server and write only this Mac's folder, so they are never the place's.
  */
-const FOR_THIS_MAC: ReadonlySet<RpcMethod> = new Set(["macProjects.bringState", "macProjects.bring", "threads.moveCheck", "threads.move", "threads.moveDismiss", "threads.cloudCopy"]);
+const FOR_THIS_MAC: ReadonlySet<RpcMethod> = new Set([
+  "macProjects.bringState",
+  "macProjects.bring",
+  "threads.moveCheck",
+  "threads.move",
+  "threads.moveDismiss",
+  "threads.cloudCopy",
+  "threads.cloudCopyRefresh",
+]);
 
 /** A here-routed operation still cannot substitute this Mac's files for a hosted conversation. */
 export function heldHereCall(place: HostedThreads, method: RpcMethod, params: Record<string, unknown>): boolean {

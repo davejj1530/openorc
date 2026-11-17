@@ -88,7 +88,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                   .filter((action) => (action.available?.() ?? true) && !(organization?.organization && action.label === "Add project"))
                   .map(({ label, icon: Icon, run }) =>
                     search.cloudThread && label === "New file" ? (
-                      <HostedPaletteUnavailable key={label} label={label} reason={HOSTED_REASONS.fileBrowser} />
+                      <HostedPaletteUnavailable key={label} label={label} reason={HOSTED_REASONS.fileWrite} />
                     ) : (
                       <Item key={label} onSelect={() => go(run)} icon={<Icon size={15} />} label={label} />
                     ),

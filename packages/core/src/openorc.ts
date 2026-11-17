@@ -40,7 +40,7 @@ import { createHostedSkillsCloudHandlers } from "./handlers/hosted-skills-cloud.
 import { createMacProjectsHandlers } from "./handlers/mac-projects.js";
 import { MacProjects } from "./services/mac-projects.js";
 import { createCloudMovesHandlers } from "./handlers/cloud-moves.js";
-import { CloudCopies } from "./services/cloud-copies.js";
+import { CloudFolders } from "./services/cloud-folders.js";
 import { CloudMoves } from "./services/cloud-moves.js";
 import { AgentSessions } from "./services/agent-sessions.js";
 import { agentHomes } from "./services/agent-homes.js";
@@ -184,7 +184,7 @@ export class OpenOrc {
   readonly claudeAccounts: ClaudeAccountService;
   private connectorService: ConnectorService | null = null;
   private cloudMoveService: CloudMoves | null = null;
-  private cloudCopyService: CloudCopies | null = null;
+  private cloudFolderService: CloudFolders | null = null;
   readonly environment: ShellEnvironment;
   readonly providerUsage: ProviderUsageService;
   private readonly claudeAccountSwitch: ClaudeAccountSwitch;
@@ -380,15 +380,15 @@ export class OpenOrc {
   }
 
   /** Cloud threads' code read here without moving them, made on first use. */
-  get cloudCopies(): CloudCopies {
-    this.cloudCopyService ??= new CloudCopies({
+  get cloudFolders(): CloudFolders {
+    this.cloudFolderService ??= new CloudFolders({
       db: this.db,
       hosted: () => this.account,
       dataDir: this.options.dataDir,
       invalidate: (keys) => this.options.transport.push({ type: "invalidate", keys }),
       here: computerNames(process.platform),
     });
-    return this.cloudCopyService;
+    return this.cloudFolderService;
   }
 
   get account(): Hosted | null {
@@ -734,7 +734,7 @@ export class OpenOrc {
       createHostedSkillsCloudHandlers(() => this.hostedSkills, this.settings),
       createCloudMovesHandlers(
         () => this.cloudMoves,
-        () => this.cloudCopies,
+        () => this.cloudFolders,
       ),
       createMacProjectsHandlers(new MacProjects({ db: this.db, hosted: () => this.account, changed: () => this.options.transport.push({ type: "invalidate", keys: ["macProjects"] }) })),
       hostedParityHandlers,
@@ -776,7 +776,7 @@ export class OpenOrc {
       createReviewThreadHandlers({ review: this.review, db: this.db, invalidate }),
       createReviewCommentsHandlers({ review: this.review, invalidate }),
       createReviewWorkspaceHandlers({ review: this.review, db: this.db, taskCheckout: this.taskCheckout, invalidate }),
-      createFilesHandlers({ db: this.db, files: this.files }),
+      createFilesHandlers({ db: this.db, files: this.files, folder: (scope) => this.cloudFolders.of(scope) }),
       createSkillsHandlers({
         db: this.db,
         files: this.files,

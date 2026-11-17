@@ -1,5 +1,5 @@
 import { fileCount, panelToolLabels, snoozePresets, threadResolved } from "@openorc/client";
-import { isSubagentThread, type RpcParams, type ThreadSummary } from "@openorc/protocol";
+import { isSubagentThread, placeOf, type RpcParams, type ThreadSummary } from "@openorc/protocol";
 import type { Link } from "expo-router";
 import type { ComponentProps } from "react";
 
@@ -90,10 +90,10 @@ export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, p
 
 /**
  * New Subthread, as the desktop's menus offer it: a thread started under this one, in its folder. A team's thread and
- * an Orcling's conversation start none from a phone.
+ * an Orcling's conversation start none from a phone, and OpenOrc Cloud starts no thread under another.
  */
 function startUnder(thread: ThreadSummary): ThreadAction[] {
-  if (thread.teamInstanceId || thread.orclingId) return [];
+  if (thread.teamInstanceId || thread.orclingId || placeOf(thread).elsewhere) return [];
   return [{ kind: "screen", label: "New Subthread", icon: "square.and.pencil", pathname: "/new-subthread" }];
 }
 

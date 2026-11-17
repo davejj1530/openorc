@@ -158,6 +158,19 @@ it("starts a cloud thread in a space's project and keeps its own pin as the read
   await vi.waitFor(async () => expect(await call("threads.get", { id: threads.mine })).toMatchObject({ pinnedAt: expect.any(Number) }));
 });
 
+it("renames, snoozes, resolves and marks unread a cloud thread from the phone's own session, as its menu does", async () => {
+  const threadId = threads.mine;
+  const until = Date.now() + 3_600_000;
+  await call("threads.update", { id: threadId, patch: { title: "Offline map tiles per trip" } });
+  await call("threads.update", { id: threadId, patch: { snoozedUntil: until } });
+  await call("threads.update", { id: threadId, patch: { archived: true } });
+  await call("threads.update", { id: threadId, patch: { seen: false } });
+  await vi.waitFor(async () =>
+    expect(await call("threads.get", { id: threadId })).toMatchObject({ title: "Offline map tiles per trip", snoozedUntil: expect.any(Number), archivedAt: expect.any(Number) }),
+  );
+  await call("threads.update", { id: threadId, patch: { archived: false, snoozedUntil: null } });
+});
+
 it("sends a file from the phone with a message to a cloud thread, through its own session, and its path into the log", async () => {
   stand.threadFiles.capabilities = { files: { available: true } };
   const threadId = threads.mine;

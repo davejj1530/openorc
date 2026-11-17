@@ -223,10 +223,8 @@ export const ThreadRow = memo(
     const facts = menuFacts(thread, where);
     const detail = rowFacts(thread, { now: useSidebarNow(), ...(project ? { project } : {}) }).detail;
     const swipes = threadSwipes(thread);
-    // A cloud thread is read here and changed on the Mac: its row has no swipe and no menu yet.
-    const kept = isSubagentThread(thread) || cloud !== null;
-    const leading: SwipeAction | undefined = kept ? undefined : { label: swipes.leading.label, tone: "review", run: () => actions.save(swipes.leading.patch) };
-    const trailing: SwipeAction | undefined = swipes.trailing && !cloud ? { label: swipes.trailing.label, tone: "accent", run: () => actions.save(swipes.trailing!.patch) } : undefined;
+    const leading: SwipeAction | undefined = isSubagentThread(thread) ? undefined : { label: swipes.leading.label, tone: "review", run: () => actions.save(swipes.leading.patch) };
+    const trailing: SwipeAction | undefined = swipes.trailing ? { label: swipes.trailing.label, tone: "accent", run: () => actions.save(swipes.trailing!.patch) } : undefined;
     const label = rowLabel(
       thread,
       compact
@@ -252,7 +250,7 @@ export const ThreadRow = memo(
                   {lines}
                 </ListPressable>
               </Link.Trigger>
-              {cloud ? null : rowMenu(threadMenu(thread, "row", now), actions.run, { title: thread.title, subtitle: facts.join(" · ") })}
+              {rowMenu(threadMenu(thread, "row", now), actions.run, { title: thread.title, subtitle: facts.join(" · ") })}
             </Link>
             {toggle}
           </View>

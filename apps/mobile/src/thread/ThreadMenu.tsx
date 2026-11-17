@@ -1,4 +1,4 @@
-import { isSubagentThread, type ThreadSummary } from "@openorc/protocol";
+import { isSubagentThread, placeOf, type ThreadSummary } from "@openorc/protocol";
 import { useChangesCount } from "./use-changes-count";
 import { usePreviewPanel } from "./use-preview-panel";
 import { Link, Stack } from "expo-router";
@@ -70,7 +70,8 @@ export function headerMenu(sections: ThreadAction[][], run: Run): ReactElement {
 }
 
 export function useThreadHeaderMenu(thread: ThreadSummary | null, now: Date, run: Run): ReactElement | null {
-  const actionable = isSubagentThread(thread) ? null : thread;
+  // A cloud thread's panels are the cloud's, which the Mac's reads do not answer.
+  const actionable = isSubagentThread(thread) || (thread && placeOf(thread).elsewhere) ? null : thread;
   const uncommitted = useChangesCount(actionable);
   const preview = usePreviewPanel(actionable);
   const subthreads = useSubthreads(actionable).subthreads.length;

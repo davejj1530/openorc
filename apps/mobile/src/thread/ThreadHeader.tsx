@@ -70,7 +70,7 @@ export function ThreadTitle({ thread, onRename }: { thread: ThreadSummary | null
   const linkLine = threadLinkLine(link, thread, ownCloud);
   const line = linkLine ?? place;
   // A cloud thread's title is everyone's in its project; a phone does not change it yet.
-  const rename = isSubagentThread(thread) || placeOf(thread).elsewhere ? undefined : onRename;
+  const rename = isSubagentThread(thread) ? undefined : onRename;
   const open = parentId ? () => router.push({ pathname: "/thread/[id]", params: { id: parentId } }) : rename;
   const label = [thread.title, line].filter(Boolean).join(", ");
   const lines = (

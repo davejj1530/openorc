@@ -210,7 +210,7 @@ export function ThreadScreen() {
   const { threadQuery, thread, runsQuery, runs, activeRun } = useOpenThread(id);
   const settings = { ...client.useConversationSettings({ thread, activeRun }), claudeAccountId: thread?.claudeAccountId ?? undefined, claudeAccount: useThreadClaudeAccount(thread) };
   useShareSettings(id, settings);
-  // An OpenOrc Cloud thread's menu is the Mac's; the phone reads it, writes in it and marks it read.
+  // An OpenOrc Cloud thread: its files go to the cloud through the phone's own session.
   const cloud = thread !== null && placeOf(thread).elsewhere;
   const together = threadTogetherOf(thread);
   useMarkSeen(thread);
@@ -219,7 +219,7 @@ export function ThreadScreen() {
   const [disclosure] = useState(createDisclosure);
   const [{ live, working, generatingImage }, setActivity] = useState(IDLE);
   const actions = useThreadActions(thread, { onUnread: goBack });
-  const menu = useThreadHeaderMenu(cloud ? null : thread, useSnoozeClock(), actions.run);
+  const menu = useThreadHeaderMenu(thread, useSnoozeClock(), actions.run);
   const authors = useThreadAuthors(thread, together);
   const linkState = useLinkState();
   const ownCloud = useOwnCloud();

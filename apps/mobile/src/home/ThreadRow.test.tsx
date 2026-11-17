@@ -139,7 +139,7 @@ it("leaves the cloud to a group label that wears it, and keeps the age and the m
   }
 });
 
-it("marks an OpenOrc Cloud thread with the cloud and the face of the teammate who started it, says where in its label, and leaves its menu to the Mac", () => {
+it("marks an OpenOrc Cloud thread with the cloud and the face of the teammate who started it, says where in its label, and organizes it from its menu", () => {
   const mine = { ...fixtureThreads.find((thread) => thread.id === "t-plan")!, branch: null, prUrl: null };
   const cloud = { ...mine, id: "cloud", owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 1, startedBy: { name: "Mara Okafor", image: null } } };
   const row = render(<ThreadRow thread={cloud} project="Canvas" arriving={false} />);
@@ -148,7 +148,13 @@ it("marks an OpenOrc Cloud thread with the cloud and the face of the teammate wh
   expect(row.queryByText("Canvas · Mara")).toBeNull();
   expect(row.queryByText("OpenOrc Cloud")).toBeNull();
   expect(label(row)).toContain("Canvas, OpenOrc Cloud, started by Mara Okafor");
-  expect(menus.built).toEqual([]);
+  // Pin, snooze, read state, rename and resolve, as on the Mac's own threads; OpenOrc Cloud starts no thread under another.
+  const labels = menus.built
+    .at(-1)!
+    .flat()
+    .map((action) => action.label);
+  expect(labels).toEqual(expect.arrayContaining(["Pin", "Snooze", "Mark as Unread", "Rename…", "Resolve"]));
+  expect(labels).not.toContain("New Subthread");
   row.unmount();
 
   const own = render(<ThreadRow thread={mine} project="Canvas" arriving={false} />);

@@ -20,6 +20,7 @@ import { ClaudeAccountScope } from "../lib/claude-account";
 import { usePermissionSelection, useRpc, useRpcMutation } from "../lib/client";
 import { useNewThreadHosted } from "../lib/cloud-offered";
 import { CLOUD_MODEL_LIMITS } from "../lib/cloud-model-limits";
+import { useCloudRunChoice } from "../lib/cloud-run-choice";
 import { useCloudStartReady } from "../lib/use-cloud-start-ready";
 import { useMounted } from "../lib/use-mounted";
 import { usePublishComposerAccount } from "../lib/composer-account";
@@ -171,11 +172,11 @@ function NewThreadProject({
     setDraft(next);
     start.reset();
   };
-  const choice = targetModel(draft.target);
+  const picked = targetModel(draft.target);
   const target = draft.target;
   // No thread action applies to the landing composer. Skills belong to the project or Workspace folder chosen here; a
   // cloud-only project has no folder on this Mac, so it offers none of this Mac's, as a cloud thread's composer does.
-  const suggestions = useComposerSuggestions(projectScope(macFolder || isWorkspace ? projectId : null, draft.workingDirectory), choice?.agent, executionMode(draft.mode, permission), claudeAccountId);
+  const suggestions = useComposerSuggestions(projectScope(macFolder || isWorkspace ? projectId : null, draft.workingDirectory), picked?.agent, executionMode(draft.mode, permission), claudeAccountId);
   const hosted = useNewThreadHosted(target, projectId);
   const workspaceMode = cloudOnly
     ? "hosted"
@@ -188,6 +189,9 @@ function NewThreadProject({
   // On OpenOrc Cloud the thread runs on the person's cloud sign-in, so this Mac's own agents and accounts never hold it.
   const onCloud = workspaceMode === "hosted";
   const files = useNewThreadFiles(projectId, onCloud);
+  // The model the start runs; on OpenOrc Cloud, one the cloud runs.
+  const choice = useCloudRunChoice(picked, onCloud);
+  const runDraft: NewThreadDraft = choice && target.kind === "model" ? { ...draft, target: { kind: "model", choice } } : draft;
 
   useEffect(() => {
     if (target.kind !== "model" || target.choice || !models.data || defaultHarness === undefined) return;
@@ -219,7 +223,7 @@ function NewThreadProject({
   // A cloud start from this Mac's folder carries its work, said on the line above Start before anything leaves.
   const macStart = useMacStart(cloudOnly ? null : projectId, spaceId ?? undefined, onCloud);
   const disabledReason = onCloud ? (hosted.blocked?.words ?? macStart.refusal ?? (!hosted.shown ? "Checking OpenOrc Cloud…" : targetDisabledReason)) : localReason;
-  const cloudStartReady = useCloudStartReady({ draft, onCloud, held: Boolean(disabledReason), permissionMode: permission, spaceId });
+  const cloudStartReady = useCloudStartReady({ draft: runDraft, onCloud, held: Boolean(disabledReason), permissionMode: permission, spaceId });
   const location = useNewThreadLocation(projectId, selected, workspaceMode, draft.workingDirectory);
   const chooseModel = (model: ModelChoice) => changeDraft({ target: { kind: "model", choice: model } });
   const retry = () => {
@@ -235,7 +239,7 @@ function NewThreadProject({
     if (disabledReason) throw new Error(disabledReason);
     if (!choice || !selected || target.kind === "unavailable") throw new Error("Choose a project and execution target first.");
     const threadId = await startNewThread({
-      draft: { ...draft, claudeAccountId },
+      draft: { ...runDraft, claudeAccountId },
       project: selected,
       isWorkspace,
       workspaceMode,

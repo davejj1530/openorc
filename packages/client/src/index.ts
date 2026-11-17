@@ -68,6 +68,7 @@ export {
 } from "./git-actions.js";
 export { isImageGeneration, isImageView } from "./image-activity.js";
 export {
+  agentDefaultChoice,
   browserModels,
   catalogModel,
   defaultChoice,

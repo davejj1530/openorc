@@ -72,6 +72,7 @@ it.each(["claude", "codex"] as const)("shows the cloud %s sign-in's last reading
   };
   render(<AccountUsage />, { wrapper });
   expect(await screen.findByText("19%")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "OpenOrc Cloud: 19% left this week" })).toBeTruthy();
   expect(host.asked).toEqual([{ provider: agent, cloud: true }]);
   expect(host.reads).not.toContain("claude.accounts.list");
   expect(screen.queryByText("64%")).toBeNull();

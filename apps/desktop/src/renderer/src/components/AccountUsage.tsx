@@ -325,7 +325,8 @@ function useOpenThreadPlace(): "reading" | "mac" | { cloud: HarnessId } {
 function CloudAccountUsage({ agent }: { agent: HarnessId }) {
   const usage = useRpc("providers.usage", { provider: agent, cloud: true }, { staleTime: USAGE_MAX_AGE_MS });
   const now = useNow();
-  const account: UsageAccount = { provider: agent, name: `${harnessCatalog[agent].name} · OpenOrc Cloud` };
+  // The agent is in the row's logo; its name says where the sign-in is.
+  const account: UsageAccount = { provider: agent, name: "OpenOrc Cloud" };
   const mark = accountMark(account, usage.data, null);
   if (!mark || !usage.data) return null;
   const report: UsageAccountReport = { ...account, id: agent, plan: usage.data.plan, windows: usage.data.windows, credits: usage.data.credits, context: usage.data.context, status: usage.data.status };

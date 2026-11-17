@@ -139,13 +139,15 @@ function RootLines({
 
 /**
  * What a root row's facts line says: outside its project's group, the project's name; the teammate who started it,
- * unless the headline already speaks of who; and its branch. `cloud` when it is an OpenOrc Cloud thread its label does
+ * unless the headline already speaks of who; and, for a thread of the Mac, its branch. `cloud` when it is an OpenOrc Cloud thread its label does
  * not already mark with the cloud.
  */
 function rowLine(thread: ThreadSummary, project: string | null, cloudLabel: boolean): { words: string; cloud: boolean } {
-  const cloud = placeOf(thread).rowIcon && !cloudLabel;
+  const inCloud = Boolean(placeOf(thread).rowIcon);
   const starter = togetherActivity(thread) ? null : rowStarter(thread)?.first;
-  return { words: [project, starter, thread.branch].filter(Boolean).join(" · "), cloud };
+  // A cloud thread's branch is the one OpenOrc Cloud made for it, which the cloud already says.
+  const branch = inCloud ? null : thread.branch;
+  return { words: [project, starter, branch].filter(Boolean).join(" · "), cloud: inCloud && !cloudLabel };
 }
 
 /** What a row says of its thread's state: a root row's pull request has its own place on the project line. */

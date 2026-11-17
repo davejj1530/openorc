@@ -100,7 +100,8 @@ it("keeps a quiet row in its project's group to one line, its age at the end, an
   expect(branched.getByText("fix/menu")).toBeTruthy();
   cleanup();
   // A cloud thread in a group whose label wears the cloud says nothing more; under a folder's label it wears its own.
-  const cloud = { ...quiet, id: "cloud", owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 1 } };
+  // Nor does the branch OpenOrc Cloud made for it.
+  const cloud = { ...quiet, id: "cloud", branch: "openorc/plan-the-week", owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 1 } };
   expect(render(<ThreadRow thread={cloud} project={null} cloudLabel arriving={false} />).queryByLabelText("Cloud glyph")).toBeNull();
   cleanup();
   const mixed = render(<ThreadRow thread={cloud} project={null} arriving={false} />);

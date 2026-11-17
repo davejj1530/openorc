@@ -23,12 +23,12 @@ it("refreshes task activity and attention on the existing thread change topic wi
   expect((await viewer.tasks.get({ spaceId, id: task.id })).task.id).toBe(task.id);
 });
 
-it.each([false, true])("refreshes Personal task reads only when that delivery is enabled (%s)", async (personal) => {
+it("refreshes the person's Personal task reads when a thread of theirs changes", async () => {
   const stand = await standIn({ signup: "open" });
   cleanup.push(() => stand.close());
   const email = "person@example.com";
   const projectId = stand.addProject(email, { name: "Example", fullName: "example/project" });
-  const viewer = await taskClient(stand, email, { organization: true, personal });
+  const viewer = await taskClient(stand, email, { organization: true, personal: true });
   cleanup.push(viewer.close);
   const status = viewer.hosted.spaces.status();
   if (status.state !== "ready") throw new Error("The account isn't ready.");
@@ -36,6 +36,5 @@ it.each([false, true])("refreshes Personal task reads only when that delivery is
   const thread = stand.addThread(email, { projectId, title: "Progress", status: "working" });
   await vi.waitFor(() => expect(viewer.hosted.threads.holds({ thread })).toBe(true));
   const expected = { type: "invalidate", keys: [`online-tasks:${status.personalSpaceId}`] };
-  if (personal) expect(viewer.seen.pushes).toContainEqual(expected);
-  else expect(viewer.seen.pushes).not.toContainEqual(expected);
+  expect(viewer.seen.pushes).toContainEqual(expected);
 });

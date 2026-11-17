@@ -13,7 +13,7 @@ export interface TaskDelivery {
   personal: boolean;
 }
 /** Each delivery opens only after its paired server and compatibility checks pass. Opening task threads is the server's to say. */
-export const taskDelivery: Readonly<TaskDelivery> = { organization: true, personal: false };
+export const taskDelivery: Readonly<TaskDelivery> = { organization: true, personal: true };
 /** How long a space's answer on opening task threads holds before it is asked again. */
 const EXECUTION_HOLDS_MS = 5 * 60_000;
 interface Dependencies extends Pick<HostedDeps, "push"> {

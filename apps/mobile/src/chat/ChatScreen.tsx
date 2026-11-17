@@ -228,6 +228,24 @@ function ChatComposer({ target, title, failure, self, onSend, onFocus }: { targe
   );
 }
 
+/** What the reader can do with the conversation's messages, as the server takes them, and its words when one fails. */
+function useMessageMoves(lease: TeamChatLease, target: TeamChatTarget): { moves: MessageMoves; failure: string | null } {
+  const state = teamChat.useChatState(lease).data;
+  const chat = state?.state === "ready" ? state.chat : null;
+  const joined = chat?.conversations.find((each) => each.id === target.conversationId)?.joined === true;
+  const [failure, setFailure] = useState<string | null>(null);
+  const failed = (error: Error) => setFailure(error.message);
+  const moves: MessageMoves = {
+    lease,
+    self: lease.accountId,
+    retryCall: (call) => void teamChat.retryCall(lease, target, call).catch(failed),
+    react: (message, emoji) => void teamChat.react(lease, target, message, emoji).catch(failed),
+    reply: chat?.features.includes("replies") ? (message) => teamChat.drafts.reply(target, answeredOf(message)) : null,
+    pin: chat?.features.includes("pins") && joined ? (message) => void teamChat.pin(lease, target, message, !message.pinned).catch(failed) : null,
+  };
+  return { moves, failure };
+}
+
 /** One conversation of the organization's chat, in the desktop's shape: its messages live, earlier ones a tap away, and a composer that keeps its draft. */
 function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: TeamChatLease; conversationId: string; title: string; newFrom: number | null; jump: ChatJump | null }) {
   const insets = useSafeAreaInsets();
@@ -235,9 +253,6 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
   teamChat.useWatch(lease, conversationId);
   const timeline = teamChat.useTimeline(lease, conversationId);
   const draft = teamChat.useDraft(target);
-  const state = teamChat.useChatState(lease).data;
-  const chat = state?.state === "ready" ? state.chat : null;
-  const joined = chat?.conversations.find((each) => each.id === conversationId)?.joined === true;
   const list = useRef<ScrollViewInstance>(null);
   // Following the end until the reader scrolls up; an unread conversation opens at its New messages line instead, and
   // a search hit at its message.
@@ -253,16 +268,8 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
   useEffect(() => {
     if (lastId) void teamChat.seen(lease, target, { id: lastId }).catch(() => undefined);
   }, [lease, target, lastId]);
-  const [failure, setFailure] = useState<string | null>(null);
+  const { moves, failure } = useMessageMoves(lease, target);
   const send = (message: PendingTeamMessage) => void teamChat.send(lease, target, message).catch(() => undefined);
-  const moves: MessageMoves = {
-    lease,
-    self: lease.accountId,
-    retryCall: (call) => void teamChat.retryCall(lease, target, call).catch((error: Error) => setFailure(error.message)),
-    react: (message, emoji) => void teamChat.react(lease, target, message, emoji).catch((error: Error) => setFailure(error.message)),
-    reply: chat?.features.includes("replies") ? (message) => teamChat.drafts.reply(target, answeredOf(message)) : null,
-    pin: chat?.features.includes("pins") && joined ? (message) => void teamChat.pin(lease, target, message, !message.pinned).catch((error: Error) => setFailure(error.message)) : null,
-  };
   const write = () => {
     const message = teamChat.drafts.begin(target);
     if (!message) return;

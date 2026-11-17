@@ -120,6 +120,14 @@ describe("sending to an OpenOrc Cloud thread", () => {
     expect((await said(hosted, run)).map((line) => line.split(": ")[1])).toEqual(["Then open a pull request"]);
   });
 
+  it("sends a waiting message now into the turn its sender saw, which a phone names over this host's own row", async () => {
+    const { hosted, thread } = await withThread({ status: "working" });
+    const [waiting] = await hosted.threads.call("threads.queue", { id: thread, text: "And the footer too", requestKey: crypto.randomUUID() });
+    const before = stand.sent.length;
+    await hosted.threads.call("threads.sendQueued", { id: thread, messageId: waiting!.id, expectedTurnId: "turn-the-phone-saw" });
+    expect(stand.sent.slice(before)).toEqual([expect.objectContaining({ threadId: thread, body: expect.objectContaining({ text: "And the footer too", expectedTurnId: "turn-the-phone-saw" }) })]);
+  });
+
   it("takes a message out of the queue, and Stop ends the turn and cancels what waits", async () => {
     const { hosted, thread, run } = await withThread({ status: "working" });
     const [first] = await hosted.threads.call("threads.queue", { id: thread, text: "First", requestKey: crypto.randomUUID() });

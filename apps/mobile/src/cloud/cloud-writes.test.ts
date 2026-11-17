@@ -137,6 +137,17 @@ it("queues for after a running turn and takes its own waiting message back", asy
   expect(left.some((each) => each.id === mine!.id)).toBe(false);
 });
 
+it("sends a waiting message now into the turn it saw, naming that turn as a message sent now does", async () => {
+  const threadId = threads.teammate;
+  await mara.threads.call("runs.start", { threadId, ...settings, prompt: "Tighten the spacing." }).catch(() => undefined);
+  const live = (await together(threadId, (state) => state.live !== null)).live!;
+  const queued = (await call("threads.queue", { id: threadId, text: "And the footer too." })) as { id: string; text: string }[];
+  const mine = queued.find((each) => each.text === "And the footer too.")!;
+  const before = sentTo(threadId).length;
+  await call("threads.sendQueued", { id: threadId, messageId: mine.id, expectedTurnId: live.id });
+  expect(sentTo(threadId).slice(before)).toEqual([expect.objectContaining({ body: expect.objectContaining({ text: "And the footer too.", expectedTurnId: live.id }) })]);
+});
+
 it("starts a cloud thread in a space's project and keeps its own pin as the reader's", async () => {
   const [project] = (await call("spaces.projects", { spaceId: alder })) as { key: string }[];
   const started = stand.started.length;

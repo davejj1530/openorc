@@ -27,7 +27,7 @@ const mac = vi.hoisted(() => {
     "agents.availability": [{ id: "codex", state: "ready" }],
     "app.settings.get": { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review", defaultHarness: null },
   };
-  return { git, reads, focused: true, phone: null as FakeMac | null, start: vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>() };
+  return { git, reads, focused: true, asleep: false, phone: null as FakeMac | null, start: vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>() };
 });
 
 vi.mock("../client", async () => {
@@ -37,7 +37,9 @@ vi.mock("../client", async () => {
     if (method === "projects.git") return Promise.resolve(mac.git[(params as RpcParams<"projects.git">).id]);
     return Promise.resolve(mac.reads[method]);
   });
-  return mac.phone.module;
+  const connected = mac.phone.module.useLinkState;
+  // `asleep`: the Mac does not answer, as when it sleeps.
+  return { ...mac.phone.module, useLinkState: () => (mac.asleep ? { kind: "waiting", mac: { id: "mac-1", name: "Studio" }, why: "timeout", retryAt: null } : connected()) };
 });
 vi.mock("react-native-keyboard-controller", () => ({ KeyboardStickyView: ({ children }: { children: ReactNode }) => <>{children}</> }));
 vi.mock("expo-router", () => ({
@@ -52,6 +54,7 @@ beforeEach(() => {
   mac.phone!.module.queryClient.clear();
   mac.start.mockReset();
   mac.focused = true;
+  mac.asleep = false;
   Object.assign(mac.git, { openorc: "ready", notes: "none", later: "none" });
   vi.mocked(router.replace).mockClear();
   vi.mocked(router.push).mockClear();
@@ -238,6 +241,7 @@ it("in a space, lists its projects only OpenOrc Cloud has beside the Mac's, and 
   });
   act(() => mac.phone!.cloud.hold(true));
   const asked = vi.spyOn(mac.git, "openorc", "get");
+  onTestFinished(() => asked.mockRestore());
   await openAndWrite("Fix the build");
   const sheet = openProjects();
   expect(screen.getAllByRole("radio").map((row) => row.getAttribute("aria-label"))).toEqual(["Workspace", "openorc", "notes-app"]);
@@ -250,4 +254,47 @@ it("in a space, lists its projects only OpenOrc Cloud has beside the Mac's, and 
   expect(mac.start.mock.calls[0]![0]).toMatchObject({ projectId: "cloud-project:h-notes", spaceId: "personal-me", hosted: true, prompt: "Search the attachments" });
   expect(mac.start.mock.calls[0]![0]).not.toHaveProperty("workspaceMode");
   expect(asked).not.toHaveBeenCalled();
+});
+
+it("holds Start in a Mac folder while the Mac is out of reach and says why on a tap, its rows faded, while a cloud project still starts", async () => {
+  const personal = { id: "personal-me", kind: "personal" as const };
+  mac.reads["spaces.status"] = {
+    state: "ready",
+    userId: "me",
+    apiOrigin: "",
+    personalSpaceId: personal.id,
+    spaces: [personal],
+    create: { allowed: false, reason: null },
+    invitations: [],
+    reach: "live",
+    heardAt: 1,
+    error: null,
+  };
+  mac.reads["spaces.projects"] = [
+    { key: "openorc", name: "openorc", repo: null, localProjectId: "openorc", hostedProjectId: null, connected: true },
+    { key: "cloud-project:h-notes", name: "notes-app", repo: "riley/notes-app", localProjectId: null, hostedProjectId: "h-notes", connected: true },
+  ];
+  onTestFinished(() => {
+    delete mac.reads["spaces.status"];
+    delete mac.reads["spaces.projects"];
+    act(() => mac.phone!.cloud.hold(false));
+  });
+  act(() => mac.phone!.cloud.hold(true));
+  mac.asleep = true;
+  render(<NewThreadScreen />, { wrapper: mac.phone!.wrapper });
+  await screen.findByRole("button", { name: "Project, openorc, Not connected to Studio" });
+  act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)("Fix the build"));
+  await waitFor(() => expect(button("Start").getAttribute("aria-disabled")).toBe("true"));
+  fireEvent.click(button("Start"));
+  expect(await screen.findByText("Not connected to Studio")).toBeTruthy();
+  expect(mac.start).not.toHaveBeenCalled();
+  const sheet = openProjects();
+  expect(screen.getAllByRole("radio").map((row) => row.getAttribute("aria-label"))).toEqual(["Workspace, Not connected to Studio", "openorc, Not connected to Studio", "notes-app"]);
+  await act(async () => fireEvent.click(project("notes-app")));
+  sheet.unmount();
+  act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)("Search the attachments"));
+  mac.start.mockResolvedValue({ thread: { id: "cloud-thread" } });
+  await waitFor(() => expect(button("Start").disabled).toBe(false));
+  await act(async () => fireEvent.click(button("Start")));
+  expect(mac.start.mock.calls[0]![0]).toMatchObject({ projectId: "cloud-project:h-notes", hosted: true });
 });

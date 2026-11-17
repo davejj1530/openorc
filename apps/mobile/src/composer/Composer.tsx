@@ -1,18 +1,16 @@
 import { composerActivity, conversationPlaceholder, type ClientState } from "@openorc/client";
-import { harnessShortName, isHarnessId, placeOf, type QueuedMessage, type ThreadSummary } from "@openorc/protocol";
+import type { QueuedMessage, ThreadSummary } from "@openorc/protocol";
 import { useState } from "react";
 import { Pressable, View, type LayoutChangeEvent } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRpcMutation } from "../client";
 import { Square } from "../generated/icons";
-import { ownPaused, threadTogetherOf } from "../thread/cloud-together";
 import { SessionRecovery } from "../thread/SessionRecovery";
 import { cn } from "../ui/cn";
 import { Text } from "../ui/Text";
 import { ComposerPlane } from "./ComposerPlane";
-import { MessageQueue } from "./MessageQueue";
 import { SendButton } from "./SendButton";
+import { ThreadQueue } from "./ThreadQueue";
 import { useComposer, type ComposerInput } from "./use-composer";
 
 type Settings = ReturnType<ClientState["useConversationSettings"]>;
@@ -30,36 +28,6 @@ export interface ComposerProps extends Omit<ComposerInput, "threadId"> {
    * left to it.
    */
   to?: string;
-}
-
-/** Messages waiting for the running turn, each able to go now or leave the queue. */
-function Queue({ thread, queued, canSteer, typing, onSent }: { thread: ThreadSummary; queued: QueuedMessage[]; canSteer: boolean; typing: boolean; onSent: () => void }) {
-  const unqueue = useRpcMutation("threads.unqueue");
-  const sendQueued = useRpcMutation("threads.sendQueued");
-  const startQueued = useRpcMutation("threads.startQueued");
-  const failure = (unqueue.error ?? sendQueued.error ?? startQueued.error)?.message;
-  return (
-    <>
-      <MessageQueue
-        messages={queued}
-        canSend={canSteer}
-        pending={unqueue.isPending || sendQueued.isPending || startQueued.isPending}
-        agentName={harnessShortName(isHarnessId(thread.agent) ? thread.agent : "codex")}
-        typing={typing}
-        onSend={(messageId) => {
-          sendQueued.mutate({ id: thread.id, messageId });
-          onSent();
-        }}
-        onRemove={(messageId) => unqueue.mutate({ id: thread.id, messageId })}
-        paused={ownPaused(threadTogetherOf(thread))}
-        onStart={(messageId) => {
-          startQueued.mutate({ threadId: thread.id, messageId });
-          onSent();
-        }}
-      />
-      {failure ? <Text className="px-1 text-sm text-bad">{failure}</Text> : null}
-    </>
-  );
 }
 
 /** What holds the composer back, in words: a failure in red, else why its send is dimmed. */
@@ -93,8 +61,7 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
   return (
     <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
       <View onLayout={onLayout} className="gap-2 bg-bg px-3 pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
-        {/* A waiting message of a cloud thread goes now from the Mac, which sees the turn it would join. */}
-        <Queue thread={thread} queued={queued} canSteer={input.canSteer && !placeOf(thread).elsewhere} typing={typing} onSent={input.onSent} />
+        <ThreadQueue thread={thread} queued={queued} canSteer={input.canSteer} typing={typing} onSent={input.onSent} />
         {typing || input.working ? null : <SessionRecovery thread={thread} request={input.request} disabled={input.disabledReason !== null} onSent={input.onSent} />}
         <ComposerNotice failure={failure} dim={composer.dimReason} />
         <ComposerPlane

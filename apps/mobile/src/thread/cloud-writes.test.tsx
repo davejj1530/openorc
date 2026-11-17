@@ -4,7 +4,9 @@ import type { RpcMethod, ThreadCollaboration } from "@openorc/protocol";
 import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
+import { ThreadQueue } from "../composer/ThreadQueue";
 import { useComposer, type ComposerInput } from "../composer/use-composer";
+import { fixtureThreads } from "../home/test-fixtures/threads";
 import type { FakeMac } from "../test-fixtures/fake-mac";
 import { ApprovalCard } from "./cards";
 import { TogetherContext, turnSeen } from "./cloud-together";
@@ -138,4 +140,18 @@ it("answers on this Mac as always, with nothing named", async () => {
   render(createElement(ApprovalCard, { block: approval, runId: "mac-run" }), { wrapper: withTogether(null) });
   await act(async () => fireEvent.click(screen.getByText("Allow")));
   expect(mac.calls).toEqual([{ method: "approvals.resolve", params: { runId: "mac-run", approvalId: "ask-1", decision: "allow" } }]);
+});
+
+it("sends a waiting message now into the running turn it saw, in a cloud thread as on the Mac", async () => {
+  const thread = { ...fixtureThreads[0]!, id: "t1", owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 1 } };
+  const queued = [{ id: "q1", text: "And the footer too", attachments: [], queuedAt: 1 }];
+  render(
+    <TogetherContext.Provider value={together({})}>
+      <ThreadQueue thread={thread} queued={queued} canSteer typing={false} onSent={() => undefined} />
+    </TogetherContext.Provider>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  fireEvent.click(screen.getByRole("button", { name: /^1 queued/ }));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Send now" })));
+  expect(mac.calls).toContainEqual({ method: "threads.sendQueued", params: { id: "t1", messageId: "q1", expectedTurnId: "turn-7" } });
 });

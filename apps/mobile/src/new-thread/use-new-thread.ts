@@ -13,6 +13,7 @@ import { haptic } from "../ui/haptics";
 import { useSheetDraft, useSheetPermission } from "./drafts";
 import type { ProjectChoice } from "../projects";
 import { startBlocker, unstarted, type SheetDraft } from "./new-thread-state";
+import { projectReach, useMacReach } from "./project-reach";
 
 /**
  * A new thread in one project, with the desktop's defaults: the model for the Mac's default harness or its first
@@ -53,7 +54,9 @@ export function useNewThread(project: ProjectChoice) {
     },
     claudeAccount: { chosen: claudeAccountId, select: (claudeAccountId) => change({ claudeAccountId }), projectId },
   };
-  const blocker = startBlocker(draft, { permissionReady: permission.ready });
+  // A Mac project waits for the Mac: Start is held with why, rather than sent to fail.
+  const reach = projectReach(project, useMacReach());
+  const blocker = startBlocker(draft, { permissionReady: permission.ready }) ?? reach;
   const controls = composerControls({
     text: draft.prompt,
     attachments: draft.images.length,

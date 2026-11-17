@@ -227,7 +227,8 @@ export const rpcParams = {
   /** Ask the agent to summarise the conversation so far and continue from the summary. */
   "threads.compact": z.object({ id: z.string(), requestKey: z.string().min(1).max(200).optional() }),
   "threads.unqueue": z.object({ id: z.string(), messageId: z.string().min(1) }),
-  "threads.sendQueued": z.object({ id: z.string(), messageId: z.string().min(1) }),
+  /** A waiting message, now, into the turn its sender saw running (`expectedTurnId`), never into one that started since. */
+  "threads.sendQueued": z.object({ id: z.string(), messageId: z.string().min(1), expectedTurnId: z.string().min(1).optional() }),
   /** Stop a command the agent left running in the background, such as a dev server. */
   "threads.stopCommand": z.object({ id: z.string(), commandId: z.string().min(1) }),
   /**

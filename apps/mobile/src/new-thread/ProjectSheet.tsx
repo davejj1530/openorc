@@ -8,18 +8,62 @@ import { Check, Search, X } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { ListPressable } from "../ui/ListPressable";
+import type { ProjectChoice } from "../projects";
 import { Text } from "../ui/Text";
 import { projectIcon } from "./project-icon";
+import { projectReach, useMacReach } from "./project-reach";
 
 function closeSheet() {
   Keyboard.dismiss();
   router.back();
 }
 
+/**
+ * One project in the sheet: its glyph and name, read as out of reach (`away`, why) while the place it needs is, as a
+ * place out of reach does on Home, and checked while chosen.
+ */
+function ProjectRow({
+  choice,
+  on,
+  away,
+  disabled,
+  onPress,
+  onLayout,
+}: {
+  choice: ProjectChoice;
+  on: boolean;
+  away: string | null;
+  disabled: boolean;
+  onPress: () => void;
+  onLayout: (layout: { y: number; height: number }) => void;
+}) {
+  const Icon = projectIcon(choice, on);
+  return (
+    <ListPressable
+      accessibilityRole="radio"
+      accessibilityLabel={away ? `${choice.name}, ${away}` : choice.name}
+      accessibilityState={{ checked: on, disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      onLayout={({ nativeEvent }) => onLayout(nativeEvent.layout)}
+      className={cn("mx-3 min-h-touch-row flex-row items-center gap-3 rounded-md px-3 active:bg-surface-3", on && "bg-surface-2", choice.id === WORKSPACE_ID && "mb-2")}
+    >
+      <View className={cn("min-w-0 flex-1 flex-row items-center gap-3", away && "opacity-40")}>
+        <Icon size={18} className="text-ink-3" />
+        <Text numberOfLines={1} className="min-w-0 flex-1 text-md">
+          {choice.name}
+        </Text>
+      </View>
+      {on ? <Check size={16} /> : null}
+    </ListPressable>
+  );
+}
+
 /** A searchable list of the new thread's projects, including Workspace and, in a space, its cloud projects. */
 export function ProjectSheet() {
   const { composerId } = useLocalSearchParams<{ composerId: string }>();
   const project = useSharedSettings(composerId)?.project;
+  const macReach = useMacReach();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
   const search = query.trim().toLocaleLowerCase();
@@ -80,14 +124,13 @@ export function ProjectSheet() {
       </View>
       {choices.map((choice) => {
         const on = choice.id === project?.chosen;
-        const Icon = projectIcon(choice, on);
         return (
-          <ListPressable
+          <ProjectRow
             key={choice.id}
-            accessibilityRole="radio"
-            accessibilityLabel={choice.name}
-            accessibilityState={{ checked: on, disabled: project?.disabled }}
-            disabled={project?.disabled}
+            choice={choice}
+            on={on}
+            away={projectReach(choice, macReach)}
+            disabled={Boolean(project?.disabled)}
             onPress={() => {
               if (!project || project.disabled) return;
               if (!on) {
@@ -96,19 +139,12 @@ export function ProjectSheet() {
               }
               closeSheet();
             }}
-            onLayout={({ nativeEvent }) => {
+            onLayout={(layout) => {
               if (!on) return;
-              currentRow.current = nativeEvent.layout;
+              currentRow.current = layout;
               reveal();
             }}
-            className={cn("mx-3 min-h-touch-row flex-row items-center gap-3 rounded-md px-3 active:bg-surface-3", on && "bg-surface-2", choice.id === WORKSPACE_ID && "mb-2")}
-          >
-            <Icon size={18} className="text-ink-3" />
-            <Text numberOfLines={1} className="min-w-0 flex-1 text-md">
-              {choice.name}
-            </Text>
-            {on ? <Check size={16} /> : null}
-          </ListPressable>
+          />
         );
       })}
       {!choices.length ? <Text className="px-6 py-6 text-center text-md text-ink-3">No projects found</Text> : null}

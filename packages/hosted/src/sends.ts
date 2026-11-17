@@ -135,10 +135,10 @@ export async function unqueue(calls: Calls, { id, messageId }: RpcParams<"thread
 }
 
 /** threads.sendQueued: the same message again, now: it steers the running turn, or a refused one is tried again. */
-export async function sendQueued(calls: Calls, { id, messageId }: RpcParams<"threads.sendQueued">): Promise<QueuedMessage[]> {
+export async function sendQueued(calls: Calls, { id, messageId, expectedTurnId }: RpcParams<"threads.sendQueued">): Promise<QueuedMessage[]> {
   const waiting = calls.row(id).waiting.find((message) => message.id === messageId);
   if (!waiting) return toQueued(calls.row(id));
-  await post(calls, id, { id: waiting.id, text: waiting.text });
+  await post(calls, id, { id: waiting.id, text: waiting.text, expectedTurnId });
   return toQueued(calls.row(id));
 }
 

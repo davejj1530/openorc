@@ -5,9 +5,11 @@ import { ChevronDown } from "../generated/icons";
 import type { ProjectChoice } from "../projects";
 import type { IconProps } from "../ui/icon";
 import { Text } from "../ui/Text";
+import { cn } from "../ui/cn";
 import { projectIcon } from "./project-icon";
+import { projectReach, useMacReach } from "./project-reach";
 
-function Picker({ label, name, Icon, disabled, onPress }: { label: string; name: string; Icon: ComponentType<IconProps>; disabled: boolean; onPress: () => void }) {
+function Picker({ label, name, Icon, away, disabled, onPress }: { label: string; name: string; Icon: ComponentType<IconProps>; away: boolean; disabled: boolean; onPress: () => void }) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -21,7 +23,10 @@ function Picker({ label, name, Icon, disabled, onPress }: { label: string; name:
       hitSlop={{ top: 4, bottom: 4 }}
       className="h-control-xl min-w-0 flex-shrink flex-row items-center gap-2 rounded-full bg-surface-2 px-3 active:bg-surface-3"
     >
-      <Icon size={16} className="text-ink-3" />
+      {/* The glyph takes its ink from its class; its fade, while the project's place is out of reach, is the view's. */}
+      <View className={cn(away && "opacity-40")}>
+        <Icon size={16} className="text-ink-3" />
+      </View>
       <Text numberOfLines={1} className="min-w-0 flex-shrink text-md">
         {name}
       </Text>
@@ -32,10 +37,12 @@ function Picker({ label, name, Icon, disabled, onPress }: { label: string; name:
 
 /** The new thread's project, above the composer. */
 export function NewThreadPickers({ composerId, project, starting, uploading }: { composerId: string; project: ProjectChoice; starting: boolean; uploading: boolean }) {
+  const away = projectReach(project, useMacReach());
   return (
     <View className="min-h-touch flex-row items-center gap-2 px-3">
       <Picker
-        label={`Project, ${project.name}`}
+        away={away !== null}
+        label={away ? `Project, ${project.name}, ${away}` : `Project, ${project.name}`}
         name={project.name}
         Icon={projectIcon(project, true)}
         disabled={starting || uploading}

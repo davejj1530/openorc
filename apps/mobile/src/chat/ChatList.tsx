@@ -1,16 +1,16 @@
 import { teamChatList, type TeamChatLease, type TeamChatListRow } from "@openorc/client";
 import { router } from "expo-router";
 import { useState } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { call, teamChat } from "../client";
 import { failureMessage } from "../failure";
 import { ListPressable } from "../ui/ListPressable";
-import { PersonFace } from "../ui/PersonFace";
 import { Text } from "../ui/Text";
+import { ConversationFace, type ChatPresence } from "./ChatFace";
 
-/** One conversation: a person's face, or a channel's #, its title, and what is unread in it, an @ where it tags the person. */
-function ChatRow({ row, onOpen }: { row: TeamChatListRow; onOpen: (row: TeamChatListRow) => void }) {
+/** One conversation: its face, its title, and what is unread in it, an @ where it tags the person. */
+function ChatRow({ row, self, presence, onOpen }: { row: TeamChatListRow; self: string; presence: ChatPresence; onOpen: (row: TeamChatListRow) => void }) {
   const unread = row.unread > 0;
   return (
     <ListPressable
@@ -19,13 +19,7 @@ function ChatRow({ row, onOpen }: { row: TeamChatListRow; onOpen: (row: TeamChat
       onPress={() => onOpen(row)}
       className="mx-3 min-h-touch flex-row items-center gap-3 rounded-lg px-2 py-2.5 active:bg-surface-2"
     >
-      {row.kind === "person" ? (
-        <PersonFace name={row.person.name} image={row.person.image} size="md" />
-      ) : (
-        <View className="size-5 items-center justify-center">
-          <Text className="text-md text-ink-4">#</Text>
-        </View>
-      )}
+      <ConversationFace row={row} self={self} presence={presence} />
       <Text numberOfLines={1} className="min-w-0 flex-1 text-lg text-ink">
         {row.title}
       </Text>
@@ -44,6 +38,7 @@ export function ChatList({ lease, top, bottom }: { lease: TeamChatLease; top: nu
   const state = teamChat.useChatState(lease);
   const [failure, setFailure] = useState<string | null>(null);
   const rows = teamChatList(state.data, lease.accountId);
+  const presence = teamChat.usePresence(lease, state.data?.state === "ready" && state.data.chat.features.includes("presence"));
   const open = async (row: TeamChatListRow) => {
     setFailure(null);
     try {
@@ -58,7 +53,7 @@ export function ChatList({ lease, top, bottom }: { lease: TeamChatLease; top: nu
       {failure ? <Text className="px-5 pb-2 text-sm text-bad">{failure}</Text> : null}
       {state.error ? <Text className="px-5 py-10 text-center text-ink-4">{state.error.message}</Text> : null}
       {rows.map((row) => (
-        <ChatRow key={row.id} row={row} onOpen={(each) => void open(each)} />
+        <ChatRow key={row.id} row={row} self={lease.accountId} presence={presence} onOpen={(each) => void open(each)} />
       ))}
     </ScrollView>
   );

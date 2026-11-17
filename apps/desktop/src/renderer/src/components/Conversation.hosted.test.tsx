@@ -125,6 +125,18 @@ it("still offers Fork on a thread of this Mac", async () => {
   expect(composer.props!.commands?.map((command) => command.name)).toContain("fork");
 });
 
+it("offers Compact in a cloud thread only once its server serves it", async () => {
+  queries.set("hosted.capabilities", { version: 1, features: {} });
+  await open();
+  expect(composer.props!.commands?.map((command) => command.name)).not.toContain("compact");
+  expect(composer.props!.onCompact).toBeUndefined();
+  cleanup();
+  queries.set("hosted.capabilities", { version: 1, features: { compact: { available: true } } });
+  await open();
+  await waitFor(() => expect(composer.props!.commands?.map((command) => command.name)).toContain("compact"));
+  expect(composer.props!.onCompact).toBeTypeOf("function");
+});
+
 it("leaves out of a cloud thread's composer what OpenOrc Cloud does not take yet", async () => {
   await open();
   const props = composer.props!;

@@ -48,7 +48,7 @@ import {
 import { openThread, useRouter, type MessageTarget } from "../lib/router";
 import { useConnectorMentions } from "../lib/connector-mentions";
 import { OWN_SKILLS_SCOPE, useSkillCommands } from "../lib/skill-commands";
-import { useHostedSkills } from "../hooks/useHostedCapabilities";
+import { useHostedCapabilities, useHostedSkills } from "../hooks/useHostedCapabilities";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { ThreadVoicesContext, useThreadVoices } from "../lib/thread-authors";
 import { ThreadNotesContext, useComposerNotes, useMentionReveal, useThreadNotes, type ThreadNotesValue } from "./ThreadNotes";
@@ -284,7 +284,9 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const skills = useSkillCommands(...skillsAsked);
   const connectorMentions = useConnectorMentions(suggestScope, choice?.agent, executionMode(mode, permission));
   const onFork = thread && !forkUnavailable(thread.agent) && !placeOf(thread).elsewhere ? forkConversation : undefined;
-  const commands: SlashCommand[] = [...threadCommands({ thread, working, compact: cloud.hosted ? undefined : compact.mutate, fork: onFork }), ...skills.commands];
+  // A cloud thread compacts where its server serves it; until then the composer shows /compact held with its reason.
+  const compactHeld = useHostedCapabilities(thread).reason("compact") !== null;
+  const commands: SlashCommand[] = [...threadCommands({ thread, working, compact: compactHeld ? undefined : compact.mutate, fork: onFork }), ...skills.commands];
   const marks = useMessageMarks(skills.commands, connectorMentions);
 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
@@ -380,7 +382,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
               context={cloud.hosted ? (liveTranscript?.context ?? null) : (thread?.context ?? null)}
               compacting={compact.isPending}
               generatingImage={generatingImage}
-              onCompact={thread && !working ? () => compact.mutate({ id: thread.id }) : undefined}
+              onCompact={thread && !working && !compactHeld ? () => compact.mutate({ id: thread.id }) : undefined}
               compactDisabledReason={working ? "Available after this turn finishes." : undefined}
               fileSearch={conversation}
               commands={commands}

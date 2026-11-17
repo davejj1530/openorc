@@ -14,6 +14,33 @@ interface QueryState {
   flushTimer: ReturnType<typeof setTimeout> | null;
 }
 
+/** The key the core pushes when a thread is read at another place from now on (a move between this Mac and OpenOrc Cloud). */
+const PLACE = "place:";
+
+/** Whether a read is about the thread: named by its params, or a run of it in OpenOrc Cloud. */
+function readsThread(query: Query, threadId: string): boolean {
+  const params = query.queryKey[1] as Record<string, unknown> | undefined;
+  const scope = params?.["scope"] as { id?: unknown } | undefined;
+  return params?.["threadId"] === threadId || params?.["id"] === threadId || scope?.id === threadId || params?.["runId"] === `hosted:${threadId}`;
+}
+
+/** A turn of the event loop: by then the screen has drawn what the cache just took. */
+const drawn = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+/**
+ * Threads read at another place from now on. What each is now is read first, and the screen draws it, so what it
+ * showed for the old place unmounts or stops asking; then its reads no reader holds any more are dropped, and the rest
+ * are read again where it is. A read of the old place is never asked again.
+ */
+async function moved(q: QueryState, threadIds: readonly string[]): Promise<void> {
+  await Promise.all(threadIds.map((id) => q.client.refetchQueries({ queryKey: ["threads.get", { id }], exact: true })));
+  await drawn();
+  await drawn();
+  const about = (query: Query) => query.queryKey[0] !== "threads.get" && threadIds.some((id) => readsThread(query, id));
+  q.client.removeQueries({ predicate: (query) => about(query) && query.getObserversCount() === 0 });
+  await q.client.invalidateQueries({ predicate: about });
+}
+
 function flushInvalidations(q: QueryState, cancelRefetch = true): void {
   if (q.flushTimer) {
     clearTimeout(q.flushTimer);
@@ -22,7 +49,14 @@ function flushInvalidations(q: QueryState, cancelRefetch = true): void {
   if (q.pendingTags.size === 0) return;
   const batch = new Set(q.pendingTags);
   q.pendingTags.clear();
-  const predicate = (query: Query) => ((query.meta?.["tags"] as string[] | undefined) ?? []).some((t) => batch.has(t));
+  const threadIds = [...batch].flatMap((tag) => (tag.startsWith(PLACE) ? [tag.slice(PLACE.length)] : []));
+  if (threadIds.length) void moved(q, threadIds).then(() => refresh(q, batch, cancelRefetch, (query) => !threadIds.some((id) => readsThread(query, id))));
+  else refresh(q, batch, cancelRefetch);
+}
+
+/** Reads the batch's tags name again; `outside`, when given, keeps the reads it refuses out of the pass. */
+function refresh(q: QueryState, batch: ReadonlySet<string>, cancelRefetch: boolean, outside: (query: Query) => boolean = () => true): void {
+  const predicate = (query: Query) => outside(query) && ((query.meta?.["tags"] as string[] | undefined) ?? []).some((t) => batch.has(t));
   // Without cancelling, a read already loading absorbs this refresh, yet it may predate the change announced: read it once more after.
   const loading = cancelRefetch ? [] : q.client.getQueryCache().findAll({ predicate, fetchStatus: "fetching" });
   void q.client.invalidateQueries({ predicate }, { cancelRefetch }).then(() => {

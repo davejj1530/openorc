@@ -67,7 +67,15 @@ it("compacts through the server as the asker's own turn, the same request asked 
   await expect(hosted.threads.call("threads.compact", { id })).rejects.toThrow("Wait for the current turn to finish before compacting.");
 });
 
-it("refuses full output without substituting a Mac tool result", async () => {
+it("reads a tool call's whole output from a server that serves it", async () => {
+  stand.threadFiles.capabilities = { toolOutput: { available: true } };
+  const whole = "line of output\n".repeat(5_000);
+  stand.append(id, [{ type: "tool.call.completed", ts: 40, toolCallId: "tool-1", output: whole }]);
+  await expect(hosted.threads.call("events.toolOutput", { runId: `hosted:${id}`, toolCallId: "tool-1" })).resolves.toEqual({ output: whole });
+  await expect(hosted.threads.call("events.toolOutput", { runId: `hosted:${id}`, toolCallId: "never-ended" })).resolves.toEqual({ output: null });
+});
+
+it("refuses full output from a server that does not serve it, without substituting a Mac tool result", async () => {
   await expect(hosted.threads.call("events.toolOutput", { runId: `hosted:${id}`, toolCallId: "tool-1" })).rejects.toThrow("The full tool output isn't available for this cloud thread.");
 });
 

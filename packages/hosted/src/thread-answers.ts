@@ -4,7 +4,7 @@ import { toRuns } from "./translate.js";
 import * as sends from "./sends.js";
 import * as review from "./thread-review.js";
 import * as terminals from "./thread-terminals.js";
-import { lastMessage } from "./thread-history.js";
+import { lastMessage, toolOutput } from "./thread-history.js";
 import { capabilities } from "./capabilities.js";
 import { nativeRuns, stopNative } from "./subthreads.js";
 import * as together from "./collaboration.js";
@@ -90,7 +90,7 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "threads.fork": refused(HOSTED_REASONS.fork),
   "subagents.stop": stopNative,
   "runs.close": refused("Closing a cloud agent session isn't available yet."),
-  "events.toolOutput": refused(HOSTED_REASONS.toolOutput),
+  "events.toolOutput": toolOutput,
   "tasks.create": refused(HOSTED_REASONS.tasks),
   "orclings.ask": refused("Orclings aren't available in this cloud thread yet."),
   "orclings.assign": refused("Orclings aren't available in this cloud thread yet."),

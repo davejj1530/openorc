@@ -33,7 +33,7 @@ import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 import { attachedPath, StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInCollaboration } from "./stand-in-collaboration.js";
 import { StandInNotes } from "./stand-in-notes.js";
-import { headOf, lastAgentSeq, messageOf, pageOf, turnEnd, turnEnds, wire } from "./stand-in-thread-log.js";
+import { headOf, lastAgentSeq, messageOf, pageOf, toolOutputOf, turnEnd, turnEnds, wire } from "./stand-in-thread-log.js";
 import { parentOf, placeOwn, placeShared, startTurn } from "./stand-in-thread-placement.js";
 import { StandInCompactions } from "./stand-in-compactions.js";
 import type { UploadedFile } from "../wire-files.js";
@@ -260,11 +260,12 @@ export class StandInThreads {
       const read = [...this.#threads.values()].filter((thread) => this.#reads(as.who, thread) && thread.space === as.space).sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
       return { status: 200, body: { threads: read.map((thread) => this.#rowOf(thread, as.who)) } };
     }
-    const match = /^\/hosted\/threads\/([^/]+)(\/events|\/compact|\/commands\/([^/]+)\/stop)?$/.exec(path);
+    const match = /^\/hosted\/threads\/([^/]+)(\/events|\/compact|\/commands\/([^/]+)\/stop|\/tool-calls\/([^/]+)\/output)?$/.exec(path);
     if (!match) return null;
     const thread = this.#readable(as, decodeURIComponent(match[1]!));
     if (!thread) return missing();
     if (method === "GET" && match[2] === "/events") return { status: 200, body: pageOf(thread, query) };
+    if (match[4]) return { status: 200, body: toolOutputOf(thread, decodeURIComponent(match[4])) };
     if (!match[2]) return this.#one(method, thread, as.who, body);
     return method === "POST" ? this.#act(thread, as.who, match[3] ? decodeURIComponent(match[3]) : null, body) : null;
   }

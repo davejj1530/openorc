@@ -290,6 +290,8 @@ export const ROUTES = {
   ready: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/ready`, null),
   answer: (askId: string) => route("POST", `/hosted/asks/${encodeURIComponent(askId)}/answer`, wireAnswered),
   stopCommand: (id: string, commandId: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/commands/${encodeURIComponent(commandId)}/stop`, null),
+  /** One tool call's whole output, as the server kept it; null output for a call that never ended. */
+  toolOutput: (id: string, toolCallId: string) => route("GET", `/hosted/threads/${encodeURIComponent(id)}/tool-calls/${encodeURIComponent(toolCallId)}/output`, z.object({ output: z.unknown() })),
   /** The agent folds the conversation between turns. Asking again with the same id is the same compaction. */
   compact: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/compact`, wireCompacting),
 } as const;

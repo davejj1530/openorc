@@ -9,9 +9,8 @@
  *   4. A start that asks for OpenOrc Cloud goes to it, and never to this Mac, which would start the thread somewhere
  *      the person did not choose.
  */
-import type { HostedSpaces, HostedThreads } from "@openorc/hosted";
-import { mergeThreadPages, ownerRoute, rpcParams, type RoutedMethod, type RpcMethod, type RpcParams, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
-import type { RpcReply } from "../transport.js";
+import type { HostedSpaces, HostedThreads } from "../index.js";
+import { mergeThreadPages, ownerRoute, rpcParams, type RoutedMethod, type RpcMethod, type RpcParams, type RpcReply, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
 import { SpaceRequests } from "./space-requests.js";
 import { HostedCallGuard, heldHereCall } from "./hosted-call-guard.js";
 

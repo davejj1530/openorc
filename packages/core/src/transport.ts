@@ -1,7 +1,7 @@
-import type { CorePush } from "@openorc/protocol";
+import type { CorePush, RpcReply } from "@openorc/protocol";
 
 /** The answer to one request. It goes back only to the window that sent it, on that window's own port. */
-export type RpcReply = Extract<CorePush, { type: "rpc.result" | "rpc.error" }>;
+export type { RpcReply };
 
 /** What every window hears: frames, invalidations, notices, logs and startup state. Never a reply. */
 export type Broadcast = Exclude<CorePush, RpcReply>;

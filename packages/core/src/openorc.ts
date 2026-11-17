@@ -26,7 +26,7 @@ import { HostedSkills } from "./services/hosted-skills.js";
 import { createHostedSkillsCloudHandlers } from "./handlers/hosted-skills-cloud.js";
 import { createMacProjectsHandlers } from "./handlers/mac-projects.js";
 import { MacProjects } from "./services/mac-projects.js";
-import { PlaceRouter } from "./services/place-router.js";
+import { PlaceRouter } from "@openorc/hosted/router";
 import { rememberedConnectors } from "./services/remembered-connectors.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
 import { createCodeExplanationHandlers } from "./handlers/code-explanations.js";

@@ -793,3 +793,5 @@ export const CorePush = z.discriminatedUnion("type", [
   z.object({ type: z.literal("bench.done"), eventsSent: z.number(), framesSent: z.number(), durationMs: z.number() }),
 ]);
 export type CorePush = z.infer<typeof CorePush>;
+/** The answer to one request: its result or its error, sent back to the one caller that asked. */
+export type RpcReply = Extract<CorePush, { type: "rpc.result" | "rpc.error" }>;

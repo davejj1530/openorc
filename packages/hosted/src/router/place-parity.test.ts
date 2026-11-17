@@ -1,4 +1,4 @@
-import type { HostedThreads } from "@openorc/hosted";
+import type { HostedThreads } from "../index.js";
 import { describe, expect, it, vi } from "vitest";
 import { PlaceRouter } from "./place-router.js";
 

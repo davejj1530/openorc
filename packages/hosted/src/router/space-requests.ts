@@ -1,6 +1,5 @@
-import type { HostedSpaces, HostedThreads } from "@openorc/hosted";
-import { mergeThreadPages, rpcParams, WORKSPACE_ID, type RpcMethod, type RpcParams, type RpcRequest, type RpcResults, type SpaceProject } from "@openorc/protocol";
-import type { RpcReply } from "../transport.js";
+import type { HostedSpaces, HostedThreads } from "../index.js";
+import { mergeThreadPages, rpcParams, WORKSPACE_ID, type RpcMethod, type RpcParams, type RpcReply, type RpcRequest, type RpcResults, type SpaceProject } from "@openorc/protocol";
 
 interface Dependencies {
   spaces(): Pick<HostedSpaces, "status" | "projects" | "people"> | null;

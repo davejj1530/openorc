@@ -7,6 +7,7 @@
   "description": "OpenOrc Cloud as the app speaks to it: the account, answered in the app's own shapes.",
   "exports": {
     ".": "./src/index.ts",
+    "./router": "./src/router/place-router.ts",
     "./testing": "./src/testing/stand-in.ts"
   },
   "scripts": {

@@ -1,4 +1,4 @@
-import type { HostedThreads } from "@openorc/hosted";
+import type { HostedThreads } from "../index.js";
 import { HOSTED_REASONS, hostedThreadOf, ownerRoute, type RpcMethod } from "@openorc/protocol";
 
 function threadOf(method: RpcMethod, params: Record<string, unknown>): string | null {

@@ -10,6 +10,7 @@ import { cn } from "../ui/cn";
 import { Text } from "../ui/Text";
 import { ComposerPlane } from "./ComposerPlane";
 import { SendButton } from "./SendButton";
+import { HandoffCard } from "./HandoffCard";
 import { ThreadQueue } from "./ThreadQueue";
 import { useComposer, type ComposerInput } from "./use-composer";
 
@@ -63,6 +64,7 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
       <View onLayout={onLayout} className="gap-2 bg-bg px-3 pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
         <ThreadQueue thread={thread} queued={queued} canSteer={input.canSteer} typing={typing} onSent={input.onSent} />
         {typing || input.working ? null : <SessionRecovery thread={thread} request={input.request} disabled={input.disabledReason !== null} onSent={input.onSent} />}
+        <HandoffCard thread={thread} />
         <ComposerNotice failure={failure} dim={composer.dimReason} />
         <ComposerPlane
           composerId={thread.id}

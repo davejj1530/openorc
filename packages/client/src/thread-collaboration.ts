@@ -83,6 +83,15 @@ export function threadWriteBlock(thread: Row | null | undefined): string | null 
 /** The one move a handoff block offers its reader: release it, or, with nothing else to press, ask the person who can. */
 export type HandoffAction = { kind: "retry-save" } | { kind: "stop-commands"; commandIds: string[] } | { kind: "stop-work" } | { kind: "note"; note: ThreadHandoffNote };
 
+/** A handoff's move, as its button says it: a cloud thread's terminal is held in the same block as a command, and named for what it is. */
+export function handoffLabel(action: HandoffAction): string {
+  if (action.kind === "note") return `Tag ${personFirst(action.note.to)}`;
+  if (action.kind === "retry-save") return "Retry save";
+  if (action.kind === "stop-work") return "Stop work";
+  if (action.commandIds.length > 0 && action.commandIds.every((id) => id.startsWith("terminal-"))) return action.commandIds.length > 1 ? "Stop terminals" : "Stop terminal";
+  return action.commandIds.length > 1 ? "Stop commands" : "Stop command";
+}
+
 const SAVE_FAILED = "The thread's work could not be saved.";
 
 /**

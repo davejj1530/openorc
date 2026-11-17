@@ -75,6 +75,10 @@ const cloudReplies: { [M in CloudRemoteMethod]: Reply<M> } = {
   "threads.authors": same,
   // The queue as it now stands: messages' own words and their state.
   "threads.startQueued": same,
+  // Nothing comes back from a handoff's moves.
+  "threads.retrySave": same,
+  "threads.stopWork": same,
+  "threads.stopCommand": same,
 };
 
 export function cloudReply<M extends CloudRemoteMethod>(method: M, result: RpcResults[M], context: PhoneShaping): RpcResults[M] {

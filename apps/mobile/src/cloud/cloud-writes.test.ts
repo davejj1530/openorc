@@ -194,3 +194,24 @@ it("refuses a file of the Mac's for a cloud thread in words before the server ta
   expect(await refusal(call("runs.send", { runId: hostedRunId(threadId), text: "Look.", attachments: image }))).toBe("Files can't be sent to OpenOrc Cloud yet.");
   expect(sentTo(threadId).length).toBe(before);
 });
+
+it("releases a turn a handoff holds from the phone's own session: stops the command, the work, and retries the save", async () => {
+  const [teammate, mine] = [threads.teammate, threads.mine];
+  stand.endTurn(teammate);
+  stand.threadCollaboration.handoffs.set(teammate, { code: "handoff_command", responsible: MARA, commandIds: ["c1"] });
+  expect((await together(teammate, (state) => state.handoff !== null)).handoff).toMatchObject({ commandIds: ["c1"] });
+  await call("threads.stopCommand", { id: teammate, commandId: "c1" });
+  await together(teammate, (state) => state.handoff === null);
+  // Work a teammate's turn left reporting back is stopped by one of the thread's people: here its starter.
+  // Every turn sent to it before has ended: a queued message runs as a turn of its own once the one before it ends.
+  await vi.waitFor(async () => {
+    stand.endTurn(mine);
+    expect((await together(mine, () => true)).live).toBeNull();
+  });
+  stand.threadCollaboration.handoffs.set(mine, { code: "handoff_unavailable", responsible: MARA, commandIds: [] });
+  expect((await together(mine, (state) => state.handoff !== null)).handoff).toMatchObject({ stopWork: true });
+  await call("threads.stopWork", { threadId: mine });
+  await together(mine, (state) => state.handoff === null);
+  await call("threads.retrySave", { threadId: teammate });
+  expect(stand.requests.some((request) => request.path === `/hosted/threads/${teammate}/retry-save`)).toBe(true);
+});

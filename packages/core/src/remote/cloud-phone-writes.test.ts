@@ -148,3 +148,22 @@ it("starts a cloud thread in a space's project, and keeps its own pin as the rea
   await phone.call("threads.update", { id: at.cloud.threads.mine, patch: { pinned: true } });
   expect(await at.window("threads.get", { id: at.cloud.threads.mine })).toMatchObject({ pinnedAt: expect.any(Number) });
 });
+
+it("releases a turn a handoff holds, as the person's own window does: stops the command, the work, and retries the save", async () => {
+  const { teammate, mine } = at.cloud.threads;
+  at.stand.endTurn(teammate);
+  at.stand.threadCollaboration.handoffs.set(teammate, { code: "handoff_command", responsible: MARA, commandIds: ["c1"] });
+  await together(teammate, (state) => state.handoff?.commandIds[0] === "c1");
+  await phone.call("threads.stopCommand", { id: teammate, commandId: "c1" });
+  await together(teammate, (state) => state.handoff === null);
+  await vi.waitFor(async () => {
+    at.stand.endTurn(mine);
+    expect((await together(mine, () => true)).live).toBeNull();
+  });
+  at.stand.threadCollaboration.handoffs.set(mine, { code: "handoff_unavailable", responsible: MARA, commandIds: [] });
+  await together(mine, (state) => state.handoff?.stopWork === true);
+  await phone.call("threads.stopWork", { threadId: mine });
+  await together(mine, (state) => state.handoff === null);
+  await phone.call("threads.retrySave", { threadId: teammate });
+  expect(at.stand.requests.some((request) => request.path === `/hosted/threads/${teammate}/retry-save`)).toBe(true);
+});

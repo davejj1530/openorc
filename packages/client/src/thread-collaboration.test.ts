@@ -6,6 +6,7 @@ import {
   canStopCommands,
   canStopTurn,
   handoffCard,
+  handoffLabel,
   mentionLeads,
   personFirst,
   personName,
@@ -155,6 +156,19 @@ describe("a teammate's cloud thread on today's server", () => {
     // Joining a running turn is not held by a handoff, so there is no card while one runs and takes messages.
     expect(handoffCard(row(together(THEO, { canWrite: true, send: "now", handoff: command, live: live(MARA) }), "running", mara))).toBeNull();
     expect(handoffCard(idle(null))).toBeNull();
+  });
+
+  it("names the handoff's move on its button, a cloud thread's terminal as a terminal", () => {
+    const stop = (...commandIds: string[]) => handoffLabel({ kind: "stop-commands", commandIds });
+    expect([stop("c1"), stop("c1", "c2"), stop("terminal-1"), stop("terminal-1", "terminal-2"), stop("terminal-1", "c2")]).toEqual([
+      "Stop command",
+      "Stop commands",
+      "Stop terminal",
+      "Stop terminals",
+      "Stop commands",
+    ]);
+    expect([handoffLabel({ kind: "retry-save" }), handoffLabel({ kind: "stop-work" })]).toEqual(["Retry save", "Stop work"]);
+    expect(handoffLabel({ kind: "note", note: { to: MARA, text: "@Mara can you retry the save?", mention: { start: 0, end: 5 } } })).toBe("Tag Mara");
   });
 
   it("says a parked ask the reader may answer continues on their own sign-in and hours, in a thread others are in", () => {

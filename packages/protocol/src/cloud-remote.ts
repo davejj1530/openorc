@@ -52,8 +52,8 @@ export interface CloudRemoteRpcResults {
 
 /**
  * What a session that shares cloud threads may call besides REMOTE_METHODS. Default deny like that list, with a guard
- * and a shaped reply per method in the core: the person's spaces, a space's projects, who the person is, and who is at
- * work in a cloud thread and who wrote what in it.
+ * and a shaped reply per method in the core: the person's spaces, a space's projects, who the person is, who is at
+ * work in a cloud thread and who wrote what in it, and the moves that release a turn its handoff holds.
  */
 export const CLOUD_REMOTE_METHODS = [
   "spaces.status",
@@ -63,6 +63,10 @@ export const CLOUD_REMOTE_METHODS = [
   "threads.authors",
   // Starts the reader's own paused message as their own turn.
   "threads.startQueued",
+  // A handoff's moves: retry the save that failed, stop the work or a command the last turn left running.
+  "threads.retrySave",
+  "threads.stopWork",
+  "threads.stopCommand",
 ] as const satisfies readonly RpcMethod[];
 export type CloudRemoteMethod = (typeof CLOUD_REMOTE_METHODS)[number];
 
@@ -82,10 +86,10 @@ export const CLOUD_THREAD_READS = [
 
 /**
  * What such a session may change in an OpenOrc Cloud thread, as the person signed in on the Mac: start one, send, queue,
- * take a waiting message back, start a paused one, stop a turn, answer an ask, and keep the thread as its windows do.
- * Stop and an answer must name the turn and the ask the phone saw, and a send into a running turn names its turn: a
- * phone's screen is always a moment behind the Mac. Sending a queued message now is left to the Mac, which sees the
- * turn it would join.
+ * take a waiting message back, start a paused one, stop a turn, answer an ask, release a turn a handoff holds, and keep
+ * the thread as its windows do. Stop and an answer must name the turn and the ask the phone saw, and a send into a
+ * running turn names its turn: a phone's screen is always a moment behind the Mac. Sending a queued message now is left
+ * to the Mac, which sees the turn it would join.
  */
 export const CLOUD_THREAD_WRITES = [
   "threads.start",
@@ -97,4 +101,7 @@ export const CLOUD_THREAD_WRITES = [
   "runs.interrupt",
   "approvals.resolve",
   "threads.update",
+  "threads.retrySave",
+  "threads.stopWork",
+  "threads.stopCommand",
 ] as const satisfies readonly RoutedMethod[];

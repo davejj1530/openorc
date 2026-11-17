@@ -121,8 +121,9 @@ export function ThreadHeader({
 function ThreadMenu({ thread, renaming, onRename }: { thread: Thread; renaming: boolean; onRename?: () => void }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const header = useCallback(() => trigger.current?.closest("header") ?? null, []);
+  const menu = useRef<Menu.Root.Actions>(null);
   return (
-    <Menu.Root>
+    <Menu.Root actionsRef={menu}>
       <Menu.Trigger ref={trigger} render={<IconButton aria-label="Thread actions" className="thread-more" />}>
         <MoreHorizontal size={16} />
       </Menu.Trigger>
@@ -130,7 +131,7 @@ function ThreadMenu({ thread, renaming, onRename }: { thread: Thread; renaming: 
         <CoversPreview />
         <Menu.Positioner anchor={header} side="bottom" sideOffset={8} align="end" alignOffset={8} collisionAvoidance={{ side: "flip", align: "shift" }} className="z-40" collisionPadding={8}>
           <Menu.Popup ref={floatingGround} className={menuPopup} finalFocus={renaming ? false : undefined}>
-            <ThreadMenuItems thread={thread} parts={Menu} header onRename={onRename} />
+            <ThreadMenuItems thread={thread} parts={Menu} header onRename={onRename} close={() => menu.current?.close()} />
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>

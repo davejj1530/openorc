@@ -25,10 +25,11 @@ export type MenuParts = Pick<typeof Menu, "Item" | "Separator" | "SubmenuRoot" |
  * Where the menu opens. The header's thread is open right there, so opening it again, its parent (the header shows
  * that link) and marking it unread (looking at it reads it) drop out; Rename joins in. A sidebar row keeps them all.
  */
-type ItemsProps = { thread: ThreadSummary; parts: MenuParts; header?: boolean; onRename?: () => void };
+/** `close` closes the menu, for an item that stays open while its work runs and is done once that work is. */
+type ItemsProps = { thread: ThreadSummary; parts: MenuParts; header?: boolean; onRename?: () => void; close?: () => void };
 
 /** Every action a thread has, as menu items. The same list serves the header menu and the sidebar's context menu. */
-export function ThreadMenuItems({ thread, parts: M, header, onRename }: ItemsProps) {
+export function ThreadMenuItems({ thread, parts: M, header, onRename, close }: ItemsProps) {
   const home = orclingHome(useOrclings(), thread.id);
   if (isSubagentThread(thread))
     return (
@@ -52,7 +53,7 @@ export function ThreadMenuItems({ thread, parts: M, header, onRename }: ItemsPro
       </>
     );
   }
-  return <ThreadMenuContent key={thread.id} thread={thread} parts={M} header={header} onRename={onRename} />;
+  return <ThreadMenuContent key={thread.id} thread={thread} parts={M} header={header} onRename={onRename} close={close} />;
 }
 
 function RenameItem({ parts: M, onRename, away = null }: { parts: MenuParts; onRename: () => void; away?: string | null }) {
@@ -85,7 +86,7 @@ function OpenItems({ thread, parts: M }: { thread: ThreadSummary; parts: MenuPar
   );
 }
 
-function ThreadMenuContent({ thread, parts: M, header, onRename }: ItemsProps) {
+function ThreadMenuContent({ thread, parts: M, header, onRename, close }: ItemsProps) {
   const update = useRpcMutation("threads.update");
   const patch = (p: Parameters<typeof update.mutate>[0]["patch"]) => update.mutate({ id: thread.id, patch: p });
   // Mutations can outlive a closed menu. Reopening it must not enable sibling writes. A thread out of reach takes none.
@@ -102,7 +103,7 @@ function ThreadMenuContent({ thread, parts: M, header, onRename }: ItemsProps) {
           <M.Separator className={menuSeparator} />
         </>
       )}
-      <ThreadPlaceItems thread={thread} parts={M} />
+      <ThreadPlaceItems thread={thread} parts={M} close={close} />
       {update.error ? (
         <div className="max-w-64 px-2 py-1 text-xs text-bad break-words" role="alert">
           {update.error.message}

@@ -1,4 +1,5 @@
 import { ContextMenu } from "@base-ui/react/context-menu";
+import { useRef } from "react";
 import { mentionLeads, ownerMark, rowFacts, subagentStatusLabel, threadStatus, threadTreeStatus, useSidebarNow, useTicking, workDuration, type ThreadStatus } from "@openorc/client";
 import { harnessShortName, type ThreadSummary } from "@openorc/protocol";
 import { cn } from "../lib/cn";
@@ -28,6 +29,7 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
   const addPane = useRouter((s) => s.addThreadPane);
   // Every visible work pane is marked alike; aria-current names only the focused one.
   const open = useRouter((s) => s.route.view !== "team-chat" && s.threadIds.includes(thread.id)) || active;
+  const menu = useRef<ContextMenu.Root.Actions>(null);
   const status = threadTreeStatus(threadStatus(thread), subthreads);
   const facts = rowFacts(thread, { now: useSidebarNow(), project: project?.name });
   const child = thread.subagent;
@@ -37,7 +39,7 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
   const detail = [facts.detail, running, mentioned].filter(Boolean).join(" · ");
   const mention = mentionLeads(thread, status);
   return (
-    <ContextMenu.Root>
+    <ContextMenu.Root actionsRef={menu}>
       <ContextMenu.Trigger
         render={
           <button
@@ -67,7 +69,7 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
         <CoversPreview />
         <ContextMenu.Positioner className="z-40" collisionPadding={8}>
           <ContextMenu.Popup ref={floatingGround} className={menuPopup}>
-            <ThreadMenuItems thread={thread} parts={ContextMenu as unknown as MenuParts} />
+            <ThreadMenuItems thread={thread} parts={ContextMenu as unknown as MenuParts} close={() => menu.current?.close()} />
           </ContextMenu.Popup>
         </ContextMenu.Positioner>
       </ContextMenu.Portal>

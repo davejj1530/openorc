@@ -114,14 +114,14 @@ const mount = (element: ReactNode) =>
     </QueryClientProvider>,
   );
 
-function openMenu(thread: ThreadSummary) {
+function openMenu(thread: ThreadSummary, close?: () => void) {
   mount(
     <Menu.Root open>
       <Menu.Portal>
         <CoversPreview />
         <Menu.Positioner>
           <Menu.Popup>
-            <ThreadMenuItems thread={thread} parts={Menu as unknown as MenuParts} />
+            <ThreadMenuItems thread={thread} parts={Menu as unknown as MenuParts} close={close} />
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>
@@ -263,13 +263,15 @@ it("names the folder that stopped a move as the person reads paths, and opens it
   expect(revealFile).toHaveBeenCalledWith(folder);
 });
 
-it("opens a cloud thread's code on this computer, a copy of its newest save, in the file manager", async () => {
+it("opens a cloud thread's code on this computer, a copy of its newest save, in the file manager, then closes the menu", async () => {
   const revealFile = vi.fn();
+  const close = vi.fn(() => expect(revealFile).toHaveBeenCalled());
   Object.assign(window, { openorc: { ...window.openorc, revealFile } });
-  openMenu(cloudThread);
+  openMenu(cloudThread, close);
   fireEvent.click(screen.getByText("OpenOrc Cloud"));
   fireEvent.click(await screen.findByRole("menuitem", { name: /Open on Mac/ }));
   await vi.waitFor(() => expect(revealFile).toHaveBeenCalledWith("/Users/ada/Library/Application Support/OpenOrc/cloud-copies/cloud-example"));
+  expect(close, "once the copy is shown, not when it is chosen").toHaveBeenCalledTimes(1);
   expect(vi.mocked(core.call)).toHaveBeenCalledWith("threads.cloudCopy", { threadId: cloudThread.id });
 });
 

@@ -18,7 +18,7 @@ import { machine, revealLabel } from "../lib/this-computer";
  * thread there. Each row's submenu holds the moves away from there, so the menu below is only about the conversation.
  * A thread moving between this computer and the cloud says where it is going, and nothing else, until it is there.
  */
-export function ThreadPlaceItems({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+export function ThreadPlaceItems({ thread, parts: M, close }: { thread: ThreadSummary; parts: MenuParts; close?: (() => void) | undefined }) {
   const branch = thread.projectId !== WORKSPACE_ID;
   const hosted = thread.owner?.brain === "hosted";
   const moving = movingHold(thread.moving, machine);
@@ -32,7 +32,7 @@ export function ThreadPlaceItems({ thread, parts: M }: { thread: ThreadSummary; 
       ) : (
         <>
           {branch ? <BranchRow thread={thread} parts={M} /> : null}
-          {hosted ? <HostedPlaceRow thread={thread} parts={M} /> : null}
+          {hosted ? <HostedPlaceRow thread={thread} parts={M} close={close} /> : null}
         </>
       )}
       <M.Separator className={menuSeparator} />
@@ -40,11 +40,11 @@ export function ThreadPlaceItems({ thread, parts: M }: { thread: ThreadSummary; 
   );
 }
 
-function HostedPlaceRow({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+function HostedPlaceRow({ thread, parts: M, close }: { thread: ThreadSummary; parts: MenuParts; close: (() => void) | undefined }) {
   return (
     <PlaceRow parts={M} icon={<Cloud size={13} />} label="OpenOrc Cloud">
       <CloudMoveItem thread={thread} parts={M} />
-      <OpenHereItem thread={thread} parts={M} />
+      <OpenHereItem thread={thread} parts={M} close={close} />
     </PlaceRow>
   );
 }
@@ -53,7 +53,7 @@ function HostedPlaceRow({ thread, parts: M }: { thread: ThreadSummary; parts: Me
  * Shows the thread's code here without moving it: a copy of its newest save, made or brought up to date, then opened in
  * the file manager. Held with why when it can't be made (its project isn't here, it has no save yet).
  */
-function OpenHereItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+function OpenHereItem({ thread, parts: M, close }: { thread: ThreadSummary; parts: MenuParts; close: (() => void) | undefined }) {
   const copy = useRpcMutation("threads.cloudCopy");
   const label = (
     <>
@@ -67,7 +67,22 @@ function OpenHereItem({ thread, parts: M }: { thread: ThreadSummary; parts: Menu
       </HostedMenuReason>
     );
   return (
-    <M.Item className={menuItem} closeOnClick={false} disabled={copy.isPending} onClick={() => copy.mutate({ threadId: thread.id }, { onSuccess: (made) => window.openorc.revealFile(made.folder) })}>
+    <M.Item
+      className={menuItem}
+      closeOnClick={false}
+      disabled={copy.isPending}
+      onClick={() =>
+        copy.mutate(
+          { threadId: thread.id },
+          {
+            onSuccess: (made) => {
+              window.openorc.revealFile(made.folder);
+              close?.();
+            },
+          },
+        )
+      }
+    >
       {label}
     </M.Item>
   );

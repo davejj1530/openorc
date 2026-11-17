@@ -51,10 +51,12 @@ it("waits for a superseding read before an explicit opening selects the new orga
   expect(spaceNavigation.getState().current).toBe("birch");
 });
 
-it("keeps the existing local navigation when the account has no organization", async () => {
+it("opens Personal with its cloud projects for an account with no organization", async () => {
+  const site: SpaceProject = { key: "cloud:site", name: "site", repo: "acme/site", localProjectId: null, hostedProjectId: "site", connected: true };
+  vi.mocked(core.call).mockImplementation(((method: string) => Promise.resolve(method === "spaces.projects" ? [site] : [])) as typeof core.call);
   await reconcileSpaceNavigation({ ...status, spaces: [{ kind: "personal", id: "personal" }] }, "core");
-  expect(core.call).not.toHaveBeenCalled();
-  expect(spaceNavigation.getState().key).toBeNull();
+  expect(spaceNavigation.getState()).toMatchObject({ current: "personal", personal: "personal" });
+  expect(spaceNavigation.getState().inventory.map((space) => space.projects)).toEqual([[site]]);
 });
 
 const frozenAccess = { state: "frozen", reason: "no_pro", until: null, message: "You need Pro to use an organization. Open Account or ask an admin for a seat." } as const;

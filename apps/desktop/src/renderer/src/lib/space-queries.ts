@@ -126,7 +126,6 @@ async function readSpaceNavigation(status: SpacesStatus, coreIdentity: string, t
     return;
   }
   if (status.state !== "ready") return;
-  if (!spaceNavigation.getState().key && status.spaces.every((space) => space.kind === "personal")) return;
   const lease = organizationLease(organizationContentGate, status);
   const listed = await Promise.all(
     status.spaces.map(async (space): Promise<SpaceInventory> => {

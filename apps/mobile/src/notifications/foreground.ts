@@ -13,13 +13,14 @@ const SHOWN: Presentation = { shouldShowBanner: true, shouldShowList: true, shou
 const HIDDEN: Presentation = { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false };
 
 /**
- * An alert that arrives while the app is open: nothing when its thread is on screen, live from its Mac, as the desktop
- * decides for a window. While not connected the screen may be stale, so it shows. The sound is whatever the Mac sent.
+ * An alert that arrives while the app is open: nothing when its thread is on screen, live from its Mac or from the
+ * phone's own OpenOrc Cloud (`cloudSender`), as the desktop decides for a window. While not connected the screen may be
+ * stale, so it shows. The sound is whatever the sender sent.
  */
-export function presentationFor(data: unknown, link: LinkState, threadOnScreen: string | null): Presentation {
+export function presentationFor(data: unknown, link: LinkState, threadOnScreen: string | null, cloudSender: string | null = null): Presentation {
   const route = routeOf(data);
   if (!route?.threadId) return SHOWN;
-  const focused = link.kind === "connected" && link.mac.id === route.macId;
+  const focused = route.macId === cloudSender || (link.kind === "connected" && link.mac.id === route.macId);
   return noticeVisible({ threadId: route.threadId, taskId: null }, { focused, threadIds: threadOnScreen ? [threadOnScreen] : [], taskId: null }) ? HIDDEN : SHOWN;
 }
 
@@ -40,10 +41,10 @@ export interface Delivered {
   dismiss(id: string): Promise<void>;
 }
 
-/** Opening a thread on the phone reads what its alerts said, so they leave Notification Center. */
-export async function clearDelivered(macId: string, threadId: string, center: Delivered): Promise<void> {
+/** Opening a thread on the phone reads what its alerts said, from any of `senders`, so they leave Notification Center. */
+export async function clearDelivered(senders: readonly string[], threadId: string, center: Delivered): Promise<void> {
   for (const { id, data } of await center.delivered()) {
     const route = routeOf(data);
-    if (route?.macId === macId && route.threadId === threadId) await center.dismiss(id);
+    if (route && senders.includes(route.macId) && route.threadId === threadId) await center.dismiss(id);
   }
 }

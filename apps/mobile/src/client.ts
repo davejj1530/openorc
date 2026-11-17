@@ -27,7 +27,9 @@ import { ScratchStore } from "./scratch-store";
 import { liveSocketOf } from "@openorc/hosted/socket";
 import { io } from "socket.io-client";
 import { followMac } from "./cloud/follow-mac";
-import { keptIn, keychainVault } from "./cloud/native";
+import { CloudAlerts } from "./cloud/cloud-alerts";
+import { cloudKeys, keptIn, keychainVault } from "./cloud/native";
+import { knowCloudSender } from "./notifications/on-screen";
 import { PhoneCloud } from "./cloud/phone-cloud";
 import { RoutedConnection } from "./cloud/routed-connection";
 import { timeFrame } from "./thread/perf-probe";
@@ -146,7 +148,7 @@ link.start("other");
 // A first launch, or any launch with no Mac paired, opens on the demo; Skip is in reach from its first frame.
 showDemo();
 alerts.start();
-handleAlerts(oncePerNotice((data) => presentationFor(data, link.getState(), threadOnScreen())));
+handleAlerts(oncePerNotice((data) => presentationFor(data, link.getState(), threadOnScreen(), cloudAlerts.senderKey())));
 void getNetworkStateAsync().then((state) => link.setNetwork(networkKind(state)));
 addNetworkStateListener((state) => link.setNetwork(networkKind(state)));
 AppState.addEventListener("change", (state) => {
@@ -190,13 +192,31 @@ function macProjects() {
 const holds = () => cloud.hosted?.account.status().state === "signed-in";
 // Holding a session of its own, the phone reads the cloud itself: it no longer asks the Mac for cloud threads.
 link.connection.askFor(() => (holds() ? PHONE_CAPABILITIES.filter((capability) => capability !== CLOUD_THREADS) : PHONE_CAPABILITIES));
+/**
+ * Alerts about the person's OpenOrc Cloud threads, which the server sends while the phone holds a session of its own:
+ * registered as this phone wants alerts, and kept so as that changes or the session does.
+ */
+export const cloudAlerts = new CloudAlerts({
+  crypto: phoneCrypto,
+  keys: cloudKeys,
+  held: () => {
+    const hosted = cloud.hosted;
+    return hosted && holds() && cloud.server ? { server: cloud.server, registry: hosted.account } : null;
+  },
+  registration: () => alerts.registration(),
+  warn: (message) => console.warn(`[OpenOrc] ${message}`),
+});
+knowCloudSender(() => cloudAlerts.senderKey());
+
 let held = false;
 /** The phone came to hold a session of its own, or lost it: the Mac hears what it asks for now, and every list is read again. */
 function heldChanged(): void {
+  void cloudAlerts.sync();
   if (holds() === held) return;
   held = holds();
   link.connection.renegotiate();
   void client.queryClient.invalidateQueries();
 }
 cloud.subscribe(heldChanged);
+alerts.subscribe(() => void cloudAlerts.sync());
 void cloud.start().then(() => followMac(link, cloud, (message) => console.warn(`[OpenOrc] ${message}`)));

@@ -79,7 +79,7 @@ func reveal(_ content: UNMutableNotificationContent, keys: (String) -> DeviceKey
   switch keys(envelope.m) {
   case .found(let found): key = found
   case .missing:
-    content.body = "From a Mac this iPhone no longer pairs with."
+    content.body = "From a Mac or account this iPhone no longer uses."
     return nil
   case .locked: return nil
   }

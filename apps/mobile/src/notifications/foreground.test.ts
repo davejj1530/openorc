@@ -28,8 +28,12 @@ it("clears only that Mac's delivered alerts for the thread just opened", async (
     { id: "e", data: { ...route, id: "n3" } },
   ];
   const dismissed: string[] = [];
-  await clearDelivered("studio", "t1", { delivered: async () => delivered, dismiss: async (id) => void dismissed.push(id) });
+  await clearDelivered(["studio"], "t1", { delivered: async () => delivered, dismiss: async (id) => void dismissed.push(id) });
   expect(dismissed).toEqual(["a", "e"]);
+  // The phone's own cloud is a sender too: its thread's alerts go with the Mac's.
+  dismissed.length = 0;
+  await clearDelivered(["studio", "laptop"], "t1", { delivered: async () => delivered, dismiss: async (id) => void dismissed.push(id) });
+  expect(dismissed).toEqual(["a", "c", "e"]);
 });
 
 describe("a notice heard more than once", () => {

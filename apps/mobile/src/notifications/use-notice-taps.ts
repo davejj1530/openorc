@@ -1,7 +1,7 @@
 import { clearLastNotificationResponse, useLastNotificationResponse } from "expo-notifications";
 import { router } from "expo-router";
 import { useEffect } from "react";
-import { link } from "../client";
+import { cloudAlerts, link } from "../client";
 import { keychainKeys, phoneCrypto } from "../connection/native";
 import { noticeOpener, openTap, tapOf } from "./taps";
 
@@ -20,6 +20,7 @@ export function useNoticeTaps(): void {
     if (!tap) return;
     void openTap(tap, {
       macs: link.getMacs,
+      cloudSender: () => cloudAlerts.senderKey(),
       select: (macId) => link.select(macId),
       openThread: (id) => {
         router.dismissTo("/");

@@ -23,9 +23,10 @@ vi.mock("react-native-mmkv", () => ({
 vi.mock("./cloud/native", () => ({
   keychainVault: { load: async () => null, save: async () => undefined },
   keptIn: () => ({ load: () => null, save: () => undefined, forget: () => undefined }),
+  cloudKeys: { load: async () => null, save: async () => undefined, file: async () => undefined, unfile: async () => undefined },
 }));
 vi.mock("react-native-quick-crypto", () => ({ randomUUID: () => "id" }));
-vi.mock("./notifications/on-screen", () => ({ threadOnScreen: () => null }));
+vi.mock("./notifications/on-screen", () => ({ threadOnScreen: () => null, knowCloudSender: () => undefined }));
 vi.mock("./connection/asset-cache", () => ({ createAssetCache: () => ({ forget: () => undefined, uri: async () => "" }) }));
 vi.mock("./connection/native", async () => {
   const { toBase64Url } = await import("@openorc/link");

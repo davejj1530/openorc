@@ -1,5 +1,5 @@
 import type { ClientPush } from "@openorc/client";
-import { PUSH_SENDER_TAG, type DeviceParams, type DeviceRpcResults, type PushEnvironment } from "@openorc/protocol";
+import { PUSH_SENDER_TAG, type DeviceParams, type DeviceRpcResults, type PushEnvironment, type PushRegistration } from "@openorc/protocol";
 import type { LinkState } from "../connection/manager";
 import { DEFAULT_PREFS, registrationFor, type AlertChoice, type AlertPrefs, type MacSender, type Permission } from "./registration";
 
@@ -84,6 +84,9 @@ export class PhoneAlerts {
 
   getState = (): AlertsState => this.state;
 
+  /** What this phone wants of alerts now, as it tells a Mac; null while it wants none, iOS allows none or no token came. */
+  registration = (): PushRegistration | null => registrationFor(this.state.prefs, this.state.permission, this.token, this.environment);
+
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -93,6 +96,7 @@ export class PhoneAlerts {
     this.ready = this.readIos();
     this.deps.platform.onToken((token) => {
       this.token = token;
+      this.update({});
       void this.registerShown();
     });
     this.deps.link.subscribe(() => this.linkChanged());
@@ -152,6 +156,7 @@ export class PhoneAlerts {
     this.deps.platform.token().then(
       (token) => {
         this.token = token;
+        this.update({});
         if (!this.awaitingToken) return;
         this.awaitingToken = false;
         void this.registerShown();

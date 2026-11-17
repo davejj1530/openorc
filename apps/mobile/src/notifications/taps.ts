@@ -75,6 +75,8 @@ export function noticeOpener(crypto: LinkCrypto, readKey: (macId: string) => Pro
 
 export interface TapEffects {
   macs(): readonly { id: string }[];
+  /** The phone's own OpenOrc Cloud's sender key while the phone takes its alerts; its threads open without a Mac. */
+  cloudSender(): string | null;
   select(macId: string): void;
   /** On the Mac the alert came from, which `select` shows. */
   openThread(threadId: string): void;
@@ -88,9 +90,14 @@ const showed = (notice: PushNotice, shown: Shown) => (shown.title ?? "") === not
 /**
  * Shows the Mac that sent the alert, then its thread. An answer chosen on the alert waits for the approval's card only
  * when this phone's key opens the notice and iOS showed its text, so it is always for the approval the person read. An
- * alert from a Mac this phone forgot stays on Home.
+ * alert from a Mac this phone forgot stays on Home. An alert from the phone's own OpenOrc Cloud opens its thread from
+ * there, whichever Mac is shown; it carries no answer yet.
  */
 export async function openTap({ route, answer, shown }: NoticeTap, effects: TapEffects): Promise<void> {
+  if (route.macId === effects.cloudSender()) {
+    if (route.threadId) effects.openThread(route.threadId);
+    return;
+  }
   if (!effects.macs().some((mac) => mac.id === route.macId)) return;
   effects.select(route.macId);
   if (route.threadId) effects.openThread(route.threadId);

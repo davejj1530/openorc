@@ -75,6 +75,16 @@ describe.runIf(process.platform === "darwin")("the notification service extensio
     expect(shown.get("test")!.userInfo).toEqual({ body: { macId, id: test.id, kind: "test", o: vector(vectorFile.good, "test notice") } });
   });
 
+  it("opens what OpenOrc Cloud sealed as it opens a Mac's: another sender, its key named by m, the same code", () => {
+    const server = nodeCrypto.generateKeyPair();
+    const serverId = Buffer.from(server.publicKey).toString("base64url");
+    const notice: PushNotice = { id: "cloud-1", kind: "finished", threadId: "cloud-thread", title: "Pricing page layout", body: "Three columns at 1040 px and up." };
+    const envelope = sealPush(nodeCrypto, pushKeys(nodeCrypto, server, phonePublic, "mac").seal, server.publicKey, notice);
+    const shown = show([{ name: "cloud", userInfo: { aps: { alert: { body: "New activity in OpenOrc Cloud" }, "mutable-content": 1 }, o: envelope }, key: "found" }]);
+    expect(shown.get("cloud")).toMatchObject({ title: notice.title, body: notice.body, threadIdentifier: "cloud-thread", categoryIdentifier: "", asked: [serverId] });
+    expect(shown.get("cloud")!.userInfo).toEqual({ body: { macId: serverId, id: "cloud-1", kind: "finished", threadId: "cloud-thread", o: envelope } });
+  });
+
   it("opens a reply the Mac cut through an emoji, half of it left alone", () => {
     const cut = `${"a".repeat(139)}🚀`.slice(0, 140);
     const shown = show([
@@ -124,7 +134,7 @@ describe.runIf(process.platform === "darwin")("the notification service extensio
     ]);
     const plain = (name: string, body: string) =>
       expect(shown.get(name)).toEqual({ name, title: "", subtitle: "", body, threadIdentifier: "", categoryIdentifier: "", userInfo: {}, asked: shown.get(name)!.asked });
-    plain("forgotten Mac", "From a Mac this iPhone no longer pairs with.");
+    plain("forgotten Mac", "From a Mac or account this iPhone no longer uses.");
     plain("newer scheme", "Update OpenOrc on this iPhone to read this.");
     for (const name of ["before first unlock", ...Object.keys(unopenable), "not ours"]) plain(name, "New activity on your Mac");
     expect(shown.get("newer scheme")!.asked).toEqual([]);

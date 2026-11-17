@@ -58,6 +58,7 @@ describe("opening what was tapped", () => {
   const steps: string[] = [];
   const deps = {
     macs: () => [{ id: macId }, { id: "laptop" }],
+    cloudSender: () => "cloud-server-key",
     select: (id: string) => void steps.push(`select ${id === macId ? "studio" : id}`),
     openThread: (threadId: string) => void steps.push(`open ${threadId}`),
     open: noticeOpener(nobleCrypto, async (id) => (id === macId ? iphone.privateKey : null)),
@@ -77,6 +78,16 @@ describe("opening what was tapped", () => {
     await openTap(tap({ answer: null }), deps);
     expect(steps).toEqual(["select studio", "open t1"]);
     expect(queued()).toBeNull();
+  });
+
+  it("opens an alert from the phone's own cloud on its thread, choosing no Mac and answering nothing", async () => {
+    await openTap(tap({ route: { macId: "cloud-server-key", id: "n9", kind: "approval", threadId: "cloud-thread", runId: "r", approvalId: "a" }, answer: "allow" }), deps);
+    expect(steps).toEqual(["open cloud-thread"]);
+    expect(takeQueued({ macId: "cloud-server-key", runId: "r", approvalId: "a" }, 1_000)).toBeNull();
+    // Once the phone takes no cloud alerts, the same sender is one it does not know: Home stays.
+    steps.length = 0;
+    await openTap(tap({ route: { macId: "cloud-server-key", id: "n9", kind: "finished", threadId: "cloud-thread" }, answer: null }), { ...deps, cloudSender: () => null });
+    expect(steps).toEqual([]);
   });
 
   it("stays on Home for the test notice and for a Mac this phone forgot", async () => {

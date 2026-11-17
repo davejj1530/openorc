@@ -49,6 +49,11 @@ export class PhoneCloud {
 
   constructor(private readonly deps: PhoneCloudDeps) {}
 
+  /** The server the phone's own session belongs to; null while it holds none. */
+  get server(): string | null {
+    return this.#hosted ? this.#server : null;
+  }
+
   /** The phone's own account while it holds a session; null while it holds none. */
   get hosted(): Hosted | null {
     return this.#hosted;

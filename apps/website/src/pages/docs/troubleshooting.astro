@@ -166,6 +166,47 @@ import { docHref } from "../../data/docs";
     <p>If you removed the phone in Settings, or the pairing code expired before you scanned it, pair again with a new code. See <a href={docHref("phone")}>Phone app</a>.</p>
   </section>
 
+  <section aria-labelledby="cloud">
+    <h2 id="cloud">A cloud thread won't start a turn</h2>
+    <p>When a cloud thread can't start, a card above its composer says why, with a button that leads to the fix:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">The card says</th>
+            <th scope="col">What to do</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>OpenOrc Cloud can't be reached.</strong></td>
+            <td>Check your internet connection. Settings → Account says <strong>Can't be reached</strong> until it reconnects.</td>
+          </tr>
+          <tr>
+            <td><strong>OpenOrc Cloud needs Pro.</strong></td>
+            <td>Click <strong>Upgrade</strong>, or ask an admin of your organization for a seat.</td>
+          </tr>
+          <tr>
+            <td><strong>You're out of cloud hours.</strong></td>
+            <td>Click <strong>Buy more hours</strong>, or wait for the month's hours to reset.</td>
+          </tr>
+          <tr>
+            <td><strong>Your payment hasn't gone through.</strong></td>
+            <td>Click <strong>Update payment</strong> and fix the card on the payment page.</td>
+          </tr>
+          <tr>
+            <td><strong>Claude isn't signed in on OpenOrc Cloud.</strong>, or its sign-in ended</td>
+            <td>Click <strong>Sign in</strong> and sign the agent in again under Settings → Cloud.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      For anything else, open Settings → <strong>Cloud</strong> and click <strong>Run check</strong>. It names the link that is broken. If a teammate's work holds the thread, see <a href={docHref("together") + "#held"}>When someone else's work
+      holds the thread</a>.
+    </p>
+  </section>
+
   <section aria-labelledby="git">
     <h2 id="git">Worktree and Git errors</h2>
     <div class="docs-table">

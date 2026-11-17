@@ -1,0 +1,105 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+---
+
+<DocsLayout slug="organizations">
+  <p>
+    An organization is a group of people in <a href={docHref("cloud")}>OpenOrc Cloud</a> who share projects, cloud threads, team tasks, and <a href={docHref("chat")}>Team chat</a>. Your own work lives in <strong>Personal</strong>, which
+    only you can see.
+  </p>
+
+  <section aria-labelledby="switch">
+    <h2 id="switch">Switch between organizations</h2>
+    <p>
+      The switcher at the top of the sidebar lists your organizations and <strong>Personal</strong>, with a tick on the one you are in. The sidebar, tasks, and chat then show that one's work. A dot marks another organization with
+      <strong>Unread chat</strong> or an <strong>Unread mention</strong>.
+    </p>
+    <p>
+      Invitations you received are listed in the switcher too, each with <strong>Join</strong> and <strong>Decline</strong>. You can also open the link in the invitation email. In an organization, the switcher adds
+      <strong>People</strong>, and for an admin <strong>Invite people…</strong>.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/components/SpaceMenu.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="create">
+    <h2 id="create">Create an organization</h2>
+    <ol class="docs-steps">
+      <li>Open the switcher and choose <strong>Create organization…</strong>.</li>
+      <li>Enter the <strong>Organization name</strong>. To add a logo, click <strong>Add logo</strong>.</li>
+      <li>Click <strong>Create organization</strong>. You are its first admin.</li>
+    </ol>
+    <p>If you can't create one now, the menu item is dimmed and says why when you point at it. While sign-up is by invitation, new organizations can't be created from the app.</p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/dialogs/OrganizationIdentityDialog.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="invite">
+    <h2 id="invite">Invite people</h2>
+    <ol class="docs-steps">
+      <li>As an admin, choose <strong>Invite people…</strong> in the switcher.</li>
+      <li>Enter one or more <strong>Email addresses</strong>, up to 30 at a time, and choose <strong>Admin</strong> or <strong>Member</strong> for them.</li>
+      <li>To give someone Pro as they join, choose a seat for them. See <a href="#seats">Seats</a>.</li>
+      <li>Click <strong>Send invitations</strong>.</li>
+    </ol>
+    <p>
+      <strong>Invitations</strong> on the <strong>People</strong> page lists the invitations still open. Each has <strong>Resend</strong> and <strong>Copy link</strong>, for when the email doesn't arrive.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/dialogs/OrganizationInviteDialog.tsx</code>, <code>views/OrganizationInvitations.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="people">
+    <h2 id="people">People and roles</h2>
+    <p>
+      <strong>People</strong> lists everyone in the organization with their <strong>Role</strong> and <strong>Plan</strong>. Admins invite people, change roles, remove people, manage seats, decide who can use each project, and set a project's environment.
+      Members use the projects they have access to.
+    </p>
+    <ul>
+      <li>
+        <strong>Project access…</strong>, in a project's menu, sets <strong>Who can use this project</strong>: <strong>Everyone in</strong> the organization, or <strong>Only people you choose</strong>. Admins always have access. Someone
+        without access reads <strong>An admin needs to give you access to a project.</strong>
+      </li>
+      <li>The <strong>More</strong> menu beside the organization's name has <strong>Edit organization…</strong>, <strong>Leave organization…</strong>, and for an admin, <strong>Delete organization…</strong>.</li>
+      <li>The last admin can't leave. <strong>Make someone else an admin first.</strong></li>
+    </ul>
+    <Callout>
+      <strong>Delete organization…</strong> asks you to type the organization's name. Its projects, threads, files, and activity are deleted for everyone, and this can't be undone. Leaving removes your access to its projects and threads.
+    </Callout>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/views/OrganizationPeople.tsx</code>, <code>OrganizationMenus.tsx</code>, <code>dialogs/ProjectAccessDialog.tsx</code>, <code>dialogs/OrganizationMembershipDialog.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="seats">
+    <h2 id="seats">Seats</h2>
+    <p>
+      Every member needs Pro to open the organization's work. A person can pay for their own Pro, or the organization can buy seats and give them to people. A seat is Pro paid for by the organization, with its included cloud hours. The
+      prices are in <a href={docHref("cloud") + "#limits"}>Prices, hours, and limits</a>.
+    </p>
+    <h3>Buy seats</h3>
+    <ol class="docs-steps">
+      <li>On the <strong>People</strong> page, open <strong>Seats</strong>.</li>
+      <li>Click <strong>Buy seats</strong>, choose how to <strong>Pay</strong> and how many seats, and pay on the checkout page that opens.</li>
+      <li>Back in the app, <strong>Seats bought.</strong> appears, and the seats are listed as <strong>Available</strong>.</li>
+    </ol>
+    <p>
+      To change the number later, use <strong>Add seats</strong>, or lower it for the next renewal. A pending change can be undone with <strong>Keep current seats</strong>. <strong>Manage billing</strong> opens the payment service's page.
+    </p>
+    <h3>Give, move, and take back a seat</h3>
+    <p>Each seat lists who it is <strong>Assigned to</strong>, their <strong>Hours left</strong>, and when the hours renew. Its actions menu has:</p>
+    <ul>
+      <li><strong>Give…</strong> assigns an available seat to a person. Their app turns Pro without a reload.</li>
+      <li><strong>Move…</strong> gives an assigned seat to someone else.</li>
+      <li><strong>Take back…</strong> frees the seat. The person keeps Pro for one more day, to get Pro another way.</li>
+    </ul>
+    <p>
+      When a person's Pro ends, the organization's work closes in their app and a screen says why. An admin without Pro can still invite on a paid seat, give themselves a seat, or delete the organization. If more people hold seats than
+      are paid for, <strong>Seats</strong> says <strong>More people hold seats than are paid for. Take back a seat or add seats.</strong>
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/views/OrganizationSeats.tsx</code>, <code>SeatInventory.tsx</code>, <code>PersonSeatActions.tsx</code>, <code>SeatQuantityControls.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "together" }, { slug: "chat" }, { slug: "cloud-threads" }]} columns={3} />
+  </section>
+</DocsLayout>

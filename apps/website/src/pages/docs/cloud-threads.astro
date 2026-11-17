@@ -1,0 +1,148 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+---
+
+<DocsLayout slug="cloud-threads">
+  <p>
+    A cloud thread works on a machine of yours in <a href={docHref("cloud")}>OpenOrc Cloud</a>, so it keeps going while your Mac sleeps. You need Pro, an agent signed in for the cloud, and a cloud project.
+  </p>
+
+  <section aria-labelledby="agents">
+    <h2 id="agents">Sign agents in for the cloud</h2>
+    <p>
+      A cloud turn runs on your own sign-in for its agent, which OpenOrc Cloud keeps for you. Your Mac's logins don't go to the cloud. Open Settings → <strong>Cloud</strong>, and under <strong>OpenOrc Cloud</strong> sign in each agent you
+      want:
+    </p>
+    <ul>
+      <li><strong>Claude Code:</strong> click <strong>Sign in with Claude</strong> and finish in the browser that opens. With several Claude accounts on this Mac, first choose the <strong>Claude account</strong>. Or click <strong>Use an API key</strong>.</li>
+      <li><strong>Codex:</strong> click <strong>Sign in with ChatGPT</strong>. A code appears. Click <strong>Open page</strong> and enter the code on OpenAI's page. Or click <strong>Use an API key</strong>.</li>
+      <li><strong>OpenCode:</strong> click <strong>Add a key</strong>, choose the <strong>Provider</strong>, and paste its key. Add one key for each provider you use.</li>
+    </ul>
+    <p>
+      A signed-in agent reads <strong>Ready</strong>, with <strong>Remove</strong> beside it. The same sign-in serves your turns in every organization you are in. If a sign-in ends, the row says <strong>Signed out</strong> and offers its
+      ways again.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/views/settings-cloud-openorc-sign-ins.tsx</code>, <code>packages/protocol/src/account.ts</code></p>
+  </section>
+
+  <section aria-labelledby="projects">
+    <h2 id="projects">Add a cloud project</h2>
+    <p>A cloud project is where cloud threads start. It comes from a GitHub repository or from a folder on your Mac that has no remote.</p>
+    <h3>From GitHub</h3>
+    <ol class="docs-steps">
+      <li>Under <strong>OpenOrc Cloud</strong> in Settings → <strong>Cloud</strong>, click <strong>Connect GitHub</strong>. GitHub opens in your browser, where you install OpenOrc Cloud's GitHub app on your account or an organization and choose its repositories.</li>
+      <li>Back in the app, the <strong>GitHub</strong> row says who is connected and how many repositories it reaches. <strong>Choose repositories</strong> changes them later.</li>
+      <li>Under <strong>Personal projects</strong>, choose a project in <strong>Add a project</strong> and add it. The list offers this Mac's projects whose GitHub repository isn't in the cloud yet. One that GitHub doesn't let OpenOrc Cloud read says so.</li>
+    </ol>
+    <p>A cloud thread on a GitHub project clones the repository on its machine. It takes no code from your Mac.</p>
+    <h3>From a folder on your Mac</h3>
+    <p>
+      For a Git folder with no remote, choose it in <strong>Add a project</strong>, where it reads <strong>· no remote</strong>. Adding it sends the folder's history to OpenOrc Cloud once, and the row shows how much has gone. Later threads
+      send only what changed since.
+    </p>
+    <h3>Manage projects</h3>
+    <p>
+      Each of your projects has <strong>Environment</strong> and <strong>Remove</strong>. <strong>Remove</strong> asks first, because it deletes the project's cloud threads with it. The folder on your Mac stays. The projects of the
+      organization you are in are listed below yours, under the organization's name.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/views/settings-cloud-projects.tsx</code>, <code>settings-cloud-mac-projects.tsx</code>, <code>settings-cloud-openorc-projects.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="start">
+    <h2 id="start">Start a cloud thread</h2>
+    <ol class="docs-steps">
+      <li>Start a new thread in the project.</li>
+      <li>Under the composer, click the button that says where the thread works, and choose <strong>OpenOrc Cloud</strong>. The row shows the cloud hours you have left.</li>
+      <li>Write your message and send it.</li>
+    </ol>
+    <p>
+      The thread works on a new branch from the one you started from, as <strong>Works on OpenOrc Cloud, on a new branch from main</strong> says. If the project isn't in the cloud yet, the row ends in <strong>Add this project</strong>, which
+      opens Settings → <strong>Cloud</strong> at it.
+    </p>
+    <p>
+      In a project from a folder, a line above the composer says what leaves this Mac, such as <strong>From this Mac: 2 commits, 3 changed files and 1 new · 48 KB · 2 held back</strong>. <strong>Files</strong> lists them by name. Files
+      that Git ignores never go. New files that look like secrets are held back unless you tick them. Nothing is sent until you send the message.
+    </p>
+    <p>
+      The first reply takes longer than a reply on your Mac. The machine wakes, gets the code, and gets the skills you chose before the agent starts. Between turns, the machine sleeps when nothing needs it, and your next message wakes it.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/components/NewThreadOptions.tsx</code>, <code>packages/client/src/hosted-send.ts</code></p>
+  </section>
+
+  <section aria-labelledby="bring">
+    <h2 id="bring">Bring the work to your Mac</h2>
+    <p>
+      The <strong>Changes</strong> panel, <strong>Review changes</strong> on a turn, and the <strong>Commits</strong> panel work in a cloud thread as in any thread. <strong>Commits</strong> marks commits that are only <strong>In the
+      cloud</strong> or <strong>Not pushed</strong>, and opens a commit's changes when you click it.
+    </p>
+    <ul>
+      <li><strong>A GitHub project:</strong> <strong>Commit</strong>, then <strong>Publish branch</strong> or <strong>Push</strong>, then <strong>Open a pull request</strong>. The branch goes to GitHub from the machine.</li>
+      <li>
+        <strong>A project from a folder:</strong> <strong>Bring to this Mac</strong> takes the place of Publish branch. It brings the thread's commits into the folder as a branch, such as <strong>Brought 3 commits to this Mac as
+        fix-login.</strong> It changes neither your files nor the branch you have checked out. Changes the agent didn't commit stay in the cloud.
+      </li>
+    </ul>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/panels/HostedCommitsPanel.tsx</code>, <code>HostedPublishControls.tsx</code>, <code>HostedBring.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="bring-along">
+    <h2 id="bring-along">What a cloud turn brings along</h2>
+    <p>Each of these is set once and reaches every cloud turn you start.</p>
+    <h3>Skills</h3>
+    <p>
+      Under <strong>Skills</strong> in Settings → <strong>Cloud</strong>, each agent's row says how many of your skills go, such as <strong>3 of 4 go to the cloud</strong>. Click <strong>Choose</strong> to switch each skill on or off, with its size beside it. Every file
+      in a skill's folder goes, including <code>.env</code> files and linked files, and only to your own turns. Your Mac's skills stay as they are. In a cloud thread, <strong>/</strong> lists the skills your turns get.
+    </p>
+    <h3>Connectors</h3>
+    <p>
+      In Settings → <strong>Connectors</strong>, a connector of yours has an <strong>OpenOrc Cloud</strong> line. Click <strong>Set up</strong>, enter its <strong>Server address</strong>, add any headers or click <strong>Use this Mac's
+      headers</strong>, choose the agents under <strong>Use with</strong>, and save. A connector in the cloud must be reached over HTTPS. A connector that runs a command runs on your Mac only.
+    </p>
+    <h3>The project's environment</h3>
+    <p>
+      Choose <strong>Environment…</strong> in a cloud project's menu in the sidebar, or <strong>Environment</strong> beside it in Settings → <strong>Cloud</strong>. Add each variable's name and value, or click <strong>Fill from .env</strong>,
+      then save. Every turn and terminal in the project's cloud threads gets them. A saved value is never shown again. In an organization, only an admin changes them, and members see the names.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/views/settings-cloud-skills.tsx</code>, <code>settings-cloud-connector.tsx</code>, <code>dialogs/ProjectEnvironmentDialog.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="in-thread">
+    <h2 id="in-thread">Work in a cloud thread</h2>
+    <ul>
+      <li><strong>Files.</strong> Attach files and pictures to a message, as on your Mac.</li>
+      <li><strong>Terminal.</strong> The Terminal opens a shell on the thread's machine. What you run there counts toward your hours, and teammates in the thread can watch it. It ends on its own after a while with nothing typed or printed.</li>
+      <li><strong>Subthreads.</strong> Subthreads the agent starts appear under the thread, as on your Mac.</li>
+      <li><strong>Compact.</strong> <code>/compact</code> or <strong>Compact context</strong> folds the conversation between turns.</li>
+      <li><strong>Tasks.</strong> <strong>Open thread</strong> on a team task puts <code>Work on "…" in this thread.</code> in the composer. Your message then carries the task, and the agent can read and update it.</li>
+    </ul>
+    <p>
+      Some controls of a Mac thread aren't available in a cloud thread yet. They stay in place, dimmed, and say why when you point at them, such as <strong>Forking a cloud thread isn't available yet.</strong>
+    </p>
+    <Callout>
+      Delete a cloud thread from its menu, as you would any thread. Only the person who started it, or an organization's admin, can delete it. Its conversation, saved work, subthreads, and the files sent to it are deleted from OpenOrc
+      Cloud.
+    </Callout>
+    <p class="docs-source">Source: <code>packages/protocol/src/hosted-parity.ts</code>, <code>apps/desktop/src/renderer/src/panels/CloudTerminalPanel.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="machines">
+    <h2 id="machines">Machines and hours</h2>
+    <p>
+      Settings → <strong>Cloud</strong> → <strong>Machines</strong> lists each machine awake for you, the thread or threads it serves, how long it has been awake, and the hours it used. <strong>Stop</strong> puts one to sleep now. When
+      nothing is awake, it says <strong>Nothing is running</strong>. <strong>This month</strong> shows the month's hours used. <a href={docHref("cloud") + "#limits"}>Prices, hours, and limits</a> has the numbers.
+    </p>
+    <p>
+      A sleeping machine keeps each thread's folder, so the next turn starts where the last one ended. A thread whose folder or machine was removed comes back from its saved work and conversation on the machine its next message gets.
+      Installed packages and build output don't come back. Your code, its commits, and small ignored files such as <code>.env.local</code> do.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/views/settings-cloud-machines.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "together" }, { slug: "phone" }, { slug: "security" }]} columns={3} />
+  </section>
+</DocsLayout>

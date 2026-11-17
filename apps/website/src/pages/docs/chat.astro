@@ -1,0 +1,55 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+---
+
+<DocsLayout slug="chat">
+  <p>
+    Team chat is where the people of an <a href={docHref("organizations")}>organization</a> talk outside any thread. It holds channels, group chats, and direct messages, and it lives in OpenOrc Cloud with the organization's other work.
+    Only people in the organization can be in its conversations.
+  </p>
+
+  <section aria-labelledby="open">
+    <h2 id="open">Open a conversation</h2>
+    <p>
+      In an organization, the sidebar's <strong>Chat</strong> section lists your conversations, starting with <strong>#general</strong>. A conversation with messages you haven't read is marked, and it opens at <strong>New messages</strong>.
+      Each conversation opens in a tab of its own beside your threads.
+    </p>
+    <p>To add a conversation, click <strong>Add conversation</strong> in the Chat section and choose one of these:</p>
+    <ul>
+      <li><strong>New channel…</strong> makes a channel with a <strong>Name</strong> and a <strong>Topic</strong>. Its <strong>Audience</strong> is <strong>Public</strong>, which anyone in the organization can join, or <strong>Private</strong>, for <strong>Only people added</strong>.</li>
+      <li><strong>Browse channels…</strong> lists the public channels, each with <strong>Join channel</strong>.</li>
+      <li><strong>New group chat…</strong> opens a conversation with two or more people you choose.</li>
+    </ul>
+    <p>To message one person, open <strong>People</strong> and choose <strong>Message</strong> for them. A channel's details list its people and have <strong>Leave channel</strong>.</p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/components/TeamChatAddMenu.tsx</code>, <code>TeamChannelDialog.tsx</code>, <code>TeamGroupDialog.tsx</code>, <code>SidebarChat.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="write">
+    <h2 id="write">Write messages</h2>
+    <ul>
+      <li>Type <strong>@</strong> to tag a person. They get a mention mark, which also shows on the organization in the switcher.</li>
+      <li>Click <strong>Attach files</strong> to send files. Anyone in the conversation can download them.</li>
+      <li>Point at a message for its controls: <strong>Reply</strong>, <strong>React</strong>, <strong>Pin</strong>, and <strong>Copy text</strong>.</li>
+    </ul>
+    <p>
+      A reply shows the message it answers above it. Click that quote to go to the message. A pinned message is pinned for everyone in the conversation, and <strong>Pinned messages</strong> lists them, each with <strong>Unpin</strong>.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/components/TeamChatMessageControls.tsx</code>, <code>TeamChatReplyQuote.tsx</code>, <code>TeamChatPins.tsx</code>, <code>TeamChatComposerFiles.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="search">
+    <h2 id="search">Find a message</h2>
+    <p>
+      Open the command palette and type at least two characters. It lists the chat messages that match, in the conversations you can read, with who wrote each and where, such as <strong>Mara Okafor in
+      #general</strong>. Choose one to open its conversation at that message.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/components/TeamChatSearchHits.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "organizations" }, { slug: "together" }, { slug: "phone" }]} columns={3} />
+  </section>
+</DocsLayout>

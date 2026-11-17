@@ -19,7 +19,7 @@ export interface DocSection {
 }
 
 /** When these pages were last checked against the source. Update it when a page is revised. */
-export const docsReviewed = { date: "November 9, 2026" };
+export const docsReviewed = { date: "November 18, 2026" };
 
 /** The sidebar, in reading order. Groups are named after parts of the app. */
 export const docGroups: DocGroup[] = [
@@ -142,23 +142,6 @@ export const docGroups: DocGroup[] = [
         ],
       },
       {
-        slug: "cloud",
-        title: "Cloud threads",
-        description: "Run a thread in a sandbox on your own Vercel or Agent37 account, and let a cloud brain keep your threads going while your computer sleeps.",
-        sections: [
-          { id: "how", title: "How cloud threads work" },
-          { id: "connect", title: "Connect a cloud service" },
-          { id: "sign-ins", title: "How agents sign in there" },
-          { id: "start", title: "Start a thread in the cloud" },
-          { id: "move", title: "Move a thread to the cloud and back" },
-          { id: "sleep", title: "When your computer sleeps" },
-          { id: "brain", title: "The cloud brain" },
-          { id: "costs", title: "Costs and limits" },
-          { id: "remove", title: "Remove cloud resources" },
-          { id: "next-steps", title: "Next steps" },
-        ],
-      },
-      {
         slug: "orclings",
         title: "Orclings",
         description: "Companions you design, each with its own conversation, instructions, and private memory. Think something through with one, or bring it into project work.",
@@ -171,6 +154,77 @@ export const docGroups: DocGroup[] = [
           { id: "instructions-and-memory", title: "Instructions and memory" },
           { id: "project-work", title: "Bring it into project work" },
           { id: "edit-or-delete", title: "Edit or delete an Orcling" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+    ],
+  },
+  {
+    title: "OpenOrc Cloud",
+    pages: [
+      {
+        slug: "cloud",
+        title: "OpenOrc Cloud",
+        description: "Threads that keep working while your Mac sleeps, shared work for an organization, and what Pro and cloud hours cost.",
+        sections: [
+          { id: "what", title: "What OpenOrc Cloud adds" },
+          { id: "account", title: "Sign in" },
+          { id: "pro", title: "Pro and cloud hours" },
+          { id: "limits", title: "Prices, hours, and limits" },
+          { id: "settings", title: "Set up the cloud on this computer" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+      {
+        slug: "cloud-threads",
+        title: "Cloud threads",
+        description: "Sign agents in for the cloud, add a project from GitHub or a folder, start a thread, and bring its work back to your Mac.",
+        sections: [
+          { id: "agents", title: "Sign agents in for the cloud" },
+          { id: "projects", title: "Add a cloud project" },
+          { id: "start", title: "Start a cloud thread" },
+          { id: "bring", title: "Bring the work to your Mac" },
+          { id: "bring-along", title: "What a cloud turn brings along" },
+          { id: "in-thread", title: "Work in a cloud thread" },
+          { id: "machines", title: "Machines and hours" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+      {
+        slug: "together",
+        title: "Working together in a thread",
+        label: "Working together",
+        description: "Write in a teammate's cloud thread, join a running turn, leave notes, and answer or stop someone else's turn.",
+        sections: [
+          { id: "whose-turn", title: "Whose turn it is" },
+          { id: "notes", title: "Leave a note" },
+          { id: "stop", title: "Stop a teammate's turn" },
+          { id: "asks", title: "Answer the agent's question" },
+          { id: "held", title: "When someone else's work holds the thread" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+      {
+        slug: "organizations",
+        title: "Organizations and seats",
+        description: "Create an organization, invite people, choose who uses each project, and give people Pro with seats.",
+        sections: [
+          { id: "switch", title: "Switch between organizations" },
+          { id: "create", title: "Create an organization" },
+          { id: "invite", title: "Invite people" },
+          { id: "people", title: "People and roles" },
+          { id: "seats", title: "Seats" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+      {
+        slug: "chat",
+        title: "Team chat",
+        description: "Channels, group chats, and direct messages for an organization, with replies, pins, files, and search.",
+        sections: [
+          { id: "open", title: "Open a conversation" },
+          { id: "write", title: "Write messages" },
+          { id: "search", title: "Find a message" },
           { id: "next-steps", title: "Next steps" },
         ],
       },
@@ -336,12 +390,12 @@ export const docGroups: DocGroup[] = [
       {
         slug: "phone",
         title: "Phone app",
-        description: "Pair your iPhone with OpenOrc on your computer, then follow, answer, and start threads from your phone.",
+        description: "Pair your iPhone with OpenOrc on your computer, then follow, answer, and start threads from your phone, including cloud threads while your computer sleeps.",
         sections: [
           { id: "pair", title: "Pair your phone" },
           { id: "connection", title: "How the phone reaches your computer" },
           { id: "use", title: "What you can do from the phone" },
-          { id: "cloud-brain", title: "Reach the cloud brain" },
+          { id: "cloud", title: "Cloud threads on the phone" },
           { id: "remove", title: "Remove a phone" },
           { id: "next-steps", title: "Next steps" },
         ],
@@ -411,6 +465,7 @@ export const docGroups: DocGroup[] = [
         sections: [
           { id: "usage", title: "Usage" },
           { id: "connections", title: "Connections" },
+          { id: "account", title: "Account" },
           { id: "cloud", title: "Cloud" },
           { id: "slack", title: "Slack" },
           { id: "phone", title: "Phone" },
@@ -450,7 +505,7 @@ export const docGroups: DocGroup[] = [
           { id: "ledger", title: "Agent events" },
           { id: "redaction", title: "Redaction" },
           { id: "secrets", title: "Settings and secrets" },
-          { id: "cloud", title: "In the cloud" },
+          { id: "cloud", title: "In OpenOrc Cloud" },
           { id: "window", title: "Window storage" },
           { id: "retention", title: "How long things stay" },
           { id: "deleting", title: "What deleting removes" },
@@ -468,7 +523,7 @@ export const docGroups: DocGroup[] = [
           { id: "downloads", title: "Downloads and update checks" },
           { id: "git", title: "Git and GitHub" },
           { id: "local", title: "Local servers" },
-          { id: "cloud", title: "Cloud threads and the brain" },
+          { id: "cloud", title: "OpenOrc Cloud" },
           { id: "never", title: "What OpenOrc does not send" },
           { id: "next-steps", title: "Next steps" },
         ],
@@ -483,7 +538,7 @@ export const docGroups: DocGroup[] = [
           { id: "window", title: "The app window and the Preview" },
           { id: "agents", title: "What agents can do through OpenOrc" },
           { id: "package", title: "The installed app" },
-          { id: "cloud", title: "Cloud sandboxes and the brain" },
+          { id: "cloud", title: "OpenOrc Cloud" },
           { id: "secrets", title: "Secrets and your data" },
           { id: "limits", title: "What OpenOrc cannot protect against" },
           { id: "report", title: "Reporting a vulnerability" },
@@ -515,6 +570,7 @@ export const docGroups: DocGroup[] = [
           { id: "approvals", title: "Approvals don't appear" },
           { id: "slack", title: "Slack doesn't reply" },
           { id: "phone", title: "The phone can't reach your computer" },
+          { id: "cloud", title: "A cloud thread won't start a turn" },
           { id: "git", title: "Worktree and Git errors" },
           { id: "updates", title: "Updates won't install" },
           { id: "next-steps", title: "Next steps" },

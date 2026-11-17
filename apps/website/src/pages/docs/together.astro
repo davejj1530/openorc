@@ -1,0 +1,85 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+---
+
+<DocsLayout slug="together">
+  <p>
+    In an <a href={docHref("organizations")}>organization</a>, every member can read the cloud threads of the projects they can use, and write in them. Each turn runs on the sign-in and hours of the person who started it.
+  </p>
+
+  <section aria-labelledby="whose-turn">
+    <h2 id="whose-turn">Whose turn it is</h2>
+    <p>
+      Each turn and message shows who sent it. While a teammate's turn runs, the thread says whose turn it is, such as <strong>Mara's turn</strong>. Your own reads <strong>Your turn</strong>. Point at <strong>Send</strong> to read what your
+      message would run on before you send it.
+    </p>
+    <div class="docs-table">
+      <table>
+        <thead><tr><th scope="col">When you send</th><th scope="col">What happens</th><th scope="col">Whose sign-in and hours</th></tr></thead>
+        <tbody>
+          <tr><td>Between turns</td><td>Your message starts a turn of your own in the thread.</td><td>Yours: <strong>Uses your sign-in and hours.</strong></td></tr>
+          <tr><td><strong>Send now</strong>, while a teammate's turn runs</td><td>Your message joins their turn, as steering does on your Mac.</td><td>Theirs: <strong>Joins Mara's turn, on their sign-in and hours.</strong></td></tr>
+          <tr><td><strong>Queue</strong>, while a teammate's turn runs</td><td>Your message waits, then runs as your own turn.</td><td>Yours: <strong>After Mara's turn, using your sign-in and hours.</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      When the person working changes, the thread first moves to the new person's own machine, so that reply takes longer than usual. The code and its unpushed work come along. Installed packages and build output don't.
+    </p>
+    <p>
+      A queued message that misses its turn, because someone stopped the queue, waits as paused with <strong>Start turn</strong>. It never starts a paid turn by itself. Only its author can start it.
+    </p>
+    <p class="docs-source">Source: <code>packages/client/src/thread-collaboration.ts</code>, <code>apps/desktop/src/renderer/src/components/ComposerSendButton.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="notes">
+    <h2 id="notes">Leave a note</h2>
+    <p>
+      A note is for people, not the agent. It starts no turn and costs no hours. To write one, tag a teammate with <strong>@</strong> in the composer. A draft that tags someone is a note, and <strong>Send</strong> becomes <strong>Post
+      note</strong>.
+    </p>
+    <ul>
+      <li>The person you tag gets a mention mark on the thread, and the thread opens at the first mention they haven't read.</li>
+      <li>The agent reads the notes once, at the start of the next turn.</li>
+      <li>A note can't carry attachments. Remove them first.</li>
+    </ul>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/components/composer-notes.ts</code></p>
+  </section>
+
+  <section aria-labelledby="stop">
+    <h2 id="stop">Stop a teammate's turn</h2>
+    <p>
+      Anyone who can write in the project can stop the turn they see running, even in a thread they never wrote in. Point at the stop button to read <strong>Stop Mara's turn</strong>. The thread then says, once, who stopped whose turn,
+      such as <strong>Theo stopped Mara's turn.</strong> Messages that other people queued are paused for their authors.
+    </p>
+  </section>
+
+  <section aria-labelledby="asks">
+    <h2 id="asks">Answer the agent's question</h2>
+    <p>
+      While a turn runs, only the person who started it can answer the agent's question or approval. Others read, for example, <strong>Theo can answer while this turn is running.</strong> Once the turn has stopped to wait on the question,
+      anyone in the thread can answer with <strong>Answer and continue</strong>. That answer starts their own turn, on their sign-in and hours.
+    </p>
+  </section>
+
+  <section aria-labelledby="held">
+    <h2 id="held">When someone else's work holds the thread</h2>
+    <p>Sometimes a teammate's work keeps your message from starting. A card above the composer names it and offers a way on:</p>
+    <ul>
+      <li><strong>Stop command</strong> for a command a teammate's turn left running, and <strong>Stop terminal</strong> for a terminal they left open.</li>
+      <li><strong>Retry save</strong> when the thread's work could not be saved. The person whose work it is, or an admin, can retry.</li>
+      <li><strong>Tag Mara</strong> puts a note to that person in the composer, when only they can clear the block.</li>
+      <li><strong>Stop work</strong> ends work their agent left running, if you are one of the thread's people.</li>
+    </ul>
+    <Callout>Teammates can also <strong>Commit</strong> and publish in your thread. The thread's log names who did each.</Callout>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/components/HostedSendNotice.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "organizations" }, { slug: "chat" }, { slug: "cloud-threads" }]} columns={3} />
+  </section>
+</DocsLayout>

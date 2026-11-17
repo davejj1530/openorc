@@ -1,9 +1,8 @@
-import { createHosted, type Hosted, type HostedDeps } from "@openorc/hosted";
-import { liveSocketOf } from "@openorc/hosted/socket";
+import type { Hosted } from "@openorc/hosted";
 import { standIn, type StandIn } from "@openorc/hosted/testing";
-import { io } from "socket.io-client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { PhoneCloud, type CloudRecord, type CloudSource } from "./phone-cloud";
+import { accountOn, quiet, socket } from "./test-fixtures/stand-in-account";
 
 /*
  * The phone's own OpenOrc Cloud, against the stand-in: it takes a session of its own from the Mac it pairs with, for the
@@ -12,7 +11,6 @@ import { PhoneCloud, type CloudRecord, type CloudSource } from "./phone-cloud";
 
 const RILEY = "riley@example.com";
 const MARA = "mara@example.com";
-const quiet = { info: () => undefined, warn: () => undefined };
 
 let stand: StandIn;
 const hosts: { close(): void }[] = [];
@@ -24,37 +22,10 @@ afterEach(async () => {
   await stand.close();
 });
 
-/** The socket a host opens, as the apps open it. */
-const socket = liveSocketOf(io);
-
-/** The Mac's account, signed in as `email` through its browser, and the source a phone takes its cloud from. */
+/** The Mac's account, signed in as `email`, and the source a phone takes its cloud from. */
 async function mac(email: string): Promise<{ hosted: Hosted; source: CloudSource; asked: string[] }> {
-  let stored: string | null = null;
-  let resolve: (query: string) => void = () => undefined;
-  const browser: NonNullable<HostedDeps["browser"]> = {
-    awaitReturn: async () => ({ port: 41_000, query: new Promise<string>((done) => (resolve = done)), redirect: () => undefined, close: () => undefined }),
-    open: (url) => {
-      if (new URL(url).pathname === "/sign-in") resolve(new URL(stand.signInPage(url, email)).search.slice(1));
-    },
-  };
-  const hosted = createHosted({
-    server: stand.url,
-    session: { load: async () => stored, save: async (value) => void (stored = value) },
-    kept: { load: () => null, save: () => undefined },
-    projects: () => [],
-    fetch,
-    connect: socket,
-    push: () => undefined,
-    notify: () => undefined,
-    browser,
-    deviceName: "OpenOrc on this Mac",
-    now: Date.now,
-    log: quiet,
-  });
+  const hosted = await accountOn(stand, email);
   hosts.push(hosted);
-  await hosted.start();
-  await hosted.account.signIn();
-  await vi.waitFor(() => expect(hosted.account.status()).toMatchObject({ state: "signed-in", email }));
   const asked: string[] = [];
   const source: CloudSource = {
     owner: async () => {
@@ -89,6 +60,7 @@ function phone() {
       fetch,
       connect: socket,
       push: () => undefined,
+      projects: () => [],
       now: Date.now,
       log: quiet,
     });

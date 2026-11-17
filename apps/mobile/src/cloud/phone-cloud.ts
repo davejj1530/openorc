@@ -29,6 +29,8 @@ export interface PhoneCloudDeps {
   fetch: HostedDeps["fetch"];
   connect: HostedDeps["connect"];
   push: HostedDeps["push"];
+  /** The shown Mac's projects with their remotes, which the cloud's projects are matched to, so one project is one group. */
+  projects: HostedDeps["projects"];
   now(): number;
   log: HostedDeps["log"];
 }
@@ -113,8 +115,7 @@ export class PhoneCloud {
         },
       },
       kept: this.deps.kept,
-      // Matched to the Mac's folders when the list joins them (the next unit); none on their own.
-      projects: () => [],
+      projects: this.deps.projects,
       fetch: this.deps.fetch,
       connect: this.deps.connect,
       push: this.deps.push,

@@ -51,6 +51,23 @@ describe("calls over the link", () => {
     expect(await reply).toEqual([]);
   });
 
+  it("asks the current session again for what it asks for now, and reads what the Mac shares from its new answer", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const { connection } = connect(mac);
+    await advance(10);
+    const negotiations = () => mac.heard.flatMap((message) => (message.t === "rpc" && message.method === "session.negotiate" ? [message] : []));
+    mac.send({ t: "rpc.result", id: negotiations()[0]!.id, result: { capabilities: ["cloud-threads", "cloud-session"] } });
+    expect(await connection.shares("cloud-threads")).toBe(true);
+    connection.askFor(() => ["cloud-session"]);
+    connection.renegotiate();
+    await advance(10);
+    expect(negotiations().map((message) => message.params)).toEqual([expect.anything(), { capabilities: ["cloud-session"] }]);
+    const sharing = connection.shares("cloud-threads");
+    mac.send({ t: "rpc.result", id: negotiations()[1]!.id, result: { capabilities: ["cloud-session"] } });
+    expect(await sharing).toBe(false);
+  });
+
   it("asks for a reply's image only from a Mac that said it serves them", async () => {
     const ref = { kind: "reply-image", runId: "run-1", messageId: "m1", path: "/Users/me/shot.png" } as const;
     const negotiate = (mac: FakeMac) => {

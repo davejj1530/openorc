@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { memo, useMemo, useState, type ReactNode } from "react";
 import { ScrollView, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { link, useLinkRead, useRun } from "../client";
+import { call, useLinkRead, useRun } from "../client";
 import type { LinkRead } from "../connection/link-hooks";
 import { Mono } from "../ui/Mono";
 import { Spinner } from "../ui/Spinner";
@@ -15,7 +15,7 @@ import { createSheetWindow, SheetWindowContext } from "./sheet-window";
 import { toolIcons, toolState, type ToolBlock } from "./tools";
 
 /** Reads a call's output from the Mac's ledger; `key` names the run and the call. */
-const readToolOutput = (key: string) => link.connection.call("events.toolOutput", JSON.parse(key) as { runId: string; toolCallId: string });
+const readToolOutput = (key: string) => call("events.toolOutput", JSON.parse(key) as { runId: string; toolCallId: string });
 
 /** A page leaves large outputs out; the sheet reads the call's output from the ledger when it opens. */
 function useToolOutput(block: ToolBlock | undefined): { output: unknown; state: LinkRead<unknown>["state"] } {

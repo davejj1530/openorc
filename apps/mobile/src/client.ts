@@ -1,5 +1,5 @@
 import { createClientState, type RpcQueryOptions } from "@openorc/client";
-import type { AssetRef, CloudRemoteMethod, RemoteMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import { CLOUD_THREADS, PHONE_CAPABILITIES, type AssetRef, type CloudRemoteMethod, type Project, type RemoteMethod, type RpcMethod, type RpcParams, type RpcResults } from "@openorc/protocol";
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 import Constants from "expo-constants";
 import { addNetworkStateListener, getNetworkStateAsync, NetworkStateType, type NetworkState } from "expo-network";
@@ -29,6 +29,7 @@ import { io } from "socket.io-client";
 import { followMac } from "./cloud/follow-mac";
 import { keptIn, keychainVault } from "./cloud/native";
 import { PhoneCloud } from "./cloud/phone-cloud";
+import { RoutedConnection } from "./cloud/routed-connection";
 import { timeFrame } from "./thread/perf-probe";
 
 /** The app's own key-value store on disk. Only saved Macs use it directly; the demo never touches them. */
@@ -60,8 +61,32 @@ export const link = new ConnectionManager({
   },
 });
 
+/**
+ * The phone's own OpenOrc Cloud: a session of its own, which the Mac it shows gets it for the person signed in there,
+ * kept in the Keychain and followed as that Mac's account changes.
+ */
+export const cloud = new PhoneCloud({
+  vault: keychainVault,
+  kept: keptIn(kept),
+  fetch,
+  connect: liveSocketOf(io),
+  push: (push) => {
+    routed.cloudPush(push);
+    if (push.type === "invalidate" && push.keys.includes("account")) heldChanged();
+  },
+  projects: () => macProjects(),
+  now: Date.now,
+  log: { info: () => undefined, warn: (message) => console.warn(`[OpenOrc] ${message}`) },
+});
+
+/** The cloud answers for its own threads while the phone holds a session of its own; the Mac, over the link, for the rest. */
+const routed = new RoutedConnection(link.connection, cloud);
+
+/** A call outside the client's queries, routed as theirs are: to the phone's own cloud for its threads, else to the Mac. */
+export const call = <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => routed.call(method, params);
+
 /** Client state over the link, built like the desktop's: same tags, same transcript reducer, another connection. */
-export const client = createClientState(link.connection, {
+export const client = createClientState(routed, {
   scheduleFrame: (callback) => requestAnimationFrame(timeFrame(callback)),
   // Every refetch is a trip over the network, and agents push "threads" about once a second while they work.
   invalidationBatchMs: 250,
@@ -157,17 +182,21 @@ export const useRpcs = <M extends PhoneMethod>(method: M, paramsList: readonly R
 export const useRpcMutation = <M extends PhoneMethod>(method: M): UseMutationResult<RpcResults[M], Error, RpcParams<M>> => client.useRpcMutation(method);
 export const { queryClient, useRun } = client;
 
-/**
- * The phone's own OpenOrc Cloud: a session of its own, which the Mac it shows gets it for the person signed in there,
- * kept in the Keychain and followed as that Mac's account changes. Its lists and threads join Home in the next unit.
- */
-export const cloud = new PhoneCloud({
-  vault: keychainVault,
-  kept: keptIn(kept),
-  fetch,
-  connect: liveSocketOf(io),
-  push: () => undefined,
-  now: Date.now,
-  log: { info: () => undefined, warn: (message) => console.warn(`[OpenOrc] ${message}`) },
-});
+/** The shown Mac's projects with their remotes, as its list last answered, for matching the cloud's projects to them. */
+function macProjects() {
+  return (client.queryClient.getQueryData<Project[]>(["projects.list", {}]) ?? []).map((project) => ({ id: project.id, name: project.name, remote: project.gitRemote }));
+}
+
+const holds = () => cloud.hosted?.account.status().state === "signed-in";
+// Holding a session of its own, the phone reads the cloud itself: it no longer asks the Mac for cloud threads.
+link.connection.askFor(() => (holds() ? PHONE_CAPABILITIES.filter((capability) => capability !== CLOUD_THREADS) : PHONE_CAPABILITIES));
+let held = false;
+/** The phone came to hold a session of its own, or lost it: the Mac hears what it asks for now, and every list is read again. */
+function heldChanged(): void {
+  if (holds() === held) return;
+  held = holds();
+  link.connection.renegotiate();
+  void client.queryClient.invalidateQueries();
+}
+cloud.subscribe(heldChanged);
 void cloud.start().then(() => followMac(link, cloud, (message) => console.warn(`[OpenOrc] ${message}`)));

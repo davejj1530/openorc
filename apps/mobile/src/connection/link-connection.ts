@@ -138,6 +138,8 @@ export class LinkConnection implements CoreConnection {
   private readonly capabilities = new WeakMap<PhoneLine, Promise<readonly string[]>>();
   /** Answers still due to `session.negotiate`, kept apart from calls so no handover or drain waits on them. */
   private readonly negotiations = new Map<number, { session: PhoneLine; answer(capabilities: readonly string[]): void }>();
+  /** What this phone asks each session for: every capability it has, unless something it holds says otherwise. */
+  private asked: () => readonly string[] = () => PHONE_CAPABILITIES;
 
   constructor(
     private readonly clock: Clock,
@@ -207,14 +209,32 @@ export class LinkConnection implements CoreConnection {
     session.onClose(() => this.lost(session));
     // Best effort: older Macs refuse this RPC. No pending call may hold up a handover or reconnect waiting for it; only
     // a reply's image waits for the answer.
-    const negotiate = this.id();
-    this.capabilities.set(session, new Promise((answer) => this.negotiations.set(negotiate, { session, answer })));
-    session.send({ t: "rpc", id: negotiate, method: "session.negotiate", params: { capabilities: PHONE_CAPABILITIES } });
+    this.negotiate(session);
     session.send({ t: "interest", runIds: this.interest });
     this.emit({ type: "session", resumed: this.resumable });
     this.resumable = true;
     for (const waiter of this.waiting) waiter.ready(session);
     this.waiting.clear();
+  }
+
+  /** What the phone asks every session for from now on; `renegotiate` asks the current one again. */
+  askFor(asked: () => readonly string[]): void {
+    this.asked = asked;
+  }
+
+  /**
+   * Asks the current session again for what the phone asks for now, as when the phone came to hold a session of
+   * OpenOrc Cloud of its own and no longer reads the cloud through the Mac. Calls go on meanwhile; what the Mac shares
+   * is read from its new answer.
+   */
+  renegotiate(): void {
+    if (this.current && !this.current.closed) this.negotiate(this.current);
+  }
+
+  private negotiate(session: PhoneLine): void {
+    const negotiate = this.id();
+    this.capabilities.set(session, new Promise((answer) => this.negotiations.set(negotiate, { session, answer })));
+    session.send({ t: "rpc", id: negotiate, method: "session.negotiate", params: { capabilities: this.asked() } });
   }
 
   /**

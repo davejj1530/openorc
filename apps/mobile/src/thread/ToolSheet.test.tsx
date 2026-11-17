@@ -15,7 +15,7 @@ vi.mock("../client", async () => {
   const { fakeLink } = await import("../test-fixtures/fake-link");
   sheet.store = runStore();
   sheet.link = fakeLink();
-  return { useRun: sheet.store.client.useRun, useLinkRead: sheet.link.useLinkRead, link: { connection: { call: sheet.read } }, assetUri: () => new Promise(() => undefined) };
+  return { useRun: sheet.store.client.useRun, useLinkRead: sheet.link.useLinkRead, call: sheet.read, assetUri: () => new Promise(() => undefined) };
 });
 
 const numbered = (count: number) => Array.from({ length: count }, (_, i) => `line ${i + 1}`).join("\n");

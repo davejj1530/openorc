@@ -43,3 +43,9 @@ it("says once, in the muted ink, which skill was left out and why, and again onl
   mount();
   expect((await screen.findByRole("status")).textContent).toBe("Sent without your skill ui-ux-pro-max: its file data/tokens.json can't be read.");
 });
+
+it("says every skill was left out when this Mac couldn't list the agent's skills", async () => {
+  left = [{ name: null, cause: "Codex on this Mac couldn't list them." }];
+  mount();
+  expect((await screen.findByRole("status")).textContent).toBe("Sent without your skills: Codex on this Mac couldn't list them.");
+});

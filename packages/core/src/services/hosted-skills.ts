@@ -14,7 +14,7 @@ import { lstat, open, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { listSkills } from "@openorc/agents";
 import type { OwnSkill } from "@openorc/hosted";
-import type { AgentSkill, CloudSkill, HarnessId, LeftOutSkill } from "@openorc/protocol";
+import { harnessShortName, type AgentSkill, type CloudSkill, type HarnessId, type LeftOutSkill } from "@openorc/protocol";
 
 /** How long an agent's listing of its skills stands: listing may start the agent's CLI. */
 const LISTED_MS = 60_000;
@@ -126,15 +126,20 @@ export class HostedSkills {
   ) {}
 
   /**
-   * The agent's own skills that are on. Rejects in words when the agent cannot list them. A skill that can't be read is
-   * left out, with why (`leftOut`), and the rest go; the agent is then asked again at the next call, so a skill fixed or
-   * turned off in Settings counts then.
+   * The agent's own skills that are on. A skill that can't be read is left out, with why (`leftOut`), and the rest go;
+   * the agent is then asked again at the next call, so a skill fixed or turned off in Settings counts then. A Mac whose
+   * agent can't list its skills, not installed here or broken, has none to give: none go, and `leftOut` says why.
    */
   async own(agent: HarnessId): Promise<OwnSkill[]> {
+    const listed = await this.list(agent).catch(() => null);
+    if (!listed) {
+      this.note(agent, [{ name: null, cause: `${harnessShortName(agent)} on this Mac couldn't list them.` }]);
+      return [];
+    }
     const own: OwnSkill[] = [];
     const left: LeftOutSkill[] = [];
     const off = new Set(this.deps.off?.(agent) ?? []);
-    for (const { name, folder } of this.named(await this.list(agent))) {
+    for (const { name, folder } of this.named(listed)) {
       if (off.has(name)) continue;
       try {
         const files = await filesOf(folder);
@@ -145,10 +150,15 @@ export class HostedSkills {
       }
     }
     if (left.length) this.listed.delete(agent);
+    this.note(agent, left);
+    return own;
+  }
+
+  /** Keeps what the agent's last set left out, telling of it only when it changed. */
+  private note(agent: HarnessId, left: LeftOutSkill[]): void {
     const before = JSON.stringify(this.left.get(agent) ?? []);
     this.left.set(agent, left);
     if (JSON.stringify(left) !== before) this.deps.changed?.();
-    return own;
   }
 
   /**

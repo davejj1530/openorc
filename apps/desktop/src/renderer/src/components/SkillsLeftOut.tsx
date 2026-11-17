@@ -41,7 +41,7 @@ export function SkillsLeftOut({ agent, on }: { agent: string | null; on: boolean
   if (!on || !shown.length) return null;
   return (
     <div role="status" className="text-xs text-ink-3 px-1">
-      {shown.map((skill) => `Sent without your skill ${skill.name}: ${skill.cause}`).join(" ")}
+      {shown.map((skill) => (skill.name === null ? `Sent without your skills: ${skill.cause}` : `Sent without your skill ${skill.name}: ${skill.cause}`)).join(" ")}
     </div>
   );
 }

@@ -1,8 +1,11 @@
 import { z } from "zod";
 import { HarnessId } from "./harness.js";
 
-/** A skill of the person's left out of a cloud turn because this Mac could not read it, and why, in plain words. */
-export type LeftOutSkill = { name: string; cause: string };
+/**
+ * A skill of the person's left out of a cloud turn because this Mac could not read it, and why, in plain words. With no
+ * `name`, every skill of the agent's was left out: this Mac could not list them.
+ */
+export type LeftOutSkill = { name: string | null; cause: string };
 
 /**
  * One of an agent's own skills on this Mac as its cloud turns would get it: whether it goes (`on`, the person's choice

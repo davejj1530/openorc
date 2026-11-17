@@ -182,7 +182,7 @@ describe("the person's own skills on this Mac, for their cloud turns", () => {
     expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ agent: "claude" }));
   });
 
-  it("says why when the agent cannot list its skills, asks again the next time, and keeps its last listing through a later failure", async () => {
+  it("gives none when the agent cannot list its skills and says why, asks again the next time, and keeps its last listing through a later failure", async () => {
     let now = 1_000_000;
     let fails = true;
     const review = await skill("user", "review");
@@ -193,7 +193,8 @@ describe("the person's own skills on this Mac, for their cloud turns", () => {
       },
       () => now,
     );
-    await expect(skills.own("codex")).rejects.toThrow("Codex could not list skills for this project.");
+    expect(await skills.own("codex")).toEqual([]);
+    expect(skills.leftOut("codex")).toEqual([{ name: null, cause: "Codex on this Mac couldn't list them." }]);
     fails = false;
     expect((await skills.own("codex")).map((own) => own.name)).toEqual(["review"]);
     fails = true;

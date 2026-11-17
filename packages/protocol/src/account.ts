@@ -188,6 +188,21 @@ const ConnectSignIn = z.discriminatedUnion("way", [
   z.object({ way: z.literal("key"), agent: Agent, provider: Provider.optional(), key: z.string().trim().min(1).max(8192) }).strict(),
 ]);
 
+const DeletionOrganization = z.object({ id: z.string(), name: z.string(), image: z.string().nullable() });
+
+/**
+ * What deleting the OpenOrc account would do now: the organizations that go with it (`seats` when the seats they pay
+ * for end), the teams it leaves, the ones that hold it and why, and the person's own Pro that ends, paid or given.
+ */
+export const AccountDeletion = z.object({
+  email: z.string(),
+  deleted: z.array(DeletionOrganization.extend({ seats: z.boolean() })),
+  left: z.array(DeletionOrganization),
+  held: z.array(DeletionOrganization.extend({ reason: z.string() })),
+  pro: z.enum(["paid", "given"]).nullable(),
+});
+export type AccountDeletion = z.infer<typeof AccountDeletion>;
+
 export const accountRpcParams = {
   "account.status": z.object({}),
   /**
@@ -221,10 +236,19 @@ export const accountRpcParams = {
   "account.billing.leave": z.object({}).strict(),
   /** What Pro and an hours pack cost, read from the server each time it is asked; null when it can't say. */
   "account.offers": z.object({}).strict(),
+  /** What deleting the account would do now, read from the server each time it is asked. */
+  "account.deletion": z.object({}).strict(),
+  /** Emails the account's own address the code a deletion asks for. */
+  "account.deletion.code": z.object({}).strict(),
+  /** Deletes the account for good, with its address typed out and the code just sent to it; this app is then signed out. */
+  "account.delete": z.object({ email: z.string().trim().min(1).max(320), otp: z.string().regex(/^\d{6}$/, "Enter the six-digit code from your email.") }).strict(),
 };
 
 /** Every call but the offers answers the whole status, so a window never reads a stale half. */
-export type AccountRpcResults = { [M in Exclude<keyof typeof accountRpcParams, "account.offers">]: AccountStatus } & { "account.offers": BillingOffers | null };
+export type AccountRpcResults = { [M in Exclude<keyof typeof accountRpcParams, "account.offers" | "account.deletion">]: AccountStatus } & {
+  "account.offers": BillingOffers | null;
+  "account.deletion": AccountDeletion;
+};
 
 /**
  * Why a message cannot start a turn on OpenOrc Cloud now: out of reach, or one of the server's refusals, which name

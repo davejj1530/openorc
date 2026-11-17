@@ -37,6 +37,16 @@ export const wireBilling = z.object({
 });
 export type WireBilling = z.infer<typeof wireBilling>;
 
+const wireDeletionOrganization = z.object({ id: z.string(), name: z.string(), logo: z.string().nullable() });
+export const wireAccountDeletion = z.object({
+  email: z.string(),
+  deleted: z.array(wireDeletionOrganization.extend({ seats: z.boolean() })),
+  left: z.array(wireDeletionOrganization),
+  held: z.array(wireDeletionOrganization.extend({ reason: z.string() })),
+  pro: z.enum(["paid", "given"]).nullable(),
+});
+export type WireAccountDeletion = z.infer<typeof wireAccountDeletion>;
+
 const wirePrice = z.object({ amount: z.number().int().nonnegative(), currency: z.string().min(1) }).nullable();
 
 /** What Pro and an hours pack cost, as the server reads them from Polar's products. */
@@ -244,6 +254,12 @@ export const ROUTES = {
   portal: route("POST", "/billing/portal", wireBillingLink),
   person: route("GET", "/api/auth/get-session", wirePerson),
   updateProfile: route("PATCH", "/account/profile", z.object({ id: z.string(), name: z.string(), email: z.string(), image: z.string().nullable() })),
+  /** What deleting the account would do now: the organizations that go, the teams left, what holds it, the Pro that ends. */
+  accountDeletion: route("GET", "/account/deletion", wireAccountDeletion),
+  /** Emails the account's own address the code a deletion asks for; 429 in words past a few. */
+  accountDeletionCode: route("POST", "/account/deletion/code", null),
+  /** Deletes the account, 202 once its billing has ended and every session is signed out; refused in words, nothing changed. */
+  deleteAccount: route("DELETE", "/account", null),
   hostedSettings: route("GET", "/settings/hosted", wireHostedSettings),
   setHostedSettings: route("PATCH", "/settings/hosted", wireHostedSettings),
   signIns: route("GET", "/agent-sign-ins", z.array(wireSignIn)),
@@ -318,6 +334,8 @@ export const ROUTES = {
   toolOutput: (id: string, toolCallId: string) => route("GET", `/hosted/threads/${encodeURIComponent(id)}/tool-calls/${encodeURIComponent(toolCallId)}/output`, z.object({ output: z.unknown() })),
   /** The agent folds the conversation between turns. Asking again with the same id is the same compaction. */
   compact: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/compact`, wireCompacting),
+  /** A fork of the thread, the asker's own, under an id the app chose: asking again with it answers the same fork. */
+  fork: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/fork`, wireThread),
 } as const;
 
 function stringsOf(from: Record<string, number>): Record<string, string> {

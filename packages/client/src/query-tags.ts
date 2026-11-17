@@ -85,6 +85,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "account.status": ["account"],
   // Not "account": prices are read once per visit to the screen, not again on every change to the account.
   "account.offers": ["account-offers"],
+  "account.deletion": ["account"],
   "claude.accounts.list": ["claude-accounts"],
   "connectors.list": ["connectors"],
   "connectors.spec": ["connectors"],
@@ -229,6 +230,7 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "account.github.disconnect": ["account"],
   "account.billing.open": ["account"],
   "account.billing.leave": ["account"],
+  "account.delete": ["account"],
   "devices.setup": ["devices"],
   "worktrees.remove": ["worktrees", "threads", "tasks", "workspace-diff"],
   "devices.settings.set": ["devices"],

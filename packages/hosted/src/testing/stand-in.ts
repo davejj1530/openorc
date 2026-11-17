@@ -87,6 +87,8 @@ export interface StandIn {
   sandboxes: Map<string, string | null>;
   /** Ends every session, so the next request is refused. */
   revoke(): void;
+  /** The code last mailed to the address and not yet spent, as the person reads it in their email. */
+  lastCode(email: string): string | null;
   /** Stops answering and drops every connection, as an unreachable server does. `up()` brings it back on the same port. */
   down(): Promise<void>;
   up(): Promise<void>;
@@ -282,6 +284,35 @@ function accounts(options: StandInOptions) {
       const who = holder(token);
       return who ? { status: 200, body: signInRows(signIns.get(who) ?? []) } : unauthorized();
     },
+    // Deleting an account, as the server answers it once nothing holds it: its own organizations and teams are the
+    // server's to work out, so the stand-in has none to name, and the person's sessions all end with the request.
+    "GET /account/deletion": (_body, token) => {
+      const who = holder(token);
+      return who ? { status: 200, body: { email: who, deleted: [], left: [], held: [], pro: billing.get(who)?.pro ? "paid" : null } } : unauthorized();
+    },
+    "POST /account/deletion/code": (_body, token) => {
+      const who = holder(token);
+      if (!who) return unauthorized();
+      routes["POST /api/auth/email-otp/send-verification-otp"]!({ email: who, type: "sign-in" }, null);
+      return { status: 204, body: null };
+    },
+    "DELETE /account": (body, token) => {
+      const who = holder(token);
+      if (!who) return unauthorized();
+      if (
+        String(body["email"] ?? "")
+          .trim()
+          .toLowerCase() !== who
+      )
+        return { status: 400, body: { statusCode: 400, message: `Type ${who} exactly to delete your account.` } };
+      const refused = checkCode(who, String(body["otp"] ?? ""));
+      if (refused) return refused;
+      for (const [id, email] of sessions) if (email === who) sessions.delete(id);
+      billing.delete(who);
+      people.delete(who);
+      signIns.delete(who);
+      return { status: 202, body: null };
+    },
     "GET /settings/hosted": (_body, token) => {
       const who = holder(token);
       return who ? { status: 200, body: hostedSettings(who) } : unauthorized();
@@ -301,7 +332,7 @@ function accounts(options: StandInOptions) {
 }
 
 export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
-  const { sessions, billing, people, sandboxes, signIns, admit: admitTurn, holder, caller, routes, checkCode, session, mail } = accounts(options);
+  const { codes, sessions, billing, people, sandboxes, signIns, admit: admitTurn, holder, caller, routes, checkCode, session, mail } = accounts(options);
   const appSignIns = new StandInAppSignIns({ web: () => `http://127.0.0.1:${port}`, session, checkCode, mail });
   const requests: StandIn["requests"] = [];
   const connections = new Set<Socket>();
@@ -393,6 +424,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     addProject: (email, project, space) => spaces.addProject(email.toLowerCase(), project, space),
     ...agentSignInsFace(signIns, signInWrites),
     revoke: () => sessions.clear(),
+    lastCode: (email) => codes.get(email)?.code ?? null,
     requests,
     ...lifetime,
     connect: (_url, token) => inProcessSocket(token, { holder, peers, admit, serving: isServing, answer: answerSocket }),

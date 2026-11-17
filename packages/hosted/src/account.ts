@@ -12,6 +12,7 @@
  */
 import {
   openCodeProvider,
+  type AccountDeletion,
   type AccountProject,
   type BillingOffers,
   type BillingPage,
@@ -188,6 +189,30 @@ export class Account implements HostedAccount {
 
   async removeDevice(id: string): Promise<void> {
     await this.deps.session.request(ROUTES.removeDevice(id));
+  }
+
+  /** What deleting the account would do now, as the server reads it. */
+  async deletion(): Promise<AccountDeletion> {
+    const plan = await this.deps.session.request(ROUTES.accountDeletion);
+    const organization = ({ logo, ...rest }: { id: string; name: string; logo: string | null }) => ({ ...rest, image: toImage(logo) });
+    return {
+      email: plan.email,
+      deleted: plan.deleted.map((each) => ({ ...organization(each), seats: each.seats })),
+      left: plan.left.map(organization),
+      held: plan.held.map((each) => ({ ...organization(each), reason: each.reason })),
+      pro: plan.pro,
+    };
+  }
+
+  async sendDeletionCode(): Promise<void> {
+    await this.deps.session.request(ROUTES.accountDeletionCode);
+  }
+
+  /** Once the server has taken the deletion, every session of the person's is over: this one is forgotten here too. */
+  async deleteAccount(input: RpcParams<"account.delete">): Promise<void> {
+    await this.deps.session.request(ROUTES.deleteAccount, input);
+    await this.deps.session.end("person");
+    this.#announce();
   }
 
   async updateProfile(input: RpcParams<"account.profile.update">): Promise<void> {

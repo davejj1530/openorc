@@ -26,6 +26,9 @@ export function createAccountHandlers(
   | "account.billing.open"
   | "account.billing.leave"
   | "account.offers"
+  | "account.deletion"
+  | "account.deletion.code"
+  | "account.delete"
 > {
   const after = async (work: (account: HostedAccount) => Promise<void>): Promise<AccountStatus> => {
     if (!account) throw new Error(UNAVAILABLE);
@@ -48,5 +51,11 @@ export function createAccountHandlers(
     "account.billing.open": (page) => after((a) => a.openBilling(page)),
     "account.billing.leave": () => after(async (a) => a.leaveBilling()),
     "account.offers": () => account?.offers() ?? null,
+    "account.deletion": () => {
+      if (!account) throw new Error(UNAVAILABLE);
+      return account.deletion();
+    },
+    "account.deletion.code": () => after((a) => a.sendDeletionCode()),
+    "account.delete": (input) => after((a) => a.deleteAccount(input)),
   };
 }

@@ -41,6 +41,35 @@ describe("hosted calls normally served here", () => {
     expect(await router.handle({ type: "rpc", id: 4, method: "events.page", params: { runId: "hosted:cloud-thread" } })).toMatchObject({ type: "rpc.error" });
   });
 
+  it("asks this Mac a call the cloud failed because the thread moved here while it was on its way", async () => {
+    let holds = true;
+    const moved = new Set<string>();
+    const next = vi.fn(async () => ({ type: "rpc.result" as const, id: 5, result: { viewer: null, turnOf: {}, senders: {}, authors: {} } }));
+    const leaving: HostedThreads = {
+      ...place,
+      holds: (ref) => holds && place.holds(ref),
+      call: async () => {
+        // The thread leaves the place, for this Mac, while the call is there.
+        holds = false;
+        moved.add("cloud-thread");
+        throw new Error("That conversation isn't on OpenOrc Cloud.");
+      },
+    };
+    const router = new PlaceRouter({ place: () => leaving, next, movedHere: (id) => moved.has(id) });
+    expect(await router.handle({ type: "rpc", id: 5, method: "threads.authors", params: { threadId: "cloud-thread" } })).toMatchObject({ type: "rpc.result" });
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the place's refusal for a thread that is still there, or went anywhere but this Mac", async () => {
+    const next = vi.fn(async () => ({ type: "rpc.result" as const, id: 6, result: null }));
+    const router = new PlaceRouter({ place: () => place, next, movedHere: () => false });
+    expect(await router.handle({ type: "rpc", id: 6, method: "threads.authors", params: { threadId: "cloud-thread" } })).toMatchObject({
+      type: "rpc.error",
+      message: "This cloud operation is unavailable.",
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it("recognizes a hosted run even when its account is no longer active", async () => {
     const next = vi.fn(async () => ({ type: "rpc.result" as const, id: 3, result: null }));
     const router = new PlaceRouter({ place: () => null, next });

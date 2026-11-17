@@ -91,13 +91,13 @@ export class PlaceRouter {
     switch (route.by) {
       case "owner": {
         const id = route.thread(params as never);
-        return id && place.holds({ thread: id }) ? ask() : this.deps.next(request);
+        return id && place.holds({ thread: id }) ? this.whereItIs(place, request, id, ask) : this.deps.next(request);
       }
       case "run":
         return place.holds({ run: route.run(params as never) }) ? ask() : this.deps.next(request);
       case "merge": {
         const id = route.thread?.(params as never);
-        if (id) return place.holds({ thread: id }) ? ask() : this.deps.next(request);
+        if (id) return place.holds({ thread: id }) ? this.whereItIs(place, request, id, ask) : this.deps.next(request);
         if (method === "threads.list") return this.list(place, request, params as RpcParams<"threads.list">);
         if (method === "threads.resolvedCount") return this.resolvedCount(place, request, params as RpcParams<"threads.resolvedCount">);
         if (method === "threads.search") return this.search(place, request, params as RpcParams<"threads.search">);
@@ -121,6 +121,12 @@ export class PlaceRouter {
     } catch (error) {
       return { type: "rpc.error", id: request.id, message: error instanceof Error ? error.message : String(error) };
     }
+  }
+
+  /** A call about a thread the place failed because the thread moved to this Mac while it was on its way: asked here, where it is now. */
+  private async whereItIs(place: HostedThreads, request: RpcRequest, threadId: string, ask: () => Promise<RpcReply>): Promise<RpcReply> {
+    const reply = await ask();
+    return reply.type === "rpc.error" && !place.holds({ thread: threadId }) && this.deps.movedHere?.(threadId) ? this.deps.next(request) : reply;
   }
 
   /** One call to the place as a reply. Never rejects: the place's rejection becomes an error with its words. */

@@ -1,6 +1,12 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { cleanup, fireEvent, render as mount, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, expect, it } from "vitest";
+import { queryClient } from "../lib/client";
 import { ContextUsage } from "./ContextUsage";
+
+/** As the app mounts it: Compact reads whether its conversation's place may run it. */
+const render = (node: ReactNode) => mount(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>);
 
 afterEach(cleanup);
 

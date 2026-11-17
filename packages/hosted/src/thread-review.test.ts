@@ -105,6 +105,12 @@ it("keeps the recorded diff and later missing-checkpoint caveat together", async
   expect(await hosted.threads.call("hosted.review.changes", { threadId })).toEqual(answer);
 });
 
+it("reads changes a terminal's work left after the last turn, which belong to no turn", async () => {
+  answer = { ...recorded, turnId: null };
+  expect(await hosted.threads.call("hosted.review.changes", { threadId })).toEqual(answer);
+  expect(await hosted.threads.call("review.threadChanges", { threadId, comparison: "base" })).toMatchObject({ baseSha: "abc", files: [file] });
+});
+
 it("does not return protected changes after the session changes during a read", async () => {
   beforeReply = () => hosted.account.signOut();
   await expect(hosted.threads.call("hosted.review.changes", { threadId })).rejects.toThrow("You no longer have access to this project.");

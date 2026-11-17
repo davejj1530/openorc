@@ -83,7 +83,8 @@ const recorded = {
 };
 const missing = z.object({ state: z.literal("missing"), turnId: z.string(), line: z.string() });
 export const HostedThreadChanges = z.discriminatedUnion("state", [
-  z.object({ ...recorded, comparison: z.literal("base"), missing: z.string().nullable() }),
+  // A checkpoint taken as a terminal's work settled belongs to no turn.
+  z.object({ ...recorded, turnId: z.string().nullable(), comparison: z.literal("base"), missing: z.string().nullable() }),
   missing,
   z.object({ state: z.literal("none"), line: z.string() }),
 ]);

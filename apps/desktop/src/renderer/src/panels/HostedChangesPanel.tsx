@@ -34,7 +34,7 @@ export function HostedChangesPanel({ thread }: { thread: ThreadSummary }) {
         state={state.error ? undefined : state.data}
         stateError={state.error}
         changes={read.error ? undefined : changes}
-        heading={<span data-tip={recorded ? `Since ${thread.baseBranch ?? "the starting commit"} (${recorded.baseSha.slice(0, 7)}), turn ${recorded.turnId}` : undefined}>Branch</span>}
+        heading={<span data-tip={recorded ? `Since ${thread.baseBranch ?? "the starting commit"} (${recorded.baseSha.slice(0, 7)})` : undefined}>Branch</span>}
         meta={
           recorded ? (
             <>

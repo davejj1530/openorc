@@ -48,6 +48,7 @@ const ACCESS: { [M in AppMethod]: "reads" | "changes" } = {
   "skills.list": "reads",
   "claude.accounts.list": "reads",
   "providers.limits": "reads",
+  "providers.usage": "reads",
   "app.settings.get": "reads",
   "threads.start": "changes",
   "threads.update": "changes",

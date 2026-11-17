@@ -26,6 +26,29 @@ describe("phone policy", () => {
     expect(admitRemoteRequest("threads.switchClaudeAccount", { id: "t", claudeAccountId: "work" }, context)).toEqual({ ok: true });
   });
 
+  it("reads OpenOrc Cloud's agent sign-in for a phone, never a read of the Mac's own CLIs, and without the CLI's words", () => {
+    expect(admitRemoteRequest("providers.usage", { provider: "claude", cloud: true }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("providers.usage", { provider: "claude" }, context)).toMatchObject({ ok: false });
+    const usage = {
+      provider: "claude" as const,
+      status: "available" as const,
+      source: "OpenOrc Cloud",
+      context: "OpenOrc Cloud",
+      plan: "Max",
+      checkedAt: 1,
+      refreshedAt: 1,
+      message: "The CLI said so.",
+      windows: [],
+      credits: [],
+      accountUrl: "",
+      localRuns: null,
+    };
+    expect(remoteReply("providers.usage", usage, { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) })).toEqual({
+      ...usage,
+      message: null,
+    });
+  });
+
   it("lists a conversation's skills for the picker, without the Mac's paths or a token in a description", () => {
     expect(admitRemoteRequest("skills.list", { scope: { kind: "thread", id: "solo" }, agent: "claude", claudeAccountId: "work" }, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("skills.list", { scope: { kind: "project", id: "p" }, agent: "codex" }, context)).toEqual({ ok: true });

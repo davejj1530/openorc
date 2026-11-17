@@ -1,8 +1,8 @@
 import { tagsFor } from "@openorc/client";
-import type { PlanLimits } from "@openorc/protocol";
+import type { PlanLimits, RpcParams } from "@openorc/protocol";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { link, queryClient, useLinkState } from "../client";
+import { link, queryClient, useLinkState, useRpcs } from "../client";
 
 /** The plan limits as Settings shows them. */
 export interface Usage {
@@ -75,4 +75,34 @@ function useBeat(running: boolean): number {
     return () => clearInterval(timer);
   }, [running]);
   return now;
+}
+
+/** The agents whose sign-in OpenOrc Cloud reports after a person's turn. */
+const CLOUD_USAGE: readonly RpcParams<"providers.usage">[] = [
+  { provider: "claude", cloud: true },
+  { provider: "codex", cloud: true },
+];
+
+/**
+ * The person's agent sign-ins on OpenOrc Cloud, as the Mac last heard them after one of their cloud turns, each as an
+ * account card named OpenOrc Cloud beside its agent's mark, as the desktop names it. None for an agent with no
+ * reading, or from a Mac that does not answer them.
+ */
+export function useCloudLimits(live: boolean): readonly PlanLimits[] {
+  const reads = useRpcs("providers.usage", CLOUD_USAGE, { enabled: live, staleTime: 60_000 });
+  return reads.flatMap(({ data }) => {
+    if (!data || (data.provider !== "claude" && data.provider !== "codex") || (!data.windows.length && !data.credits.length)) return [];
+    return [
+      {
+        id: `cloud:${data.provider}`,
+        provider: data.provider,
+        name: "OpenOrc Cloud",
+        plan: data.plan,
+        status: data.status,
+        windows: data.windows,
+        credits: data.credits,
+        refreshedAt: data.refreshedAt,
+      },
+    ];
+  });
 }

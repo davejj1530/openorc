@@ -27,6 +27,8 @@ export const REMOTE_METHODS = [
   // Names and whether each can run, for a new thread's account choice; no email, organization or CLI text.
   "claude.accounts.list",
   "providers.limits",
+  // The person's agent sign-in on OpenOrc Cloud as the Mac last heard it; never a read of the Mac's own CLIs.
+  "providers.usage",
   "app.settings.get",
   "threads.start",
   "threads.update",

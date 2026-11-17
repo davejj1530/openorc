@@ -200,6 +200,8 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "claude.accounts.list": ({ refresh }) => (refresh ? NOT_FROM_PHONE : null),
   // Takes nothing and answers the shares and plans alone, shaped by the core: no email, token, path or CLI text.
   "providers.limits": allow,
+  // OpenOrc Cloud's reading alone: a read of the Mac's own sign-ins starts its CLIs, which the Mac's Settings do.
+  "providers.usage": ({ cloud }) => (cloud ? null : NOT_FROM_PHONE),
   "app.settings.get": allow,
   // Whether the Mac offers cloud threads, which builds from before the own cloud went still ask: it does not.
   "cloud.offer": allow,
@@ -305,6 +307,8 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   // A sign-in's email and organization, and the CLI's own words, stay on the Mac.
   "claude.accounts.list": ({ accounts, defaultId }) => ({ defaultId, accounts: accounts.map((account) => ({ ...account, email: null, organization: null, message: null })) }),
   "providers.limits": same,
+  // The CLI's own words stay on the Mac.
+  "providers.usage": (usage) => ({ ...usage, message: null }),
   "app.settings.get": same,
   "cloud.offer": same,
   "threads.movePreview": same,

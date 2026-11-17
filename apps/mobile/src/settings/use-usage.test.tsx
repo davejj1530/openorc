@@ -1,20 +1,25 @@
 // @vitest-environment jsdom
-import type { PlanLimits } from "@openorc/protocol";
+import type { PlanLimits, ProviderUsage, RpcParams } from "@openorc/protocol";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { LinkState } from "../connection/manager";
 import type { FakeMac } from "../test-fixtures/fake-mac";
-import { useUsage } from "./use-usage";
+import { useCloudLimits, useUsage } from "./use-usage";
 
 const mac = vi.hoisted(() => ({
   shown: null as FakeMac | null,
   state: { kind: "connecting", mac: { id: "studio", name: "Studio" }, why: null } as LinkState,
   limits: vi.fn<() => Promise<PlanLimits[]>>(),
+  usage: vi.fn<(params: RpcParams<"providers.usage">) => Promise<ProviderUsage>>(),
 }));
 
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
-  mac.shown = fakeMac((method) => (method === "providers.limits" ? mac.limits() : Promise.reject(new Error(`no ${method}`))));
+  mac.shown = fakeMac((method, params) => {
+    if (method === "providers.limits") return mac.limits();
+    if (method === "providers.usage") return mac.usage(params as RpcParams<"providers.usage">);
+    return Promise.reject(new Error(`no ${method}`));
+  });
   return { ...mac.shown.module, useLinkState: () => mac.state };
 });
 
@@ -37,6 +42,7 @@ beforeEach(() => {
   vi.useFakeTimers({ now, shouldAdvanceTime: true });
   mac.shown!.module.queryClient.clear();
   mac.limits.mockReset();
+  mac.usage.mockReset();
   mac.state = connected;
 });
 afterEach(() => {
@@ -110,4 +116,31 @@ it("asks again when told, after a read that failed", async () => {
 it("waits with the name of the Mac it would read", () => {
   mac.state = waiting;
   expect(open().result.current).toMatchObject({ state: "loading", live: false, hostName: "Studio" });
+});
+
+it("shows the person's sign-ins on OpenOrc Cloud with a reading as OpenOrc Cloud cards, and none without one", async () => {
+  const window = { id: "five_hour", label: "5-hour window", usedPercent: 30, remainingPercent: 70, resetsAt: now + 3_600_000, observedAt: now - 60_000, exhausted: false };
+  const reading = (provider: "claude" | "codex", windows: (typeof window)[]): ProviderUsage => ({
+    provider,
+    status: windows.length ? "available" : "unavailable",
+    source: "OpenOrc Cloud",
+    context: "OpenOrc Cloud",
+    plan: windows.length ? "Max" : null,
+    checkedAt: now,
+    refreshedAt: windows.length ? now - 60_000 : null,
+    message: null,
+    windows,
+    credits: [],
+    accountUrl: "",
+    localRuns: null,
+  });
+  mac.usage.mockImplementation(async ({ provider }) => reading(provider as "claude" | "codex", provider === "claude" ? [window] : []));
+  const { result } = renderHook(() => useCloudLimits(true), { wrapper: mac.shown!.wrapper });
+  await waitFor(() =>
+    expect(result.current).toEqual([{ id: "cloud:claude", provider: "claude", name: "OpenOrc Cloud", plan: "Max", status: "available", windows: [window], credits: [], refreshedAt: now - 60_000 }]),
+  );
+  expect(mac.usage.mock.calls.map(([params]) => params)).toEqual([
+    { provider: "claude", cloud: true },
+    { provider: "codex", cloud: true },
+  ]);
 });

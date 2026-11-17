@@ -9,7 +9,7 @@ import { ListPressable } from "../ui/ListPressable";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { Card, Divider, RowLines, rowClass, Section } from "./parts";
-import { useUsage, type Usage } from "./use-usage";
+import { useCloudLimits, useUsage, type Usage } from "./use-usage";
 import { UsageRing } from "./UsageRing";
 
 const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
@@ -104,11 +104,13 @@ function noCardsWords({ state, live, hostName }: Pick<Usage, "state" | "live" | 
 }
 
 /**
- * The shown Mac's account limits, read only, as the desktop's Settings > Usage shows them. While the phone is not
+ * The shown Mac's account limits, then the person's sign-ins on OpenOrc Cloud, read only, as the desktop's Settings >
+ * Usage shows them. While the phone is not
  * connected the last read stays, dimmed and held still, with the time it was read under the label.
  */
 export function UsageSection() {
-  const { accounts, state, live, readAt, now, hostName, retry } = useUsage();
+  const { accounts: mac, state, live, readAt, now, hostName, retry } = useUsage();
+  const accounts = [...mac, ...useCloudLimits(live)];
   const none = state === "failed" && live ? <ReadFailed retry={retry} /> : <NoCards words={noCardsWords({ state, live, hostName })} reading={state === "loading" && live} />;
   return (
     <Section title="Usage" note={live || readAt === null ? null : `Last read at ${time.format(readAt)}`}>

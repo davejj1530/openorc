@@ -49,7 +49,7 @@ vi.mock("../client", async () => ({
 }));
 
 const usage = vi.hoisted(() => ({ now: 0, retried: 0, current: null as Usage | null }));
-vi.mock("./use-usage", () => ({ useUsage: () => usage.current }));
+vi.mock("./use-usage", () => ({ useUsage: () => usage.current, useCloudLimits: () => [] }));
 
 const { SettingsScreen } = await import("./SettingsScreen");
 

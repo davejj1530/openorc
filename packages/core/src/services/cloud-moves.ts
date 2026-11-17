@@ -22,7 +22,7 @@ import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { packSession, SessionRefused, unpackSession, type PackedSession } from "@openorc/agents";
-import { cloudMoves, listEvents, orclings, projects, runs, threads, type CloudMove, type Db, type LedgerWriter } from "@openorc/db";
+import { cloudMoves, listEvents, orclings, projects, runs, subagents, threads, type CloudMove, type Db, type LedgerWriter, type SubagentRecord } from "@openorc/db";
 import { bringIntoFolder, git } from "@openorc/git";
 import type { ArrivalLine, ArrivalSettings, Hosted } from "@openorc/hosted";
 import {
@@ -60,6 +60,14 @@ const HEARD_MS = 30_000;
 const words = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /** How a run here ended, as the cloud keeps a turn's outcome; a run still going reads as one that ended well. */
+/** A subagent's status as the cloud keeps a finished one: one still marked running here was stopped by the move's wait. */
+const CHILD_STATUS: Record<SubagentRecord["status"], "completed" | "failed" | "stopped"> = {
+  running: "stopped",
+  completed: "completed",
+  failed: "failed",
+  stopped: "stopped",
+  no_updates: "completed",
+};
 const OUTCOMES: Partial<Record<string, "error" | "cancelled">> = { error: "error", cancelled: "cancelled" };
 
 export interface CloudMovesDeps {
@@ -105,7 +113,7 @@ export class CloudMoves {
     if (moving) return held(moving);
     if (!hosted || hosted.spaces.status().state !== "ready") return held(SIGN_IN);
     if (!isHostedAgent(thread.agent)) return held(`${harnessShortName(thread.agent)} doesn't run on OpenOrc Cloud.`);
-    if (runs.listForThread(this.deps.db, threadId).some((run) => run.state === "starting" || run.state === "running")) return held(WORKING);
+    if (runs.listForThread(this.deps.db, threadId).some((run) => run.state === "starting" || run.state === "running") || subagents.hasWorkingDescendants(this.deps.db, threadId)) return held(WORKING);
     const cloud = hosted.threads.cloudProjectFor?.(thread.projectId);
     if (!cloud) return held(NOT_IN_CLOUD);
     const status = hosted.spaces.status();
@@ -230,8 +238,27 @@ export class CloudMoves {
     }
   }
 
-  /** The thread's transcript as the arrival takes it: each person's message and what followed it, as one turn. */
+  /**
+   * The thread's transcript as the arrival takes it: each person's message and what followed it, as one turn; then each
+   * of its subagents as a thread of its own, under its id here, with its native record and what it did.
+   */
   private async *historyOf(thread: Thread): AsyncGenerator<ArrivalLine> {
+    // The turn each subagent started in, by its card in the thread's events.
+    const startedIn = new Map<string, string>();
+    for (const turn of this.turnsOf(thread)) {
+      for (const event of turn.events) if (event["type"] === "subagent.started" && typeof event["threadId"] === "string") startedIn.set(event["threadId"], turn.id);
+      yield turn;
+    }
+    for (const child of subagents.forRoot(this.deps.db, thread.id)) {
+      const line = this.childOf(child, startedIn.get(child.threadId) ?? null);
+      if (!line) continue;
+      yield line;
+      yield* this.turnsOf(threads.get(this.deps.db, child.threadId)!);
+    }
+  }
+
+  /** A thread's runs as turns: each person's message and what followed it, as one turn. */
+  private *turnsOf(thread: Thread): Generator<Extract<ArrivalLine, { kind: "turn" }>> {
     const settings = this.settingsOf(thread);
     for (const run of runs.listForThread(this.deps.db, thread.id)) {
       const outcome = OUTCOMES[run.state] ?? "success";
@@ -252,6 +279,34 @@ export class CloudMoves {
     }
   }
 
+  /**
+   * A subagent as the arrival takes it: its thread here, the agent's own name for it and the conversation it ran in, so
+   * the cloud reads it as one of its own. None for one whose thread is gone, or that ran in no conversation the agent
+   * named, which the cloud could not place.
+   */
+  private childOf(child: SubagentRecord, parentTurnId: string | null): Extract<ArrivalLine, { kind: "child" }> | null {
+    const row = threads.get(this.deps.db, child.threadId);
+    const parentSessionId = runs.get(this.deps.db, child.hostRunId)?.externalSessionId;
+    if (!row || !parentSessionId) return null;
+    return {
+      kind: "child",
+      id: child.threadId,
+      title: row.title,
+      settings: this.settingsOf(row),
+      nativeId: child.nativeId,
+      parentSessionId,
+      agentType: child.agentType,
+      toolCallId: child.toolCallId,
+      prompt: child.prompt,
+      status: CHILD_STATUS[child.status],
+      result: child.result,
+      error: null,
+      parentTurnId,
+      startedAt: new Date(child.startedAt).toISOString(),
+      endedAt: child.endedAt === null ? null : new Date(child.endedAt).toISOString(),
+    };
+  }
+
   private async toMac(hosted: Hosted, move: CloudMove, local: Project): Promise<void> {
     const threadId = move.threadId;
     const row = hosted.threads.row!(threadId);
@@ -268,6 +323,7 @@ export class CloudMoves {
       this.step(move, { step: "writing" });
       const thread = this.writeHere(threadId, local, row, runId, events, session);
       written = true;
+      await this.childrenHere(hosted, row.space, thread, runId, events);
       if (work.save?.bundle) await this.workHere(hosted, row.space, thread, local, work.save, temp);
       else await this.worktreeAt(thread, local, work.save?.base ?? null);
       const placed = threads.get(this.deps.db, threadId)!;
@@ -342,6 +398,59 @@ export class CloudMoves {
     this.deps.ledger.flush();
     this.deps.db.stmt("UPDATE threads SET last_activity_at = ?, seen_at = ?, updated_at = ? WHERE id = ?").run(endedAt, endedAt, endedAt, threadId);
     return threads.get(this.deps.db, threadId)!;
+  }
+
+  /**
+   * The cloud thread's subagents here as threads of their own, under their cloud ids, read from the cards in its events:
+   * each with the agent's own name for it, what it was asked, how it ended and what it did, so a card opens its thread
+   * here as it did there.
+   */
+  private async childrenHere(hosted: Hosted, space: string, root: Thread, rootRunId: string, events: readonly AgentEvent[]): Promise<void> {
+    const cards = new Map<string, { started: Extract<AgentEvent, { type: "subagent.started" }>; updated: Extract<AgentEvent, { type: "subagent.updated" }> | null }>();
+    for (const event of events) {
+      if (event.type === "subagent.started" && event.threadId) cards.set(event.threadId, { started: event, updated: null });
+      if (event.type === "subagent.updated" && event.threadId && cards.has(event.threadId)) cards.get(event.threadId)!.updated = event;
+    }
+    for (const [childId, { started, updated }] of cards) {
+      const runId = randomUUID();
+      const done: AgentEvent[] = [];
+      for await (const event of hosted.moves.events(space, childId)) done.push({ ...event, runId } as AgentEvent);
+      const status = updated?.status && updated.status !== "running" ? updated.status : "completed";
+      const endedAt = updated?.ts ?? done.at(-1)?.ts ?? started.ts;
+      this.deps.db.transaction(() => {
+        threads.insert(this.deps.db, {
+          id: childId,
+          projectId: root.projectId,
+          title: started.title,
+          agent: root.agent,
+          model: root.model,
+          effort: root.effort,
+          mode: root.mode,
+          permissionMode: root.permissionMode,
+          workspaceMode: root.workspaceMode,
+        });
+        threads.update(this.deps.db, childId, { parentThreadId: root.id, parentRelation: "subagent" });
+        runs.insert(this.deps.db, { id: runId, taskId: null, threadId: childId, agent: root.agent, model: root.model, mode: root.mode, permissionMode: root.permissionMode });
+        runs.update(this.deps.db, runId, { state: "success", endedAt });
+        subagents.insert(this.deps.db, {
+          threadId: childId,
+          runId,
+          hostRunId: rootRunId,
+          rootThreadId: root.id,
+          nativeId: started.subagentId,
+          toolCallId: started.toolCallId ?? null,
+          taskId: null,
+          agentType: started.agentType ?? null,
+          prompt: started.prompt ?? null,
+          status,
+          result: updated?.result ?? null,
+          startedAt: started.ts,
+          endedAt,
+        });
+      });
+      for (const event of done) this.deps.ledger.push(event);
+      this.deps.ledger.flush();
+    }
   }
 
   /**

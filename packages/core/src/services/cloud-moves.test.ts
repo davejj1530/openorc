@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:f
 import os from "node:os";
 import path from "node:path";
 import { claudeSessionFile, hostHome, packSession, unpackSession, type SessionId } from "@openorc/agents";
-import { cloudMoves, Db, LedgerWriter, listEvents, projects, runs, threads } from "@openorc/db";
+import { cloudMoves, Db, LedgerWriter, listEvents, projects, runs, subagents, threads } from "@openorc/db";
 import type { ArrivalLine, Hosted } from "@openorc/hosted";
 import { computerNames, type AgentEvent } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -83,6 +83,8 @@ function account() {
     bundle: "",
     session: null as Buffer | null,
     events: [] as AgentEvent[],
+    /** Each subagent's own events, by its thread's id. */
+    children: {} as Record<string, AgentEvent[]>,
     summaryProject: "",
   };
   const hosted = {
@@ -124,8 +126,8 @@ function account() {
         return { id };
       },
       undo: async (_space: string, id: string) => void sent.undone.push(id),
-      events: async function* () {
-        for (const event of cloud.events) yield event;
+      events: async function* (_space: string, id: string) {
+        for (const event of cloud.children[id] ?? cloud.events) yield event;
       },
       savedSession: async () => (cloud.session ? new Response(new Uint8Array(cloud.session)) : new Response(null, { status: 404 })),
       movedAway: async (_space: string, id: string) => {
@@ -178,7 +180,88 @@ async function macThread() {
 
 const settled = (id: string) => vi.waitFor(() => expect(cloudMoves.open(db, id)).toBeNull(), { timeout: 10_000 });
 
+/** A subagent the thread's first run started: its own thread, its card in the parent's events, its own run and what it did. */
+function subagentOf(parent: string, status: "running" | "completed" = "completed") {
+  const made = threads.insert(db, {
+    projectId: threads.get(db, parent)!.projectId,
+    title: "Find the login handler",
+    agent: "claude",
+    model: null,
+    mode: "act",
+    permissionMode: "trusted",
+    workspaceMode: "current",
+  });
+  const child = threads.update(db, made.id, { parentThreadId: parent, parentRelation: "subagent" });
+  runs.insert(db, { id: "child-run", taskId: null, threadId: child.id, agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+  runs.update(db, "child-run", { state: status === "running" ? "running" : "success" });
+  ledger.push({
+    type: "subagent.started",
+    runId: "run-1",
+    ts: 1_500,
+    subagentId: "agent-7",
+    threadId: child.id,
+    toolCallId: "toolu_7",
+    title: "Find the login handler",
+    prompt: "Where is login handled?",
+    agentType: "Explore",
+  });
+  ledger.push({ type: "message.completed", runId: "child-run", ts: 1_600, messageId: "child-1", role: "assistant", text: "In src/auth/login.ts" });
+  ledger.flush();
+  subagents.insert(db, {
+    threadId: child.id,
+    runId: "child-run",
+    hostRunId: "run-1",
+    rootThreadId: parent,
+    nativeId: "agent-7",
+    toolCallId: "toolu_7",
+    taskId: null,
+    agentType: "Explore",
+    prompt: "Where is login handled?",
+    status,
+    result: status === "completed" ? "In src/auth/login.ts" : null,
+    startedAt: 1_500,
+    endedAt: status === "completed" ? 1_700 : null,
+  });
+  return child;
+}
+
 describe("a thread moving from this Mac to OpenOrc Cloud", () => {
+  it("carries each of its subagents as a thread of its own, with its native record, the turn it began in and what it did", async () => {
+    const { thread } = await macThread();
+    const child = subagentOf(thread.id);
+    const { hosted, sent } = account();
+    await moves(hosted).move(thread.id, false);
+    await settled(thread.id);
+    const [parentTurn, childLine, childTurn] = sent.history;
+    expect(parentTurn).toMatchObject({ kind: "turn", thread: thread.id, events: expect.arrayContaining([expect.objectContaining({ type: "subagent.started", threadId: child.id })]) });
+    expect(childLine).toEqual({
+      kind: "child",
+      id: child.id,
+      title: "Find the login handler",
+      settings: { agent: "claude", model: null, effort: null, mode: "act", permissionMode: "trusted" },
+      nativeId: "agent-7",
+      parentSessionId: SESSION,
+      agentType: "Explore",
+      toolCallId: "toolu_7",
+      prompt: "Where is login handled?",
+      status: "completed",
+      result: "In src/auth/login.ts",
+      error: null,
+      parentTurnId: parentTurn!.kind === "turn" ? parentTurn!.id : null,
+      startedAt: new Date(1_500).toISOString(),
+      endedAt: new Date(1_700).toISOString(),
+    });
+    expect(childTurn).toMatchObject({ kind: "turn", thread: child.id, events: [{ type: "message.completed", role: "assistant", text: "In src/auth/login.ts" }] });
+    expect(sent.done).toEqual([thread.id]);
+  });
+
+  it("waits while a subagent of the thread is still working", async () => {
+    const { thread } = await macThread();
+    subagentOf(thread.id, "running");
+    const { hosted } = account();
+    expect(await moves(hosted).check(thread.id)).toEqual({ to: "cloud", can: false, reason: "The agent is still working. Move it once it stops." });
+  });
+
   it("sends its transcript, its conversation and its folder's work under its own id, then goes from this Mac", async () => {
     const { thread } = await macThread();
     const { hosted, sent } = account();
@@ -317,6 +400,47 @@ describe("a cloud thread moving to this Mac", () => {
     expect(git(here.worktreePath!, "status", "--porcelain")).toBe("M README.md");
     const taken = await readFile(claudeSessionFile(claude, here.worktreePath!, SESSION), "utf8");
     expect(taken).toContain(here.worktreePath!);
+  });
+
+  it("brings each of its subagents as a thread of its own under its cloud id, with its native record and what it did", async () => {
+    const project = projects.insert(db, { name: "App", rootPath: folder, gitRemote: "https://github.com/acme/app.git", defaultBranch: "main", settings: {} });
+    const made = account();
+    const id = await cloudThread(made, project);
+    const child = "5b1d0f0e-7a43-4c61-9a52-0b8e2f6a1c77";
+    made.cloud.events.push(
+      {
+        type: "subagent.started",
+        runId: `hosted:${id}`,
+        ts: 1_500,
+        subagentId: "agent-9",
+        threadId: child,
+        toolCallId: "toolu_9",
+        title: "Read the session code",
+        prompt: "How do sessions expire?",
+        agentType: "Explore",
+      },
+      { type: "subagent.updated", runId: `hosted:${id}`, ts: 1_800, subagentId: "agent-9", threadId: child, status: "completed", result: "After 30 days" },
+    );
+    made.cloud.children[child] = [{ type: "message.completed", runId: `hosted:${child}`, ts: 1_700, messageId: "child-a", role: "assistant", text: "After 30 days" }];
+    await moves(made.hosted).move(id, false);
+    await settled(id);
+    expect(cloudMoves.latest(db, id)).toMatchObject({ phase: "done", error: null });
+    expect(threads.get(db, child)).toMatchObject({ parentThreadId: id, parentRelation: "subagent", title: "Read the session code" });
+    const [root] = runs.listForThread(db, id);
+    expect(subagents.byThread(db, child)).toMatchObject({
+      rootThreadId: id,
+      hostRunId: root!.id,
+      nativeId: "agent-9",
+      toolCallId: "toolu_9",
+      agentType: "Explore",
+      prompt: "How do sessions expire?",
+      status: "completed",
+      result: "After 30 days",
+      startedAt: 1_500,
+      endedAt: 1_800,
+    });
+    const [run] = runs.listForThread(db, child);
+    expect(listEvents(db, run!.id).map((event) => (event.type === "message.completed" ? event.text : event.type))).toEqual(["After 30 days"]);
   });
 
   it("comes into a worktree at its base, its conversation with it, when the cloud kept nothing beyond the base", async () => {

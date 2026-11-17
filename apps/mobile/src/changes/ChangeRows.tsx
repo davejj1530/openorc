@@ -1,4 +1,4 @@
-import { fileMarks, relativeTime, shortSha, type FileMarkTone } from "@openorc/client";
+import { fileCount, fileMarks, relativeTime, shortSha, type FileMarkTone } from "@openorc/client";
 import type { Commit, FileChangeStat } from "@openorc/protocol";
 import { memo } from "react";
 import { Pressable, View } from "react-native";
@@ -83,14 +83,9 @@ export const CommitRow = memo(function CommitRow({ commit, unpushed }: { commit:
   );
 });
 
-/** Nothing to show: the desktop's empty words, over the Commits section. */
-export function CleanBlock({ where }: { where: string }) {
-  return (
-    <View className="items-center gap-1 px-8 py-10">
-      <Text className="text-md">Clean workspace</Text>
-      <Text className="text-center text-sm text-ink-4">Edits the agent makes in {where} show up here, ready to commit.</Text>
-    </View>
-  );
+/** A thread's changes with no files in them, counted as the desktop's bar counts them. */
+export function NoFilesBlock() {
+  return <Text className="px-5 py-10 text-center text-ink-4">{fileCount(0)}</Text>;
 }
 
 /** The Mac could not list the changes: what it said, and a way to ask again. */

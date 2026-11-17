@@ -112,11 +112,10 @@ it("lists the files and the branch's commits, with Commit in ink and Push after 
   expect(router.push).toHaveBeenCalledWith({ pathname: "/diff", params: { threadId: "t1", path: "src/pair.ts", comparison: "head" } });
 });
 
-it("says Clean workspace with nothing to commit, push or open", async () => {
+it("counts no files as the desktop does, with nothing to commit, push or open", async () => {
   world({ files: [], log: [], push: push({ unpushedCount: 0, unpushed: [] }), thread: thread({ branch: "main" }) });
   open();
-  await waitFor(() => expect(screen.getByText("Clean workspace")).toBeTruthy());
-  expect(screen.getByText("Edits the agent makes in this thread's worktree show up here, ready to commit.")).toBeTruthy();
+  await waitFor(() => expect(screen.getByText("0 files")).toBeTruthy());
   expect(screen.queryByRole("button", { name: "Commit" })).toBeNull();
 });
 

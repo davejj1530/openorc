@@ -15,7 +15,7 @@ import { Spinner } from "../ui/Spinner";
 import { useLate } from "../ui/use-late";
 import { changesLine } from "./change-words";
 import { changesItems, ITEM_HEIGHTS, type ChangesItem } from "./changes-items";
-import { CleanBlock, CommitRow, CommitsHead, FailedBlock, FileRow, UnlistedRow } from "./ChangeRows";
+import { CommitRow, CommitsHead, FailedBlock, FileRow, NoFilesBlock, UnlistedRow } from "./ChangeRows";
 import { perfEnabled } from "../thread/perf-probe";
 import { ChangesPerf } from "./ChangesPerf";
 import { PanelTitle } from "./PanelTitle";
@@ -75,7 +75,6 @@ function ChangesList({ threadId, reads, comparison, onComparison, footer, dim, l
   const open = useCallback((path: string) => router.push({ pathname: "/diff", params: { threadId, path, comparison } }), [threadId, comparison]);
   if (!changes.data && changes.error) return <FailedBlock message={changes.error.message} onRetry={() => void changes.refetch()} />;
   if (!changes.data) return <View className="flex-1 items-center justify-center">{late ? <Spinner /> : null}</View>;
-  const where = thread.data?.workspaceMode === "worktree" ? "this thread's worktree" : (reads.project.data?.name ?? "this project");
   const refresh = () => {
     setRefreshing(true);
     void reads.refresh().finally(() => setRefreshing(false));
@@ -92,7 +91,7 @@ function ChangesList({ threadId, reads, comparison, onComparison, footer, dim, l
       ListHeaderComponent={
         <View>
           {thread.data?.worktreePath ? <ComparePicker value={comparison} onChange={onComparison} /> : null}
-          {changes.data.totals.files === 0 ? <CleanBlock where={where} /> : null}
+          {changes.data.totals.files === 0 ? <NoFilesBlock /> : null}
         </View>
       }
       className={cn(dim && "opacity-60")}

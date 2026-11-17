@@ -12,6 +12,7 @@ const mac = vi.hoisted(() => ({
   actions: [] as unknown[],
   answer: null as unknown,
   changes: { available: true } as { available: boolean; reason?: string },
+  empty: false,
 }));
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
@@ -27,11 +28,13 @@ vi.mock("../client", async () => {
         baseSha: "a".repeat(40),
         treeSha: "b".repeat(40),
         recordedAt: "2026-11-18T03:00:00.000Z",
-        totals: { files: 2, insertions: 12, deletions: 3 },
-        files: [
-          { path: "src/export.ts", status: "modified", body: { kind: "text", insertions: 10, deletions: 3 }, withheld: false },
-          { path: "src/export.test.ts", status: "added", body: { kind: "text", insertions: 2, deletions: 0 }, withheld: false },
-        ],
+        totals: mac.empty ? { files: 0, insertions: 0, deletions: 0 } : { files: 2, insertions: 12, deletions: 3 },
+        files: mac.empty
+          ? []
+          : [
+              { path: "src/export.ts", status: "modified", body: { kind: "text", insertions: 10, deletions: 3 }, withheld: false },
+              { path: "src/export.test.ts", status: "added", body: { kind: "text", insertions: 2, deletions: 0 }, withheld: false },
+            ],
         unlisted: 0,
       });
     if (method === "hosted.review.state") return Promise.resolve(mac.state);
@@ -55,6 +58,7 @@ afterEach(() => {
   mac.phone!.module.client.queryClient.clear();
   mac.actions = [];
   mac.changes = { available: true };
+  mac.empty = false;
   mac.phone!.saved.clear();
 });
 
@@ -90,6 +94,13 @@ it("offers Commit while there is work to commit, and nothing to push once the br
   render(<CloudChangesScreen />, { wrapper: mac.phone!.wrapper });
   expect(await screen.findByRole("button", { name: "Commit" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: /Push|Publish/ })).toBeNull();
+});
+
+it("counts no files as the desktop does where the server recorded none", async () => {
+  mac.empty = true;
+  mac.state = state({ uncommitted: null, unpushed: null, published: false });
+  render(<CloudChangesScreen />, { wrapper: mac.phone!.wrapper });
+  expect(await screen.findByText("0 files")).toBeTruthy();
 });
 
 it("says only the server's reason where it does not serve a thread's changes, with nothing to retry", async () => {

@@ -11,7 +11,7 @@ import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { openInApp } from "../ui/web";
 import { changesLine } from "./change-words";
-import { CommitRow, CommitsHead, FailedBlock, FileRow, UnlistedRow } from "./ChangeRows";
+import { CommitRow, CommitsHead, FailedBlock, FileRow, NoFilesBlock, UnlistedRow } from "./ChangeRows";
 import { PanelTitle } from "./PanelTitle";
 import { BarButton } from "./PublishBar";
 import { pullWords, type BarPill } from "./publish-state";
@@ -139,6 +139,7 @@ function Files({ threadId, changes, error, retry }: { threadId: string; changes:
   if (error) return <FailedBlock message={error.message} onRetry={retry} />;
   if (!changes) return <View className="items-center py-10">{<Spinner />}</View>;
   if (changes.state !== "recorded") return <Text className="px-5 py-10 text-center text-ink-4">{changes.line}</Text>;
+  if (!changes.files.length && !changes.unlisted) return <NoFilesBlock />;
   const open = (path: string) => router.push({ pathname: "/cloud-diff", params: { threadId, path } });
   return (
     <>

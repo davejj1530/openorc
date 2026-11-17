@@ -5,7 +5,7 @@ export interface NativeProps {
   children?: ReactNode | ((state: { pressed: boolean }) => ReactNode);
   accessibilityLabel?: string;
   accessibilityRole?: string;
-  accessibilityState?: { expanded?: boolean; disabled?: boolean };
+  accessibilityState?: { expanded?: boolean; disabled?: boolean; selected?: boolean };
   accessibilityElementsHidden?: boolean;
   testID?: string;
   disabled?: boolean;
@@ -63,6 +63,7 @@ function host(tag: string) {
         "data-testid": testID,
         "aria-expanded": accessibilityState?.expanded,
         "aria-disabled": accessibilityState?.disabled,
+        "aria-selected": accessibilityState?.selected,
         disabled: tag === "button" ? Boolean(disabled) : undefined,
         onClick: onPress,
       },

@@ -1,5 +1,5 @@
 import { answeredName, answeredOf, personFirst, stretchTime, teamConversationTitle, type TeamChatLease, type TeamChatTarget } from "@openorc/client";
-import type { TeamChatAnswered, TeamConversation, TeamMessage } from "@openorc/protocol";
+import { TeamChatReaction, type TeamChatAnswered, type TeamConversation, type TeamMessage } from "@openorc/protocol";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionSheetIOS, Pressable, TextInput, View, type ScrollViewInstance } from "react-native";
@@ -15,6 +15,7 @@ import { Text } from "../ui/Text";
 import { openInApp } from "../ui/web";
 import { chatItems, type ChatItem } from "./chat-items";
 import { useChatLease } from "./lease";
+import { Reactions } from "./Reactions";
 
 /** A message the draft began, on its way or kept after it did not go. */
 type PendingTeamMessage = NonNullable<ReturnType<typeof teamChat.drafts.begin>>;
@@ -68,16 +69,20 @@ function Quote({ answered, self, mine }: { answered: TeamChatAnswered; self: str
   );
 }
 
-/** What a long press on a message offers: Reply where the server takes replies, Pin or Unpin for a member. */
+/** What a long press on a message offers: a reaction, Reply where the server takes replies, Pin or Unpin for a member. */
 interface MessageMoves {
   self: string;
+  react: (message: TeamMessage, emoji: TeamChatReaction) => void;
   reply: ((message: TeamMessage) => void) | null;
   pin: ((message: TeamMessage) => void) | null;
 }
 
 function offer(message: TeamMessage, moves: MessageMoves) {
-  const actions = [...(moves.reply ? [{ label: "Reply", run: () => moves.reply!(message) }] : []), ...(moves.pin ? [{ label: message.pinned ? "Unpin" : "Pin", run: () => moves.pin!(message) }] : [])];
-  if (!actions.length) return;
+  const actions = [
+    ...TeamChatReaction.options.map((emoji) => ({ label: emoji, run: () => moves.react(message, emoji) })),
+    ...(moves.reply ? [{ label: "Reply", run: () => moves.reply!(message) }] : []),
+    ...(moves.pin ? [{ label: message.pinned ? "Unpin" : "Pin", run: () => moves.pin!(message) }] : []),
+  ];
   ActionSheetIOS.showActionSheetWithOptions({ options: [...actions.map((action) => action.label), "Cancel"], cancelButtonIndex: actions.length }, (index) => actions[index]?.run());
 }
 
@@ -94,6 +99,7 @@ function Mine({ message, moves }: { message: TeamMessage; moves: MessageMoves })
           <Words body={message.body} className="text-md text-bubble-ink" />
         </View>
       )}
+      <Reactions message={message} self={moves.self} mine onReact={(emoji) => moves.react(message, emoji)} />
       {message.pinned ? <Text className="pr-1 text-xs text-ink-4">Pinned</Text> : null}
     </Pressable>
   );
@@ -123,6 +129,7 @@ function Theirs({ item, moves }: { item: Extract<ChatItem, { kind: "theirs" }>; 
             <Words body={message.body} className="text-md text-ink" />
           </View>
         )}
+        <Reactions message={message} self={moves.self} mine={false} onReact={(emoji) => moves.react(message, emoji)} />
         {message.pinned ? <Text className="pl-1 text-xs text-ink-4">Pinned</Text> : null}
       </Pressable>
     </View>
@@ -233,6 +240,7 @@ function Conversation({ lease, conversationId, title, newFrom }: { lease: TeamCh
   const send = (message: PendingTeamMessage) => void teamChat.send(lease, target, message).catch(() => undefined);
   const moves: MessageMoves = {
     self: lease.accountId,
+    react: (message, emoji) => void teamChat.react(lease, target, message, emoji).catch((error: Error) => setFailure(error.message)),
     reply: chat?.features.includes("replies") ? (message) => teamChat.drafts.reply(target, answeredOf(message)) : null,
     pin: chat?.features.includes("pins") && joined ? (message) => void teamChat.pin(lease, target, message, !message.pinned).catch((error: Error) => setFailure(error.message)) : null,
   };

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { normalizeModelSettings, placeOf, type AgentKind, type PermissionPreset, type Run, type RunMode, type ThreadSummary } from "@openorc/protocol";
 import { agentDefaultChoice, defaultChoice, type ModelChoice } from "./model-picker-selection.js";
 import type { PermissionDefault } from "./permission-default.js";
@@ -19,28 +19,34 @@ function savedModelChoice(thread: SavedThreadSettings | null, activeRun: Run | u
   return null;
 }
 
+/** A thread's default with nothing saved: a cloud thread keeps its own agent, as what this Mac runs by default has no say in it. */
+function threadDefault(models: Parameters<typeof defaultChoice>[0], agent: AgentKind | null, elsewhere: boolean): ModelChoice | null {
+  return elsewhere && agent ? agentDefaultChoice(models, agent) : defaultChoice(models, agent);
+}
+
 /** Model/policy choices persist in selection order, before any message is sent. */
 export function useConversationSettingsWith(queries: ClientQueries, permissions: PermissionDefault, { thread, activeRun }: { thread: SavedThreadSettings | null; activeRun: Run | undefined }) {
   const models = queries.useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
   const updateThread = queries.useRpcMutation("threads.update");
-  const stored = savedModelChoice(thread, activeRun);
-  const [choice, setChoice] = useState<ModelChoice | null>(stored);
-  const storedKey = JSON.stringify(stored);
+  const storedKey = JSON.stringify(savedModelChoice(thread, activeRun));
+  const stored = useMemo(() => JSON.parse(storedKey) as ModelChoice | null, [storedKey]);
+  // The person's own pick, until the thread's saved choice changes: Slack and other windows can change the
+  // authoritative thread settings while this view stays mounted.
+  const [picked, setPicked] = useState<ModelChoice | null>(null);
   const previousStored = useRef(storedKey);
   useEffect(() => {
-    // Slack and other windows can change the authoritative thread settings while this view stays mounted.
     if (previousStored.current !== storedKey) {
       previousStored.current = storedKey;
-      setChoice(stored);
+      setPicked(null);
     }
-  }, [storedKey, stored]);
-  useEffect(() => {
-    if (!models.data || choice) return;
-    const prefer = thread ? thread.agent : (activeRun?.agent ?? null);
-    // Keep saved execution settings visible even while the catalog is stale or unavailable. A cloud thread keeps its own
-    // agent: what this Mac runs by default has no say in it.
-    setChoice(stored ?? (thread && placeOf(thread).elsewhere ? agentDefaultChoice(models.data, thread.agent) : defaultChoice(models.data, prefer)));
-  }, [choice, models.data, stored, thread, activeRun?.agent]);
+  }, [storedKey]);
+  const agent = thread?.agent ?? activeRun?.agent ?? null;
+  const elsewhere = Boolean(thread && placeOf(thread).elsewhere);
+  // Saved execution settings stay visible even while the catalog is stale or unavailable. With nothing saved or picked,
+  // the default for the thread's own agent, worked out again as the thread and the models arrive in either order, so a
+  // screen that opens before its thread has loaded never keeps another agent's default.
+  const fallback = useMemo(() => (picked || stored || !models.data ? null : threadDefault(models.data, agent, elsewhere)), [picked, stored, models.data, agent, elsewhere]);
+  const choice = picked ?? stored ?? fallback;
   const [mode, setMode] = useState<RunMode>(thread ? thread.mode : (activeRun?.mode ?? "act"));
   const savedMode = thread?.mode ?? activeRun?.mode;
   const lastSavedMode = useRef(savedMode);
@@ -87,7 +93,7 @@ export function useConversationSettingsWith(queries: ClientQueries, permissions:
     });
 
   const selectModel = (next: ModelChoice) => {
-    setChoice(next);
+    setPicked(next);
     persist({ ...next, fastMode: Boolean(next.fastMode) });
   };
   const selectMode = (next: RunMode) => {

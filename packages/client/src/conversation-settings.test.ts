@@ -132,3 +132,24 @@ it("gives a cloud thread with no saved model its own agent's default, even where
   // The composer shows it without saving it: a teammate's thread is not the person's to write settings to.
   expect(updates()).toEqual([]);
 });
+
+it("gives a thread its own agent's default once it loads, when the models answered before it did, and keeps a pick", async () => {
+  const models = [
+    { id: "gpt-6-sol", label: "GPT-6 Sol", agent: "codex", isDefault: true, efforts: ["medium"], defaultEffort: "medium" },
+    { id: "claude-opus-5-5", label: "Opus 5.5", agent: "claude", isDefault: true, efforts: ["high"], defaultEffort: "high" },
+  ];
+  call.mockImplementation((method) => Promise.resolve(method === "agents.models" ? models : {}));
+  const cloud: SavedThreadSettings = { ...thread, agent: "claude", model: null, effort: null, owner: { brain: "hosted", reach: "live", heardAt: 0 } };
+  // The screen opens before its thread has loaded, as a phone does with the models kept from its last launch.
+  const { result, rerender } = renderHook(({ loaded }) => client.useConversationSettings({ thread: loaded, activeRun: undefined }), {
+    wrapper,
+    initialProps: { loaded: null as SavedThreadSettings | null },
+  });
+  await waitFor(() => expect(result.current.choice).not.toBeNull());
+  rerender({ loaded: cloud });
+  await waitFor(() => expect(result.current.choice).toEqual({ agent: "claude", model: "claude-opus-5-5", effort: "high" }));
+  // A model the person picked stays theirs as the models read again.
+  act(() => result.current.selectModel({ agent: "codex", model: "gpt-6-sol", effort: "medium" }));
+  rerender({ loaded: { ...cloud } });
+  expect(result.current.choice).toEqual({ agent: "codex", model: "gpt-6-sol", effort: "medium" });
+});

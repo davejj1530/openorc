@@ -1,6 +1,7 @@
 import type { LegendListRef } from "@legendapp/list/react-native";
 import { KeyboardAwareLegendList } from "@legendapp/list/keyboard";
 import type { Block } from "@openorc/client";
+import type { ThreadNote } from "@openorc/protocol";
 import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from "react";
 import { Pressable, View } from "react-native";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
@@ -15,6 +16,8 @@ import { newArrivals, useArrival } from "./arrivals";
 import { countArrivals } from "./perf-probe";
 import { Card, RevealCard } from "./cards";
 import { Notice, Prompt, Reply } from "./messages";
+import { notePlaces } from "./note-places";
+import { NoteRow } from "./NoteRow";
 import { emptyRowMemo, endMark, fixedHeight, isNews, transcriptRows, unsentRows, withWaitingApprovals, type EndMark, type Row } from "./rows";
 import { AuthorsContext } from "./thread-authors";
 import { TurnEnd } from "./TurnEnd";
@@ -29,6 +32,88 @@ import { SubagentCards } from "./SubagentCards";
 
 /** What a scroll event says about where the reader is. */
 type ScrollPosition = { contentOffset: { y: number }; layoutMeasurement: { height: number }; contentSize: { height: number }; contentInset?: { bottom?: number } };
+
+/**
+ * The keyboard rises as a card's field takes focus; once it has, the field's bottom comes to the foot of what stays in
+ * view, however tall the card. A card ends its row, so its bottom is the row's.
+ */
+function useCardReveal(rows: Row[], listRef: RefObject<LegendListRef | null>) {
+  return useCallback(
+    (blockId: string, belowField: number) => {
+      const index = rows.findIndex((row) => row.kind === "card" && row.block.id === blockId);
+      if (index !== -1) setTimeout(() => void listRef.current?.scrollToIndex({ index, viewPosition: 1, viewOffset: belowField - 12, animated: true }), 250);
+    },
+    [rows, listRef],
+  );
+}
+
+/**
+ * A page that lands while the top is still in reach asks for the next one, as the desktop keeps loading while the top
+ * stays in view; the list's own start callback fires only when a scroll crosses into it.
+ */
+function useOlderPages(
+  rows: Row[],
+  { hasOlder, filled, loadOlder }: { hasOlder: boolean; filled: boolean; loadOlder: () => void },
+  listRef: RefObject<LegendListRef | null>,
+  nearStart: RefObject<boolean>,
+) {
+  useEffect(() => {
+    const state = listRef.current?.getState();
+    const fits = Boolean(state && state.contentLength <= state.scrollLength);
+    if (hasOlder && filled && (fits || nearStart.current)) loadOlder();
+  }, [rows, hasOlder, filled, loadOlder, listRef, nearStart]);
+}
+
+/** The conversation's rows: its turns with their names and notes, then what waits on the person outside it. */
+function useRows(blocks: Block[], { live, working }: { live: boolean; working: boolean }, runId: string, waiting: readonly WaitingApproval[], notes: readonly ThreadNote[]): Row[] {
+  const memo = useRef(emptyRowMemo());
+  const voices = useContext(VoicesContext);
+  const senders = useContext(AuthorsContext);
+  const places = useMemo(() => notePlaces(blocks, notes), [blocks, notes]);
+  const conversation = useMemo(() => transcriptRows(blocks, { live, working }, runId, memo.current, { voices, senders }, places), [blocks, live, working, runId, voices, senders, places]);
+  return useMemo(() => withWaitingApprovals(conversation, waiting), [conversation, waiting]);
+}
+
+/**
+ * Brings the reader's first unread mention into view once, as the thread opens at it rather than at its end: the list
+ * stops following the end, so what arrives later does not move the view away from the note.
+ */
+function useMentionOpening(mention: string | null, rows: Row[], filled: boolean, listRef: RefObject<LegendListRef | null>, onFollow: (following: boolean) => void) {
+  const opened = useRef<string | null>(null);
+  const index = mention && filled && opened.current !== mention ? rows.findIndex((row) => row.key === `note:${mention}`) : -1;
+  useEffect(() => {
+    if (index === -1 || !mention) return;
+    opened.current = mention;
+    onFollow(false);
+    void listRef.current?.scrollToIndex({ index, viewPosition: 0.3, animated: false });
+  }, [index, mention, listRef, onFollow]);
+}
+
+/**
+ * Reports the unread notes that tag the reader once half of one is on screen, by the list's own positions, as the list
+ * scrolls and once rows are laid out. A list with no such note looks for none.
+ */
+function useNotesOnScreen(rows: Row[], listRef: RefObject<LegendListRef | null>, onNotesSeen: ((ids: string[]) => void) | undefined): () => void {
+  const unread = useMemo(() => rows.filter((row): row is Extract<Row, { kind: "note" }> => row.kind === "note" && row.note.mentionedYou && !row.note.read), [rows]);
+  const look = useCallback(() => {
+    const state = unread.length && onNotesSeen ? listRef.current?.getState() : undefined;
+    if (!state) return;
+    const end = state.scroll + state.scrollLength;
+    const seen = unread.filter((row) => {
+      const at = state.positionByKey(row.key);
+      const size = state.sizes.get(row.key);
+      return at !== undefined && size !== undefined && size > 0 && Math.min(end, at + size) - Math.max(state.scroll, at) >= size / 2;
+    });
+    if (seen.length) onNotesSeen!(seen.map((row) => row.note.id));
+  }, [unread, listRef, onNotesSeen]);
+  useEffect(() => {
+    if (!unread.length) return;
+    // Rows measure a frame after they mount, so a note that arrives on screen is looked for once it has its size.
+    const timer = setTimeout(look, 300);
+    return () => clearTimeout(timer);
+  }, [unread, look]);
+  return look;
+}
 
 /** How near the end still counts as reading the newest turn. */
 const AT_END = 24;
@@ -57,6 +142,8 @@ function RowView({ row }: { row: Row }): ReactElement | null {
       return <TurnEnd row={row} />;
     case "presence":
       return <AgentPresence working={row.working} />;
+    case "note":
+      return <NoteRow note={row.note} />;
   }
 }
 
@@ -147,23 +234,44 @@ export interface TranscriptProps {
   followKey: number;
   /** What waits on the person outside the loaded runs, answered here: the phone has no task view, and older runs page in late. */
   waiting?: readonly WaitingApproval[];
+  /** A cloud thread's notes, which stand among its turns. */
+  notes?: readonly ThreadNote[];
+  /** Notes that tag the reader, unread, came on screen. */
+  onNotesSeen?: (ids: string[]) => void;
+  /** The note that tags the reader, unread as the thread opened, to open at once it is drawn. */
+  mention?: string | null;
 }
 
 const NOTHING_WAITING: readonly WaitingApproval[] = [];
+const NO_NOTES: readonly ThreadNote[] = [];
 
 /**
  * The conversation as a list of rows, opening at the newest turn. Older turns load a page at a time as the reader
  * nears the top, without moving what they read. While the reader is at the end, new content keeps them there; scrolled
  * up, a New chip offers the way back.
  */
-export function Transcript({ blocks, live, working, runId, hasOlder, loadOlder, filled, composerInset, listRef, onFollow, following, followKey, waiting = NOTHING_WAITING }: TranscriptProps) {
-  const memo = useRef(emptyRowMemo());
-  const voices = useContext(VoicesContext);
-  const senders = useContext(AuthorsContext);
-  const conversation = useMemo(() => transcriptRows(blocks, { live, working }, runId, memo.current, { voices, senders }), [blocks, live, working, runId, voices, senders]);
-  const rows = useMemo(() => withWaitingApprovals(conversation, waiting), [conversation, waiting]);
+export function Transcript({
+  blocks,
+  live,
+  working,
+  runId,
+  hasOlder,
+  loadOlder,
+  filled,
+  composerInset,
+  listRef,
+  onFollow,
+  following,
+  followKey,
+  waiting = NOTHING_WAITING,
+  notes = NO_NOTES,
+  onNotesSeen,
+  mention = null,
+}: TranscriptProps) {
+  const rows = useRows(blocks, { live, working }, runId, waiting, notes);
   const { frames, place, placeAtRest, warm } = useFramePlacement(rows, listRef, hasOlder);
   const arrivals = useArrivals(rows, filled);
+  const lookForNotes = useNotesOnScreen(rows, listRef, onNotesSeen);
   const end = endMark(rows, blocks);
   // The end the reader saw before scrolling up; a new row there, or a reply that grew, is news.
   const seen = useRef<EndMark | null>(null);
@@ -181,8 +289,9 @@ export function Transcript({ blocks, live, working, runId, hasOlder, loadOlder, 
       if (atEnd || touching.current) onFollow(atEnd);
       if (atEnd) place();
       else placeAtRest();
+      lookForNotes();
     },
-    [onFollow, place, placeAtRest],
+    [onFollow, place, placeAtRest, lookForNotes],
   );
   const grab = useCallback(() => {
     touching.current = true;
@@ -199,13 +308,8 @@ export function Transcript({ blocks, live, working, runId, hasOlder, loadOlder, 
     onFollow(true);
     void listRef.current?.scrollToEnd({ animated: true });
   };
-  // A page that lands while the top is still in reach asks for the next one, as the desktop keeps loading while the
-  // top stays in view; the list's own start callback fires only when a scroll crosses into it.
-  useEffect(() => {
-    const state = listRef.current?.getState();
-    const fits = Boolean(state && state.contentLength <= state.scrollLength);
-    if (hasOlder && filled && (fits || nearStart.current)) loadOlder();
-  }, [rows, hasOlder, filled, loadOlder, listRef]);
+  useOlderPages(rows, { hasOlder, filled, loadOlder }, listRef, nearStart);
+  useMentionOpening(mention, rows, filled, listRef, onFollow);
   const sent = useRef(followKey);
   useEffect(() => {
     if (sent.current === followKey) return;
@@ -215,15 +319,7 @@ export function Transcript({ blocks, live, working, runId, hasOlder, loadOlder, 
     void listRef.current?.scrollToEnd({ animated: false });
   }, [followKey, onFollow, listRef]);
 
-  // The keyboard rises as a card's field takes focus; once it has, the field's bottom comes to the foot of what stays in
-  // view, however tall the card. A card ends its row, so its bottom is the row's.
-  const reveal = useCallback(
-    (blockId: string, belowField: number) => {
-      const index = rows.findIndex((row) => row.kind === "card" && row.block.id === blockId);
-      if (index !== -1) setTimeout(() => void listRef.current?.scrollToIndex({ index, viewPosition: 1, viewOffset: belowField - 12, animated: true }), 250);
-    },
-    [rows, listRef],
-  );
+  const reveal = useCardReveal(rows, listRef);
 
   return (
     <View className="flex-1">

@@ -37,7 +37,10 @@ export function threadStatus(thread: Pick<ThreadSummary, "activity" | "session" 
 }
 
 /** A row's lead: its status, else the state of the thread's pull request. */
-export type ThreadMark = ThreadStatus | { kind: "pull"; label: string; state: PrState };
+export type ThreadMark = ThreadStatus | { kind: "pull"; label: string; state: PrState } | { kind: "mention"; label: string };
+
+/** A row's mark for the reader's unread mention, where `mentionLeads` puts it before the row's status. */
+export const MENTION_MARK = { kind: "mention", label: "Mentioned you" } as const satisfies ThreadMark;
 
 /** Where a thread works, as its row's hover title and spoken label name it. */
 export type ThreadPlace = { kind: "branch" | "pull" | "folder"; label: string };

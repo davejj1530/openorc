@@ -167,3 +167,15 @@ it("releases a turn a handoff holds, as the person's own window does: stops the 
   await phone.call("threads.retrySave", { threadId: teammate });
   expect(at.stand.requests.some((request) => request.path === `/hosted/threads/${teammate}/retry-save`)).toBe(true);
 });
+
+it("reads a teammate's note that tags the person through the Mac, and marks it read once seen", async () => {
+  const threadId = at.cloud.threads.teammate;
+  const id = crypto.randomUUID();
+  const me = (await together(threadId, () => true)).viewer!;
+  await at.asMara((mara) => mara("threads.postNote", { threadId, id, text: "@Riley can you check the footer?", mentions: [{ userId: me.id, start: 0, end: 6 }] }));
+  expect((await together(threadId, (state) => state.mentions.unread)).mentions.firstUnreadNoteId).toBe(id);
+  const page = await phone.call("threads.notes", { threadId, limit: 200 });
+  expect(page.notes.find((note) => note.id === id)).toMatchObject({ mentionedYou: true, read: false, author: { name: "Mara Okafor" } });
+  await phone.call("threads.readNotes", { threadId, ids: [id] });
+  await together(threadId, (state) => !state.mentions.unread);
+});

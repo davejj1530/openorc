@@ -13,9 +13,10 @@ import {
   workTurns,
   type Block,
 } from "@openorc/client";
-import type { ThreadPerson, Visualization } from "@openorc/protocol";
+import type { ThreadNote, ThreadPerson, Visualization } from "@openorc/protocol";
 import { height } from "../generated/tokens";
 import { messagePieces } from "./markdown-chunks";
+import { NO_NOTES, notesAfter, notesKey, type NotePlaces } from "./note-places";
 import { messageAuthor, turnSender, type ThreadSenders } from "./senders";
 import { NO_VOICES, voiceOf, type Voice, type Voices } from "./voices";
 import type { WaitingApproval } from "./waiting-approvals";
@@ -68,6 +69,8 @@ export type Row = { key: string; gap: number } & (
       text: string | null;
     }
   | { kind: "presence"; working: boolean }
+  /** A note in a cloud thread: words for the people it tags, beside the agent's work and never to it. */
+  | { kind: "note"; note: ThreadNote }
 );
 
 /**
@@ -93,12 +96,14 @@ export interface PieceSource {
 
 /** What the previous pass made of each turn, so turns and rows that did not change keep their objects. */
 export interface RowMemo {
-  turns: Map<string, { blocks: Block[]; live: boolean; opening: number; names: HeadNames; rows: Row[] }>;
+  turns: Map<string, { blocks: Block[]; live: boolean; opening: number; names: HeadNames; notes: string; rows: Row[] }>;
+  /** The notes before every turn, as last drawn. */
+  top: { key: string; rows: Row[] };
   /** The last pass's rows, handed back whole when no row changed. */
   rows: Row[];
 }
 
-export const emptyRowMemo = (): RowMemo => ({ turns: new Map(), rows: [] });
+export const emptyRowMemo = (): RowMemo => ({ turns: new Map(), top: { key: "", rows: [] }, rows: [] });
 
 const sameItems = <T>(a: readonly T[], b: readonly T[]) => a.length === b.length && a.every((item, i) => item === b[i]);
 
@@ -150,6 +155,7 @@ const sameAs: { [K in RowKind]: (a: RowOf<K>, b: RowOf<K>) => boolean } = {
   visualization: sameBlock,
   end: (a, b) => a.live === b.live && a.writing === b.writing && a.startedAt === b.startedAt && a.durationMs === b.durationMs && a.outcome === b.outcome && a.text === b.text,
   presence: (a, b) => a.working === b.working,
+  note: (a, b) => a.note.id === b.note.id && a.note.read === b.note.read,
   head: (a, b) => sameVoice(a.voice, b.voice) && samePerson(a.sender, b.sender),
   // A streamed delta the row does not draw keeps the row, so the list and the open steps card hold still.
   work: (a, b) => a.live === b.live && a.runId === b.runId && sameNow(a.now, b.now) && a.work.length === b.work.length && a.work.every((block, i) => drawnSame(block, b.work[i]!)),
@@ -232,11 +238,12 @@ interface HeadNames {
 }
 
 /** A turn's rows, in the desktop's order: before the work, the head where it has one and the work, what follows it, the end. */
-function turnParts(turn: { id: string; blocks: Block[] }, live: boolean, fallbackRunId: string, names: HeadNames): Unspaced[] {
+function turnParts(turn: { id: string; blocks: Block[] }, live: boolean, fallbackRunId: string, names: HeadNames, notes: NotePlaces): Unspaced[] {
   const runId = runOf(turn.blocks, fallbackRunId);
   const timing = workTiming(turn.blocks, live);
   const { before, work, after } = workParts(turn.blocks, timing.live);
   const rows: Unspaced[] = before.flatMap((block) => beforeRows(block, runId));
+  rows.push(...noteRows(notesAfter(notes, before)));
   const ended = timing.outcome === "error" || timing.outcome === "cancelled";
   const spoke = Boolean(work.length || after.length || timing.live || ended);
   const sender = turnSender(names.senders, turn.blocks, timing.live);
@@ -255,6 +262,7 @@ function turnParts(turn: { id: string; blocks: Block[] }, live: boolean, fallbac
     const card = cards[index];
     if (card) rows.push(...afterRows(card, runId));
   });
+  rows.push(...noteRows(notesAfter(notes, work)));
   const rest = after.filter((block) => block.kind !== "approval");
   rows.push(...afterTurnRows(rest, runId));
   const reply = turnReply(after.filter((block) => !providerError(block)));
@@ -262,8 +270,20 @@ function turnParts(turn: { id: string; blocks: Block[] }, live: boolean, fallbac
   const end = { live: timing.live, writing, startedAt: timing.startedAt, durationMs: timing.durationMs, outcome: timing.outcome };
   // A finished turn that neither took a time nor said anything to copy has nothing to end on.
   if (spoke && (turnStatusWords(turnStatus(end, 0)) || reply)) rows.push({ kind: "end", key: `end:${turn.id}`, ...end, text: !timing.live && reply ? reply.text : null });
+  // What follows the work, and any block the turn does not draw, has its notes after the turn's end.
+  const placed = new Set([...before, ...work]);
+  rows.push(
+    ...noteRows(
+      notesAfter(
+        notes,
+        turn.blocks.filter((block) => !placed.has(block)),
+      ),
+    ),
+  );
   return rows;
 }
+
+const noteRows = (notes: readonly ThreadNote[]): Unspaced[] => notes.map((note) => ({ kind: "note", key: `note:${note.id}`, note }));
 
 /**
  * The work in the order it ran, cut at each question or approval card: what the agent did after an answer reads below
@@ -300,8 +320,8 @@ function gapAbove(row: Unspaced, above: Unspaced | undefined, opening: number): 
 }
 
 /** A turn's rows with the space above each; `opening` is the space above its first. */
-function turnRows(turn: { id: string; blocks: Block[] }, live: boolean, fallbackRunId: string, opening: number, names: HeadNames): Row[] {
-  return turnParts(turn, live, fallbackRunId, names).map((row, index, rows) => ({ ...row, gap: gapAbove(row, rows[index - 1], opening) }) as Row);
+function turnRows(turn: { id: string; blocks: Block[] }, live: boolean, fallbackRunId: string, opening: number, names: HeadNames, notes: NotePlaces): Row[] {
+  return turnParts(turn, live, fallbackRunId, names, notes).map((row, index, rows) => ({ ...row, gap: gapAbove(row, rows[index - 1], opening) }) as Row);
 }
 
 /**
@@ -319,10 +339,10 @@ export interface TranscriptActivity {
  * array back. So a streamed word changes no row at all (the streaming piece reads its words itself), and a frame that
  * updates a step hands the list that one new row.
  */
-export function transcriptRows(blocks: Block[], { live, working }: TranscriptActivity, runId: string, memo: RowMemo, { voices, senders }: TurnNames = NO_NAMES): Row[] {
+export function transcriptRows(blocks: Block[], { live, working }: TranscriptActivity, runId: string, memo: RowMemo, { voices, senders }: TurnNames = NO_NAMES, notes: NotePlaces = NO_NOTES): Row[] {
   const turns = workTurns(blocks);
   const next: RowMemo["turns"] = new Map();
-  const rows: Row[] = [];
+  const rows: Row[] = [...topNoteRows(memo, notes)];
   // Each turn names its agent and model only where they changed from the turn before; the first, from the thread's own.
   let spoken = voices.own;
   turns.forEach((turn, index) => {
@@ -333,17 +353,18 @@ export function transcriptRows(blocks: Block[], { live, working }: TranscriptAct
     // A prompt whose answer came as a turn of its own still sits 28 above it.
     const opening = (rows.at(-1)?.kind === "prompt" ? GAP.prompt : GAP.turn) - spaceBelow(rows.at(-1));
     const previous = memo.turns.get(turn.id);
-    if (previous && previous.live === turnLive && previous.opening === opening && sameHeadNames(previous.names, names) && sameItems(previous.blocks, turn.blocks)) {
+    const noted = notesKey(notesAfter(notes, turn.blocks));
+    if (previous && previous.live === turnLive && previous.opening === opening && previous.notes === noted && sameHeadNames(previous.names, names) && sameItems(previous.blocks, turn.blocks)) {
       next.set(turn.id, previous);
       rows.push(...previous.rows);
       return;
     }
     const kept = new Map(previous?.rows.map((row) => [row.key, row]));
-    const fresh = turnRows(turn, turnLive, runId, opening, names).map((row) => {
+    const fresh = turnRows(turn, turnLive, runId, opening, names, notes).map((row) => {
       const before = kept.get(row.key);
       return before && sameRow(row, before) ? before : row;
     });
-    next.set(turn.id, { blocks: turn.blocks, live: turnLive, opening, names, rows: fresh });
+    next.set(turn.id, { blocks: turn.blocks, live: turnLive, opening, names, notes: noted, rows: fresh });
     rows.push(...fresh);
   });
   memo.turns = next;
@@ -351,6 +372,13 @@ export function transcriptRows(blocks: Block[], { live, working }: TranscriptAct
   if (sameItems(rows, memo.rows)) return memo.rows;
   memo.rows = rows;
   return rows;
+}
+
+/** The notes from before every loaded turn, the same rows while they are the same notes. */
+function topNoteRows(memo: RowMemo, notes: NotePlaces): Row[] {
+  const key = notesKey(notes.top);
+  if (memo.top.key !== key) memo.top = { key, rows: noteRows(notes.top).map((row, index) => ({ ...row, gap: index ? GAP.part : 0 }) as Row) };
+  return memo.top.rows;
 }
 
 /**

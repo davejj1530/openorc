@@ -79,6 +79,9 @@ const cloudReplies: { [M in CloudRemoteMethod]: Reply<M> } = {
   "threads.retrySave": same,
   "threads.stopWork": same,
   "threads.stopCommand": same,
+  // Notes as the server gives them to everyone in the thread: words, tags and their authors by name and picture.
+  "threads.notes": same,
+  "threads.readNotes": same,
 };
 
 export function cloudReply<M extends CloudRemoteMethod>(method: M, result: RpcResults[M], context: PhoneShaping): RpcResults[M] {

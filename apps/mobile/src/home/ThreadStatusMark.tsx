@@ -4,8 +4,12 @@ import Animated from "react-native-reanimated";
 import { AlertCircle, CircleHelp, GitPullRequest, LoaderCircle, Terminal } from "../generated/icons";
 import type { ThreadMark } from "@openorc/client";
 import { useReducedMotion } from "../ui/reduced-motion";
+import { Text } from "../ui/Text";
 
 const pullTone: Record<PrState, string> = { open: "text-ink-4", merged: "text-ok", closed: "text-bad" };
+
+/** The desktop's mention mark: an @ in the ink at 15 on a 16 pt line. */
+const MENTION_TYPE = { fontSize: 15, lineHeight: 16 };
 
 // Tailwind's animate-spin, which the desktop's spinner uses.
 const spin = { to: { transform: [{ rotate: "360deg" }] } };
@@ -36,15 +40,21 @@ function Glyph({ mark }: { mark: ThreadMark }) {
       return <Terminal size={16} className="text-ink-4" />;
     case "pull":
       return <GitPullRequest size={16} className={pullTone[mark.state]} />;
+    case "mention":
+      return (
+        <Text maxFontSizeMultiplier={1} className="text-ink" style={MENTION_TYPE}>
+          @
+        </Text>
+      );
   }
 }
 
 /**
  * How far each kind of 16 pt status glyph reaches left of its center on the title line, stroke included: the rings
  * (8.5 of 24 plus half the 1.75 stroke), the cross's and the pull request's left arms (6 of 24), the terminal's frame
- * (9 of 24 plus half the stroke), the 8 pt unread dot.
+ * (9 of 24 plus half the stroke), the 8 pt unread dot, the @ at 15.
  */
-export const REACH = { ring: 6.25, cross: 4.6, frame: 6.6, dot: 4 } as const;
+export const REACH = { ring: 6.25, cross: 4.6, frame: 6.6, dot: 4, at: 6.5 } as const;
 
 const reaches: Record<ThreadMark["kind"], number> = {
   waiting: REACH.ring,
@@ -54,6 +64,7 @@ const reaches: Record<ThreadMark["kind"], number> = {
   unread: REACH.dot,
   background: REACH.frame,
   pull: REACH.cross,
+  mention: REACH.at,
 };
 
 /** How far a row's status glyph reaches left of its center, so the tree's lines can stop a set gap short of it. */

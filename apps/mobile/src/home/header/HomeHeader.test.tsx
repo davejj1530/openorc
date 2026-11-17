@@ -3,7 +3,8 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { SharedValue } from "react-native-reanimated";
 import { afterEach, expect, it, vi } from "vitest";
-import type { LinkState } from "../../connection/manager";
+import type { DownReason, LinkState } from "../../connection/manager";
+import { nativeProps } from "../../test-fixtures/react-native";
 import { HomeBar } from "./HomeBar";
 import { LostLine } from "./MacLine";
 
@@ -40,6 +41,15 @@ const quickConnect: LinkState = { kind: "connecting", mac: studio, why: null };
 /** The list scrolled `y` points. */
 const shared = <T,>(value: T) => ({ value }) as SharedValue<T>;
 const bar = (state: LinkState, tab?: "threads" | "orclings" | "tasks") => render(<HomeBar state={state} scroll={{ scrollY: shared(0) }} tab={tab} />);
+/** The room after the title and the status's own width, as the phone lays them out. */
+function layOut(room: number, status: number) {
+  const width = (id: string, value: number) => nativeProps.get(screen.getByTestId(id))?.onLayout?.({ nativeEvent: { layout: { x: 0, y: 0, width: value, height: 52 } } });
+  act(() => {
+    width("status-room", room);
+    width("link-status", status);
+  });
+}
+
 /** The bar's buttons by the names VoiceOver reads, left to right. */
 const circles = () => screen.getAllByRole("button").map((button) => button.getAttribute("aria-label") ?? button.textContent);
 
@@ -53,6 +63,7 @@ it("puts the connection first among the circles, as a laptop", () => {
 
 it("rings the connection and says what is wrong after the wordmark while the phone is not connected", () => {
   bar(tailnet);
+  layOut(200, 120);
   expect(screen.getAllByRole("button", { name: "Studio, Not reachable over Tailscale" })).toHaveLength(2);
   expect(screen.getByText("Check Tailscale")).toBeTruthy();
   expect(screen.getAllByTestId("link-dot")).toHaveLength(2);
@@ -158,4 +169,31 @@ it("offers no filter where Home has no list, as for a space shut to the person",
   render(<HomeBar state={connected} listed={false} />);
   expect(screen.queryByRole("button", { name: /^Show/ })).toBeNull();
   expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
+});
+
+it("lets the status leave whole before a long organization's name loses a letter, at its own type size, in every link state", () => {
+  const long = { id: "org-long", kind: "organization", name: "Northern Lights Cooperative Engineering", logo: null, memberId: "member", role: "member", memberCount: 9 } as const;
+  account.spaces = { state: "ready", spaces: [{ id: "personal-me", kind: "personal" }, long], current: long, access: null, offline: false };
+  const reasons: DownReason[] = ["unreachable", "silent", "tailnet", "no-route", "offline", "restarting", "disabled", "busy"];
+  const states: LinkState[] = [
+    { kind: "connecting", mac: studio, why: "unreachable" },
+    ...reasons.map((why): LinkState => ({ kind: "waiting", mac: studio, why, retryAt: null })),
+    { kind: "incompatible", mac: studio },
+  ];
+  for (const state of states) {
+    bar(state);
+    const status = screen.getByTestId("link-status");
+    // Measured, it stands only where its words fit whole after the name; otherwise it leaves, VoiceOver and touch with it.
+    layOut(40, 120);
+    expect(status.getAttribute("aria-hidden")).toBe("true");
+    expect(nativeProps.get(status)?.className).toContain("opacity-0");
+    expect(screen.getByText(long.name)).toBeTruthy();
+    layOut(200, 120);
+    expect(status.getAttribute("aria-hidden")).toBeNull();
+    expect(nativeProps.get(status)?.className).not.toContain("opacity-0");
+    // Its words keep their size: nothing fits them to the room.
+    const words = Array.from(status.querySelectorAll("span")).find((node) => node.textContent && node.textContent.length > 1)!;
+    expect(nativeProps.get(words)?.adjustsFontSizeToFit).toBeUndefined();
+    cleanup();
+  }
 });

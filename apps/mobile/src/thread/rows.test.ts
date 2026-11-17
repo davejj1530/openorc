@@ -1,6 +1,7 @@
 import { liveHeadline, workEntries } from "@openorc/client";
 import { describe, expect, it } from "vitest";
 import { emptyRowMemo, endMark, fixedHeight, isNews, newestRow, transcriptRows, unsentRows, withWaitingApprovals, type Row, type TurnNames } from "./rows";
+import type { NotePlaces } from "./note-places";
 import { threadSenders } from "./senders";
 import { activity, finishedTurn, runStore, type Draft } from "./test-fixtures/run-store";
 
@@ -17,6 +18,37 @@ describe("transcriptRows", () => {
       expect.stringMatching(/^end:/),
       "presence",
     ]);
+  });
+
+  it("stands a cloud thread's notes where the desktop does: after the prompt, after the work, after the turn's end, and before every turn", () => {
+    const { frame } = runStore();
+    const run = frame(...finishedTurn);
+    const note = (id: string, read = false) => ({ id, seq: 1, author: null, text: "@Riley look", mentions: [], replyTo: null, createdAt: "", afterEventSeq: 0, mentionedYou: true, read });
+    const work = run.blocks.find((block) => block.kind === "tool")!;
+    const places = (read = false): NotePlaces => ({
+      top: [note("n-top")],
+      after: new Map([
+        ["ask-1", [note("n-prompt")]],
+        [work.id, [note("n-work", read)]],
+        ["reply-1", [note("n-reply")]],
+      ]),
+    });
+    const memo = emptyRowMemo();
+    const rows = transcriptRows(run.blocks, activity(run), "r", memo, undefined, places());
+    expect(outline(rows)).toEqual([
+      "note:n-top",
+      "prompt:ask-1",
+      "note:n-prompt",
+      expect.stringMatching(/^work:/),
+      "note:n-work",
+      "reply:reply-1:0",
+      expect.stringMatching(/^end:/),
+      "note:n-reply",
+      "presence",
+    ]);
+    // A note read since changes its own row and leaves the others as they were.
+    const again = transcriptRows(run.blocks, activity(run), "r", memo, undefined, places(true));
+    expect(again.filter((row, index) => row !== rows[index]).map((row) => row.key)).toEqual(["note:n-work"]);
   });
 
   const codex = (model: string) => ({ agent: "codex", model });

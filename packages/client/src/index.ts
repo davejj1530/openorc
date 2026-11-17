@@ -163,6 +163,7 @@ export { pruneThreadFolds, threadFoldIds } from "./thread-folds.js";
 export { threadHeadline, type ThreadHeadline } from "./thread-headline.js";
 export {
   latestActivity,
+  MENTION_MARK,
   ownerMark,
   pullRequestMark,
   pullRequestNumber,

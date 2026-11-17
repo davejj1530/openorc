@@ -41,3 +41,20 @@ export function noteFromDraft(draft: string, people: readonly { id: string; name
   text += source.slice(at);
   return mentions.length ? { text, mentions } : null;
 }
+
+/**
+ * A note's words in runs, each tag of a person its own run, in the order they stand; a tag whose span overlaps the one
+ * before it or runs past the words is left as words.
+ */
+export function noteSegments(note: { text: string; mentions: readonly { start: number; end: number }[] }): { text: string; tag: boolean }[] {
+  const runs: { text: string; tag: boolean }[] = [];
+  let at = 0;
+  for (const mention of [...note.mentions].sort((a, b) => a.start - b.start)) {
+    if (mention.start < at || mention.end > note.text.length) continue;
+    if (mention.start > at) runs.push({ text: note.text.slice(at, mention.start), tag: false });
+    runs.push({ text: note.text.slice(mention.start, mention.end), tag: true });
+    at = mention.end;
+  }
+  if (at < note.text.length) runs.push({ text: note.text.slice(at), tag: false });
+  return runs;
+}

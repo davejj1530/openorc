@@ -1,6 +1,7 @@
 import {
-  initials,
   latestActivity,
+  MENTION_MARK,
+  mentionLeads,
   pullRequestMark,
   relativeTime,
   rowAge,
@@ -19,11 +20,12 @@ import {
 import { harnessShortName, isHarnessId, isSubagentThread, placeOf, type PrState, type ThreadSummary } from "@openorc/protocol";
 import { Link } from "expo-router";
 import { memo, useMemo, type ComponentType } from "react";
-import { Image, useWindowDimensions, View } from "react-native";
+import { useWindowDimensions, View } from "react-native";
 import { Cloud, GitMerge, GitPullRequest, GitPullRequestClosed } from "../generated/icons";
 import { cn } from "../ui/cn";
 import type { IconProps } from "../ui/icon";
 import { ListPressable } from "../ui/ListPressable";
+import { PersonFace } from "../ui/PersonFace";
 import { swipeAccessibility, type SwipeAction } from "../ui/swipe";
 import { SwipeRow } from "../ui/SwipeRow";
 import { SweepText } from "../ui/SweepText";
@@ -68,18 +70,6 @@ const MARK_PULL = ACTION_INSET - ROW_INSET - 14 - ACTION_RESERVE;
 /** The age's column, wide enough for "11mo", so ages end on one line down the list. */
 const AGE_WIDTH = 32;
 
-/** A teammate's face in a 16 pt fact slot: their picture, else their initials on a quiet fill, as the desktop's. */
-function StarterFace({ name, image }: { name: string; image: string | null }) {
-  if (image) return <Image source={{ uri: image }} accessibilityIgnoresInvertColors className="size-3.5 rounded-full" />;
-  return (
-    <View className="size-3.5 items-center justify-center rounded-full bg-surface-3">
-      <Text maxFontSizeMultiplier={1} className="text-ink-2" style={{ fontSize: 7, lineHeight: 9 }}>
-        {initials(name)}
-      </Text>
-    </View>
-  );
-}
-
 /**
  * A root row's facts, as the desktop's row packs them before its state: who started it when it is someone else, its
  * pull request in its state's tone, and the cloud for an OpenOrc Cloud thread whose group's label does not wear it,
@@ -98,7 +88,7 @@ function FactSlots({ thread, cloudLabel }: { thread: ThreadSummary; cloudLabel: 
     <View className="shrink-0 flex-row items-center gap-1" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
       {starter ? (
         <View className="size-4 items-center justify-center">
-          <StarterFace name={starter.name} image={starter.image} />
+          <PersonFace name={starter.name} image={starter.image} size="sm" />
         </View>
       ) : null}
       {PullIcon && pull ? (
@@ -153,6 +143,8 @@ function rowLabel(thread: ThreadSummary, { state, about }: { state: string | und
 function rowMarks(thread: ThreadSummary, compact: boolean) {
   const status = threadStatus(thread);
   const working = !compact && status?.kind === "running";
+  // The reader's unread mention stands before a quiet wait or an unread result, as on the desktop.
+  if (mentionLeads(thread, status)) return { status, working, mark: MENTION_MARK };
   return { status, working, mark: compact ? threadMark(thread) : status };
 }
 
@@ -229,7 +221,7 @@ export const ThreadRow = memo(
       thread,
       compact
         ? { state: child ? subagentStatusLabel[child.status] : (mark ?? status)?.label, about: [child?.agentType] }
-        : { state: status?.label, about: [headline?.text, detail, pullRequestMark(thread)?.label] },
+        : { state: mark?.label, about: [headline?.text, detail, pullRequestMark(thread)?.label] },
       facts,
     );
     const lines = compact ? (

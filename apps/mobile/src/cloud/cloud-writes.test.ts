@@ -215,3 +215,14 @@ it("releases a turn a handoff holds from the phone's own session: stops the comm
   await call("threads.retrySave", { threadId: teammate });
   expect(stand.requests.some((request) => request.path === `/hosted/threads/${teammate}/retry-save`)).toBe(true);
 });
+
+it("reads a teammate's note that tags the person from the phone's own session, and marks it read once seen", async () => {
+  const threadId = threads.teammate;
+  const id = crypto.randomUUID();
+  await mara.threads.call("threads.postNote", { threadId, id, text: "@Riley can you check the annual toggle?", mentions: [{ userId: `user-${RILEY}`, start: 0, end: 6 }] });
+  expect((await together(threadId, (state) => state.mentions.unread)).mentions.firstUnreadNoteId).toBe(id);
+  const page = (await call("threads.notes", { threadId, limit: 200 })) as { notes: { id: string; mentionedYou: boolean; read: boolean }[] };
+  expect(page.notes.find((note) => note.id === id)).toMatchObject({ mentionedYou: true, read: false });
+  await call("threads.readNotes", { threadId, ids: [id] });
+  await together(threadId, (state) => !state.mentions.unread);
+});

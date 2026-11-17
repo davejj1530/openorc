@@ -31,6 +31,7 @@ import { useSnoozeClock } from "./snooze-clock";
 import { SubagentStatusBar } from "./SubagentStatusBar";
 import { ThreadTitle } from "./ThreadHeader";
 import { useThreadHeaderMenu } from "./ThreadMenu";
+import { useMentionOpening, useNoteReading, useThreadNotes } from "./thread-notes";
 import { Transcript } from "./Transcript";
 import { useThreadActions } from "./use-thread-actions";
 import { VoicesContext, type Voice, type Voices } from "./voices";
@@ -104,6 +105,9 @@ function LoadFailed({ retry }: { retry: () => void }) {
 function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActivity, composerInset, listRef, followKey }: PaneProps) {
   const { merged, liveTranscript, hasOlder, loadOlder, shown } = client.useConversationTranscript({ runs, threadId });
   const waiting = useWaitingApprovals(threadId, shown);
+  const notes = useThreadNotes(thread);
+  const seeNotes = useNoteReading(threadId);
+  const mention = useMentionOpening(thread);
   const { live, working, generatingImage } = conversationActivity({ thread, activeRun: runs.at(-1), liveTranscript, compacting: false });
   useEffect(() => onActivity({ live, working, generatingImage }), [live, working, generatingImage, onActivity]);
   const [following, setFollowing] = useState(true);
@@ -128,6 +132,9 @@ function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActi
       onFollow={setFollowing}
       followKey={followKey}
       waiting={waiting}
+      notes={notes}
+      onNotesSeen={seeNotes}
+      mention={mention}
     />
   );
 }

@@ -109,17 +109,15 @@ export function WhatsNewSheet({ open, onClose }: { open: boolean; onClose: () =>
             <img src={step.light} alt={step.alt} className="dark:hidden" />
             <img src={step.dark} alt={step.alt} className="hidden dark:block" />
           </div>
-          <div className="whats-new-head">
-            <BaseDialog.Title key={step.id} className="whats-new-title motion-arrive">
-              {step.title}
-            </BaseDialog.Title>
-            <BaseDialog.Close render={<IconButton aria-label="Close" size="sm" />}>
-              <X size={15} />
-            </BaseDialog.Close>
-          </div>
-          <BaseDialog.Description key={step.id} className="whats-new-line motion-arrive">
+          <BaseDialog.Title key={`title:${step.id}`} className="whats-new-title motion-arrive">
+            {step.title}
+          </BaseDialog.Title>
+          <BaseDialog.Description key={`line:${step.id}`} className="whats-new-line motion-arrive">
             {step.line}
           </BaseDialog.Description>
+          <BaseDialog.Close render={<IconButton aria-label="Close" size="sm" className="whats-new-close" />}>
+            <X size={15} />
+          </BaseDialog.Close>
           <div className="whats-new-foot">
             <div className="whats-new-dots">
               {steps.map((each, at) => (

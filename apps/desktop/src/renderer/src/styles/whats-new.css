@@ -1,12 +1,14 @@
 /* What's new after an update: a 560px sheet, its step's picture set 8px into it at the sheet's radius less that, then
-   the step's title with the close beside it and its line, then the step dots, the way to try it and Next. Every step
-   keeps the sheet's height. */
+   the step's title and line, then the step dots, the way to try it and Next. The close sits where every sheet has it,
+   16px into the top corner, on the picture's corner, which every picture keeps clear. Every step keeps the sheet's
+   height; a short window shortens the pictures, never the controls. */
 .whats-new {
   width: 560px;
 }
 .whats-new-picture {
   margin: 8px 8px 0;
-  height: 320px;
+  /* The sheet's 75vh, less the 156px of words and controls under the picture. */
+  height: min(380px, calc(75vh - 156px));
   overflow: hidden;
   border-radius: calc(var(--radius-3xl) - 8px);
 }
@@ -14,15 +16,16 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: top;
 }
-.whats-new-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px 0 20px;
+.whats-new-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: var(--surface);
 }
 .whats-new-title {
+  padding: 18px 20px 0;
   color: var(--ink);
   font-size: var(--text-md);
   line-height: 20px;

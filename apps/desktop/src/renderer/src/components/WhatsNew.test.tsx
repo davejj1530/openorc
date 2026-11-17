@@ -57,6 +57,7 @@ it("goes through each step with Next and closes for good with Done", () => {
   render(<WhatsNew />);
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
   expect(screen.getByRole("dialog", { name: "Work with your team" })).toBeTruthy();
+  expect(screen.queryByText("Threads that keep working with your Mac closed")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Your cloud threads on your phone" }));
   expect(screen.getByRole("dialog", { name: "Your cloud threads on your phone" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Done" }));

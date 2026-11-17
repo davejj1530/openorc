@@ -29,11 +29,11 @@
   outline-offset: 2px;
 }
 
-/* In the `@` list, what an Orcling is to the person, after its name. */
-.team-chat-tag-detail {
-  margin-left: auto;
-  color: var(--ink-4);
-  font-size: var(--text-sm);
+/* In the `@` list an Orcling sits like a person: its face, then its name. */
+.team-chat-tag-orcling {
+  display: inline-block;
+  margin-right: 10px;
+  vertical-align: middle;
 }
 
 .team-chat-message:has(> .team-chat-call) {

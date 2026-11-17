@@ -4,6 +4,7 @@ import { AccountFace } from "./AccountFace";
 import { OrclingAvatar } from "./OrclingAvatar";
 import { ComposerSuggestions } from "./ComposerSuggestions";
 import "../styles/team-chat-unread.css";
+import "../styles/team-chat-orcling.css";
 
 /** Who the `@` word can name: a teammate, tagged, or one of the person's own Orclings, called once. */
 export type TeamChatTagCandidate = { kind: "person"; person: TeamChatPerson } | { kind: "orcling"; orcling: TeamChatOrclingPick };
@@ -45,15 +46,17 @@ export function TeamChatTagPicker({
             onMouseMove={() => onCursor(index)}
           >
             {candidate.kind === "person" ? (
-              <>
+              <span className="composer-suggestion-label">
                 <AccountFace name={candidate.person.name} image={candidate.person.image} />
-                <span className="composer-suggestion-label">{candidate.person.name}</span>
-              </>
+                {candidate.person.name}
+              </span>
             ) : (
               <>
-                <OrclingAvatar orcling={candidate.orcling} size={20} />
-                <span className="composer-suggestion-label">{candidate.orcling.name}</span>
-                <span className="team-chat-tag-detail">Your Orcling</span>
+                <span className="composer-suggestion-label">
+                  <OrclingAvatar orcling={candidate.orcling} size={20} className="team-chat-tag-orcling" />
+                  {candidate.orcling.name}
+                </span>
+                <span className="composer-suggestion-hint">Your Orcling</span>
               </>
             )}
           </button>

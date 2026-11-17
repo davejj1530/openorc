@@ -2,11 +2,10 @@ import { answeredName, answeredOf, personFirst, stretchTime, teamConversationTit
 import { TeamChatReaction, type TeamChatAnswered, type TeamConversation, type TeamMessage, type TeamOrclingCall } from "@openorc/protocol";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ActionSheetIOS, Pressable, TextInput, View, type ScrollViewInstance } from "react-native";
-import { KeyboardChatScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
+import { ActionSheetIOS, Pressable, View, type ScrollViewInstance } from "react-native";
+import { KeyboardChatScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { teamChat } from "../client";
-import { SendButton } from "../composer/SendButton";
 import { OrclingFace } from "../orclings/OrclingFace";
 import { PersonFace } from "../ui/PersonFace";
 import { Spinner } from "../ui/Spinner";
@@ -16,6 +15,7 @@ import { openInApp } from "../ui/web";
 import { chatItems, type ChatItem } from "./chat-items";
 import { CallLine } from "./CallLine";
 import { ChatFiles, ChatFileScopeContext, chatFileScope } from "./ChatFiles";
+import { ChatComposer } from "./ChatComposer";
 import { useChatLease } from "./lease";
 import { useMessageReveal, type ChatJump } from "./reveal";
 import { Reactions } from "./Reactions";
@@ -191,45 +191,11 @@ function Row({ item, moves, onNew }: { item: ChatItem; moves: MessageMoves; onNe
   }
 }
 
-/** The composer under a conversation: what the draft answers, why the last pin failed, and the words, kept per conversation. */
-function ChatComposer({ target, title, failure, self, onSend, onFocus }: { target: TeamChatTarget; title: string; failure: string | null; self: string; onSend: () => void; onFocus: () => void }) {
-  const insets = useSafeAreaInsets();
-  const draft = teamChat.useDraft(target);
-  return (
-    <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
-      <View className="gap-2 bg-bg px-3 pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
-        {failure ? <Text className="px-2 text-sm text-bad">{failure}</Text> : null}
-        {draft.replyTo ? (
-          <View className="flex-row items-center gap-2 px-2">
-            <Text numberOfLines={1} className="min-w-0 flex-1 text-sm text-ink-3">
-              {`Replying to ${answeredName(draft.replyTo, self)}: ${draft.replyTo.excerpt}`}
-            </Text>
-            <Pressable accessibilityRole="button" accessibilityLabel="Don't reply" onPress={() => teamChat.drafts.reply(target, null)} hitSlop={8} className="active:opacity-60">
-              <Text className="text-sm text-ink-2">Cancel</Text>
-            </Pressable>
-          </View>
-        ) : null}
-        <View className="flex-row items-end gap-2 rounded-3xl bg-composer-input py-2 pl-4 pr-2">
-          <TextInput
-            multiline
-            value={draft.text}
-            onChangeText={(text) => teamChat.drafts.write(target, text)}
-            onFocus={onFocus}
-            placeholder={`Message ${title}…`}
-            accessibilityLabel="Message"
-            className="min-h-touch flex-1 py-2.5 font-sans text-md leading-5 text-ink"
-            placeholderTextColorClassName="accent-ink-4"
-            style={{ maxHeight: 120 }}
-          />
-          <SendButton state="send" disabled={!draft.text.trim()} onPress={onSend} />
-        </View>
-      </View>
-    </KeyboardStickyView>
-  );
-}
-
-/** What the reader can do with the conversation's messages, as the server takes them, and its words when one fails. */
-function useMessageMoves(lease: TeamChatLease, target: TeamChatTarget): { moves: MessageMoves; failure: string | null } {
+/**
+ * What the reader can do with the conversation's messages, as the server takes them, and its words when one fails;
+ * `orclings`, whether a message may call one of the reader's Orclings.
+ */
+function useMessageMoves(lease: TeamChatLease, target: TeamChatTarget): { moves: MessageMoves; failure: string | null; orclings: boolean } {
   const state = teamChat.useChatState(lease).data;
   const chat = state?.state === "ready" ? state.chat : null;
   const joined = chat?.conversations.find((each) => each.id === target.conversationId)?.joined === true;
@@ -243,7 +209,7 @@ function useMessageMoves(lease: TeamChatLease, target: TeamChatTarget): { moves:
     reply: chat?.features.includes("replies") ? (message) => teamChat.drafts.reply(target, answeredOf(message)) : null,
     pin: chat?.features.includes("pins") && joined ? (message) => void teamChat.pin(lease, target, message, !message.pinned).catch(failed) : null,
   };
-  return { moves, failure };
+  return { moves, failure, orclings: Boolean(chat?.features.includes("orcling")) };
 }
 
 /** One conversation of the organization's chat, in the desktop's shape: its messages live, earlier ones a tap away, and a composer that keeps its draft. */
@@ -268,7 +234,7 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
   useEffect(() => {
     if (lastId) void teamChat.seen(lease, target, { id: lastId }).catch(() => undefined);
   }, [lease, target, lastId]);
-  const { moves, failure } = useMessageMoves(lease, target);
+  const { moves, failure, orclings } = useMessageMoves(lease, target);
   const send = (message: PendingTeamMessage) => void teamChat.send(lease, target, message).catch(() => undefined);
   const write = () => {
     const message = teamChat.drafts.begin(target);
@@ -328,6 +294,7 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
           title={title}
           failure={failure}
           self={lease.accountId}
+          orclings={orclings}
           onSend={write}
           onFocus={() => {
             atEnd.current = true;

@@ -1,7 +1,9 @@
 import {
+  latestActivity,
   pullRequestMark,
   pullRequestNumber,
   relativeTime,
+  rowAge,
   rowStarter,
   subagentStatusLabel,
   togetherActivity,
@@ -9,10 +11,10 @@ import {
   threadMark,
   threadPlace,
   threadStatus,
-  workspaceLabel,
   type ThreadHeadline,
   type ThreadMark,
   type ThreadTreeRow,
+  useSidebarNow,
 } from "@openorc/client";
 import { harnessShortName, isHarnessId, isSubagentThread, placeOf, WORKSPACE_ID, type PrState, type ThreadSummary } from "@openorc/protocol";
 import { Link } from "expo-router";
@@ -98,8 +100,10 @@ function HeadlineLine({ headline, trailing }: { headline: ThreadHeadline | null;
 }
 
 /**
- * A root row's lines: the title, lighting up while its agent works; the live headline; the project line. The row's
- * mark ends the line under the title: the headline while there is one, else the project line.
+ * A root row's lines: the title, lighting up while its agent works, with its age at the end; the live headline; then
+ * the facts line, only when there is something to say. A quiet row with nothing to say is the title line alone, its
+ * mark at the line's end; otherwise the mark ends the line under the title. A parent keeps its facts line, where the
+ * tree's line leaves for its sub threads.
  */
 function RootLines({
   thread,
@@ -107,6 +111,8 @@ function RootLines({
   headline,
   mark,
   working,
+  parent,
+  cloudLabel,
   onNode,
 }: {
   thread: ThreadSummary;
@@ -114,16 +120,32 @@ function RootLines({
   headline: ThreadHeadline | null;
   mark: ThreadMark | null;
   working: boolean;
+  parent: boolean;
+  cloudLabel: boolean;
   onNode: (mid: number) => void;
 }) {
   const trailing = <RowMark thread={thread} mark={mark} />;
+  const facts = rowLine(thread, project, cloudLabel);
+  const factsLine = facts.words || facts.cloud || pullRequestMark(thread) || parent;
+  const age = rowAge(latestActivity(thread), useSidebarNow());
   return (
     <>
-      <ThreadRowHeading thread={thread} compact={false} mark={null} working={working} />
+      <ThreadRowHeading thread={thread} compact={false} mark={null} working={working} age={age} trailing={headline || factsLine ? null : trailing} />
       <HeadlineLine headline={headline} trailing={trailing} />
-      <ProjectLine thread={thread} project={project} trailing={headline ? null : trailing} onNode={onNode} />
+      {factsLine ? <FactsLine thread={thread} project={project} facts={facts} trailing={headline ? null : trailing} onNode={onNode} /> : null}
     </>
   );
+}
+
+/**
+ * What a root row's facts line says: outside its project's group, the project's name; the teammate who started it,
+ * unless the headline already speaks of who; and its branch. `cloud` when it is an OpenOrc Cloud thread its label does
+ * not already mark with the cloud.
+ */
+function rowLine(thread: ThreadSummary, project: string | null, cloudLabel: boolean): { words: string; cloud: boolean } {
+  const cloud = placeOf(thread).rowIcon && !cloudLabel;
+  const starter = togetherActivity(thread) ? null : rowStarter(thread)?.first;
+  return { words: [project, starter, thread.branch].filter(Boolean).join(" · "), cloud };
 }
 
 /** What a row says of its thread's state: a root row's pull request has its own place on the project line. */
@@ -134,11 +156,23 @@ function rowMarks(thread: ThreadSummary, compact: boolean) {
 }
 
 /**
- * A root row's last line: its project's glyph at the margin, where the tree's line leaves for its sub threads, the
- * project's name, where in it the thread works, then its pull request
- * at the end, in the state's own glyph and tone, with its number; the row's mark follows when no headline holds it.
+ * A root row's facts line: a glyph at the margin, where the tree's line leaves for its sub threads (the cloud for an
+ * OpenOrc Cloud thread, dimmed while it is out of reach, else the project's), the facts, then its pull request at the
+ * end, in the state's own glyph and tone, with its number; the row's mark follows when no headline holds it.
  */
-function ProjectLine({ thread, project, trailing, onNode }: { thread: ThreadSummary; project: string | null; trailing: ReactNode; onNode: (mid: number) => void }) {
+function FactsLine({
+  thread,
+  project,
+  facts,
+  trailing,
+  onNode,
+}: {
+  thread: ThreadSummary;
+  project: string | null;
+  facts: { words: string; cloud: boolean };
+  trailing: ReactNode;
+  onNode: (mid: number) => void;
+}) {
   const pull = pullRequestMark(thread);
   const cloud = cloudPlace(thread, project, useCloudOutOfReach());
   const Glyph = thread.projectId === WORKSPACE_ID ? Globe : Folder;
@@ -154,7 +188,7 @@ function ProjectLine({ thread, project, trailing, onNode }: { thread: ThreadSumm
         <Glyph size={16} className="text-ink-4" />
       )}
       <Text numberOfLines={1} className="flex-1 text-detail text-ink-4">
-        {cloud ? cloud.line : [project, workspaceLabel(thread)].filter(Boolean).join(" · ")}
+        {facts.words || (facts.cloud ? "OpenOrc Cloud" : "")}
       </Text>
       {pull && PullIcon ? (
         <View accessibilityLabel={pull.label} className="ml-auto flex-row items-center gap-1 pl-2">
@@ -207,12 +241,15 @@ export const ThreadRow = memo(
     arriving,
     tree,
     motion = STILL,
+    cloudLabel,
     onFold,
   }: {
     thread: ThreadSummary;
     project: string | null;
     arriving: boolean;
     tree?: ThreadTreeRow;
+    /** Its group's label wears the cloud, so its row need not. */
+    cloudLabel?: boolean;
     motion?: RowMotion;
     /** Opens or folds a parent's sub threads: its id, and whether to open them. */
     onFold?: (id: string, open: boolean) => void;
@@ -242,7 +279,7 @@ export const ThreadRow = memo(
     const lines = compact ? (
       <ThreadRowHeading thread={thread} compact mark={mark} />
     ) : (
-      <RootLines thread={thread} project={project} headline={headline} mark={mark} working={working} onNode={setNodeMid} />
+      <RootLines thread={thread} project={project} headline={headline} mark={mark} working={working} parent={Boolean(tree?.hasChildren)} cloudLabel={Boolean(cloudLabel)} onNode={setNodeMid} />
     );
     const node = compact ? undefined : { mid: nodeMid, reach: NODE_REACH };
     const toggle = <TreeToggle tree={tree} open={open} compact={compact} onFold={onFold} />;
@@ -268,6 +305,7 @@ export const ThreadRow = memo(
   (before, next) =>
     before.thread === next.thread &&
     before.project === next.project &&
+    before.cloudLabel === next.cloudLabel &&
     before.arriving === next.arriving &&
     before.motion === next.motion &&
     before.onFold === next.onFold &&

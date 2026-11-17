@@ -59,7 +59,7 @@ function HomeRow({ item, home, index, motion, fold }: { item: HomeItem; home: Ho
     case "section":
       return <SectionToggle section={item} room={headingRoom(home.items, index)} motion={motion} onToggle={() => fold(item.key, !(item.open && !motion.folding))} />;
     case "thread":
-      return <ThreadRow thread={item.thread} project={item.project} arriving={item.arriving} tree={item.tree} motion={motion} onFold={fold} />;
+      return <ThreadRow thread={item.thread} project={item.project} arriving={item.arriving} tree={item.tree} cloudLabel={item.cloudLabel} motion={motion} onFold={fold} />;
     case "more":
       return <ShowMore motion={motion} onPress={home.showMore} />;
     case "group-more":

@@ -82,12 +82,30 @@ it("names a root row's project under its title, with its pull request's state an
   expect(view.getByRole("button").getAttribute("aria-label")).toContain("Pull request #93, closed");
 });
 
-it("says after a root row's project where its thread works: the checkout's branch or a worktree", () => {
+it("says after a root row's project the branch its thread works on", () => {
   const notes = fixtureThreads.find((thread) => thread.id === "t-notes")!;
   const tokens = fixtureThreads.find((thread) => thread.id === "t-tokens")!;
   expect(render(<ThreadRow thread={{ ...notes, branch: "main" }} project="openorc" arriving={false} />).getByText("openorc · main")).toBeTruthy();
   cleanup();
-  expect(render(<ThreadRow thread={tokens} project="immaculate" arriving={false} />).getByText("immaculate · worktree")).toBeTruthy();
+  expect(render(<ThreadRow thread={tokens} project="immaculate" arriving={false} />).getByText("immaculate · feat/figma-tokens")).toBeTruthy();
+});
+
+it("keeps a quiet row in its project's group to one line, its age at the end, and a second line only for something to say", () => {
+  const quiet = { ...fixtureThreads.find((thread) => thread.id === "t-plan")!, branch: null, prUrl: null, lastActivityAt: Date.now() - 12 * 60_000 };
+  const row = render(<ThreadRow thread={quiet} project={null} arriving={false} />);
+  expect(row.getByText("12m")).toBeTruthy();
+  expect(row.getByTestId("opens-thread").textContent).toBe(`${quiet.title}12m`);
+  cleanup();
+  const branched = render(<ThreadRow thread={{ ...quiet, branch: "fix/menu" }} project={null} arriving={false} />);
+  expect(branched.getByText("fix/menu")).toBeTruthy();
+  cleanup();
+  // A cloud thread in a group whose label wears the cloud says nothing more; under a folder's label it wears its own.
+  const cloud = { ...quiet, id: "cloud", owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 1 } };
+  expect(render(<ThreadRow thread={cloud} project={null} cloudLabel arriving={false} />).queryByLabelText("Cloud glyph")).toBeNull();
+  cleanup();
+  const mixed = render(<ThreadRow thread={cloud} project={null} arriving={false} />);
+  expect(mixed.getByLabelText("Cloud glyph")).toBeTruthy();
+  expect(mixed.getByText("OpenOrc Cloud")).toBeTruthy();
 });
 
 it("keeps a parent's disclosure on its own row, beside the link that opens the thread, and asks for the opposite fold", () => {
@@ -148,6 +166,10 @@ it("says whose turn it is on a cloud thread someone else is in, and dims its clo
   const row = render(<ThreadRow thread={{ ...working, id: "cloud", owner }} project="Canvas" arriving={false} />);
   expect(row.getByText("Mara's turn")).toBeTruthy();
   expect(row.queryByText("Working")).toBeNull();
+  // The headline speaks of who, so the facts line names her no more.
+  expect(row.getByText("Canvas")).toBeTruthy();
+  expect(row.queryByText(/Mara$/)).toBeNull();
+  row.unmount();
   const cloud = { ...working, id: "cloud", owner };
   expect(cloudPlace(cloud, "Canvas")).toMatchObject({ line: "Canvas · Mara", offline: false });
   expect(cloudPlace(cloud, "Canvas", true)).toMatchObject({ offline: true });

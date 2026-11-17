@@ -375,23 +375,8 @@ export function createHosted(deps: HostedDeps): Hosted {
     push: deps.push,
     log: deps.log,
   });
-  const threads: Threads = new Threads({
-    session,
-    spaces,
-    follower,
-    account,
-    skills,
-    server: deps.server,
-    kept: deps.kept,
-    projects: deps.projects,
-    ...(deps.macWork && { macWork: deps.macWork }),
-    ...(deps.moving && { moving: deps.moving }),
-    push: deps.push,
-    notify: deps.notify,
-    nameThread: deps.nameThread,
-    now: deps.now,
-    log: deps.log,
-  });
+  // What the threads take of this Mac's own (its server, kept state, projects, folder work, move journal) comes from deps whole, so none is left out.
+  const threads: Threads = new Threads({ ...deps, session, spaces, follower, account, skills });
   return {
     account,
     organizationBilling,

@@ -300,7 +300,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const answersBlocked = asksBlocked(thread);
   const placeholder = composerPlaceholder(choice?.agent, thread);
   const heard = useMemo(() => (optimistic.run ? heardTranscript(optimistic.run, thread) : null), [optimistic.run, thread]);
-  const notes = useThreadNotes(thread, heard?.blocks, controls.composer);
+  const notes = useThreadNotes(thread, heard?.blocks, controls.composer, target?.note ? target.messageId : null);
   const composerNotes = useComposerNotes(thread);
   const mention = useMentionReveal(thread);
 

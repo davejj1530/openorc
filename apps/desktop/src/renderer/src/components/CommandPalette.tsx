@@ -180,7 +180,7 @@ function MessageHits({ hits, go }: { hits: RpcHits; go: (fn: () => void) => void
           key={`${h.runId}-${h.messageId}`}
           value={`message ${h.threadTitle} ${h.snippet} ${h.ts}`}
           onSelect={() => {
-            const message = { runId: h.runId, turn: h.turn, messageId: h.messageId };
+            const message = { runId: h.runId, turn: h.turn, messageId: h.messageId, ...(h.role === "note" ? { note: true as const } : {}) };
             go(() => (h.taskId ? openTask(h.taskId, "chat", message) : openThread(h.threadId, message)));
           }}
           icon={<MessageSquare size={15} />}

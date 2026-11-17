@@ -154,3 +154,19 @@ describe("reading a thread's notes", () => {
     expect(asked()).toBe(2);
   });
 });
+
+it("finds a teammate's note in the palette's search, with its author, opening at the turn it follows", async () => {
+  const { thread, ada, bob } = await shared();
+  await bob.threads.call("threads.postNote", { threadId: thread, id: noteId(9), ...adaTag("keep the comparison table under them.") });
+  const hits = await ada.threads.search!(ada.threads.row!(thread).space, { query: "comparison table" });
+  expect(hits).toEqual([
+    expect.objectContaining({
+      threadId: thread,
+      role: "note",
+      messageId: noteId(9),
+      turn: 0,
+      snippet: "@Ada keep the comparison table under them.",
+      member: { key: "user-bob@example.com", name: expect.any(String) },
+    }),
+  ]);
+});

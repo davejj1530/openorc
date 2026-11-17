@@ -282,13 +282,14 @@ export const ThreadSearchHit = z.object({
   messageId: z.string(),
   /** The turn of its run the message falls in, counted from 0, so a conversation can load back to it. */
   turn: z.number().int().nonnegative(),
-  role: z.enum(["user", "assistant"]),
+  /** A `note` is a teammate's note in a cloud thread: `messageId` is its id, `turn` the turn it follows. */
+  role: z.enum(["user", "assistant", "note"]),
   snippet: z.string(),
   ts: z.number(),
   /** Set when the run belonged to a task, such as a team assignment; the hit opens that task's Agent view. */
   taskId: z.string().nullable(),
   taskTitle: z.string().nullable(),
-  /** The team member whose run said this, when the run was part of a team execution. */
+  /** The team member whose run said this, when the run was part of a team execution, or who wrote a note. */
   member: z.object({ key: z.string(), name: z.string() }).nullable(),
 });
 export type ThreadSearchHit = z.infer<typeof ThreadSearchHit>;

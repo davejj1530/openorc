@@ -8,7 +8,8 @@ import { onlineTaskRouteFromSpec, onlineTaskRouteSpec } from "./online-task-rout
 export type TaskTab = "chat" | "spec" | "files" | "commits" | "memory";
 
 /** A message to bring into view: its run, the turn of that run it falls in, and its id. */
-export type MessageTarget = { runId: string; turn: number; messageId: string };
+/** A message to open a conversation at; with `note`, a teammate's note in a cloud thread, by its id. */
+export type MessageTarget = { runId: string; turn: number; messageId: string; note?: true };
 
 /** The sections Settings is divided into, in the order it lists them. */
 export const SETTINGS_SECTIONS = ["usage", "connections", "account", "cloud", "slack", "phone", "skills", "connectors", "devices", "appearance", "general", "memory", "data"] as const;

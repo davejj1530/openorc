@@ -310,11 +310,11 @@ export const ROUTES = {
   stopCommand: (id: string, commandId: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/commands/${encodeURIComponent(commandId)}/stop`, null),
   /** The person's agent sign-ins' usage on OpenOrc Cloud, as each CLI there last answered after their turns. */
   agentUsage: route("GET", "/hosted/usage", z.object({ agents: z.array(z.object({ agent: z.string(), readAt: z.iso.datetime(), reading: z.unknown() })) })),
-  /** The person's cloud threads' messages in the space that hold the words, newest first. */
+  /** The person's cloud threads' messages and notes in the space that hold the words, newest first. */
   search: (q: string, limit: number) =>
     route(
       "GET",
-      `/hosted/search?${new URLSearchParams({ q, limit: String(limit) })}`,
+      `/hosted/search?${new URLSearchParams({ q, limit: String(limit), notes: "1" })}`,
       z.object({
         hits: z.array(
           z.object({
@@ -323,9 +323,10 @@ export const ROUTES = {
             projectId: z.string().nullable(),
             messageId: z.string(),
             turn: z.number().int().nonnegative(),
-            role: z.enum(["user", "assistant"]),
+            role: z.enum(["user", "assistant", "note"]),
             snippet: z.string(),
             at: z.number(),
+            author: z.object({ id: z.string(), name: z.string() }).nullable().optional(),
           }),
         ),
       }),

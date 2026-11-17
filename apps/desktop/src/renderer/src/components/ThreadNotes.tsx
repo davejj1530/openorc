@@ -27,16 +27,17 @@ export const ThreadNotesContext = createContext<ThreadNotesValue>(NONE);
 const NOTES_PER_READ = 200;
 
 /**
- * A cloud thread's notes placed among its blocks, read once the thread has any: the newest, and those around the
- * reader's first unread mention, however far back it is. The value stays the same object while the notes stand where
+ * A cloud thread's notes placed among its blocks, read once the thread has any: the newest, and those around the note
+ * the conversation was opened at (`target`, as a search hit) or else the reader's first unread mention, however far
+ * back it is. The value stays the same object while the notes stand where
  * they stood, which streaming never changes (a new block comes after every note's place), so the transcript's turns do
  * not draw again for it. Reply puts the author's tag before the composer's draft.
  */
-export function useThreadNotes(thread: ThreadSummary | null, blocks: readonly Block[] | undefined, composer: RefObject<ComposerHandle | null>): ThreadNotesValue {
+export function useThreadNotes(thread: ThreadSummary | null, blocks: readonly Block[] | undefined, composer: RefObject<ComposerHandle | null>, target: string | null = null): ThreadNotesValue {
   const collaboration = thread?.owner?.brain === "hosted" ? thread.owner.collaboration : undefined;
   const threadId = thread?.id ?? "";
   const noted = Boolean(thread) && (collaboration?.noteHead ?? 0) > 0;
-  const mention = collaboration?.mentions.firstUnreadNoteId ?? null;
+  const mention = target ?? collaboration?.mentions.firstUnreadNoteId ?? null;
   const newest = useRpc("threads.notes", { threadId, limit: NOTES_PER_READ }, { enabled: noted });
   const around = useRpc("threads.notes", { threadId, around: mention ?? "", limit: NOTES_PER_READ }, { enabled: noted && mention !== null });
   const notes = useMemo(() => joinPages(newest.data?.notes, mention ? around.data?.notes : undefined), [newest.data, around.data, mention]);

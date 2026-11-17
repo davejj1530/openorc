@@ -414,7 +414,7 @@ export class Threads implements HostedThreads {
             ts: hit.at,
             taskId: null,
             taskTitle: null,
-            member: null,
+            member: hit.author ? { key: hit.author.id, name: hit.author.name } : null,
           },
         ];
       })

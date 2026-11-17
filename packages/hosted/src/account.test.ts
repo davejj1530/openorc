@@ -33,11 +33,18 @@ async function host(overrides: Parameters<typeof hostDeps>[2] = {}) {
   return { account: hosted.account, hosted, seen };
 }
 
-/** Signs in as `email` through the browser, signing whoever is signed in out first. */
+/**
+ * Signs in as `email` through the browser, signing whoever is signed in out first, and waits until the account has
+ * heard the server: its person, billing and sign-ins are read once the socket connects, after the session is held.
+ */
 async function signIn(account: Hosted["account"], email: string) {
   const { hosted, browser } = hostOf.get(account)!;
   if (account.status().state === "signed-in") await account.signOut();
   await signInAs(hosted, browser, email);
+  await vi.waitFor(() => {
+    const status = account.status();
+    expect(status.state === "signed-in" && status.signIns).not.toBeNull();
+  });
 }
 
 describe("the account", () => {
@@ -51,7 +58,12 @@ describe("the account", () => {
 
   it("shows Pro with its standing and its date, and Free with no hours", async () => {
     stand.setBilling(ADA, { pro: true, standing: "ending", at: RENEWS, monthlyLeftSeconds: 3_600, packsLeftSeconds: 0 });
-    const { account } = await host();
+    // Billing answering after the session is held, as under load, is still Pro once signed in.
+    const slowBilling: typeof fetch = async (input, init) => {
+      if (new URL(String(input)).pathname === "/billing") await new Promise((resolve) => setTimeout(resolve, 300));
+      return fetch(input, init);
+    };
+    const { account } = await host({ fetch: slowBilling });
     await signIn(account, ADA);
     expect(account.status()).toMatchObject({ plan: { pro: true, standing: "ending", at: Date.parse(RENEWS) } });
     await signIn(account, GRACE);

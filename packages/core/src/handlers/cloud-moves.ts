@@ -1,8 +1,12 @@
+import type { CloudCopies } from "../services/cloud-copies.js";
 import type { CloudMoves } from "../services/cloud-moves.js";
 import type { Handlers } from "./types.js";
 
-/** A thread moving between this Mac and OpenOrc Cloud: whether it can, the move itself, and putting away why one stopped. */
-export function createCloudMovesHandlers(moves: () => CloudMoves): Pick<Handlers, "threads.moveCheck" | "threads.move" | "threads.moveDismiss"> {
+/**
+ * A thread moving between this Mac and OpenOrc Cloud: whether it can, the move itself, and putting away why one stopped;
+ * and a cloud thread's code read here without moving it.
+ */
+export function createCloudMovesHandlers(moves: () => CloudMoves, copies: () => CloudCopies): Pick<Handlers, "threads.moveCheck" | "threads.move" | "threads.moveDismiss" | "threads.cloudCopy"> {
   return {
     "threads.moveCheck": ({ threadId }) => moves().check(threadId),
     "threads.move": ({ threadId, endsOk }) => moves().move(threadId, endsOk),
@@ -10,5 +14,6 @@ export function createCloudMovesHandlers(moves: () => CloudMoves): Pick<Handlers
       moves().dismiss(threadId);
       return null;
     },
+    "threads.cloudCopy": ({ threadId }) => copies().ensure(threadId),
   };
 }

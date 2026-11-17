@@ -125,6 +125,7 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "threads.moveCheck": NOT_ASKED,
   "threads.move": NOT_ASKED,
   "threads.moveDismiss": NOT_ASKED,
+  "threads.cloudCopy": NOT_ASKED,
   "tasks.get": NOT_ASKED,
   "tasks.update": NOT_ASKED,
   "tasks.delete": NOT_ASKED,

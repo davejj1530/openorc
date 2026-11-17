@@ -33,6 +33,18 @@ export type CloudMoveCheck =
 /** What asking a move came to: it started, or a question first because something running in the cloud would end. */
 export type CloudMoveStart = { started: true } | { confirm: string[] };
 
+/**
+ * A cloud thread's code to read on this computer without moving it: a copy of its newest work save (core's
+ * `CloudCopies`). `folder` is the same for the thread every time; `asOf` is what its files are as of, the save (`turnId`
+ * null, at `savedAt`) or a write made here since.
+ */
+export interface CloudCopy {
+  folder: string;
+  savedAt: string;
+  head: string;
+  asOf: { turnId: string | null; at: string };
+}
+
 const id = z.string().min(1).max(200);
 
 export const cloudMovesRpcParams = {
@@ -40,9 +52,12 @@ export const cloudMovesRpcParams = {
   "threads.move": z.object({ threadId: id, endsOk: z.boolean() }).strict(),
   /** Puts away why the thread's last move stopped. */
   "threads.moveDismiss": z.object({ threadId: id }).strict(),
+  /** The thread's reading copy on this computer, made again when its save moved on. */
+  "threads.cloudCopy": z.object({ threadId: id }).strict(),
 };
 export interface CloudMovesRpcResults {
   "threads.moveCheck": CloudMoveCheck;
   "threads.move": CloudMoveStart;
   "threads.moveDismiss": null;
+  "threads.cloudCopy": CloudCopy;
 }

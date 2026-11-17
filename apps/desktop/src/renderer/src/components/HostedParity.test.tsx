@@ -130,23 +130,3 @@ it("does not open a local interactive tool app for a hosted run", async () => {
   expect(await screen.findByText(HOSTED_REASONS.interactiveApp)).toBeTruthy();
   expect(core.call).not.toHaveBeenCalled();
 });
-
-it("keeps the code-copy control disabled in the place menu", async () => {
-  mount(
-    <Menu.Root open>
-      <Menu.Portal>
-        <CoversPreview />
-        <Menu.Positioner>
-          <Menu.Popup>
-            <ThreadMenuItems thread={cloudReviewThread} parts={Menu} />
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>,
-  );
-  fireEvent.click(screen.getByText("OpenOrc Cloud"));
-  const open = await screen.findByRole("menuitem", { name: /Open on Mac/ });
-  expect(open.getAttribute("aria-disabled")).toBe("true");
-  await act(async () => open.focus());
-  expect(await screen.findByText(HOSTED_REASONS.macCode)).toBeTruthy();
-});

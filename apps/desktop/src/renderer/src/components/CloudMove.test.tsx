@@ -2,7 +2,17 @@ import { Menu } from "@base-ui/react/menu";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { MOVING_TO_CLOUD, type AccountStatus, type CloudMoveCheck, type CloudMoveStart, type RpcMethod, type RpcResults, type SpacesStatus, type ThreadSummary } from "@openorc/protocol";
+import {
+  MOVING_TO_CLOUD,
+  type AccountStatus,
+  type CloudCopy,
+  type CloudMoveCheck,
+  type CloudMoveStart,
+  type RpcMethod,
+  type RpcResults,
+  type SpacesStatus,
+  type ThreadSummary,
+} from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { queryClient } from "../lib/client";
@@ -54,6 +64,7 @@ const spaces = {
 
 let check: CloudMoveCheck;
 let moveAnswer: CloudMoveStart;
+let copyAnswer: CloudCopy | Error;
 let account: AccountStatus;
 
 beforeEach(() => {
@@ -63,6 +74,12 @@ beforeEach(() => {
   check = { to: "cloud", can: true, space: { id: "personal", personal: true } };
   account = pro;
   moveAnswer = { started: true };
+  copyAnswer = {
+    folder: "/Users/ada/Library/Application Support/OpenOrc/cloud-copies/cloud-example",
+    savedAt: "2026-11-18T01:00:00.000Z",
+    head: "abc1234",
+    asOf: { turnId: null, at: "2026-11-18T01:00:00.000Z" },
+  };
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M, params?: unknown): Promise<RpcResults[M]> => {
     const answer: Partial<Record<RpcMethod, unknown>> = {
       "threads.moveCheck": check,
@@ -70,10 +87,12 @@ beforeEach(() => {
       "threads.get": (params as { id: string }).id === cloudThread.id ? cloudThread : macThread,
       "threads.move": moveAnswer,
       "threads.moveDismiss": null,
+      "threads.cloudCopy": copyAnswer,
       "projects.checkoutBranch": "main",
       "projects.get": null,
       "hosted.capabilities": { version: 1, features: {} },
     };
+    if (answer[method] instanceof Error) throw answer[method];
     if (method in answer) return answer[method] as RpcResults[M];
     throw new Error(`Unexpected read: ${method}`);
   });
@@ -242,4 +261,24 @@ it("names the folder that stopped a move as the person reads paths, and opens it
   expect(path.getAttribute("data-tip")).toBe(folder);
   fireEvent.click(path);
   expect(revealFile).toHaveBeenCalledWith(folder);
+});
+
+it("opens a cloud thread's code on this computer, a copy of its newest save, in the file manager", async () => {
+  const revealFile = vi.fn();
+  Object.assign(window, { openorc: { ...window.openorc, revealFile } });
+  openMenu(cloudThread);
+  fireEvent.click(screen.getByText("OpenOrc Cloud"));
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Open on Mac/ }));
+  await vi.waitFor(() => expect(revealFile).toHaveBeenCalledWith("/Users/ada/Library/Application Support/OpenOrc/cloud-copies/cloud-example"));
+  expect(vi.mocked(core.call)).toHaveBeenCalledWith("threads.cloudCopy", { threadId: cloudThread.id });
+});
+
+it("holds Open on this computer with why when the copy can't be made", async () => {
+  copyAnswer = new Error("This project isn't on this Mac.");
+  openMenu(cloudThread);
+  fireEvent.click(screen.getByText("OpenOrc Cloud"));
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Open on Mac/ }));
+  await vi.waitFor(() => expect(screen.getByRole("menuitem", { name: /Open on Mac/ }).getAttribute("aria-disabled")).toBe("true"));
+  await act(async () => screen.getByRole("menuitem", { name: /Open on Mac/ }).focus());
+  expect(await screen.findByText("This project isn't on this Mac.")).toBeTruthy();
 });

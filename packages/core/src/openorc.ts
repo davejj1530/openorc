@@ -39,6 +39,7 @@ import { createHostedSkillsCloudHandlers } from "./handlers/hosted-skills-cloud.
 import { createMacProjectsHandlers } from "./handlers/mac-projects.js";
 import { MacProjects } from "./services/mac-projects.js";
 import { createCloudMovesHandlers } from "./handlers/cloud-moves.js";
+import { CloudCopies } from "./services/cloud-copies.js";
 import { CloudMoves } from "./services/cloud-moves.js";
 import { AgentSessions } from "./services/agent-sessions.js";
 import { agentHomes } from "./services/agent-homes.js";
@@ -189,6 +190,7 @@ export class OpenOrc {
   readonly claudeAccounts: ClaudeAccountService;
   private connectorService: ConnectorService | null = null;
   private cloudMoveService: CloudMoves | null = null;
+  private cloudCopyService: CloudCopies | null = null;
   readonly environment: ShellEnvironment;
   readonly providerUsage: ProviderUsageService;
   private readonly claudeAccountSwitch: ClaudeAccountSwitch;
@@ -380,6 +382,18 @@ export class OpenOrc {
       log: this.log,
     });
     return this.cloudMoveService;
+  }
+
+  /** Cloud threads' code read here without moving them, made on first use. */
+  get cloudCopies(): CloudCopies {
+    this.cloudCopyService ??= new CloudCopies({
+      db: this.db,
+      hosted: () => this.account,
+      dataDir: this.options.dataDir,
+      invalidate: (keys) => this.options.transport.push({ type: "invalidate", keys }),
+      here: computerNames(process.platform),
+    });
+    return this.cloudCopyService;
   }
 
   get account(): Hosted | null {
@@ -734,7 +748,10 @@ export class OpenOrc {
       createClaudeAccountHandlers(this.claudeAccounts),
       createHostedHandlers(this.account, this.hostedFiles, this.db, new TeamChatOrclingCalls({ db: this.db, orclings: this.orclings, textGeneration: this.textGeneration, log: this.log })),
       createHostedSkillsCloudHandlers(() => this.hostedSkills, this.settings),
-      createCloudMovesHandlers(() => this.cloudMoves),
+      createCloudMovesHandlers(
+        () => this.cloudMoves,
+        () => this.cloudCopies,
+      ),
       createMacProjectsHandlers(new MacProjects({ db: this.db, hosted: () => this.account, changed: () => this.options.transport.push({ type: "invalidate", keys: ["macProjects"] }) })),
       hostedParityHandlers,
       threadCollaborationHandlers,

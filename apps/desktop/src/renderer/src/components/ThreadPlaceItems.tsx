@@ -1,11 +1,11 @@
 import { threadPlace } from "@openorc/client";
 import type { ThreadSummary, WorktreeBlock } from "@openorc/protocol";
-import { HOSTED_REASONS, movingHold, placeOf, WORKSPACE_ID, WORKTREE_BLOCK_WORDS } from "@openorc/protocol";
+import { movingHold, placeOf, WORKSPACE_ID, WORKTREE_BLOCK_WORDS } from "@openorc/protocol";
 import { useCloudMove, useStartCloudMove } from "./CloudMoveDialog";
 import { HostedMenuReason } from "./HostedMenuReason";
 import type { ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
-import { useRpc } from "../lib/client";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { ChevronRight, Cloud, Copy, Folder, GitBranch, GitPullRequest, Laptop, Trash2 } from "./icons";
@@ -44,10 +44,32 @@ function HostedPlaceRow({ thread, parts: M }: { thread: ThreadSummary; parts: Me
   return (
     <PlaceRow parts={M} icon={<Cloud size={13} />} label="OpenOrc Cloud">
       <CloudMoveItem thread={thread} parts={M} />
-      <HostedMenuReason parts={M} reason={HOSTED_REASONS.macCode}>
-        <Folder size={13} /> Open on {machine}
-      </HostedMenuReason>
+      <OpenHereItem thread={thread} parts={M} />
     </PlaceRow>
+  );
+}
+
+/**
+ * Shows the thread's code here without moving it: a copy of its newest save, made or brought up to date, then opened in
+ * the file manager. Held with why when it can't be made (its project isn't here, it has no save yet).
+ */
+function OpenHereItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+  const copy = useRpcMutation("threads.cloudCopy");
+  const label = (
+    <>
+      <Folder size={13} /> {copy.isPending ? "Opening…" : `Open on ${machine}`}
+    </>
+  );
+  if (copy.error)
+    return (
+      <HostedMenuReason parts={M} reason={copy.error.message}>
+        {label}
+      </HostedMenuReason>
+    );
+  return (
+    <M.Item className={menuItem} closeOnClick={false} disabled={copy.isPending} onClick={() => copy.mutate({ threadId: thread.id }, { onSuccess: (made) => window.openorc.revealFile(made.folder) })}>
+      {label}
+    </M.Item>
   );
 }
 

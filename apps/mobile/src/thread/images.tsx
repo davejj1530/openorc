@@ -1,8 +1,8 @@
-import type { AssetRef } from "@openorc/protocol";
+import type { AssetRef, HostedFileScope, TeamChatFile } from "@openorc/protocol";
 import { useQuery } from "@tanstack/react-query";
 import { useContext, useEffect, useState } from "react";
 import { Image, Keyboard, Pressable, View } from "react-native";
-import { assetUri, cloud, cloudFileUri, useLinkRead } from "../client";
+import { assetUri, chatFileUri, cloud, cloudFileUri, useLinkRead } from "../client";
 import { CloudFileScopeContext } from "../cloud/cloud-files";
 import { useOwnCloud } from "../cloud/use-own-cloud";
 import { OLDER_MAC_IMAGE } from "../connection/link-connection";
@@ -53,6 +53,13 @@ export function CloudImageTile({ path, label, compact = false }: { path: string;
   const hosted = useOwnCloud() ? cloud.hosted : null;
   const read = useQuery({ queryKey: ["cloud.file", scope?.spaceId, path], queryFn: () => cloudFileUri(hosted!, scope!, path), enabled: Boolean(hosted && scope), staleTime: Infinity });
   return <Tile loaded={cloudLoaded(read.data, Boolean(read.error || !hosted || !scope))} label={label} compact={compact} />;
+}
+
+/** An image a team chat message carries, read through the phone's own session once and kept; as `ImageTile`. */
+export function ChatImageTile({ scope, file }: { scope: HostedFileScope | null; file: TeamChatFile }) {
+  const hosted = useOwnCloud() ? cloud.hosted : null;
+  const read = useQuery({ queryKey: ["chat.file", scope?.spaceId, file.id], queryFn: () => chatFileUri(hosted!, scope!, file), enabled: Boolean(hosted && scope), staleTime: Infinity });
+  return <Tile loaded={cloudLoaded(read.data, Boolean(read.error || !hosted || !scope))} label={file.name} compact={false} />;
 }
 
 type Loaded = { state: "ready"; value: string } | { state: "failed"; reason?: string } | { state: "loading" };

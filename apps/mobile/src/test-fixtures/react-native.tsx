@@ -81,6 +81,8 @@ export const Image = Object.assign(host("img"), {
   getSize: (_uri: string, success: (width: number, height: number) => void) => success(1600, 900),
 });
 export const Modal = host("div");
+/** The share sheet, which a test watches; it closes at once as if dismissed. */
+export const Share = { share: async (_content: { url?: string; message?: string }) => ({ action: "dismissedAction" }) };
 const PlainInput = host("input");
 const RunsInput = host("div");
 /** A text box with a value, or one that draws its text from runs as children, as a styled prompt does. */

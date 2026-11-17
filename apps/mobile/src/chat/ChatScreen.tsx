@@ -1,7 +1,7 @@
 import { answeredName, answeredOf, personFirst, stretchTime, teamConversationTitle, type TeamChatLease, type TeamChatTarget } from "@openorc/client";
 import { TeamChatReaction, type TeamChatAnswered, type TeamConversation, type TeamMessage } from "@openorc/protocol";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActionSheetIOS, Pressable, TextInput, View, type ScrollViewInstance } from "react-native";
 import { KeyboardChatScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,6 +14,7 @@ import { cn } from "../ui/cn";
 import { Text } from "../ui/Text";
 import { openInApp } from "../ui/web";
 import { chatItems, type ChatItem } from "./chat-items";
+import { ChatFiles, ChatFileScopeContext, chatFileScope } from "./ChatFiles";
 import { useChatLease } from "./lease";
 import { useMessageReveal, type ChatJump } from "./reveal";
 import { Reactions } from "./Reactions";
@@ -87,19 +88,24 @@ function offer(message: TeamMessage, moves: MessageMoves) {
   ActionSheetIOS.showActionSheetWithOptions({ options: [...actions.map((action) => action.label), "Cancel"], cancelButtonIndex: actions.length }, (index) => actions[index]?.run());
 }
 
+/** A message's words: a few emoji alone stand large, other words sit in the `bubble`; a message of files alone has none. */
+function Body({ body, children }: { body: string; children: ReactNode }) {
+  if (!body.trim()) return null;
+  if (emojiOnly(body)) return <Text className="text-5xl leading-tight">{body.trim()}</Text>;
+  return children;
+}
+
 /** The reader's own message on the right, in the phone's prompt bubble. */
 function Mine({ message, moves }: { message: TeamMessage; moves: MessageMoves }) {
-  const big = emojiOnly(message.body);
   return (
     <Pressable onLongPress={() => offer(message, moves)} delayLongPress={350} className="items-end gap-1 self-end" style={{ maxWidth: "88%" }}>
       {message.replyTo ? <Quote answered={message.replyTo} self={moves.self} mine /> : null}
-      {big ? (
-        <Text className="text-5xl leading-tight">{message.body.trim()}</Text>
-      ) : (
+      <Body body={message.body}>
         <View className="rounded-2xl bg-bubble px-4 py-3">
           <Words body={message.body} className="text-md text-bubble-ink" />
         </View>
-      )}
+      </Body>
+      <ChatFiles files={message.files} mine />
       <Reactions message={message} self={moves.self} mine onReact={(emoji) => moves.react(message, emoji)} />
       {message.pinned ? <Text className="pr-1 text-xs text-ink-4">Pinned</Text> : null}
     </Pressable>
@@ -116,20 +122,18 @@ function ActorFace({ message }: { message: TeamMessage }) {
 /** Another's message on the left: the name over the first of a run, the face beside its last. */
 function Theirs({ item, moves }: { item: Extract<ChatItem, { kind: "theirs" }>; moves: MessageMoves }) {
   const { message } = item;
-  const big = emojiOnly(message.body);
   return (
     <View className="flex-row items-end gap-2" style={{ paddingRight: 48 }}>
       <View style={{ width: FACE }}>{item.last ? <ActorFace message={message} /> : null}</View>
       <Pressable onLongPress={() => offer(message, moves)} delayLongPress={350} className="flex-shrink gap-1">
         {item.first ? <Text className="pl-1 text-sm text-ink-3">{authorOf(message, moves.self)}</Text> : null}
         {message.replyTo ? <Quote answered={message.replyTo} self={moves.self} mine={false} /> : null}
-        {big ? (
-          <Text className="text-5xl leading-tight">{message.body.trim()}</Text>
-        ) : (
+        <Body body={message.body}>
           <View className="self-start bg-surface-2 px-3.5 py-2.5" style={runCorners(item)}>
             <Words body={message.body} className="text-md text-ink" />
           </View>
-        )}
+        </Body>
+        <ChatFiles files={message.files} mine={false} />
         <Reactions message={message} self={moves.self} mine={false} onReact={(emoji) => moves.react(message, emoji)} />
         {message.pinned ? <Text className="pl-1 text-xs text-ink-4">Pinned</Text> : null}
       </Pressable>
@@ -233,6 +237,7 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
   const opened = useRef(jump !== null);
   const revealId = useMessageReveal(lease, conversationId, timeline.data, jump);
   const revealed = useRef(false);
+  const files = useMemo(() => chatFileScope(lease.spaceId, conversationId), [lease, conversationId]);
   const messages = useMemo(() => timeline.data?.messages ?? [], [timeline.data]);
   const sent = new Set(messages.map((message) => message.id));
   const items = useMemo(() => chatItems(messages, lease.accountId, newFrom), [messages, lease.accountId, newFrom]);
@@ -266,52 +271,54 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
     list.current?.scrollTo({ y: Math.max(0, y - 48), animated: false });
   };
   return (
-    <View className="flex-1 bg-bg">
-      <KeyboardChatScrollView
-        ref={list}
-        offset={insets.bottom}
-        keyboardLiftBehavior="whenAtEnd"
-        onScroll={({ nativeEvent }) => {
-          atEnd.current = nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height >= nativeEvent.contentSize.height - 24;
-        }}
-        scrollEventThrottle={64}
-        onContentSizeChange={() => atEnd.current && list.current?.scrollToEnd({ animated: false })}
-        keyboardDismissMode="interactive"
-        contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12 }}
-      >
-        {timeline.data?.older ? (
-          <Pressable accessibilityRole="button" onPress={() => void teamChat.earlier(lease, conversationId)} className="items-center py-3 active:opacity-60">
-            <Text className="text-sm text-ink-3">Earlier messages</Text>
-          </Pressable>
-        ) : null}
-        {!timeline.data && !timeline.error ? <Spinner /> : null}
-        {timeline.error ? <Text className="px-5 py-10 text-center text-ink-4">{timeline.error.message}</Text> : null}
-        {timeline.data && !messages.length && !draft.pending.length ? <Text className="py-10 text-center text-ink-4">No messages yet</Text> : null}
-        {items.map((item) => (
-          <View key={item.key} style={{ paddingTop: item.gap }} onLayout={"message" in item && item.message.id === revealId ? ({ nativeEvent }) => revealAt(nativeEvent.layout.y) : undefined}>
-            <Row item={item} moves={moves} onNew={openAtNew} />
-          </View>
-        ))}
-        {draft.pending
-          .filter((message) => !sent.has(message.id))
-          .map((message) => (
-            <View key={message.id} style={{ paddingTop: 14 }}>
-              <Pending message={message} onRetry={() => send(message)} />
+    <ChatFileScopeContext.Provider value={files}>
+      <View className="flex-1 bg-bg">
+        <KeyboardChatScrollView
+          ref={list}
+          offset={insets.bottom}
+          keyboardLiftBehavior="whenAtEnd"
+          onScroll={({ nativeEvent }) => {
+            atEnd.current = nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height >= nativeEvent.contentSize.height - 24;
+          }}
+          scrollEventThrottle={64}
+          onContentSizeChange={() => atEnd.current && list.current?.scrollToEnd({ animated: false })}
+          keyboardDismissMode="interactive"
+          contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12 }}
+        >
+          {timeline.data?.older ? (
+            <Pressable accessibilityRole="button" onPress={() => void teamChat.earlier(lease, conversationId)} className="items-center py-3 active:opacity-60">
+              <Text className="text-sm text-ink-3">Earlier messages</Text>
+            </Pressable>
+          ) : null}
+          {!timeline.data && !timeline.error ? <Spinner /> : null}
+          {timeline.error ? <Text className="px-5 py-10 text-center text-ink-4">{timeline.error.message}</Text> : null}
+          {timeline.data && !messages.length && !draft.pending.length ? <Text className="py-10 text-center text-ink-4">No messages yet</Text> : null}
+          {items.map((item) => (
+            <View key={item.key} style={{ paddingTop: item.gap }} onLayout={"message" in item && item.message.id === revealId ? ({ nativeEvent }) => revealAt(nativeEvent.layout.y) : undefined}>
+              <Row item={item} moves={moves} onNew={openAtNew} />
             </View>
           ))}
-      </KeyboardChatScrollView>
-      <ChatComposer
-        target={target}
-        title={title}
-        failure={failure}
-        self={lease.accountId}
-        onSend={write}
-        onFocus={() => {
-          atEnd.current = true;
-          setTimeout(() => list.current?.scrollToEnd({ animated: true }), 250);
-        }}
-      />
-    </View>
+          {draft.pending
+            .filter((message) => !sent.has(message.id))
+            .map((message) => (
+              <View key={message.id} style={{ paddingTop: 14 }}>
+                <Pending message={message} onRetry={() => send(message)} />
+              </View>
+            ))}
+        </KeyboardChatScrollView>
+        <ChatComposer
+          target={target}
+          title={title}
+          failure={failure}
+          self={lease.accountId}
+          onSend={write}
+          onFocus={() => {
+            atEnd.current = true;
+            setTimeout(() => list.current?.scrollToEnd({ animated: true }), 250);
+          }}
+        />
+      </View>
+    </ChatFileScopeContext.Provider>
   );
 }
 

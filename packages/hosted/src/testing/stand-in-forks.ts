@@ -1,4 +1,4 @@
-import type { Thread } from "./stand-in-threads.js";
+import type { StandInThreadSeed, Thread } from "./stand-in-threads.js";
 
 type Reply = { status: number; body: unknown };
 
@@ -11,16 +11,24 @@ export class StandInForks {
   /** Every fork made, by its id: the parent it came from and who asked. */
   readonly made = new Map<string, { parentId: string; who: string }>();
 
-  take(parent: Thread, who: string, body: Record<string, unknown>, make: (id: string) => Thread): Reply & { fork?: Thread } {
+  constructor(private readonly threads: { held(id: string): Thread | undefined; add(who: string, seed: StandInThreadSeed): string; row(thread: Thread, who: string): unknown }) {}
+
+  take(parent: Thread, who: string, body: Record<string, unknown>): Reply {
     const id = typeof body["id"] === "string" ? body["id"] : "";
     if (!id) return { status: 400, body: { message: "A fork needs an id.", statusCode: 400 } };
     const before = this.made.get(id);
     if (before && (before.parentId !== parent.id || before.who !== who)) return { status: 409, body: { message: "That fork id belongs to another thread.", statusCode: 409 } };
-    const fork = make(id);
     if (!before) {
       this.made.set(id, { parentId: parent.id, who });
-      fork.events = parent.events.map((event) => ({ ...event }));
+      const seed = {
+        id,
+        projectId: parent.projectId,
+        title: `${parent.title || "Thread"} (fork)`,
+        branch: `${parent.branch}-fork-${id.slice(0, 8)}`,
+        agent: parent.agent as StandInThreadSeed["agent"],
+      };
+      this.threads.held(this.threads.add(who, seed))!.events = parent.events.map((event) => ({ ...event }));
     }
-    return { status: 200, body: null, fork };
+    return { status: 200, body: this.threads.row(this.threads.held(id)!, who) };
   }
 }

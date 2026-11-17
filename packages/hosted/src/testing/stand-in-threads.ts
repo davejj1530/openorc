@@ -37,12 +37,12 @@ import { headOf, lastAgentSeq, messageOf, pageOf, toolOutputOf, turnEnd, turnEnd
 import { parentOf, placeOwn, placeShared, startTurn } from "./stand-in-thread-placement.js";
 import { StandInCompactions } from "./stand-in-compactions.js";
 import { StandInForks } from "./stand-in-forks.js";
+import { heldWith, sentSettings } from "./stand-in-message-fields.js";
 import type { UploadedFile } from "../wire-files.js";
 import type { StandInPeer } from "./stand-in-peer.js";
 
 export interface StandInThreadSeed {
-  /** The id the app chose, as for a fork; a new one otherwise. */
-  id?: string;
+  /** The id the app chose, as a fork's is; a new one otherwise. */ id?: string;
   projectId: string | null;
   title: string;
   createdAt?: string;
@@ -143,16 +143,6 @@ const openAsk = (thread: Thread) => thread.asks.find((ask) => !ask.answered) ?? 
 const viewOf = (thread: Thread, who: string): View => thread.views.get(who) ?? { seenSeq: 0, pinnedAt: null, archivedAt: null, snoozedUntil: null };
 const UUID = /^[0-9a-f-]{36}$/i;
 
-/** Why a new message waits paused (a join that missed its turn), and the task context it was sent with. */
-function heldWith(paused: boolean, body: Record<string, unknown>): Pick<Message, "pause" | "task"> {
-  const missed = paused && typeof body["expectedTurnId"] === "string";
-  return { pause: missed ? { kind: "join", message: "The turn this was sent to has ended." } : null, task: (body["task"] as Message["task"]) ?? null };
-}
-
-/** The settings a message was sent with, kept on it for the turn it starts. */
-const sentSettings = (body: Record<string, unknown>): Pick<Message, "settings"> =>
-  typeof body["settings"] === "object" && body["settings"] !== null ? { settings: body["settings"] as Message["settings"] } : {};
-
 export class StandInThreads {
   readonly #threads = new Map<string, Thread>();
   /** Every message body a person posted, in order, as the server took it. */
@@ -166,7 +156,7 @@ export class StandInThreads {
   /** Every ready ask the stand-in stored, in order. */
   readonly readies: { threadId: string; settings: unknown }[] = [];
   readonly compactions = new StandInCompactions();
-  readonly forks = new StandInForks();
+  readonly forks = new StandInForks({ held: (id) => this.#threads.get(id), add: (who, seed) => this.addThread(who, seed), row: (thread, who) => this.#rowOf(thread, who) });
   /** Every POST /hosted/threads body, in order, with the space it named. */
   readonly started: { space: string; body: Record<string, unknown> }[] = [];
   /** Capabilities, files on messages and the files unit's rules. */
@@ -272,7 +262,7 @@ export class StandInThreads {
     if (!thread) return missing();
     if (method === "GET" && match[2] === "/events") return { status: 200, body: pageOf(thread, query, this.log.newestTurns) };
     if (match[4]) return { status: 200, body: toolOutputOf(thread, decodeURIComponent(match[4])) };
-    if (method === "POST" && match[2] === "/fork") return this.#fork(thread, as.who, body);
+    if (method === "POST" && match[2] === "/fork") return this.forks.take(thread, as.who, body);
     if (!match[2]) return this.#one(method, thread, as.who, body);
     return method === "POST" ? this.#act(thread, as.who, match[3] ? decodeURIComponent(match[3]) : null, body) : null;
   }
@@ -284,17 +274,6 @@ export class StandInThreads {
     thread.stopped.push(commandId);
     this.#released(thread, commandId);
     return { status: 204, body: null };
-  }
-
-  /** A fork of a thread its asker reads: theirs, on a branch named after the parent's (stand-in-forks.ts). */
-  #fork(parent: Thread, who: string, body: Record<string, unknown>): Reply {
-    const made = this.forks.take(parent, who, body, (id) => {
-      const held = this.#threads.get(id);
-      if (held) return held;
-      this.addThread(who, { id, projectId: parent.projectId, title: `${parent.title || "Thread"} (fork)`, branch: `${parent.branch}-fork-${id.slice(0, 8)}`, agent: parent.agent as StandInThreadSeed["agent"] });
-      return this.#threads.get(id)!;
-    });
-    return made.fork ? { status: 200, body: this.#rowOf(made.fork, who) } : made;
   }
 
   /** A stopped command no longer holds the thread's handoff; once none does, the next sender may start. */

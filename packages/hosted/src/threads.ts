@@ -37,10 +37,12 @@ import { AccountCache } from "./account-cache.js";
 import { keptThreadNames, ThreadNames } from "./thread-names.js";
 import { askNotice, endNotice, noticed } from "./notices.js";
 import * as sends from "./sends.js";
+import { forkThread } from "./fork.js";
+import { startSettings } from "./start-settings.js";
 import type { Skills } from "./skills.js";
 import { TerminalWatch } from "./thread-terminals.js";
 import { Refused, type Requests, type Session, type SessionChange } from "./session.js";
-import { CLOUD_PROJECT, githubRepoOf, listRows, projectPairs, resolvedCount, runsNow, starterOf, toAppEvent, toRuns, toSummary, wireMessageId } from "./translate.js";
+import { CLOUD_PROJECT, githubRepoOf, listRows, projectPairs, resolvedCount, runsNow, starterOf, toAppEvent, toRuns, toSummary } from "./translate.js";
 import { ROUTES, SOCKET, wireThread, wireTopics, type WireEvent, type WireThread } from "./wire.js";
 import type { QueuedStart } from "./shared-sends.js";
 
@@ -291,28 +293,15 @@ export class Threads implements HostedThreads {
     if (!this.#heard?.projects.some((row) => row.id === project.id && row.space === project.space)) throw new Refused("You no longer have access to this project.");
     if (!reply.thread) return sends.refuse(this.calls, reply.first?.sent === false ? reply.first.refusal : "", settings);
     const row = { ...reply.thread, space: project.space };
-    const heard = this.#heard;
-    if (heard && !heard.rows.some((each) => each.id === row.id)) {
-      heard.rows = [row, ...heard.rows];
-      this.#save();
-      this.#tell();
-    }
-    void this.refresh();
-    return { thread: this.summary(row.id, params.spaceId), run: toRuns(row, this.reach)[0] ?? null };
+    return { thread: this.#listNew(row, params.spaceId), run: toRuns(row, this.reach)[0] ?? null };
   }
 
-  /**
-   * A fork of a cloud thread: a new thread of the asker's own on the server, which carries on the conversation from a
-   * turn's end with a copy of the work on a branch of its own. It lists at once; its copy lands as soon as it can.
-   * Asking again with the same request key is the same fork.
-   */
-  async forkThread({ id, requestKey }: RpcParams<"threads.fork">): Promise<RpcResults["threads.fork"]> {
-    const parent = this.#heard?.rows.find((row) => row.id === id);
-    if (!parent) throw new Refused("That conversation isn't available on OpenOrc Cloud.");
-    const generation = this.deps.session.generation;
-    const forked = await this.deps.session.in(parent.space).request(ROUTES.fork(id), { id: wireMessageId(requestKey) ?? crypto.randomUUID() });
-    if (generation !== this.deps.session.generation) throw new Refused("Your OpenOrc session changed. Try again.");
-    const row = { ...forked, space: parent.space };
+  /** threads.fork (fork.ts): listed at once, as a thread started here is. */
+  forkThread = (params: RpcParams<"threads.fork">) =>
+    forkThread({ session: this.deps.session, heard: (id) => this.#heard?.rows.find((row) => row.id === id) ?? null, listNew: (row) => this.#listNew(row) }, params);
+
+  /** A thread new on the server, listed at once rather than at the list's next read. */
+  #listNew(row: HeardRow, spaceId?: string): ThreadSummary {
     const heard = this.#heard;
     if (heard && !heard.rows.some((each) => each.id === row.id)) {
       heard.rows = [row, ...heard.rows];
@@ -320,7 +309,7 @@ export class Threads implements HostedThreads {
       this.#tell();
     }
     void this.refresh();
-    return this.summary(row.id);
+    return this.summary(row.id, spaceId);
   }
 
   /** The cloud thread a new one starts under, when it names one: a thread of the same project in the same space. */
@@ -802,18 +791,3 @@ const seenUpTo = (row: WireThread, seen: boolean): number => (seen ? row.head : 
 function defined<T extends Record<string, unknown>>(fields: T): Partial<T> {
   return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)) as Partial<T>;
 }
-
-/** The settings a start runs with, as the server names them: its execution target's model, or the fields older callers send. */
-function startSettings(params: Pick<RpcParams<"threads.start">, "agent" | "executionTarget" | "model" | "effort" | "mode" | "permissionMode">): {
-  agent: HostedAgentOrOther;
-  model: string | null;
-  effort: string | null;
-  mode: RpcParams<"threads.start">["mode"];
-  permissionMode: RpcParams<"threads.start">["permissionMode"];
-} {
-  const chosen = params.executionTarget?.kind === "model" ? params.executionTarget.settings : null;
-  const agent = chosen?.agent ?? params.agent ?? "claude";
-  return { agent, model: (chosen ? chosen.model : params.model) ?? null, effort: (chosen ? chosen.effort : params.effort) ?? null, mode: params.mode, permissionMode: params.permissionMode };
-}
-
-type HostedAgentOrOther = NonNullable<RpcParams<"threads.start">["agent"]>;

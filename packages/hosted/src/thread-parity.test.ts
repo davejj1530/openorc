@@ -43,7 +43,6 @@ it.each([
   ["threads.messages", "Searching this cloud thread's full history isn't available yet."],
   ["threads.plans", "Saved plans aren't available in this cloud thread yet."],
   ["threads.checkpoints", "Restoring a cloud checkpoint isn't available yet."],
-  ["threads.fork", "Forking a cloud thread isn't available yet."],
 ] as const)("refuses %s with its specific reason instead of a false empty or generic refusal", async (method, reason) => {
   await expect(hosted.threads.call(method, { id })).rejects.toThrow(reason);
 });

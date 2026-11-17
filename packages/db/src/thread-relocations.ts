@@ -112,6 +112,12 @@ export const cloudMoves = {
     return { to, failed: null };
   },
 
+  /** Whether the thread came from the cloud to this Mac, keeping its id: that id, once a cloud thread's, is this Mac's now. */
+  cameHere(db: Db, threadId: string): boolean {
+    const move = cloudMoves.latest(db, threadId);
+    return move?.direction === "to-mac" && (move.phase === "received" || move.phase === "done");
+  },
+
   /** Forgets the thread's moves: a thread that is gone from this Mac keeps none. */
   forget(db: Db, threadId: string): void {
     db.stmt("DELETE FROM thread_relocations WHERE thread_id = ? AND role = 'coordinator'").run(threadId);

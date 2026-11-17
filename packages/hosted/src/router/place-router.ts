@@ -31,12 +31,16 @@ export interface PlaceRouterDeps {
   spaces?(): Pick<HostedSpaces, "status" | "projects" | "people"> | null;
   /** What answers a call no place holds: this Mac's own dispatch. */
   next(request: RpcRequest): Promise<RpcReply>;
+  /** Whether a thread came from the cloud to this Mac keeping its id, so its id is this Mac's own (core's CloudMoves). */
+  movedHere?(threadId: string): boolean;
 }
 
 export class PlaceRouter {
-  private readonly hostedOwnership = new HostedCallGuard();
+  private readonly hostedOwnership: HostedCallGuard;
   private readonly scoped = new SpaceRequests({ spaces: () => this.deps.spaces?.() ?? null, place: () => this.deps.place(), next: (request) => this.deps.next(request) });
-  constructor(private readonly deps: PlaceRouterDeps) {}
+  constructor(private readonly deps: PlaceRouterDeps) {
+    this.hostedOwnership = new HostedCallGuard((threadId) => deps.movedHere?.(threadId) ?? false);
+  }
 
   handle(request: RpcRequest): Promise<RpcReply> {
     const place = this.deps.place();

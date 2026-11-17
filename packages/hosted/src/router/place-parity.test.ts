@@ -25,6 +25,22 @@ describe("hosted calls normally served here", () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it("lets a cloud id go to this Mac once the thread came here by a move, keeping its id", async () => {
+    let holds = true;
+    const moved = new Set<string>();
+    const next = vi.fn(async () => ({ type: "rpc.result" as const, id: 3, result: null }));
+    const router = new PlaceRouter({ place: () => ({ ...place, holds: (ref) => holds && place.holds(ref) }), next, movedHere: (id) => moved.has(id) });
+    const request = { type: "rpc" as const, id: 3, method: "threads.get", params: { id: "cloud-thread" } };
+    await router.handle(request);
+    holds = false;
+    expect(await router.handle(request)).toMatchObject({ type: "rpc.error", message: "That conversation isn't available on OpenOrc Cloud." });
+    moved.add("cloud-thread");
+    expect(await router.handle(request)).toMatchObject({ type: "rpc.result" });
+    expect(next).toHaveBeenCalledTimes(1);
+    // A run of the thread from its cloud days still never reaches this Mac.
+    expect(await router.handle({ type: "rpc", id: 4, method: "events.page", params: { runId: "hosted:cloud-thread" } })).toMatchObject({ type: "rpc.error" });
+  });
+
   it("recognizes a hosted run even when its account is no longer active", async () => {
     const next = vi.fn(async () => ({ type: "rpc.result" as const, id: 3, result: null }));
     const router = new PlaceRouter({ place: () => null, next });

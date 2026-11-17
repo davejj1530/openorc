@@ -1,5 +1,5 @@
 import { captureLaunchEnvironment, claudeConfigDir, recoverAgentProcesses } from "@openorc/agents";
-import { claudeAccounts as storedClaudeAccounts, Db, LedgerWriter, plans, redact, settings as storedSettings } from "@openorc/db";
+import { claudeAccounts as storedClaudeAccounts, cloudMoves as moveJournal, Db, LedgerWriter, plans, redact, settings as storedSettings } from "@openorc/db";
 import type { Hosted, HostedThreads, OwnSkills } from "@openorc/hosted";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import { harnessAvailability, harnessInfo, harnessLoggedIn, rpcParams, type CloudSessionGrant, type CloudSessionOwner, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
@@ -605,6 +605,7 @@ export class OpenOrc {
       place: () => this.account?.threads ?? null,
       spaces: () => this.account?.spaces ?? null,
       next: (request) => this.dispatch(request),
+      movedHere: (threadId) => moveJournal.cameHere(this.db, threadId),
     });
     return this.placeRouter;
   }
@@ -615,6 +616,7 @@ export class OpenOrc {
       place: () => this.phoneCloud(),
       spaces: () => this.account?.spaces ?? null,
       next: (request) => this.dispatch(request, requestOrigin.getStore()),
+      movedHere: (threadId) => moveJournal.cameHere(this.db, threadId),
     });
     return this.phonePlaceRouter;
   }

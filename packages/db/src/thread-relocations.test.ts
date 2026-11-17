@@ -36,7 +36,9 @@ describe("this Mac's journal of a thread moving to and from the cloud", () => {
     threads.insert(db, { id: "t2", projectId: project.id, title: "From the cloud", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
     const listed = () => threads.list(db, {}).map((thread) => thread.id);
     expect(listed()).toEqual([]);
+    expect(cloudMoves.cameHere(db, "t2")).toBe(false);
     cloudMoves.set(db, move.id, { phase: "received" });
     expect(listed()).toEqual(["t2"]);
+    expect(cloudMoves.cameHere(db, "t2")).toBe(true);
   });
 });

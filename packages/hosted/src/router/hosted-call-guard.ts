@@ -10,9 +10,13 @@ function threadOf(method: RpcMethod, params: Record<string, unknown>): string | 
   return typeof id === "string" ? id : null;
 }
 
-/** Ownership outlives access. A withdrawn cloud id must never become a request against this Mac. */
+/**
+ * Ownership outlives access. A withdrawn cloud id must never become a request against this Mac, unless the thread came
+ * to this Mac by a move, keeping its id (`movedHere`): then the id is this Mac's own.
+ */
 export class HostedCallGuard {
   private readonly known = new Set<string>();
+  constructor(private readonly movedHere: (threadId: string) => boolean = () => false) {}
 
   refusal(place: HostedThreads | null, method: RpcMethod, params: Record<string, unknown>): string | null {
     const held = this.check(place, method, params);
@@ -28,7 +32,11 @@ export class HostedCallGuard {
       this.known.add(id);
       return "held";
     }
-    return run || this.known.has(id) ? "unavailable" : null;
+    if (run) return "unavailable";
+    if (!this.known.has(id)) return null;
+    if (!this.movedHere(id)) return "unavailable";
+    this.known.delete(id);
+    return null;
   }
 }
 

@@ -94,6 +94,8 @@ const cloudReplies: { [M in CloudRemoteMethod]: Reply<M> } = {
   "hosted.review.state": same,
   "hosted.review.action": same,
   "threads.delete": same,
+  // Models by agent and name, as the cloud's machines list them, and how fresh each agent's list is.
+  "cloudModels.catalog": same,
   // Team chat as the server gives it to every member who may read it: people by id, name and picture, never an address.
   "teamChat.state": same,
   "teamChat.openDm": same,

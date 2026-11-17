@@ -213,3 +213,7 @@ it("deletes a cloud thread from a phone, and never one of this Mac's", async () 
   await phone.request("threads.delete", { id: threadId });
   expect(at.stand.requests.slice(before)).toContainEqual(expect.objectContaining({ method: "DELETE", path: `/hosted/threads/${threadId}` }));
 });
+
+it("lets a phone read the models OpenOrc Cloud runs for the person", async () => {
+  expect(await refusal(phone.request("cloudModels.catalog", {}))).not.toBe(FROM_PHONE);
+});

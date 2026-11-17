@@ -194,7 +194,12 @@ function submitRequest(input: {
 export function ThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { threadQuery, thread, runsQuery, runs, activeRun } = useOpenThread(id);
-  const settings = { ...client.useConversationSettings({ thread, activeRun }), claudeAccountId: thread?.claudeAccountId ?? undefined, claudeAccount: useThreadClaudeAccount(thread) };
+  const settings = {
+    ...client.useConversationSettings({ thread, activeRun }),
+    claudeAccountId: thread?.claudeAccountId ?? undefined,
+    claudeAccount: useThreadClaudeAccount(thread),
+    cloud: thread !== null && placeOf(thread).elsewhere,
+  };
   useShareSettings(id, settings);
   // An OpenOrc Cloud thread: its files go to the cloud through the phone's own session.
   const cloud = thread !== null && placeOf(thread).elsewhere;

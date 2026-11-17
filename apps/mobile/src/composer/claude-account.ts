@@ -62,9 +62,18 @@ export function claudeAccountUnavailable(account: ClaudeAccountConnection): stri
   return null;
 }
 
-/** The models a composer offers: its thread's or draft's Claude account, else the Mac's default account. */
+/**
+ * The models a composer offers: for a turn on OpenOrc Cloud the ones the cloud runs for the person, as its machines'
+ * own agent CLIs list them; else, and where a server from before the cloud's catalog answers none, the Mac's for its
+ * thread's or draft's Claude account, or the Mac's default account.
+ */
 export function useComposerModels(settings: ModelSettings | undefined) {
   const claudeAccountId = settings?.claudeAccount?.chosen ?? settings?.claudeAccountId;
+  const cloud = useRpc("cloudModels.catalog", {}, { enabled: Boolean(settings?.cloud), staleTime: 5 * 60_000 });
+  const served = Boolean(settings?.cloud) && Boolean(cloud.data);
+  // A cloud turn reads the Mac's list only once its server says it keeps no catalog, or cannot be asked.
+  const macWanted = !settings?.cloud || cloud.data === null || Boolean(cloud.error);
   // The last account's list holds while the next one's loads, so the chip keeps its name.
-  return useRpc("agents.models", claudeAccountId ? { claudeAccountId } : {}, { staleTime: 5 * 60_000, placeholderData: (previous) => previous });
+  const mac = useRpc("agents.models", claudeAccountId ? { claudeAccountId } : {}, { enabled: macWanted, staleTime: 5 * 60_000, placeholderData: (previous) => previous });
+  return served ? { ...cloud, data: cloud.data!.models, isPlaceholderData: false } : mac;
 }

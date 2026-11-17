@@ -18,6 +18,8 @@ export type ModelSettings = Pick<ConversationSettings, "choice" | "selectModel">
    * project uses, when it uses only some.
    */
   claudeAccount?: { chosen: string | undefined; select: (id: string) => void; held?: string | null; failed?: string | null; projectId?: string };
+  /** A turn that runs on OpenOrc Cloud: its models are the cloud's own, where its server lists them. */
+  cloud?: boolean;
 };
 
 /**

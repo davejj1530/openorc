@@ -58,6 +58,7 @@ export function useNewThread(project: ProjectChoice) {
       permission.select(next.permissionMode);
     },
     claudeAccount: { chosen: claudeAccountId, select: (claudeAccountId) => change({ claudeAccountId }), projectId },
+    cloud: Boolean(project.cloud),
   };
   // A Mac project waits for the Mac: Start is held with why, rather than sent to fail.
   const reach = projectReach(project, useMacReach());

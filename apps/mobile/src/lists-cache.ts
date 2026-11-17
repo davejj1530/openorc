@@ -7,7 +7,16 @@ import type { KeyValue } from "./scratch-store";
  * its settings, the last usage it reported, and its agents' models and which of them are signed in, which a cloud
  * thread's composer and a new cloud thread choose from while the Mac is asleep.
  */
-const KEPT: ReadonlySet<string> = new Set<RpcMethod | DeviceMethod>(["projects.list", "threads.list", "app.settings.get", "tasks.board", "providers.limits", "agents.models", "agents.availability"]);
+const KEPT: ReadonlySet<string> = new Set<RpcMethod | DeviceMethod>([
+  "projects.list",
+  "threads.list",
+  "app.settings.get",
+  "tasks.board",
+  "providers.limits",
+  "agents.models",
+  "agents.availability",
+  "cloudModels.catalog",
+]);
 const SAVE_AFTER_MS = 1_000;
 
 type Storage = KeyValue;

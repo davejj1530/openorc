@@ -83,6 +83,8 @@ export const CLOUD_REMOTE_METHODS = [
   "hosted.review.action",
   // Deleting a cloud thread, for everyone in it. A thread of the Mac's is never deleted from a phone.
   "threads.delete",
+  // The models OpenOrc Cloud runs for the person, which a cloud thread's picker and a cloud start's offer.
+  "cloudModels.catalog",
   // The organization's team chat, as the person's own window has it. The server decides each call; a message that calls
   // the person's Orcling runs it on this Mac, which holds it.
   "teamChat.state",

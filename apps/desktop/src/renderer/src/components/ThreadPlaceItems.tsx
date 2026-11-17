@@ -133,10 +133,19 @@ function BranchRow({ thread, parts: M }: { thread: ThreadSummary; parts: MenuPar
         </M.Item>
       ) : null}
       {here && above ? <M.Separator className={menuSeparator} /> : null}
-      {here ? <MoveFolderItem thread={thread} parts={M} /> : null}
-      {here && thread.workspaceMode === "worktree" && thread.worktreePath && thread.parentRelation !== "subagent" ? <RemoveWorktreeItem thread={thread} parts={M} /> : null}
-      {here ? <CloudMoveItem thread={thread} parts={M} /> : null}
+      {here ? <MovesHere thread={thread} parts={M} /> : null}
     </PlaceRow>
+  );
+}
+
+/** The moves of a thread working on this computer: between the checkout and a worktree, out of its worktree, to the cloud. */
+function MovesHere({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+  return (
+    <>
+      <MoveFolderItem thread={thread} parts={M} />
+      {thread.workspaceMode === "worktree" && thread.worktreePath && thread.parentRelation !== "subagent" ? <RemoveWorktreeItem thread={thread} parts={M} /> : null}
+      <CloudMoveItem thread={thread} parts={M} />
+    </>
   );
 }
 

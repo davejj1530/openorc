@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { MOVING_TO_CLOUD } from "@openorc/protocol";
 import type { Db } from "./database.js";
 
 /**
@@ -95,6 +96,11 @@ export const cloudMoves = {
       now,
       id,
     );
+  },
+
+  /** Refuses a turn here for a thread moving to the cloud: its conversation and work are on their way there. */
+  assertStays(db: Db, threadId: string): void {
+    if (cloudMoves.open(db, threadId)?.direction === "to-cloud") throw new Error(MOVING_TO_CLOUD);
   },
 
   /** Where the thread is moving, or why its last move stopped; null when neither. What its summary says. */

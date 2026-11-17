@@ -81,9 +81,8 @@ export function useHostedComposer(
 } {
   const hosted = thread?.owner?.brain === "hosted";
   const writeBlock = threadTogether(thread) ? threadWriteBlock(thread) : null;
-  const moving = movingHold(thread?.moving, machine);
-  const limits = { ...(hosted ? CLOUD_LIMITS : {}), readOnlyReason: moving ?? (threadTogether(thread) ? writeBlock : threadReadOnlyReason(thread)) };
-  const moveFailed = thread?.moving?.failed ? <MoveFailedCard threadId={thread.id} to={thread.moving.to} words={thread.moving.failed} /> : null;
+  const limits = { ...(hosted ? CLOUD_LIMITS : {}), readOnlyReason: readOnlyReason(thread, writeBlock) };
+  const moveCard = moveFailedCard(thread);
   const account = useRpc("account.status", {}, { enabled: hosted });
   const ready = useRpcMutation("threads.ready");
   const blocked = sendsBlocked(thread);
@@ -103,11 +102,11 @@ export function useHostedComposer(
     const { choice, mode, permission } = settings;
     ready.mutate({ id: thread.id, settings: { ...(choice && { agent: choice.agent, model: choice.model, effort: choice.effort ?? null }), mode, permissionMode: permission } });
   };
-  if (!hosted) return { hosted, notice: moveFailed, blocked: null, limits, shown: (error) => error };
+  if (!hosted) return { hosted, notice: moveCard, blocked: null, limits, shown: (error) => error };
   Object.assign(limits, together);
   return {
     hosted,
-    notice: moveFailed ?? hostedNotice({ block: block && !blocked ? block : null, ...reachableBlock(thread, writeBlock), composer, draft }),
+    notice: moveCard ?? hostedNotice({ block: block && !blocked ? block : null, ...reachableBlock(thread, writeBlock), composer, draft }),
     blocked: blocked ?? block?.words ?? null,
     limits,
     shown: (error) => (error === block?.words ? undefined : error),
@@ -201,6 +200,19 @@ function SendBlockCard({ words, action }: { words: string; action: SendBlockActi
       ) : null}
     </section>
   );
+}
+
+/**
+ * Why nothing can be written in the thread now: it is moving between this computer and the cloud, or the server (from
+ * one that predates working together: its starter) says this person may not write in it.
+ */
+function readOnlyReason(thread: ThreadSummary | null, writeBlock: string | null): string | null {
+  return movingHold(thread?.moving, machine) ?? (threadTogether(thread) ? writeBlock : threadReadOnlyReason(thread));
+}
+
+/** Why the thread's last move between this computer and the cloud stopped, with the move again; null otherwise. */
+function moveFailedCard(thread: ThreadSummary | null): ReactNode {
+  return thread?.moving?.failed ? <MoveFailedCard threadId={thread.id} to={thread.moving.to} words={thread.moving.failed} /> : null;
 }
 
 /** Why the thread's last move between this computer and OpenOrc Cloud stopped, where it left it, with the move again. */

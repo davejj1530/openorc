@@ -311,7 +311,9 @@ export function ChatScreen() {
   const title = conversation ? conversationTitle(conversation, lease?.accountId ?? "") : "";
   // The reader's place as the conversation opened, which the New messages line keeps while it stays open.
   const [newFrom, setNewFrom] = useState<number | null | undefined>(undefined);
-  if (newFrom === undefined && conversation) setNewFrom(conversation.read && conversation.read.unread > 0 ? conversation.read.seenSeq : null);
+  // A conversation just opened, as a first message to a person, is not listed yet: it opens with no line.
+  const read = conversation?.read;
+  if (newFrom === undefined && state?.state === "ready") setNewFrom(read && read.unread > 0 ? read.seenSeq : null);
   return (
     <>
       <Stack.Screen options={{ headerTitle: title }} />

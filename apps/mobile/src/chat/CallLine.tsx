@@ -18,13 +18,18 @@ export function CallLine({ lease, call, mine, onRetry }: { lease: TeamChatLease;
   const [why, setWhy] = useState(false);
   if (!call || !line) return null;
   const reason = owned.data?.reason ?? null;
+  const words = <Text className={cn("text-sm", line.failed ? "text-bad" : "text-ink-3")}>{line.words}</Text>;
   return (
     <View accessibilityLiveRegion="polite" className={cn("gap-1 px-1", mine && "items-end")}>
       <View className="flex-row items-center gap-1.5">
         <OrclingFace look={call.look} size={16} />
-        <Pressable accessibilityRole={reason ? "button" : "text"} disabled={!reason} onPress={() => setWhy(!why)} hitSlop={6}>
-          <Text className={cn("text-sm", line.failed ? "text-bad" : "text-ink-3")}>{line.words}</Text>
-        </Pressable>
+        {reason ? (
+          <Pressable accessibilityRole="button" onPress={() => setWhy(!why)} hitSlop={6}>
+            {words}
+          </Pressable>
+        ) : (
+          words
+        )}
         {line.canRetry ? (
           <Pressable accessibilityRole="button" onPress={() => onRetry(call)} hitSlop={8} className="active:opacity-60">
             <Text className="text-sm text-ink-2">Retry</Text>

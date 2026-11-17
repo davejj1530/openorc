@@ -17,9 +17,9 @@ export function phoneFile(uri: string): { source: FileByteSource; close(): void 
 
 const folder = (scope: HostedFileScope) => new Directory(Paths.cache, "cloud-files", scope.spaceId);
 
-/** A file read through the phone's own session once and kept in the cache, as its name, under its id. */
+/** A file read through the phone's own session once and kept in the cache in a folder of its id, by its own name, which Share then offers. */
 async function keptFile(hosted: Hosted, scope: HostedFileScope, reference: { id: string; name: string }): Promise<string> {
-  const kept = new File(folder(scope), `${reference.id}-${reference.name}`);
+  const kept = new File(folder(scope), reference.id, reference.name);
   if (kept.exists) return kept.uri;
   const bytes = await hosted.files.read(scope, reference, false, async (response) => new Uint8Array(await response.arrayBuffer()));
   if (!kept.parentDirectory.exists) kept.parentDirectory.create({ intermediates: true });

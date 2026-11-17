@@ -101,21 +101,35 @@ function Body({ body, children }: { body: string; children: ReactNode }) {
   return children;
 }
 
+/**
+ * What sits under a message's words, each reachable on its own, outside the words' long press: its files, how the
+ * Orcling it called is answering, its reactions, and whether it is pinned.
+ */
+function Under({ message, moves, mine }: { message: TeamMessage; moves: MessageMoves; mine: boolean }) {
+  return (
+    <>
+      <ChatFiles files={message.files} mine={mine} />
+      <CallLine lease={moves.lease} call={message.call} mine={mine} onRetry={moves.retryCall} />
+      <Reactions message={message} self={moves.self} mine={mine} onReact={(emoji) => moves.react(message, emoji)} />
+      {message.pinned ? <Text className={cn("text-xs text-ink-4", mine ? "pr-1" : "pl-1")}>Pinned</Text> : null}
+    </>
+  );
+}
+
 /** The reader's own message on the right, in the phone's prompt bubble. */
 function Mine({ message, moves }: { message: TeamMessage; moves: MessageMoves }) {
   return (
-    <Pressable onLongPress={() => offer(message, moves)} delayLongPress={350} className="items-end gap-1 self-end" style={{ maxWidth: "88%" }}>
-      {message.replyTo ? <Quote answered={message.replyTo} self={moves.self} mine /> : null}
-      <Body body={message.body}>
-        <View className="rounded-2xl bg-bubble px-4 py-3">
-          <Words body={message.body} className="text-md text-bubble-ink" />
-        </View>
-      </Body>
-      <ChatFiles files={message.files} mine />
-      <CallLine lease={moves.lease} call={message.call} mine onRetry={moves.retryCall} />
-      <Reactions message={message} self={moves.self} mine onReact={(emoji) => moves.react(message, emoji)} />
-      {message.pinned ? <Text className="pr-1 text-xs text-ink-4">Pinned</Text> : null}
-    </Pressable>
+    <View className="items-end gap-1 self-end" style={{ maxWidth: "88%" }}>
+      <Pressable onLongPress={() => offer(message, moves)} delayLongPress={350} className="items-end gap-1">
+        {message.replyTo ? <Quote answered={message.replyTo} self={moves.self} mine /> : null}
+        <Body body={message.body}>
+          <View className="rounded-2xl bg-bubble px-4 py-3">
+            <Words body={message.body} className="text-md text-bubble-ink" />
+          </View>
+        </Body>
+      </Pressable>
+      <Under message={message} moves={moves} mine />
+    </View>
   );
 }
 
@@ -132,19 +146,18 @@ function Theirs({ item, moves }: { item: Extract<ChatItem, { kind: "theirs" }>; 
   return (
     <View className="flex-row items-end gap-2" style={{ paddingRight: 48 }}>
       <View style={{ width: FACE }}>{item.last ? <ActorFace message={message} /> : null}</View>
-      <Pressable onLongPress={() => offer(message, moves)} delayLongPress={350} className="flex-shrink gap-1">
-        {item.first ? <Text className="pl-1 text-sm text-ink-3">{authorOf(message, moves.self)}</Text> : null}
-        {message.replyTo ? <Quote answered={message.replyTo} self={moves.self} mine={false} /> : null}
-        <Body body={message.body}>
-          <View className="self-start bg-surface-2 px-3.5 py-2.5" style={runCorners(item)}>
-            <Words body={message.body} className="text-md text-ink" />
-          </View>
-        </Body>
-        <ChatFiles files={message.files} mine={false} />
-        <CallLine lease={moves.lease} call={message.call} mine={false} onRetry={moves.retryCall} />
-        <Reactions message={message} self={moves.self} mine={false} onReact={(emoji) => moves.react(message, emoji)} />
-        {message.pinned ? <Text className="pl-1 text-xs text-ink-4">Pinned</Text> : null}
-      </Pressable>
+      <View className="flex-shrink gap-1">
+        <Pressable onLongPress={() => offer(message, moves)} delayLongPress={350} className="gap-1">
+          {item.first ? <Text className="pl-1 text-sm text-ink-3">{authorOf(message, moves.self)}</Text> : null}
+          {message.replyTo ? <Quote answered={message.replyTo} self={moves.self} mine={false} /> : null}
+          <Body body={message.body}>
+            <View className="self-start bg-surface-2 px-3.5 py-2.5" style={runCorners(item)}>
+              <Words body={message.body} className="text-md text-ink" />
+            </View>
+          </Body>
+        </Pressable>
+        <Under message={message} moves={moves} mine={false} />
+      </View>
     </View>
   );
 }

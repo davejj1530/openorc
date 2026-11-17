@@ -17,7 +17,7 @@ import {
   type SendBlockAction,
   type SendPayer,
 } from "@openorc/client";
-import { movingHold, type HarnessId, type PermissionPreset, type RunMode, type ThreadMoving, type ThreadSummary } from "@openorc/protocol";
+import { movingHold, type PermissionPreset, type RunMode, type ThreadMoving, type ThreadSummary } from "@openorc/protocol";
 import type { ReactNode, RefObject } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
@@ -37,7 +37,7 @@ const FILES = "Files can't be sent to OpenOrc Cloud yet.";
 export interface CloudComposerLimits {
   accounts?: undefined;
   attachmentsDisabledReason: string;
-  modelLimits: { harnesses: readonly HarnessId[]; fast: false };
+  modelLimits: typeof CLOUD_MODEL_LIMITS;
 }
 
 const CLOUD_LIMITS: CloudComposerLimits = { accounts: undefined, attachmentsDisabledReason: FILES, modelLimits: CLOUD_MODEL_LIMITS };

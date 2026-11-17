@@ -359,7 +359,7 @@ function NewThreadModelControl({
   disabled: boolean;
 }) {
   const limits = onCloud ? CLOUD_MODEL_LIMITS : undefined;
-  if (!choice) return <ModelPicker value={null} onChange={choose} orclings={orclings} harnesses={limits?.harnesses} disabled={disabled} />;
+  if (!choice) return <ModelPicker value={null} onChange={choose} orclings={orclings} harnesses={limits?.harnesses} cloud={limits?.cloud} disabled={disabled} />;
   return <ComposerModelPicker value={choice} onChange={choose} onSelectModel={choose} orclings={orclings} accounts={accounts} limits={limits} disabled={disabled} />;
 }
 

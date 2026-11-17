@@ -168,6 +168,7 @@ function ModelBrowser({
   closeOnSelect,
   close,
   harnesses,
+  cloud,
 }: {
   value: ModelChoice | null;
   onChange: (choice: ModelChoice) => void;
@@ -181,8 +182,10 @@ function ModelBrowser({
   closeOnSelect: boolean;
   close: () => void;
   harnesses?: readonly HarnessId[];
+  /** The models OpenOrc Cloud runs, in place of this Mac's. */
+  cloud?: boolean | undefined;
 }) {
-  const models = useModelCatalog();
+  const models = useModelCatalog(cloud);
   const enabled = useEnabledHarnesses(harnesses);
   const claudeAccountId = useClaudeAccountId();
   const system = useRpc("system.info", claudeAccountId ? { claudeAccountId } : {});
@@ -387,6 +390,7 @@ export function ModelPicker({
   placeholder = "Choose a model",
   ariaLabel,
   harnesses,
+  cloud,
 }: {
   value: ModelChoice | null;
   onChange: (choice: ModelChoice) => void;
@@ -396,8 +400,10 @@ export function ModelPicker({
   placeholder?: string;
   ariaLabel?: string;
   harnesses?: readonly HarnessId[];
+  /** The models OpenOrc Cloud runs, in place of this Mac's. */
+  cloud?: boolean | undefined;
 }) {
-  const models = useModelCatalog();
+  const models = useModelCatalog(cloud);
   const popup = usePickerPopup();
   value = useEnabledChoice(value, harnesses);
   const current = catalogModel(models.data, value);
@@ -436,6 +442,7 @@ export function ModelPicker({
               showFast={showEffort}
               disabled={disabled}
               harnesses={harnesses}
+              cloud={cloud}
               closeOnSelect
               close={() => popup.setOpen(false)}
             />
@@ -475,13 +482,13 @@ interface ComposerModelPickerProps {
   modelSelector?: ReactNode;
   disabled?: boolean;
   settingsDisabled?: boolean;
-  /** Where the conversation runs takes only these agents, and Fast only when `fast`. */
-  limits?: { harnesses: readonly HarnessId[]; fast: boolean } | undefined;
+  /** Where the conversation runs takes only these agents, and Fast only when `fast`; on OpenOrc Cloud, its models (`cloud`). */
+  limits?: { harnesses: readonly HarnessId[]; fast: boolean; cloud?: boolean } | undefined;
 }
 
 export function ComposerModelPicker({ value, onChange, onSelectModel, orclings, accounts, modelSelector, disabled, settingsDisabled = false, limits }: ComposerModelPickerProps) {
   const fastReason = useHostedControlReason("speed");
-  const models = useModelCatalog();
+  const models = useModelCatalog(limits?.cloud);
   const popup = usePickerPopup();
   value = useEnabledChoice(value, limits?.harnesses);
   const current = catalogModel(models.data, value);
@@ -552,6 +559,7 @@ export function ComposerModelPicker({ value, onChange, onSelectModel, orclings, 
                 showEffort
                 showFast={Boolean(fastReason) || (limits?.fast ?? true)}
                 harnesses={limits?.harnesses}
+                cloud={limits?.cloud}
                 disabled={settingsDisabled}
                 closeOnSelect={false}
                 close={() => popup.setOpen(false)}

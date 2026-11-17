@@ -123,8 +123,8 @@ export interface ComposerProps {
   modelControl?: ReactNode;
   /** The Claude accounts the conversation can run on, offered in the model picker with their usage. */
   accounts?: PickerAccounts | undefined;
-  /** Where the conversation runs takes only these agents, and Fast only when `fast`. */
-  modelLimits?: { harnesses: readonly HarnessId[]; fast: boolean } | undefined;
+  /** Where the conversation runs takes only these agents, and Fast only when `fast`; on OpenOrc Cloud, its models (`cloud`). */
+  modelLimits?: { harnesses: readonly HarnessId[]; fast: boolean; cloud?: boolean } | undefined;
   mode: RunMode;
   onMode: (mode: RunMode) => void;
   permission: PermissionPreset;

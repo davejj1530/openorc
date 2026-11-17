@@ -22,7 +22,11 @@ export type ThreadAction =
   | { kind: "rename"; label: string; icon: Symbol }
   | { kind: "open"; label: string; icon: Symbol; url: string }
   | { kind: "parent"; label: string; icon: Symbol; threadId: string }
-  | { kind: "screen"; label: string; icon: Symbol; subtitle?: string; pathname: ThreadScreenPath };
+  | { kind: "screen"; label: string; icon: Symbol; subtitle?: string; pathname: ThreadScreenPath }
+  | { kind: "delete"; label: string; icon: Symbol };
+
+/** What deleting a cloud thread removes, in the desktop's words, asked before it goes. */
+export const DELETE_CLOUD_THREAD = "The conversation and its work on OpenOrc Cloud are removed, for everyone in it.";
 
 /** Where the menu opens: a Home row (long press), or the open thread's header, where Rename leads after Changes. */
 export type MenuPlace = "row" | "header";
@@ -84,7 +88,9 @@ export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, p
           ? { kind: "patch", label: "Reopen", icon: "arrow.uturn.backward.circle", patch: { archived: false } }
           : { kind: "patch", label: "Resolve", icon: "checkmark.circle", patch: { archived: true } },
       ];
-  const sections = place === "header" ? [[...screens, rename], family(thread, panels), organize, pull, resolve] : [startUnder(thread), organize, [rename, ...pull], resolve];
+  // A cloud thread is deleted for everyone in it, from wherever its menu opens; a thread of the Mac's only on the Mac.
+  const remove: ThreadAction[] = placeOf(thread).elsewhere ? [{ kind: "delete", label: "Delete…", icon: "trash" }] : [];
+  const sections = place === "header" ? [[...screens, rename], family(thread, panels), organize, pull, resolve, remove] : [startUnder(thread), organize, [rename, ...pull], resolve, remove];
   return sections.filter((section) => section.length > 0);
 }
 

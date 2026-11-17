@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { Alert } from "react-native";
 import { useRpcMutation } from "../client";
 import { openInApp } from "../ui/web";
-import type { OrganizePatch, ThreadAction } from "./thread-actions";
+import { DELETE_CLOUD_THREAD, type OrganizePatch, type ThreadAction } from "./thread-actions";
 
 /** The rename prompt: the title to edit, shown in full above the field when it is too long to read there. */
 function promptRename(title: string, save: (title: string) => void): void {
@@ -32,8 +32,9 @@ function promptRename(title: string, save: (title: string) => void): void {
  * Runs a thread's menu actions against the Mac. A change the Mac refuses (a thread still working, a thread gone) says
  * why in an alert. `onUnread` hears a thread marked unread, which an open thread would read again at once.
  */
-export function useThreadActions(thread: ThreadSummary | null, { onUnread }: { onUnread?: () => void } = {}) {
+export function useThreadActions(thread: ThreadSummary | null, { onUnread, onDeleted }: { onUnread?: () => void; onDeleted?: () => void } = {}) {
   const { mutate } = useRpcMutation("threads.update");
+  const { mutate: remove } = useRpcMutation("threads.delete");
   // Stable while the thread is, so a native menu built from `run` is not set again on every render.
   return useMemo(() => {
     const save = (patch: OrganizePatch | { title: string }) => {
@@ -41,6 +42,11 @@ export function useThreadActions(thread: ThreadSummary | null, { onUnread }: { o
       mutate({ id: thread.id, patch }, { onError: (failure) => Alert.alert("Couldn’t change this thread", failure.message) });
     };
     const rename = () => thread && promptRename(thread.title, (title) => save({ title }));
+    const confirmDelete = (id: string) =>
+      Alert.alert("Delete this thread?", DELETE_CLOUD_THREAD, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => remove({ id }, { onSuccess: onDeleted, onError: (failure) => Alert.alert("Couldn’t delete this thread", failure.message) }) },
+      ]);
     const run = (action: ThreadAction) => {
       if (!thread) return;
       if (action.kind === "patch") {
@@ -51,7 +57,8 @@ export function useThreadActions(thread: ThreadSummary | null, { onUnread }: { o
       else if (action.kind === "open") openInApp(action.url);
       else if (action.kind === "parent") router.push({ pathname: "/thread/[id]", params: { id: action.threadId } });
       else if (action.kind === "screen") router.push({ pathname: action.pathname, params: { threadId: thread.id } });
+      else if (action.kind === "delete") confirmDelete(thread.id);
     };
     return { run, save, rename };
-  }, [thread, mutate, onUnread]);
+  }, [thread, mutate, remove, onUnread, onDeleted]);
 }

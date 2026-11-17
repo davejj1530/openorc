@@ -122,3 +122,12 @@ it("offers only parent navigation for a hosted child even when Git and preview e
       .some((item) => item.kind === "rename"),
   ).toBe(true);
 });
+
+it("ends a cloud thread's menu with Delete, its Changes opening OpenOrc Cloud's own, and offers neither for a thread of the Mac's", () => {
+  const cloud = { ...thread("t-plan"), owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 0 } };
+  for (const place of ["row", "header"] as const) expect(threadMenu(cloud, place, wednesday, { uncommitted: 2, preview: null }).at(-1)).toEqual([{ kind: "delete", label: "Delete…", icon: "trash" }]);
+  expect(threadMenu(cloud, "header", wednesday, { uncommitted: 2, preview: null })[0]![0]).toMatchObject({ label: "Changes", pathname: "/cloud-changes", subtitle: "2 files" });
+  const mac = threadMenu(thread("t-plan"), "header", wednesday, { uncommitted: 2, preview: null });
+  expect(mac.flat().some((item) => item.kind === "delete")).toBe(false);
+  expect(mac[0]![0]).toMatchObject({ pathname: "/changes" });
+});

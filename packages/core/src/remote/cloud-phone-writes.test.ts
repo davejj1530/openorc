@@ -204,3 +204,12 @@ it("lets a phone read a cloud thread's work and ask for a commit, push or pull r
   const paths = at.stand.requests.slice(before).map((request) => request.path.split("?")[0]);
   expect(paths).toEqual(expect.arrayContaining([expect.stringContaining(`/hosted/threads/${threadId}/`)]));
 });
+
+it("deletes a cloud thread from a phone, and never one of this Mac's", async () => {
+  expect(await refusal(phone.request("threads.delete", { id: at.mac.threadId }))).toBe(FROM_PHONE);
+  expect(await at.window("threads.get", { id: at.mac.threadId })).toMatchObject({ id: at.mac.threadId });
+  const threadId = at.cloud.threads.personal;
+  const before = at.stand.requests.length;
+  await phone.request("threads.delete", { id: threadId });
+  expect(at.stand.requests.slice(before)).toContainEqual(expect.objectContaining({ method: "DELETE", path: `/hosted/threads/${threadId}` }));
+});

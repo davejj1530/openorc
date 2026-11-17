@@ -204,7 +204,7 @@ export function ThreadScreen() {
   const voices = useVoices(runs, thread);
   const [disclosure] = useState(createDisclosure);
   const [{ live, working, generatingImage }, setActivity] = useState(IDLE);
-  const actions = useThreadActions(thread, { onUnread: goBack });
+  const actions = useThreadActions(thread, { onUnread: goBack, onDeleted: goBack });
   const menu = useThreadHeaderMenu(thread, useSnoozeClock(), actions.run);
   const authors = useThreadAuthors(thread, together);
   const noteReply = useNoteReply(together);

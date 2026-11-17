@@ -20,7 +20,7 @@ function linkItems(actions: ThreadAction[], run: Run): ReactElement[] {
         {linkItems(action.actions, run)}
       </Link.Menu>
     ) : (
-      <Link.MenuAction key={action.label} icon={action.icon} onPress={() => run(action)}>
+      <Link.MenuAction key={action.label} icon={action.icon} destructive={action.kind === "delete"} onPress={() => run(action)}>
         {action.label}
       </Link.MenuAction>
     ),
@@ -47,7 +47,13 @@ function toolbarItems(actions: ThreadAction[], run: Run): ReactElement[] {
         {toolbarItems(action.actions, run)}
       </Stack.Toolbar.Menu>
     ) : (
-      <Stack.Toolbar.MenuAction key={action.label} icon={action.icon} subtitle={action.kind === "screen" ? action.subtitle : undefined} onPress={() => run(action)}>
+      <Stack.Toolbar.MenuAction
+        key={action.label}
+        icon={action.icon}
+        subtitle={action.kind === "screen" ? action.subtitle : undefined}
+        destructive={action.kind === "delete"}
+        onPress={() => run(action)}
+      >
         {action.label}
       </Stack.Toolbar.MenuAction>
     ),

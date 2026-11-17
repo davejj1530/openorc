@@ -1,4 +1,6 @@
 import { Db, orclings } from "@openorc/db";
+import { NOT_FROM_PHONE } from "../remote/policy.js";
+import { requestOrigin } from "../request-origin.js";
 import { LedgerUpkeep } from "../services/ledger-upkeep.js";
 import { ThreadService } from "../services/threads.js";
 import type { Handlers } from "./types.js";
@@ -14,6 +16,8 @@ export function createThreadWorkspaceHandlers({
 }: Dependencies): Pick<Handlers, "threads.delete" | "threads.fork" | "threads.moveWorkspace" | "threads.movePreview" | "threads.restore" | "threads.restorePreview"> {
   return {
     "threads.delete": async ({ id }) => {
+      // A phone deletes a cloud thread, which OpenOrc Cloud answers before it reaches here; never one of this Mac's.
+      if (requestOrigin.getStore()?.kind === "phone") throw new Error(NOT_FROM_PHONE);
       const owner = orclings.forThread(db, id);
       if (owner) throw new Error(`This is ${owner.name}'s own conversation. Delete ${owner.name} to remove it.`);
       await threadService.delete(id);

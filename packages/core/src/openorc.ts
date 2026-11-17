@@ -1,7 +1,7 @@
 import { captureLaunchEnvironment, claudeConfigDir, recoverAgentProcesses } from "@openorc/agents";
 import { claudeAccounts as storedClaudeAccounts, cloudMoves as moveJournal, Db, LedgerWriter, plans, redact, settings as storedSettings } from "@openorc/db";
 import type { Hosted, HostedThreads, OwnSkills } from "@openorc/hosted";
-import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
+import type { OpenOrcMcpServer } from "@openorc/mcp";
 import {
   computerNames,
   harnessAvailability,
@@ -82,21 +82,10 @@ import { createThreadWorkspaceHandlers } from "./handlers/thread-workspace.js";
 import { composeHandlers, type Handlers } from "./handlers/types.js";
 import { createWorkspaceHandlers } from "./handlers/workspace.js";
 import { createWorktreeHandlers } from "./handlers/worktrees.js";
-import { createBrowserHost } from "./mcp-host/browser.js";
-import { createContextHost } from "./mcp-host/context.js";
-import { createDeviceHost } from "./mcp-host/device.js";
-import { createMemoryHost } from "./mcp-host/memory.js";
-import { createOrclingHost } from "./mcp-host/orcling.js";
-import { createRunHost } from "./mcp-host/run.js";
-import { createTaskCreateHost } from "./mcp-host/task-create.js";
-import { createTasksHost } from "./mcp-host/tasks.js";
-import { OnlineTaskTools } from "./services/online-task-tools.js";
-import { createThreadsHost } from "./mcp-host/threads.js";
 import type { OpenOrcOptions } from "./options.js";
 import { phoneCloudPlace } from "./remote/cloud-policy.js";
 import { NO_CLOUD_SESSION, RemoteAccess } from "./remote/remote-access.js";
 import { requestOrigin, type RequestOrigin } from "./request-origin.js";
-import { guardContext } from "./remote/policy.js";
 import { AgentUpdateService } from "./services/agent-updates.js";
 import { AttachmentService } from "./services/attachments.js";
 import { ClaudeAccountSwitch } from "./services/claude-account-switch.js";
@@ -137,6 +126,8 @@ import { WorkspaceWriters } from "./services/workspace-writers.js";
 import { WorktreeCleanup } from "./services/worktree-cleanup.js";
 import { WorkspaceService } from "./services/workspace.js";
 import { transportLogger, type Logger, type RpcReply } from "./transport.js";
+import { answeredEarly } from "./early-reads.js";
+import { startCoreMcp } from "./mcp-host/core-tools.js";
 
 /**
  * The application core. One instance per app, living in the utility process.
@@ -178,6 +169,8 @@ export class OpenOrc {
   readonly workspaces: WorkspaceService;
   private hosted: Hosted | null | undefined;
   private placeRouter: PlaceRouter | undefined;
+  /** Settles once the login shell has answered and what launches has started (`open`). */
+  started: Promise<void> = Promise.resolve();
   private phonePlaceRouter: PlaceRouter | undefined;
   private phonePlace: HostedThreads | undefined;
   readonly runs: RunService;
@@ -515,7 +508,18 @@ export class OpenOrc {
     };
   }
 
+  /** Opens and starts the core: every call is answered from here. */
   static async create(options: OpenOrcOptions): Promise<OpenOrc> {
+    const core = await OpenOrc.open(options);
+    await core.started;
+    return core;
+  }
+
+  /**
+   * Opens the ledger and answers reads of it at once (early-reads.ts), with the start behind it: the login shell's
+   * answer, which can take seconds, and everything that launches. Every other call waits for `started`.
+   */
+  static async open(options: OpenOrcOptions): Promise<OpenOrc> {
     await mkdir(options.dataDir, { recursive: true });
     try {
       await recoverAgentProcesses(path.join(options.dataDir, "agent-processes"));
@@ -537,26 +541,30 @@ export class OpenOrc {
     core.runs.recoverInterrupted();
     core.comments.recover();
     plans.recover(db);
-    // Ready means launchable: nothing may be admitted before the login shell has answered once.
-    const shell = await core.environment.refresh();
-    if (!shell.ok) core.log.warn(`could not read the login shell environment, launching with the app's own: ${shell.error}`);
-    const mcp = await core.mcpServer();
-    options.transport.push({ type: "ready", pid: process.pid, mcpPort: mcp.port });
-    core.lifecycle.start();
-    core.schedules.start();
-    core.orclingWakes.start();
-    core.threads.recoverQueue();
-    core.upkeep.start();
-    if (!options.ephemeral) core.agentUpdates.start();
-    // Moves between this Mac and the cloud that a quit cut short are finished or undone once the account is heard.
-    void core.account
-      ?.start()
-      .then(() => core.cloudMoves.resume())
-      .catch((error: unknown) => core.log.warn(`moves between this Mac and OpenOrc Cloud couldn't be picked up: ${error instanceof Error ? error.message : String(error)}`));
-    void core.devices.reapStale();
-    // Embed any memories that predate the vector index, off the startup path.
-    void core.memory.backfillVectors().catch(() => undefined);
+    core.started = core.start();
     return core;
+  }
+
+  private async start(): Promise<void> {
+    // Ready means launchable: nothing may be admitted before the login shell has answered once.
+    const shell = await this.environment.refresh();
+    if (!shell.ok) this.log.warn(`could not read the login shell environment, launching with the app's own: ${shell.error}`);
+    const mcp = await this.mcpServer();
+    this.options.transport.push({ type: "ready", pid: process.pid, mcpPort: mcp.port });
+    this.lifecycle.start();
+    this.schedules.start();
+    this.orclingWakes.start();
+    this.threads.recoverQueue();
+    this.upkeep.start();
+    if (!this.options.ephemeral) this.agentUpdates.start();
+    // Moves between this Mac and the cloud that a quit cut short are finished or undone once the account is heard.
+    void this.account
+      ?.start()
+      .then(() => this.cloudMoves.resume())
+      .catch((error: unknown) => this.log.warn(`moves between this Mac and OpenOrc Cloud couldn't be picked up: ${error instanceof Error ? error.message : String(error)}`));
+    void this.devices.reapStale();
+    // Embed any memories that predate the vector index, off the startup path.
+    void this.memory.backfillVectors().catch(() => undefined);
   }
   /** Every agent's connectors, made on first use: reading them starts the agents' servers. */
   get connectors(): ConnectorService {
@@ -569,54 +577,25 @@ export class OpenOrc {
     return this.connectorService;
   }
 
-  async mcpServer(): Promise<OpenOrcMcpServer> {
-    if (!this.mcp) {
-      const { assertRunAvailable, taskFor, projectFor } = createContextHost({ db: this.db });
-      const threadsHost = createThreadsHost({ threadService: this.threads, db: this.db, assertRunAvailable });
-      // A Mac agent's tools for its own project's tasks on OpenOrc Cloud, where the server opens them.
-      const online = new OnlineTaskTools({
-        account: () => this.account,
-        projectFor: (runId) => {
-          try {
-            return projectFor(runId);
-          } catch {
-            return null;
-          }
-        },
-        captureProcess: (runId) => this.runs.captureProcess(runId),
-      });
-      this.mcp = startMcpServer({
-        ...createRunHost({ runService: this.runs, db: this.db, comments: this.comments, assertRunAvailable }),
-        ...createBrowserHost({ db: this.db, runService: this.runs, browser: this.options.browser, assertRunAvailable }),
-        ...createDeviceHost({ db: this.db, runService: this.runs, devices: this.devices, assertRunAvailable }),
-        ...createMemoryHost({ memoryService: this.memory, runService: this.runs, db: this.db, assertRunAvailable, taskFor, projectFor, online }),
-        onlineTaskScopes: (runId) => online.scopes(runId),
-        execution: {
-          available: (runId) => this.slack.executionAvailable(runId),
-          context: (runId) => this.slack.executionContext(runId),
-          switch: (runId, input) => (input.orclingId ? this.slack.switchToOrcling(runId, input.orclingId, input.instructions) : this.slack.switchExecution(runId, input)),
-        },
-        ...threadsHost,
-        ...createOrclingHost({
-          db: this.db,
-          orclings: this.orclings,
-          memory: this.memory,
-          runs: this.runs,
-          threads: this.threads,
-          settings: this.settings,
-          send: threadsHost.threads.send,
-          planLimits: () => this.planLimits(),
-          guard: guardContext(this.db, this.options.dataDir),
-          call: (method, params) => this.callAsPerson(method, params),
-          invalidate: (keys) => this.options.transport.push({ type: "invalidate", keys }),
-        }),
-        pullReview: this.pullRequests.agentTools(),
-        tasks: {
-          ...createTasksHost({ threadService: this.threads, dataDir: this.options.dataDir, assertRunAvailable, online }),
-          create: createTaskCreateHost({ threadService: this.threads, assertRunAvailable, online }),
-        },
-      });
-    }
+  mcpServer(): Promise<OpenOrcMcpServer> {
+    this.mcp ??= startCoreMcp({
+      db: this.db,
+      threads: this.threads,
+      runs: this.runs,
+      comments: this.comments,
+      devices: this.devices,
+      memory: this.memory,
+      slack: this.slack,
+      orclings: this.orclings,
+      settings: this.settings,
+      pullRequests: this.pullRequests,
+      account: () => this.account,
+      browser: this.options.browser,
+      dataDir: this.options.dataDir,
+      planLimits: () => this.planLimits(),
+      call: (method, params) => this.callAsPerson(method, params),
+      invalidate: (keys) => this.options.transport.push({ type: "invalidate", keys }),
+    });
     return this.mcp;
   }
 
@@ -626,6 +605,7 @@ export class OpenOrc {
    * request names its origin, which the handler's audit rows can read for as long as it runs.
    */
   async handle(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {
+    if (!answeredEarly(this.db, request)) await this.started;
     // A window's call may be about a thread OpenOrc Cloud holds.
     if (!origin) return this.places.handle(request);
     // A phone's stays on this Mac, unless its session shares cloud threads: then it asks what a phone may, as itself.

@@ -56,7 +56,8 @@ const terminal: SpawnTerminal = async (binary, args, { cwd, env }) => {
     kill: () => pty.kill(),
   };
 };
-const corePromise = OpenOrc.create({
+// Open answers reads of the ledger at once; the core is started once the login shell has answered (OpenOrc.open).
+const opened = OpenOrc.open({
   browser: browser.execute,
   preview: preview.host,
   dataDir,
@@ -82,6 +83,10 @@ const corePromise = OpenOrc.create({
   formatter: new WorkerFormatter(() => new Worker(join(import.meta.dirname, "formatter-worker.mjs"))),
   intelligence: new WorkerIntelligence(() => new Worker(join(import.meta.dirname, "intelligence-worker.mjs"), { resourceLimits: { maxOldGenerationSizeMb: 1024 } })),
   benchmarks: __OPENORC_QA__,
+});
+const corePromise = opened.then(async (core) => {
+  await core.started;
+  return core;
 });
 
 // Main hosts the Terminal panels and wants the login PATH the core adopted.
@@ -112,7 +117,7 @@ async function answer(request: RpcRequest, origin?: RequestOrigin): Promise<RpcR
   if (closing) return { type: "rpc.error", id: request.id, message: "OpenOrc is restarting to update. Please wait." };
   pendingRequests++;
   try {
-    return await (await corePromise).handle(request, origin);
+    return await (await opened).handle(request, origin);
   } finally {
     pendingRequests--;
   }

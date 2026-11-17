@@ -383,6 +383,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     kept: deps.kept,
     projects: deps.projects,
     ...(deps.macWork && { macWork: deps.macWork }),
+    ...(deps.moving && { moving: deps.moving }),
     push: deps.push,
     notify: deps.notify,
     nameThread: deps.nameThread,

@@ -1,6 +1,6 @@
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import { Image, Pressable, ScrollView, useWindowDimensions, View, type ScrollViewInstance } from "react-native";
+import { useEffect, useState } from "react";
+import { Image, Pressable, useWindowDimensions, View } from "react-native";
 import { whatsNew } from "../client";
 import { cn } from "../ui/cn";
 import { useMode } from "../ui/mode";
@@ -15,6 +15,8 @@ import teamLight from "./pictures/team-light.webp";
 
 /** The pictures' own shape, as cut from the phone's screens. */
 const PICTURE_RATIO = 990 / 855;
+/** The room either side of a page. */
+const SIDE = 20;
 
 /** What the update brought, one thing a person can now do per step, each shown as the phone draws it. */
 const steps = [
@@ -46,44 +48,46 @@ const steps = [
 
 const close = () => router.back();
 
-/** The steps on what the update brought, a page each, swiped or stepped with Next; however the sheet goes, they are settled. */
+/** The steps on what the update brought, one at a time, stepped with Next or the dots; however the sheet goes, they are settled. */
 export function WhatsNewSheet() {
   const { width } = useWindowDimensions();
   const bottom = useSheetBottom(16);
   const mode = useMode();
-  const pager = useRef<ScrollViewInstance>(null);
   const [page, setPage] = useState(0);
   useEffect(() => () => whatsNew.close(), []);
+  const step = steps[page]!;
   const last = page === steps.length - 1;
-  const next = () => {
-    if (last) return close();
-    pager.current?.scrollTo({ x: (page + 1) * width, animated: true });
-    setPage(page + 1);
-  };
+  // A sheet sizes to its content, so the picture takes a size of its own, not a share of a width still unknown.
+  const picture = { width: width - 2 * SIDE, height: (width - 2 * SIDE) / PICTURE_RATIO };
   return (
-    <View className="bg-bg pt-8" style={{ paddingBottom: bottom }} onAccessibilityEscape={close}>
-      <ScrollView ref={pager} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={(event) => setPage(Math.round(event.nativeEvent.contentOffset.x / width))}>
-        {steps.map((step) => (
-          <View key={step.id} style={{ width }} className="gap-5 px-5">
-            <View className="overflow-hidden rounded-3xl border border-line">
-              <Image source={mode === "dark" ? step.dark : step.light} accessibilityLabel={step.alt} style={{ width: "100%", aspectRatio: PICTURE_RATIO }} />
-            </View>
-            <View className="gap-1.5 px-1">
-              <Text accessibilityRole="header" className="text-xl">
-                {step.title}
-              </Text>
-              <Text className="text-md text-ink-3">{step.line}</Text>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
-      <View className="mt-6 flex-row items-center justify-between px-6">
-        <View accessibilityLabel={`Step ${page + 1} of ${steps.length}`} className="flex-row items-center gap-1.5">
-          {steps.map((step, index) => (
-            <View key={step.id} className={cn("h-1.5 w-1.5 rounded-full bg-ink-4", index === page && "w-4 bg-ink")} />
+    <View className="gap-5 bg-bg pt-8" style={{ paddingHorizontal: SIDE, paddingBottom: bottom }} onAccessibilityEscape={close}>
+      <View className="overflow-hidden rounded-3xl border border-line">
+        <Image source={mode === "dark" ? step.dark : step.light} accessibilityLabel={step.alt} style={picture} />
+      </View>
+      <View className="gap-1.5 px-1">
+        <Text accessibilityRole="header" className="text-xl">
+          {step.title}
+        </Text>
+        {/* Two lines kept for every step's line, so the sheet stays one height from step to step. */}
+        <Text className="min-h-11 text-md text-ink-3">{step.line}</Text>
+      </View>
+      <View className="mt-1 flex-row items-center justify-between pl-1">
+        <View className="flex-row items-center">
+          {steps.map((each, index) => (
+            <Pressable
+              key={each.id}
+              accessibilityRole="button"
+              accessibilityLabel={each.title}
+              accessibilityState={{ selected: index === page }}
+              onPress={() => setPage(index)}
+              hitSlop={6}
+              className="p-1"
+            >
+              <View className={cn("h-1.5 w-1.5 rounded-full bg-ink-4", index === page && "w-4 bg-ink")} />
+            </Pressable>
           ))}
         </View>
-        <Pressable accessibilityRole="button" onPress={next} className="h-touch items-center justify-center rounded-full bg-accent px-6 active:opacity-80">
+        <Pressable accessibilityRole="button" onPress={() => (last ? close() : setPage(page + 1))} className="h-touch items-center justify-center rounded-full bg-accent px-6 active:opacity-80">
           <Text className="text-md text-accent-fg">{last ? "Done" : "Next"}</Text>
         </Pressable>
       </View>

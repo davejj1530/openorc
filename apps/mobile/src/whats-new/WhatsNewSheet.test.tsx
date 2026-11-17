@@ -13,17 +13,14 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it("steps through what the update brought with Next, then Done closes the sheet, which settles the steps", () => {
+it("steps through what the update brought with Next or the dots, then Done closes the sheet, which settles the steps", () => {
   const { unmount } = render(<WhatsNewSheet />);
-  expect(screen.getByLabelText("Step 1 of 3")).toBeTruthy();
-  expect(screen.getAllByRole("img").map((image) => image.getAttribute("aria-label"))).toEqual([
-    "An organization's cloud threads on Home, one of them working",
-    "A note from Mara Okafor in a cloud thread, tagging Riley",
-    "A team conversation with messages from Mara Okafor",
-  ]);
+  expect(screen.getByRole("img").getAttribute("aria-label")).toBe("An organization's cloud threads on Home, one of them working");
+  expect(screen.getByRole("button", { name: "Threads that keep working with your Mac asleep" }).getAttribute("aria-selected")).toBe("true");
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
-  fireEvent.click(screen.getByRole("button", { name: "Next" }));
-  expect(screen.getByLabelText("Step 3 of 3")).toBeTruthy();
+  expect(screen.getByRole("img").getAttribute("aria-label")).toBe("A note from Mara Okafor in a cloud thread, tagging Riley");
+  fireEvent.click(screen.getByRole("button", { name: "Chat with your team" }));
+  expect(screen.getByRole("img").getAttribute("aria-label")).toBe("A team conversation with messages from Mara Okafor");
   fireEvent.click(screen.getByRole("button", { name: "Done" }));
   expect(app.back).toHaveBeenCalledOnce();
   expect(app.close).not.toHaveBeenCalled();

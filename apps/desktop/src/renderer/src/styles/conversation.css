@@ -16,8 +16,8 @@
   }
 }
 
-/* A turn: the prompt, 28px, then the agent's head, receipt, work, reply, change card and actions 14px apart. The
-   next turn follows 24px later. */
+/* A turn: the prompt, 28px, then the agent's head where it has one, receipt, work, reply, change card and end 14px
+   apart. The next turn follows 24px later. */
 .work-turn {
   display: flex;
   flex-direction: column;
@@ -51,7 +51,7 @@
   display: none;
 }
 
-/* The head: the agent's mark and name, then its model and a status that swaps in place. */
+/* The head, on a turn whose agent or model changed: the agent's mark and name, then its model. */
 .turn-head {
   display: flex;
   align-items: center;
@@ -68,12 +68,7 @@
 .turn-head-name {
   flex-shrink: 0;
 }
-.turn-head-status {
-  display: grid;
-  min-width: 0;
-}
-.turn-head-words {
-  grid-area: 1 / 1;
+.turn-head-model {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -81,14 +76,6 @@
   font-size: var(--text-xs);
   line-height: 16px;
   color: var(--ink-4);
-  font-variant-numeric: tabular-nums;
-}
-.turn-head-words[data-tone="bad"] {
-  color: var(--bad);
-}
-.turn-outcome {
-  font-size: var(--text-sm);
-  color: var(--ink-3);
 }
 
 /* The receipt: thought time, steps and the last check as faint icon items. It opens the work. */
@@ -259,7 +246,8 @@
   }
 }
 
-/* The end of a turn: copy and fork at rest on the last visible turn, on hover elsewhere. */
+/* The end of a turn: where it stands, then copy, fork and when, at rest on the last visible turn and on hover
+   elsewhere. A running, failed or stopped turn's words stay. */
 .turn-actions {
   display: flex;
   align-items: center;
@@ -267,20 +255,33 @@
   min-height: 30px;
   margin: -4px 0 0 -7px;
 }
+.turn-status {
+  padding-inline: 7px;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.turn-status[data-tone="bad"] {
+  color: var(--bad);
+}
 .message-action,
-.message-time {
+.message-time,
+.turn-actions[data-state="done"] .turn-status {
   opacity: 0;
   transition: opacity var(--duration-leave) var(--ease-out);
 }
-.group:is(:hover, :focus-within) :is(.message-action, .message-time),
-.work-turn:is(:hover, :focus-within) > .turn-actions :is(.message-action, .message-time),
-.work-turn:not(:has(~ .work-turn)) > .turn-actions .message-action,
+.group:is(:hover, :focus-within) :is(.message-action, .message-time, .turn-status),
+.work-turn:is(:hover, :focus-within) > .turn-actions :is(.message-action, .message-time, .turn-status),
+.work-turn:not(:has(~ .work-turn)) > .turn-actions :is(.message-action, .turn-status),
 .message-action:focus-visible,
 .copy-action:not([data-state="idle"]) {
   opacity: 1;
 }
 @media (hover: none) {
-  .message-action {
+  .message-action,
+  .turn-status {
     opacity: 1;
   }
 }

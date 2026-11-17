@@ -209,6 +209,7 @@ export { printedOutput, type FileRef, type PrintedLine, type PrintedOutput, type
 export { subagentGroups, subagentStatusLabel, type SubagentCard } from "./transcript-subagents.js";
 export { activityBlockId, activityIdOf, emptyRun, type Block, type RunTranscript } from "./transcript.js";
 export { turnReply, turnStatus, turnStatusWords, useTicking, useTurnModel, type TurnStatus } from "./turn-model.js";
+export { turnShowsSender, turnShowsVoice, type TurnVoice } from "./turn-voice.js";
 export {
   visualizationColors,
   visualizationContextScript,

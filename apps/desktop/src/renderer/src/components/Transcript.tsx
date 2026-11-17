@@ -29,7 +29,7 @@ import { TurnHead } from "./TurnHead";
 import { NoteList, useNotesAfter, useTopNotes } from "./ThreadNotes";
 import { TurnReceipt } from "./TurnReceipt";
 import { useTurnSize } from "./TurnFooter";
-import { ConversationVoice, useTurnAuthor } from "../lib/turn-authors";
+import { ConversationVoice, useVoicedTurns } from "../lib/turn-authors";
 import { ToolRow } from "./ToolRow";
 import { SubagentCards } from "./SubagentCards";
 import { ApprovalCard, pretty } from "./ApprovalCard";
@@ -42,7 +42,7 @@ import { SignInRecovery } from "./SignInRecovery";
 import { TranscriptErrorCard } from "./TranscriptErrorCard";
 import { TextButton } from "./ui";
 import { ImageGenerationRow, ImageViewRow, ThreadImage, ThreadMedia, ThreadRichText, type MediaScope } from "./ThreadImages";
-import { CopyMessage, MessageTime, TurnActions } from "./MessageActions";
+import { CopyMessage, MessageTime, TurnEnd } from "./MessageActions";
 import { useMessageReveal, type Reveal } from "../lib/message-reveal";
 import { UserMessage } from "./UserMessage";
 import { OrclingChat } from "./OrclingChat";
@@ -375,12 +375,10 @@ type WorkTranscriptProps = ComponentProps<typeof TranscriptContents> & {
   ambient?: boolean;
   author?: string | undefined;
   showActivity?: boolean;
-  /** Each turn opens with its head: the agent, its model and where it stands. */
-  head?: boolean;
   /** A message to bring into view; the turn that holds it opens its work when the message is there. */
   reveal?: Reveal | undefined;
 };
-type WorkTurnProps = WorkTranscriptProps & { id?: string };
+type WorkTurnProps = WorkTranscriptProps & { id?: string; /** The turn names its agent and model: they changed from the turn before. */ voiced?: boolean };
 
 /** The disclosure hierarchy stays consistent across turns and warm sessions. */
 /** An Orcling's own conversation reads as a chat with it; any other as turns of work. */
@@ -392,6 +390,7 @@ function ConversationBody(props: WorkTranscriptProps) {
 
 export function WorkTranscript({ blocks, live = false, onFork, reveal, ...props }: WorkTranscriptProps) {
   const turns = useSteadyTurns(blocks);
+  const voiced = useVoicedTurns(turns, props.runId, props.author);
   const topNotes = useTopNotes();
   // A fork carries the whole conversation and the agent's latest session, so it is offered only at the latest message.
   const forkTurn = onFork ? turns.findLastIndex((turn) => turn.blocks.some((block) => block.kind === "message" && block.role === "user")) : -1;
@@ -406,6 +405,7 @@ export function WorkTranscript({ blocks, live = false, onFork, reveal, ...props 
           onFork={index === forkTurn ? onFork : undefined}
           reveal={reveal && turn.blocks.some((block) => block.id === reveal.messageId) ? reveal : undefined}
           blocks={turn.blocks}
+          voiced={voiced[index]}
           live={live && index === turns.length - 1}
         />
       ))}
@@ -451,7 +451,7 @@ function useWorkOpen(showActivity: boolean, live: boolean, reveal: Reveal | unde
   return { open, visited, choose: (next: boolean) => setChoice({ mode: showActivity, open: next }) };
 }
 
-const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = false, author: named, trailing, showActivity = true, head = true, onFork, reveal, ...props }: WorkTurnProps) {
+const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = false, author: named, trailing, showActivity = true, voiced = false, onFork, reveal, ...props }: WorkTurnProps) {
   props = { ...props, runId: blocks.find((b) => b.runId)?.runId ?? props.runId };
   const docked = useDockedAsks();
   const visible = useMemo(() => blocks.filter((block) => !docked(block)), [blocks, docked]);
@@ -467,14 +467,16 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
   if (!showActivity && !before.length && !after.length && !ended && !footer) return null;
   const spoke = Boolean(work.length || after.length || turn.live || ended);
   if (!before.length && !spoke && !footer) return null;
-  // The fork rides the turn's actions once it has them; until then it stays on the prompt.
-  const actions = head && spoke && !turn.live && (turn.reply || onFork);
+  // The fork rides the turn's end once the turn is done; until then it stays on the prompt.
+  const done = spoke && !turn.live;
+  // A finished turn with nothing to copy or fork leaves its time out rather than end on it alone.
+  const end = spoke && (turn.status.kind !== "done" || turn.reply || onFork);
+  const prompt = before.findLast((block) => block.kind === "message" && block.role === "user")?.id;
   return (
     <div className="work-turn" data-turn={id}>
-      <TranscriptContents {...props} onFork={actions ? undefined : onFork} blocks={before} />
+      <TranscriptContents {...props} onFork={done ? undefined : onFork} blocks={before} />
       <NoteList notes={notes.before} />
-      {head && spoke ? <TurnHead runId={props.runId} named={named} status={turn.status} blocks={blocks} /> : null}
-      {!head && ended ? <TurnOutcome named={named} runId={props.runId} failed={turn.status.kind === "failed"} /> : null}
+      {spoke ? <TurnHead runId={props.runId} named={named} voiced={voiced} live={turn.live} blocks={blocks} prompt={prompt} /> : null}
       {showActivity && work.length ? (
         <section className="work-section" aria-label={named ? `${named}’s work` : "Agent work"}>
           <TurnReceipt items={turn.receipt} open={open} controls={contentId} onToggle={() => choose(!open)} />
@@ -503,9 +505,9 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
       ) : null}
       <NoteList notes={notes.work} />
       <FoldedRecovery work={work} open={open} showActivity={showActivity} />
-      <TranscriptContents {...props} blocks={after} replyActions={!head} />
+      <TranscriptContents {...props} blocks={after} replyActions={false} />
       {footer}
-      {actions ? <TurnActions text={turn.reply?.text} at={turn.reply?.at} onFork={onFork} /> : null}
+      {end ? <TurnEnd status={turn.status} text={turn.reply?.text} at={turn.reply?.at} onFork={onFork} /> : null}
       <NoteList notes={notes.after} />
     </div>
   );
@@ -529,17 +531,6 @@ function FoldedRecovery({ work, open, showActivity }: { work: Block[]; open: boo
   if (open && showActivity) return null;
   const recovery = work.findLast((block): block is Extract<Block, { kind: "activity" }> => block.kind === "activity" && Boolean(block.recovery))?.recovery;
   return recovery ? <Recovery recovery={recovery} folded /> : null;
-}
-
-/** A failed or stopped turn retains its author and outcome. */
-function TurnOutcome({ named, runId, failed }: { named: string | undefined; runId: string; failed: boolean }) {
-  const author = useTurnAuthor(named, runId);
-  return (
-    <p className="turn-outcome" role="status">
-      {author ? `${author} · ` : ""}
-      {failed ? "Failed" : "Stopped"}
-    </p>
-  );
 }
 
 /** Shared event rendering keeps approvals and media attached to their actual run. */

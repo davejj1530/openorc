@@ -1,3 +1,4 @@
+import { turnShowsVoice, type Block, type TurnVoice } from "@openorc/client";
 import type { Orcling, Run, ThreadSummary } from "@openorc/protocol";
 import { useRpc } from "./client";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
@@ -39,6 +40,25 @@ export const ConversationVoice = createContext<ConversationVoice>({ authors: new
 export function useTurnAuthor(named: string | undefined, runId: string): string | undefined {
   const { authors } = useContext(ConversationVoice);
   return named ?? authors.get(runId);
+}
+
+/**
+ * Which turns name who spoke in them: each turn against the turn before it, the first against the thread's own agent
+ * and model. `runId` stands in for a turn whose blocks name no run; `named` is a byline the caller gives every turn.
+ */
+export function useVoicedTurns(turns: readonly { blocks: readonly Block[] }[], runId: string, named: string | undefined): boolean[] {
+  const { runs, agent, authors } = useContext(ConversationVoice);
+  return useMemo(() => {
+    let before: TurnVoice | undefined = agent;
+    return turns.map((turn) => {
+      const id = turn.blocks.find((block) => block.runId)?.runId ?? runId;
+      const spoke = runs?.get(id) ?? agent;
+      const voice = spoke && { ...spoke, byline: named ?? authors.get(id) };
+      const shows = turnShowsVoice(voice, before);
+      before = voice;
+      return shows;
+    });
+  }, [turns, runs, agent, authors, runId, named]);
 }
 
 /** The agent and model a turn's run spoke with, when the conversation knows them. */

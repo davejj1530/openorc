@@ -1,36 +1,41 @@
-import { useRef } from "react";
+import { turnShowsSender } from "@openorc/client";
 import { harnessShortName, isHarnessId } from "@openorc/protocol";
-import { cn } from "../lib/cn";
 import { useRunVoice, useTurnAuthor } from "../lib/turn-authors";
-import { turnStatusWords, type TurnStatus } from "@openorc/client";
 import { HarnessLogo } from "./HarnessLogo";
-import { useTurnSender } from "../lib/thread-authors";
+import { useMessageAuthor, useTurnSender } from "../lib/thread-authors";
 import { TurnSender } from "./ThreadVoice";
 
 /**
- * One head per turn: the agent's mark and name, then its model and a status that swaps in place as the turn moves
- * from working to writing to done, then, in a cloud thread others are in, who sent the turn. A turn loaded from history
- * mounts in its final state and does not animate. `blocks`: the turn's, which name its sender.
+ * A turn's head, only where it has something to say: the agent's mark, name and model where they changed from the
+ * turn before (`voiced`), and in a cloud thread others are in, who sent the turn where its prompt does not already
+ * name them. `blocks`: the turn's, which name its sender; `prompt`: the message the turn answers.
  */
-export function TurnHead({ runId, named, status, blocks }: { runId: string; named?: string | undefined; status: TurnStatus; blocks?: readonly { id: string }[] }) {
+export function TurnHead({
+  runId,
+  named,
+  voiced,
+  live,
+  blocks,
+  prompt,
+}: {
+  runId: string;
+  named?: string | undefined;
+  voiced: boolean;
+  live: boolean;
+  blocks?: readonly { id: string }[];
+  prompt?: string | undefined;
+}) {
   const author = useTurnAuthor(named, runId);
-  const sender = useTurnSender(blocks, status.kind === "working" || status.kind === "writing");
   const voice = useRunVoice(runId);
-  const first = useRef(status.kind);
-  const name = author ?? (voice ? harnessShortName(voice.agent) : "Assistant");
-  const words = [voice?.model, turnStatusWords(status)].filter(Boolean).join(" · ");
+  const sender = useTurnSender(blocks, live);
+  const sent = turnShowsSender(sender, useMessageAuthor(prompt)) ? sender : undefined;
+  if (!voiced && sent === undefined) return null;
   return (
-    <div className="turn-head" data-state={status.kind}>
-      {voice && isHarnessId(voice.agent) ? <HarnessLogo id={voice.agent} size={14} className="turn-head-mark" /> : null}
-      <span className="turn-head-name">{name}</span>
-      {words ? (
-        <span className="turn-head-status">
-          <span key={status.kind} className={cn("turn-head-words", status.kind !== first.current && "motion-arrive")} data-tone={status.kind === "failed" ? "bad" : undefined}>
-            {words}
-          </span>
-        </span>
-      ) : null}
-      {sender !== undefined ? <TurnSender person={sender} /> : null}
+    <div className="turn-head">
+      {voiced && voice && isHarnessId(voice.agent) ? <HarnessLogo id={voice.agent} size={14} className="turn-head-mark" /> : null}
+      {voiced ? <span className="turn-head-name">{author ?? (voice ? harnessShortName(voice.agent) : "Assistant")}</span> : null}
+      {voiced && voice?.model ? <span className="turn-head-model">{voice.model}</span> : null}
+      {sent !== undefined ? <TurnSender person={sent} /> : null}
     </div>
   );
 }

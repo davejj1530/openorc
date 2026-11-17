@@ -1,13 +1,15 @@
-/* Working together in a cloud thread: who sent a turn, beside its agent, and who wrote a message, above it. */
+/* Working together in a cloud thread: who sent a turn, in its head, and who wrote a message, above it. */
 .turn-head-sender {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
   gap: 5px;
-  margin-inline-start: 4px;
   font-size: var(--text-xs);
   line-height: 16px;
   color: var(--ink-3);
+}
+.turn-head-sender:not(:first-child) {
+  margin-inline-start: 4px;
 }
 .turn-head-sender .account-face {
   width: 16px;

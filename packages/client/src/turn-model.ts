@@ -4,18 +4,18 @@ import { receiptItems, type TurnSize } from "./work-receipt.js";
 import { workEntries } from "./work-steps.js";
 import { workDuration, workParts, workTiming } from "./work-transcript.js";
 
-/** Where a turn stands, as its head says it: working with its clock, writing the reply, or done, failed or stopped. */
+/** Where a turn stands, as its end says it: working with its clock, writing the reply, or done, failed or stopped. */
 export type TurnStatus = { kind: "working" | "writing" | "done" | "failed" | "stopped" | "no_updates"; elapsed?: number | undefined };
 
-/** The head's words for a status: "working 12s", "Writing", "Failed after 3s", or how long a finished turn took. */
+/** The words for a status: "Working 12s", "Writing", "Failed after 3s", or "Worked for 1m 12s" once done. */
 export function turnStatusWords({ kind, elapsed }: TurnStatus): string {
   const time = elapsed === undefined ? "" : workDuration(elapsed);
-  if (kind === "working") return time ? `working ${time}` : "working";
+  if (kind === "working") return time ? `Working ${time}` : "Working";
   if (kind === "writing") return "Writing";
   if (kind === "failed") return time ? `Failed after ${time}` : "Failed";
   if (kind === "stopped") return time ? `Stopped after ${time}` : "Stopped";
   if (kind === "no_updates") return "No updates";
-  return time;
+  return time ? `Worked for ${time}` : "";
 }
 
 /** A clock that ticks once a second while `active`, and stands still otherwise. */
@@ -50,8 +50,8 @@ export function turnReply(after: Block[]): Extract<Block, { kind: "message" }> |
 }
 
 /**
- * What a turn shows above and around its blocks: its parts (the prompt, the work, the reply), the status its head
- * reads, and the receipt row that opens its work.
+ * What a turn shows around its blocks: its parts (the prompt, the work, the reply), the status its end reads, and the
+ * receipt row that opens its work.
  */
 export function useTurnModel(blocks: Block[], live: boolean, taskCards: boolean | undefined, ambient: boolean, pinned: string | undefined, size: TurnSize | null = null) {
   const timing = workTiming(blocks, live);

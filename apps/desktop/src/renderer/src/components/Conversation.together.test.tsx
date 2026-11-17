@@ -306,15 +306,15 @@ it("changes nothing in the reader's own cloud thread while the server keeps shar
   expect(document.querySelector(".turn-head-sender, .prompt-author")).toBeNull();
 });
 
-it("names the reader's own sender and author in an organization's thread, which its project's members read", async () => {
+it("names the reader's own messages in an organization's thread, which its project's members read, and leaves their turns' sender to them", async () => {
   const thread = ownThread(together(THEO));
   spaceNavigation.setState({ inventory: [{ id: "altalogy", personal: false, projects: [], threads: [{ id: thread.id, projectId: thread.projectId }], taskIds: [] }] });
   await open(thread, { viewer: THEO, turnOf: { [PROMPT]: "t1", "reply-1": "t1" }, senders: { t1: THEO }, authors: { [PROMPT]: THEO } });
-  expect([...document.querySelectorAll(".turn-head-sender")].map((each) => each.getAttribute("data-tip"))).toEqual(["Theo Laurent"]);
+  expect(document.querySelector(".turn-head-sender")).toBeNull();
   expect([...document.querySelectorAll(".prompt-author")].map((each) => each.textContent)).toEqual(["TLTheo Laurent"]);
 });
 
-it("names each turn's sender beside its agent and each message's author above it", async () => {
+it("names each message's author above it, and a turn's sender where its prompt does not", async () => {
   const authors: ThreadAuthors = {
     viewer: THEO,
     turnOf: { [PROMPT]: "t1", "reply-1": "t1", [JOINED]: "t1", "reply-2": "t1" },
@@ -325,7 +325,7 @@ it("names each turn's sender beside its agent and each message's author above it
   expect([...document.querySelectorAll(".prompt-author")].map((each) => each.textContent)).toEqual(["MOMara Okafor", "TLTheo Laurent"]);
   const senders = [...document.querySelectorAll(".turn-head-sender")];
   // Theo's message joined Mara's turn: the reply after it is still her turn, on her sign-in.
-  expect(senders.map((each) => each.textContent)).toEqual(["MOMara", "MOMara"]);
+  expect(senders.map((each) => each.textContent)).toEqual(["MOMara"]);
   expect(senders[0]!.getAttribute("data-tip")).toBe("Mara Okafor");
 });
 

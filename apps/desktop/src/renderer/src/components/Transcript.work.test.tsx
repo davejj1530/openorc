@@ -8,6 +8,7 @@ import { core } from "../lib/rpc";
 import { AgentPresence, Transcript, WorkTranscript, groupBlocks, groupSummary } from "./Transcript";
 import { AsksDocked } from "./ask-answer";
 import { ThreadVoicesContext } from "../lib/thread-authors";
+import { ConversationVoice } from "../lib/turn-authors";
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("./ThreadImages", () => ({
   ThreadRichText: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -42,22 +43,22 @@ const end: Block = { id: "end", kind: "status", boundary: "turn", durationMs: 22
 
 const waitingQuestion: Block = { id: "ask", kind: "approval", approvalId: "question", approvalKind: "user_input", input: { questions: [{ question: "Which report?", options: [] }] } };
 
-it.each([true, false])("draws a head for a docked ask alone only while its turn is live (%s)", (live) => {
+it.each([true, false])("draws a docked ask's turn alone only while it is live (%s)", (live) => {
   const { container } = render(
     <AsksDocked.Provider value>
       <WorkTranscript runId="run" blocks={live ? [waitingQuestion] : [waitingQuestion, end]} live={live} author="Assistant" />
     </AsksDocked.Provider>,
   );
   if (live) {
-    expect(container.querySelector(".turn-head")?.textContent).toContain("Assistant");
-    expect(container.querySelector(".turn-head")?.getAttribute("data-state")).toBe("working");
+    expect(container.querySelector(".turn-actions")?.textContent).toBe("Working");
+    expect(container.querySelector(".turn-actions")?.getAttribute("data-state")).toBe("working");
   } else {
     expect(container.textContent).toBe("");
     expect(container.querySelector(".work-turn")).toBeNull();
   }
 });
 
-it("keeps the prompt and live head while an ask is docked, then adds the reply", () => {
+it("keeps the prompt and live status while an ask is docked, then adds the reply", () => {
   const prompt: Block = { id: "prompt", kind: "message", role: "user", text: "Check the report", streaming: false };
   const draw = (blocks: Block[]) => (
     <AsksDocked.Provider value>
@@ -66,10 +67,53 @@ it("keeps the prompt and live head while an ask is docked, then adds the reply",
   );
   const { container, rerender } = render(draw([prompt, waitingQuestion]));
   expect(screen.getByText("Check the report")).toBeTruthy();
-  expect(container.querySelector(".turn-head")?.textContent).toContain("Assistant");
+  expect(container.querySelector(".turn-actions")?.textContent).toBe("Working");
   rerender(draw([prompt, reply, waitingQuestion]));
   expect(screen.getByText("The final answer.")).toBeTruthy();
-  expect(container.querySelector(".turn-head")?.textContent).toContain("Assistant");
+  expect(container.querySelector(".turn-actions")?.textContent).toBe("Working");
+});
+
+it("names the agent and model only on a turn where they changed, the first turn against the thread's own", () => {
+  const turn = (runId: string, n: number): Block[] => [
+    { id: `ask-${n}`, kind: "message", role: "user", text: `Ask ${n}`, streaming: false, runId },
+    { id: `answer-${n}`, kind: "message", role: "assistant", text: `Answer ${n}`, streaming: false, runId },
+    { ...end, id: `end-${n}`, runId },
+  ];
+  const opus = { agent: "claude", model: "Opus 5.5" };
+  const sonnet = { agent: "claude", model: "Sonnet 5.5" };
+  const heads = (agent: typeof opus) => {
+    render(
+      <ConversationVoice.Provider
+        value={{
+          authors: new Map(),
+          runs: new Map([
+            ["a", opus],
+            ["b", sonnet],
+          ]),
+          agent,
+        }}
+      >
+        <WorkTranscript runId="a" blocks={[...turn("a", 1), ...turn("b", 2), ...turn("b", 3)]} />
+      </ConversationVoice.Provider>,
+    );
+    return [...document.querySelectorAll(".work-turn")].map((each) => each.querySelector(".turn-head")?.textContent ?? null);
+  };
+  expect(heads(sonnet)).toEqual(["ClaudeOpus 5.5", "ClaudeSonnet 5.5", null]);
+  cleanup();
+  expect(heads(opus)).toEqual([null, "ClaudeSonnet 5.5", null]);
+});
+
+it("ends a running turn with where it stands, in the row its actions take once it is done", () => {
+  const prompt: Block = { id: "prompt", kind: "message", role: "user", text: "Check the report", streaming: false };
+  const { rerender } = render(<WorkTranscript runId="run" blocks={[prompt, { ...reply, streaming: true }]} live />);
+  const row = document.querySelector(".turn-actions")!;
+  expect(row.textContent).toBe("Writing");
+  expect(row.querySelector("button")).toBeNull();
+  rerender(<WorkTranscript runId="run" blocks={[prompt, reply, end]} />);
+  expect(document.querySelector(".turn-actions")).toBe(row);
+  expect(row.getAttribute("data-state")).toBe("done");
+  expect(row.querySelector(".turn-status")!.textContent).toBe("Worked for 3m 42s");
+  expect(row.querySelector("button")?.getAttribute("aria-label")).toBe("Copy message");
 });
 
 it("keeps an ask in place where there is no dock and draws its record after it is answered", () => {
@@ -81,7 +125,6 @@ it("keeps an ask in place where there is no dock and draws its record after it i
     </AsksDocked.Provider>,
   );
   expect(screen.getByText("Question for you")).toBeTruthy();
-  expect(document.querySelector(".turn-head")?.textContent).toContain("Assistant");
 });
 
 it("shows a quiet child Stop notice outside collapsed work", () => {
@@ -96,7 +139,7 @@ it("shows a quiet child Stop notice outside collapsed work", () => {
 it("shows a lone startup status once without a duplicate disclosure", () => {
   const startup: Block = { id: "startup", kind: "activity", label: "Starting OpenCode", status: "success", text: "" };
   render(<WorkTranscript runId="run" blocks={[startup, { ...end, durationMs: 0, outcome: "error" }]} />);
-  expect(document.querySelector(".turn-head")!.textContent).toContain("Failed after 0s");
+  expect(document.querySelector(".turn-actions")!.textContent).toBe("Failed after 0s");
   fireEvent.click(receipt());
   const row = screen.getByRole("button", { name: "Starting OpenCode" });
   expect(row.getAttribute("aria-expanded")).toBeNull();
@@ -262,7 +305,7 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
   rerender(<Component runId={runId} blocks={runs.get(runId)!.blocks} />);
   expect(receipt().getAttribute("aria-label")).toContain("tests passed");
   expect(receipt().getAttribute("aria-expanded")).toBe("false");
-  expect(document.querySelector(".turn-head")!.textContent).toContain("6m 21s");
+  expect(document.querySelector(".turn-actions")!.textContent).toContain("Worked for 6m 21s");
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
   expect(screen.getByText("Verified all 37 tests.")).toBeTruthy();
 
@@ -310,7 +353,7 @@ it.each([false])("keeps a genuine turn failure visible with showActivity=%s", (s
 
 it.each(["error", "cancelled"] as const)("quiet mode retains a %s turn status without an activity control", (outcome) => {
   render(<WorkTranscript runId="run" blocks={[{ ...end, outcome }]} author="Sol 2" showActivity={false} />);
-  expect(document.querySelector(".turn-head")!.textContent).toBe(`Sol 2${outcome === "error" ? "Failed" : "Stopped"} after 3m 42s`);
+  expect(document.querySelector(".turn-actions")!.textContent).toBe(`${outcome === "error" ? "Failed" : "Stopped"} after 3m 42s`);
   expect(screen.queryByRole("button")).toBeNull();
 });
 
@@ -395,7 +438,7 @@ it("shows a manual compaction between turns as finished work, not a turn under w
   runs.reset();
   const runId = "7c17e6fe-855f-4133-816e-a3ec9a25b00e";
   const frame = (seq: number, events: AgentEvent[]) => runs.applyFrame({ runId, seq, events });
-  const heads = () => [...document.querySelectorAll(".turn-head")].map((head) => head.getAttribute("data-state"));
+  const ends = () => [...document.querySelectorAll(".turn-actions")].map((end) => end.getAttribute("data-state"));
   frame(1, [
     { type: "session.started", runId, ts: 1792467848859, agent: "claude", externalSessionId: "dd1b0fd3-115e-4d6d-8274-0001c648144c", model: "claude-opus-5-5" },
     { type: "message.completed", runId, ts: 1792474970926, messageId: "user-10cec7e1-811d-4cea-a4e4-e2c9361e3470", role: "user", text: "Looking great, one more thing." },
@@ -404,9 +447,9 @@ it("shows a manual compaction between turns as finished work, not a turn under w
     { type: "turn.completed", runId, ts: 1792476111125, turnId: "766599d6-01ab-40ef-9b09-d267f07f42a1", status: "success", resultText: "Both are built, uncommitted.", durationMs: 1140194 },
     { type: "activity.updated", runId, ts: 1792476274142, activityId: "compaction-1", label: "Compacting context", status: "running", detail: { mode: "manual" } },
   ]);
-  // Core reports the thread busy while it compacts: the head and the live row say so.
+  // Core reports the thread busy while it compacts: the turn's end and the live row say so.
   const { rerender } = render(<Transcript run={runs.get(runId)!} working />);
-  expect(heads()).toEqual(["done", "working"]);
+  expect(ends()).toEqual(["done", "working"]);
   expect(document.querySelector(".tool-row-live")).toBeTruthy();
   expect(document.body.textContent).toContain("Compacting context");
   frame(2, [
@@ -432,7 +475,8 @@ it("shows a manual compaction between turns as finished work, not a turn under w
   // The compaction ended and core reports the thread idle; the session stays open for the next message.
   rerender(<Transcript run={runs.get(runId)!} working={false} />);
   expect(runs.get(runId)!.live).toBe(true);
-  expect(heads()).toEqual(["done", "done"]);
+  // The compaction ends with nothing to copy, so only the reply's turn keeps an end.
+  expect(ends()).toEqual(["done"]);
   expect(document.querySelector(".tool-row-live")).toBeNull();
   expect(document.querySelector(".work-now")).toBeNull();
   expect(receipt().textContent).toMatch(/1 step/);
@@ -443,10 +487,10 @@ it("shows a manual compaction between turns as finished work, not a turn under w
   ]);
   // The next prompt opens a turn before core's busy flag reaches the view.
   rerender(<Transcript run={runs.get(runId)!} working={false} />);
-  expect(heads()).toEqual(["done", "done", "working"]);
+  expect(ends()).toEqual(["done", "working"]);
 });
 
-it("draws a turn a teammate stopped before its agent said anything under its own head, and the line under it", () => {
+it("ends a turn a teammate stopped before its agent said anything as stopped, after the line that says who stopped it", () => {
   // Walk 8's cloud thread: Mara stopped Theo's turn three seconds in, before its agent said a word.
   runs.reset();
   const runId = "hosted:16a121e7-cd86-437b-9ed5-88ecbb061ce5";
@@ -461,14 +505,14 @@ it("draws a turn a teammate stopped before its agent said anything under its own
     ],
   });
   render(<Transcript run={runs.get(runId)!} working={false} />);
-  const head = document.querySelector(".turn-head")!;
+  const end = document.querySelector(".turn-actions")!;
   const line = screen.getByText("Mara stopped Theo's turn.");
-  expect(head.getAttribute("data-state")).toBe("stopped");
-  expect(head.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(screen.getByText("Work on the export").compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(end.getAttribute("data-state")).toBe("stopped");
+  expect(line.compareDocumentPosition(end) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByText("Work on the export").compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
-it("draws the turn a teammate's answer to a parked ask starts under its own head, with their name", () => {
+it("names who sent the turn a teammate's answer to a parked ask starts, which no prompt of theirs names", () => {
   // Walk 9: Mara's turn parked on its question; Theo answered with Answer and continue, which ran as his own turn.
   runs.reset();
   const runId = "hosted:d5117dac-5c2f-4d1a-948a-5fad6b7a1176";
@@ -500,10 +544,10 @@ it("draws the turn a teammate's answer to a parked ask starts under its own head
       <Transcript run={runs.get(runId)!} working={false} />
     </ThreadVoicesContext.Provider>,
   );
-  const heads = [...document.querySelectorAll(".turn-head")];
-  expect(heads.map((head) => head.getAttribute("data-state"))).toEqual(["done", "done"]);
-  expect(heads.map((head) => head.querySelector(".turn-sender")?.textContent ?? head.textContent)).toEqual([expect.stringContaining("Mara"), expect.stringContaining("Theo")]);
-  expect(heads[1]!.compareDocumentPosition(screen.getByText("banner")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // Mara's prompt names her turn; Theo's turn has no prompt, so its head names him.
+  const senders = [...document.querySelectorAll(".turn-head-sender")];
+  expect(senders.map((sender) => sender.getAttribute("data-tip"))).toEqual(["Theo Laurent"]);
+  expect(senders[0]!.compareDocumentPosition(screen.getByText("banner")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
 it("opens the folded work that holds a message asked for, with its whole narration, and marks that message", () => {

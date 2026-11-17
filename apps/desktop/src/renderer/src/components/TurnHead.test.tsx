@@ -1,4 +1,5 @@
 import { cleanup, render } from "@testing-library/react";
+import type { ThreadAuthors } from "@openorc/protocol";
 import { afterEach, expect, it } from "vitest";
 import { ConversationVoice } from "../lib/turn-authors";
 import { ThreadVoicesContext } from "../lib/thread-authors";
@@ -7,44 +8,41 @@ import { TurnHead } from "./TurnHead";
 afterEach(cleanup);
 
 const voice = { authors: new Map([["guest", "Rini"]]), runs: new Map([["run", { agent: "codex", model: "GPT-6-Astra" }]]) };
-const head = (runId: string, status: Parameters<typeof TurnHead>[0]["status"]) =>
+const mara = { id: "u-mara", name: "Mara Okafor", image: null };
+const theo = { id: "u-theo", name: "Theo Laurent", image: null };
+
+const head = (props: Partial<Parameters<typeof TurnHead>[0]>, together?: { authors: ThreadAuthors; live?: typeof mara }) =>
   render(
     <ConversationVoice.Provider value={voice}>
-      <TurnHead runId={runId} status={status} />
+      <ThreadVoicesContext.Provider value={together ? { ...together, shared: true } : null}>
+        <TurnHead runId="run" voiced={false} live={false} {...props} />
+      </ThreadVoicesContext.Provider>
     </ConversationVoice.Provider>,
-  ).container.querySelector(".turn-head")!;
+  ).container;
 
-it("names the agent and model, then the turn's time once it is done", () => {
-  expect(head("run", { kind: "done", elapsed: 72_000 }).textContent).toBe("CodexGPT-6-Astra · 1m 12s");
+it("names the agent and model on a turn where they changed, and nothing else", () => {
+  expect(head({ voiced: true }).textContent).toBe("CodexGPT-6-Astra");
 });
 
-it("counts up while the turn works and says when it is writing", () => {
-  expect(head("run", { kind: "working", elapsed: 48_000 }).textContent).toBe("CodexGPT-6-Astra · working 48s");
-  cleanup();
-  expect(head("run", { kind: "writing", elapsed: 50_000 }).textContent).toBe("CodexGPT-6-Astra · Writing");
-});
-
-it("keeps a failed or stopped turn's outcome in the head", () => {
-  expect(head("run", { kind: "failed", elapsed: 12_000 }).textContent).toBe("CodexGPT-6-Astra · Failed after 12s");
-  cleanup();
-  expect(head("run", { kind: "stopped" }).textContent).toBe("CodexGPT-6-Astra · Stopped");
+it("draws nothing on a turn whose agent and model did not change", () => {
+  expect(head({}).querySelector(".turn-head")).toBeNull();
 });
 
 it("gives a guest Orcling's run its byline", () => {
-  expect(head("guest", { kind: "done" }).textContent).toBe("Rini");
+  expect(head({ runId: "guest", voiced: true }).textContent).toBe("Rini");
 });
 
-it("names the live turn's sender as the server does before any of its events say whose it is, and only while it runs", () => {
-  const mara = { id: "u-mara", name: "Mara Okafor", image: null };
-  const together = (status: Parameters<typeof TurnHead>[0]["status"]) =>
-    render(
-      <ConversationVoice.Provider value={voice}>
-        <ThreadVoicesContext.Provider value={{ authors: { viewer: null, turnOf: {}, senders: {}, authors: {} }, shared: true, live: mara }}>
-          <TurnHead runId="run" status={status} blocks={[{ id: "user-prompt" }]} />
-        </ThreadVoicesContext.Provider>
-      </ConversationVoice.Provider>,
-    ).container.querySelector(".turn-head")!;
-  expect(together({ kind: "working", elapsed: 3_000 }).textContent).toBe("CodexGPT-6-Astra · working 3sMOMara");
+it("names the live turn's sender as the server does before its prompt says who wrote it", () => {
+  const authors: ThreadAuthors = { viewer: theo, turnOf: {}, senders: {}, authors: {} };
+  expect(head({ live: true, blocks: [{ id: "user-prompt" }], prompt: "user-prompt" }, { authors, live: mara }).textContent).toBe("MOMara");
   cleanup();
-  expect(together({ kind: "done", elapsed: 15_000 }).textContent).toBe("CodexGPT-6-Astra · 15s");
+  expect(head({ blocks: [{ id: "user-prompt" }], prompt: "user-prompt" }, { authors, live: mara }).querySelector(".turn-head")).toBeNull();
+});
+
+it("leaves the sender to the prompt above that names them, and names one the prompt does not", () => {
+  const authors: ThreadAuthors = { viewer: theo, turnOf: { joined: "t1", reply: "t1" }, senders: { t1: mara }, authors: { joined: mara } };
+  expect(head({ blocks: [{ id: "joined" }, { id: "reply" }], prompt: "joined" }, { authors }).querySelector(".turn-head")).toBeNull();
+  cleanup();
+  const joined = { ...authors, authors: { joined: theo } };
+  expect(head({ voiced: true, blocks: [{ id: "joined" }, { id: "reply" }], prompt: "joined" }, { authors: joined }).textContent).toBe("CodexGPT-6-Astra" + "MOMara");
 });

@@ -20,6 +20,7 @@ import { ClaudeAccountScope } from "../lib/claude-account";
 import { usePermissionSelection, useRpc, useRpcMutation } from "../lib/client";
 import { useNewThreadHosted } from "../lib/cloud-offered";
 import { CLOUD_MODEL_LIMITS } from "../lib/cloud-model-limits";
+import { useCloudStartReady } from "../lib/use-cloud-start-ready";
 import { usePublishComposerAccount } from "../lib/composer-account";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useDefaultHarness } from "../lib/default-harness";
@@ -223,6 +224,7 @@ function NewThreadProject({
   // A cloud start from this Mac's folder carries its work, said on the line above Start before anything leaves.
   const macStart = useMacStart(cloudOnly ? null : projectId, spaceId ?? undefined, onCloud);
   const disabledReason = onCloud ? (hosted.blocked?.words ?? macStart.refusal ?? (!hosted.shown ? "Checking OpenOrc Cloud…" : targetDisabledReason)) : localReason;
+  const cloudStartReady = useCloudStartReady({ draft, onCloud, held: Boolean(disabledReason), permissionMode: permission, spaceId });
   const location = useNewThreadLocation(projectId, selected, workspaceMode, draft.workingDirectory);
   const chooseModel = (model: ModelChoice) => changeDraft({ target: { kind: "model", choice: model } });
   const retry = () => {
@@ -290,6 +292,7 @@ function NewThreadProject({
                     value={draft.prompt}
                     onChange={(prompt) => changeDraft({ prompt })}
                     onSubmit={submit}
+                    onReady={cloudStartReady}
                     placeholder="Ask OpenOrc to build, fix bugs, explore"
                     size="lg"
                     presentation="new-thread"

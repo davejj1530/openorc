@@ -116,6 +116,15 @@ it("titles Home with the space it shows once the Mac's person is signed in to Op
   expect(screen.getByText("OpenOrc")).toBeTruthy();
 });
 
+it("titles Personal as OpenOrc, as the Mac's sidebar heads it, still opening the spaces", () => {
+  const personal = { id: "personal-me", kind: "personal" } as const;
+  account.spaces = { state: "ready", spaces: [personal], current: personal, access: null, offline: false };
+  render(<HomeBar state={connected} />);
+  expect(screen.getByRole("button", { name: "OpenOrc, Personal space" })).toBeTruthy();
+  expect(screen.getByText("OpenOrc")).toBeTruthy();
+  expect(screen.queryByText("Personal")).toBeNull();
+});
+
 it("offers no filter where Home has no list, as for a space shut to the person", () => {
   render(<HomeBar state={connected} listed={false} />);
   expect(screen.queryByRole("button", { name: /^Show/ })).toBeNull();

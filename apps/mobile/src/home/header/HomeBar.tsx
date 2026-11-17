@@ -3,7 +3,7 @@ import { Pressable, View } from "react-native";
 import type { LinkState } from "../../connection/manager";
 import { ChevronDown } from "../../generated/icons";
 import { SpaceMark } from "../../spaces/SpaceMark";
-import { spaceName, useSpaces } from "../../spaces/use-spaces";
+import { spaceName, titleName, useSpaces } from "../../spaces/use-spaces";
 import { LinkDot } from "../../ui/LinkDot";
 import { TopFade } from "../../ui/ScrollFade";
 import { Wordmark, WORDMARK_MAX_SCALE } from "../../ui/Wordmark";
@@ -34,7 +34,8 @@ function PinnedStatus({ state }: { state: Exclude<LinkState, { kind: "unpaired" 
 
 /**
  * The bar's title for a paired Mac: OpenOrc's wordmark, or, once the Mac says who is signed in to OpenOrc on it, the
- * space Home shows, by its mark and name in the wordmark's place and type. That one opens the spaces to choose from.
+ * space Home shows, by its mark and name in the wordmark's place and type, Personal as OpenOrc, as the Mac's sidebar
+ * heads it. That one opens the spaces to choose from.
  */
 function Title() {
   const account = useSpaces();
@@ -42,8 +43,13 @@ function Title() {
   const space = account.current;
   return (
     <Link href="/space" asChild>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${spaceName(space)}, space`} hitSlop={4} className="shrink flex-row items-center gap-1.5 self-stretch active:opacity-60">
-        <Wordmark name={spaceName(space)} mark={(size) => <SpaceMark space={space} size={size} />} className="shrink" />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={space.kind === "personal" ? "OpenOrc, Personal space" : `${spaceName(space)}, space`}
+        hitSlop={4}
+        className="shrink flex-row items-center gap-1.5 self-stretch active:opacity-60"
+      >
+        <Wordmark name={titleName(space)} mark={(size) => <SpaceMark space={space} size={size} />} className="shrink" />
         <ChevronDown size={16} className="text-ink-4" />
       </Pressable>
     </Link>

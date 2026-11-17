@@ -22,8 +22,11 @@ export type PhoneSpaces =
       offline: boolean;
     };
 
-/** What a space is called: the organization's name, or Personal. */
+/** What a space is called among the others, as the Mac's space menu names it: the organization's name, or Personal. */
 export const spaceName = (space: Space): string => (space.kind === "organization" ? space.name : "Personal");
+
+/** What Home's bar calls the space it shows, as the Mac's sidebar heads it: the organization's name, or OpenOrc. */
+export const titleName = (space: Space): string => (space.kind === "organization" ? space.name : "OpenOrc");
 
 /** Whether the person is shut out of an organization's work now: frozen, or past the day of grace the server gave. */
 export function closedToPerson(space: Space, access: OrganizationAccess | null, now: number): boolean {

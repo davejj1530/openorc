@@ -1,6 +1,9 @@
 import { WORKSPACE_ID, type Space, type SpaceProject } from "@openorc/protocol";
 import type { ProjectChoice } from "../projects";
 
+/** What the group of the Workspace's threads is called, here and in the filter: they belong to no project. */
+export const NO_PROJECT = "No project";
+
 /** Whose threads Home's lists ask for, and what they need to draw them. */
 export interface ListScope {
   /** What every list call carries: this Mac's projects, or the space, whose list the Mac then answers as for its own window. */
@@ -19,7 +22,10 @@ export interface ListScope {
 export function macScope(choices: readonly ProjectChoice[]): ListScope {
   const localIds = choices.map((project) => project.id).sort();
   // The Workspace's threads belong to no project: their group comes last, as on the Mac's sidebar.
-  const groups = [...choices.filter(({ id }) => id !== WORKSPACE_ID), ...choices.filter(({ id }) => id === WORKSPACE_ID)].map(({ id, name }) => ({ id, name }));
+  const groups = [
+    ...choices.filter(({ id }) => id !== WORKSPACE_ID).map(({ id, name }) => ({ id, name })),
+    ...(choices.some(({ id }) => id === WORKSPACE_ID) ? [{ id: WORKSPACE_ID, name: NO_PROJECT }] : []),
+  ];
   return { asks: { projectIds: localIds }, localIds, names: new Map(choices.map(({ id, name }) => [id, name])), groups, groupOf: new Map(groups.map(({ id }) => [id, id])) };
 }
 
@@ -44,7 +50,7 @@ export function spaceScope(space: Space, projects: readonly SpaceProject[] | und
   if (space.kind === "personal") {
     names.set(WORKSPACE_ID, "Workspace");
     groupOf.set(WORKSPACE_ID, WORKSPACE_ID);
-    groups.push({ id: WORKSPACE_ID, name: "Workspace" });
+    groups.push({ id: WORKSPACE_ID, name: NO_PROJECT });
     localIds.push(WORKSPACE_ID);
   }
   return { asks: { spaceId: space.id }, localIds: localIds.sort(), names, groups, groupOf };

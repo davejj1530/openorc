@@ -25,7 +25,7 @@ const groups = (items: HomeItem[]) => {
 
 const now = Date.UTC(2026, 9, 23, 12);
 const names = new Map([[WORKSPACE_ID, "Workspace"], ...fixtureProjects.map(({ id, name }): [string, string] => [id, name])]);
-const projects: HomeProject[] = [...fixtureProjects.map(({ id, name }) => ({ id, name })), { id: WORKSPACE_ID, name: "Workspace" }];
+const projects: HomeProject[] = [...fixtureProjects.map(({ id, name }) => ({ id, name })), { id: WORKSPACE_ID, name: "No project" }];
 /** Resolved open, so tests about something else see every row. */
 const allOpen = ["resolved-open:threads"];
 

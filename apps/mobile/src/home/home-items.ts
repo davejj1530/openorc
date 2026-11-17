@@ -74,9 +74,6 @@ export interface HomeOptions {
   selectedId?: string;
 }
 
-/** What the No project group is called: the Workspace's threads, which belong to no project. */
-const NO_PROJECT = "No project";
-
 /** A project's threads' roots, the most recently active first, as the day list orders them. */
 type Group = { project: HomeProject; roots: ThreadSummary[] };
 
@@ -164,9 +161,8 @@ function groupItems(list: HomeList, options: HomeOptions): HomeItem[] {
       const key = sidebarFoldKey.project(project.id);
       const open = sidebarSectionOpen(options.collapsed, "project", project.id);
       const shown = projectRows(roots, { rows: options.layout.rows.get(project.id) ?? [], open, holdsActive: (root) => active.has(root.id) });
-      const label = project.id === WORKSPACE_ID ? { ...project, name: NO_PROJECT } : project;
       return [
-        { kind: "project", key, project: label, open, waiting: waitingRoots(roots, list.days.all) } as const,
+        { kind: "project", key, project, open, waiting: waitingRoots(roots, list.days.all) } as const,
         ...treeRows(shown.rows, list, options, { named: false, arriving: options.opened === key, cloudLabel: Boolean(project.cloud) }),
         ...(shown.hidden ? [{ kind: "group-more", key: `group-more:${project.id}`, projectId: project.id, count: shown.hidden } as const] : []),
       ];

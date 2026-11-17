@@ -6,6 +6,7 @@ import { ChevronRight, X } from "./icons";
 import { applyDiffIcons } from "./icons-diff";
 import { patchStat } from "@openorc/client";
 import { cn } from "../lib/cn";
+import { PLAIN_LINES } from "../lib/diff-lines";
 import { useTheme } from "../lib/theme";
 import { Button, Textarea, TextButton } from "./ui";
 import { useWordWrap } from "../lib/word-wrap";
@@ -29,18 +30,6 @@ export interface ReviewCommentState {
 interface Annotation {
   comment: ReviewComment | null;
 }
-
-/**
- * Lines read in the diff's own tones rather than the highlighter's: every line in title ink, added lines on
- * --ok-soft and removed ones on --bad-soft, square runs that meet edge to edge. app.css sets the type and the line
- * numbers.
- */
-const PLAIN_LINES = `
-  [data-line] span { color: inherit; }
-  [data-line] { color: var(--ink); }
-  :is([data-line], [data-column-number], [data-gutter-buffer])[data-line-type="change-addition"] { background-color: var(--ok-soft); }
-  :is([data-line], [data-column-number], [data-gutter-buffer])[data-line-type="change-deletion"] { background-color: var(--bad-soft); }
-`;
 
 /** Lines marked with + and -, in the tones above, without word-level emphasis. */
 const plainLines = { diffIndicators: "classic", lineDiffType: "none", unsafeCSS: PLAIN_LINES } as const;

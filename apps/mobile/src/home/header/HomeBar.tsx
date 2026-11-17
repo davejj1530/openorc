@@ -24,7 +24,7 @@ function PinnedStatus({ state }: { state: Exclude<LinkState, { kind: "unpaired" 
   if (!line.trouble || !line.status) return null;
   return (
     <Link href="/connection" asChild>
-      <Pressable accessibilityRole="button" accessibilityLabel={line.label} className="ml-4 shrink flex-row items-center gap-1.5 self-stretch active:opacity-60">
+      <Pressable accessibilityRole="button" accessibilityLabel={line.label} className="ml-4 mr-3 shrink flex-row items-center gap-1.5 self-stretch active:opacity-60">
         <LinkDot tone={line.tone} />
         <StatusWords status={line.status} trouble={line.trouble} className="shrink" adjustsFontSizeToFit maxFontSizeMultiplier={WORDMARK_MAX_SCALE} />
       </Pressable>

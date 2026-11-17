@@ -89,7 +89,8 @@ export type BarFor = "unpaired" | "paired" | "demo";
 export function HeaderButtons({ state, tab = "threads", listed = true }: { state: LinkState; tab?: HomeTab; listed?: boolean }) {
   const shows = barFor(state);
   return (
-    <View className="flex-row gap-2">
+    // The circles never give way: the words before them shrink, and cut, instead.
+    <View className="shrink-0 flex-row gap-2">
       {state.kind === "unpaired" ? null : <ConnectionButton state={state} />}
       {shows === "unpaired" || tab !== "threads" || !listed ? null : <FilterButton />}
       {shows === "demo" ? <SkipButton /> : <SettingsButton />}

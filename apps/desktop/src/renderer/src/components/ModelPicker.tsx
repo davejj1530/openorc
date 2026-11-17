@@ -389,8 +389,7 @@ export function ModelPicker({
   orclings,
   placeholder = "Choose a model",
   ariaLabel,
-  harnesses,
-  cloud,
+  limits,
 }: {
   value: ModelChoice | null;
   onChange: (choice: ModelChoice) => void;
@@ -399,13 +398,11 @@ export function ModelPicker({
   orclings?: OrclingPickerChoices;
   placeholder?: string;
   ariaLabel?: string;
-  harnesses?: readonly HarnessId[];
-  /** The models OpenOrc Cloud runs, in place of this Mac's. */
-  cloud?: boolean | undefined;
+  limits?: ModelLimits | undefined;
 }) {
-  const models = useModelCatalog(cloud);
+  const models = useModelCatalog(limits?.cloud);
   const popup = usePickerPopup();
-  value = useEnabledChoice(value, harnesses);
+  value = useEnabledChoice(value, limits?.harnesses);
   const current = catalogModel(models.data, value);
   const chosen = chosenOrcling(orclings);
   const selectedLabel = chosen?.name;
@@ -439,10 +436,10 @@ export function ModelPicker({
               onChange={onChange}
               orclings={orclings}
               showEffort={showEffort}
-              showFast={showEffort}
+              showFast={showEffort && (limits?.fast ?? true)}
               disabled={disabled}
-              harnesses={harnesses}
-              cloud={cloud}
+              harnesses={limits?.harnesses}
+              cloud={limits?.cloud}
               closeOnSelect
               close={() => popup.setOpen(false)}
             />
@@ -482,9 +479,11 @@ interface ComposerModelPickerProps {
   modelSelector?: ReactNode;
   disabled?: boolean;
   settingsDisabled?: boolean;
-  /** Where the conversation runs takes only these agents, and Fast only when `fast`; on OpenOrc Cloud, its models (`cloud`). */
-  limits?: { harnesses: readonly HarnessId[]; fast: boolean; cloud?: boolean } | undefined;
+  limits?: ModelLimits | undefined;
 }
+
+/** Where the turn runs takes only these agents, and Fast only when `fast`; on OpenOrc Cloud, its models (`cloud`). */
+export type ModelLimits = { harnesses: readonly HarnessId[]; fast: boolean; cloud?: boolean };
 
 export function ComposerModelPicker({ value, onChange, onSelectModel, orclings, accounts, modelSelector, disabled, settingsDisabled = false, limits }: ComposerModelPickerProps) {
   const fastReason = useHostedControlReason("speed");

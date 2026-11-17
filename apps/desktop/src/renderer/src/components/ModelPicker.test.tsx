@@ -48,7 +48,7 @@ describe("ModelPicker", () => {
     const onChange = vi.fn();
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <ModelPicker value={{ agent: "opencode", model: "opencode/big", effort: null }} onChange={onChange} harnesses={["codex"]} showEffort={false} />
+        <ModelPicker value={{ agent: "opencode", model: "opencode/big", effort: null }} onChange={onChange} limits={{ harnesses: ["codex"], fast: false }} showEffort={false} />
       </QueryClientProvider>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Choose a model" }));

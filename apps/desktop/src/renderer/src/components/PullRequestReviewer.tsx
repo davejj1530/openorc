@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { harnessInfo, harnessLoggedIn, type ModelOption, type PullRequestDetail, type PullRequestReview, type ThreadSummary } from "@openorc/protocol";
 import { LoaderCircle, Wand } from "./icons";
-import { defaultChoice, ModelPicker } from "./ModelPicker";
+import { defaultChoice, ModelPicker, type ModelChoice } from "./ModelPicker";
 import { Button, Segmented, TextButton } from "./ui";
 import { draftAuthor, readPullReviewer, reviewSettings, writePullReviewer, type PullReviewer } from "../lib/pull-requests";
 import { orclingById, useOrclings } from "../lib/orclings";
@@ -9,26 +9,33 @@ import { useRpc, useRpcMutation } from "../lib/client";
 import { openThread } from "../lib/router";
 import { useModelCatalog } from "../lib/use-model-catalog";
 import { useEnabledHarnesses } from "../lib/enabled-harnesses";
+import { CLOUD_MODEL_LIMITS } from "../lib/cloud-model-limits";
 
 const reviewers = [
   { value: "you", label: "You" },
   { value: "model", label: "Model" },
 ] as const;
 
-/** The saved reviewer, with the model it would run: the one you picked, or the default of a harness you are signed in to. */
-function useReviewer() {
+/**
+ * The saved reviewer, with the model it would run: the one you picked, or the default of a harness you are signed in to.
+ * A project only OpenOrc Cloud has is reviewed there, with a model it runs: a pick it doesn't run gives way to its default.
+ */
+function useReviewer(cloud: boolean) {
   const enabled = useEnabledHarnesses();
   const [reviewer, setReviewer] = useState<PullReviewer>(readPullReviewer);
-  const models = useModelCatalog();
+  const models = useModelCatalog(cloud);
   const info = useRpc("system.info", {});
-  const signedIn = info.data ? (enabled.find((id) => harnessLoggedIn(harnessInfo(info.data, id))) ?? null) : null;
+  const signedIn = !cloud && info.data ? (enabled.find((id) => harnessLoggedIn(harnessInfo(info.data, id))) ?? null) : null;
   const fallback = models.data ? defaultChoice(models.data, signedIn) : null;
+  const picked = cloud && !offered(models.data, reviewer.choice) ? null : reviewer.choice;
   const choose = (next: PullReviewer) => {
     setReviewer(next);
     writePullReviewer(next);
   };
-  return { reviewer, choice: reviewer.choice ?? fallback, choose, models: models.data };
+  return { reviewer, choice: picked ?? fallback, choose, models: models.data };
 }
+
+const offered = (models: ModelOption[] | undefined, choice: ModelChoice | null) => Boolean(choice && models?.some((model) => model.agent === choice.agent && model.id === choice.model));
 
 function startLabel(starting: boolean, again: boolean): string {
   if (starting) return "Starting…";
@@ -54,11 +61,13 @@ function ReviewConversationLink({ conversation, models }: { conversation: Thread
  * join the same draft. Either way, only you post to GitHub.
  */
 export function PullRequestReviewer({ projectId, pull, review }: { projectId: string; pull: PullRequestDetail; review: PullRequestReview | null }) {
-  return <Reviewer projectId={projectId} pull={pull} review={review} />;
+  const project = useRpc("projects.get", { id: projectId });
+  if (!project.data) return null;
+  return <Reviewer projectId={projectId} pull={pull} review={review} cloud={project.data.rootPath === ""} />;
 }
 
-function Reviewer({ projectId, pull, review }: { projectId: string; pull: PullRequestDetail; review: PullRequestReview | null }) {
-  const { reviewer, choice, choose, models } = useReviewer();
+function Reviewer({ projectId, pull, review, cloud }: { projectId: string; pull: PullRequestDetail; review: PullRequestReview | null; cloud: boolean }) {
+  const { reviewer, choice, choose, models } = useReviewer(cloud);
   const start = useRpcMutation("pulls.review.start");
   const thread = useRpc("threads.get", { id: review?.threadId ?? "" }, { enabled: Boolean(review?.threadId) });
   const settings = reviewSettings(choice);
@@ -67,7 +76,8 @@ function Reviewer({ projectId, pull, review }: { projectId: string; pull: PullRe
   // A later round continues the review's conversation, unless it was put away.
   const again = conversation !== null && conversation.archivedAt === null;
   const orclings = useOrclings();
-  const orcling = orclingById(orclings, reviewer.orclingId);
+  // Orclings review pull requests of projects on this Mac.
+  const orcling = cloud ? null : orclingById(orclings, reviewer.orclingId);
   const begin = () => {
     if (settings) start.mutate({ projectId, number: pull.number, reviewer: settings, ...(orcling ? { orclingId: orcling.id } : {}) });
   };
@@ -82,7 +92,8 @@ function Reviewer({ projectId, pull, review }: { projectId: string; pull: PullRe
           <ModelPicker
             value={orcling ? { ...orcling.settings } : choice}
             onChange={(next) => choose({ kind: "model", choice: next, orclingId: null })}
-            orclings={{ options: orclings, selectedId: orcling?.id ?? null, onSelect: (next) => choose({ kind: "model", choice: { ...next.settings }, orclingId: next.id }) }}
+            orclings={cloud ? undefined : { options: orclings, selectedId: orcling?.id ?? null, onSelect: (next) => choose({ kind: "model", choice: { ...next.settings }, orclingId: next.id }) }}
+            limits={cloud ? CLOUD_MODEL_LIMITS : undefined}
             ariaLabel="Reviewer"
             disabled={start.isPending}
           />

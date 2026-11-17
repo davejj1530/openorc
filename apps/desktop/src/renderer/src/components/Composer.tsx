@@ -21,7 +21,6 @@ import {
   harnessShortName,
   type AgentKind,
   type FileScope,
-  type HarnessId,
   type PermissionPreset,
   type RunMode,
   type UsableConnector,
@@ -50,7 +49,7 @@ import { ContextUsage } from "./ContextUsage";
 import { hostedCommandReason, useHeldCommands, type HeldCommands } from "./HostedComposerControls";
 import { Cloud, Eye, Laptop, Lightbulb, ShieldCheck, ShieldOff } from "./icons";
 import { type PickerAccounts } from "./ModelPickerAccounts";
-import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
+import { ComposerModelPicker, type ModelChoice, type ModelLimits } from "./ModelPicker";
 import { Tooltip } from "./ui";
 
 export const permissionLabel: Record<PermissionPreset, string> = { review: "Review", trusted: "Workspace access", autonomous: "Autonomous" };
@@ -124,7 +123,7 @@ export interface ComposerProps {
   /** The Claude accounts the conversation can run on, offered in the model picker with their usage. */
   accounts?: PickerAccounts | undefined;
   /** Where the conversation runs takes only these agents, and Fast only when `fast`; on OpenOrc Cloud, its models (`cloud`). */
-  modelLimits?: { harnesses: readonly HarnessId[]; fast: boolean; cloud?: boolean } | undefined;
+  modelLimits?: ModelLimits | undefined;
   mode: RunMode;
   onMode: (mode: RunMode) => void;
   permission: PermissionPreset;

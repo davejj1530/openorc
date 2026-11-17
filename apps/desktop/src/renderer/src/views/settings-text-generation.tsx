@@ -42,7 +42,7 @@ export function TextGenerationSettings() {
             </span>
             <div className="flex min-w-0 flex-col items-end gap-1">
               <ModelPicker
-                harnesses={textGenerationHarnessIds}
+                limits={{ harnesses: textGenerationHarnessIds, fast: false }}
                 value={v.model ? { agent: explicitProvider, model: v.model, effort: null } : null}
                 placeholder="Low-cost default"
                 ariaLabel="Text generation model"

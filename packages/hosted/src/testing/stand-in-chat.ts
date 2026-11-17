@@ -117,6 +117,7 @@ export class StandInChat {
         body: standInSearch(
           this.#in(spaceId).filter((record) => this.#readable(record, who)),
           request.query.get("q") ?? "",
+          (id) => this.people(spaceId).find((person) => person.id === id)?.name,
         ),
       };
     return this.#channels.route(request, spaceId, who, body) ?? this.#recordRoute(request, spaceId, who, body) ?? this.#reactionRoute(request, spaceId, who, body);

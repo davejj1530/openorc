@@ -1,0 +1,5 @@
+/* A chat hit's place is a short conversation name: the snippet gives way first. */
+.command-palette-place.team-chat-search-place {
+  flex-shrink: 0;
+  max-width: 40%;
+}

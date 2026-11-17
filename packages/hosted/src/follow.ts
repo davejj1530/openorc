@@ -11,6 +11,7 @@
  *   watched   the threads of interest, and the timer that ends each one's interest.
  *   joined    the threads in the server's room on this socket session; a new session has none.
  *   joining   frames that arrived while a watch was being answered, handed on once it is.
+ *   heads     the head the server last said each joined thread's log is at (its watch's answer, then `hosted:changed`).
  *
  * The invariant: for a thread with a cursor, the app has been handed every event the server kept with seq <= cursor,
  * each once, in seq order. A page a window reads for itself may run ahead of the cursor; the window drops the overlap
@@ -34,6 +35,7 @@ export class Follower {
   readonly #held = new Map<string, WireEvent[][]>();
   readonly #healing = new Map<string, Promise<void>>();
   readonly #tickets = new Map<string, symbol>();
+  readonly #heads = new Map<string, number>();
 
   /** `on`: requests about a thread, in its space. */
   constructor(
@@ -74,6 +76,7 @@ export class Follower {
       this.#watched.delete(id);
       this.#cursors.delete(id);
       this.#joined.delete(id);
+      this.#heads.delete(id);
       this.#held.delete(id);
       this.#joining.delete(id);
       this.#healing.delete(id);
@@ -87,6 +90,7 @@ export class Follower {
       const reply = await this.deps.session.ask(SOCKET.watch, threadId, wireWatched);
       if (!reply.ok || this.#tickets.get(threadId) !== ticket) return;
       this.#joined.add(threadId);
+      this.#heads.set(threadId, reply.head);
       const known = this.#cursors.get(threadId);
       // The first time, the page the window reads next covers up to here; after a gap, what passed is read now.
       if (known === undefined) this.#cursors.set(threadId, reply.head);
@@ -124,11 +128,19 @@ export class Follower {
     );
   }
 
-  /** The server's `hosted:changed`: its head tells a follower that lost the last frame of a turn that it is behind. */
+  /**
+   * The server's `hosted:changed`: its head tells a follower that lost the last frame of a turn that it is behind, and
+   * a head where the last word left it, that the thread changed outside its log.
+   */
   #onChanged(body: unknown): void {
     const change = wireChange.safeParse(body);
     if (!change.success || !this.#joined.has(change.data.threadId)) return;
-    if (change.data.head > (this.#cursors.get(change.data.threadId) ?? change.data.head)) void this.#heal(change.data.threadId);
+    const { threadId, head } = change.data;
+    if (head > (this.#cursors.get(threadId) ?? head)) void this.#heal(threadId);
+    // As when a terminal's work in it is kept: what the thread's work changed is read again. A change in its log comes
+    // with its frames, and its row tells the rest.
+    if (head === this.#heads.get(threadId)) this.deps.push({ type: "invalidate", keys: [`threaddiff:${threadId}`] });
+    this.#heads.set(threadId, head);
   }
 
   /**

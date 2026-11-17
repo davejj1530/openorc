@@ -77,6 +77,18 @@ describe("a hosted thread's log", () => {
     expect(seen.pushes).toContainEqual({ type: "frame", frame: expect.objectContaining({ runId: `hosted:${thread}` }) });
   });
 
+  it("reads what the thread's work changed again when the server says it changed outside its log, and not for a change in it", async () => {
+    const { hosted, seen } = await signedIn();
+    await hosted.threads.call("events.page", { runId: `hosted:${thread}`, turns: 1 });
+    const rereads = () => seen.pushes.filter((push) => push.type === "invalidate" && push.keys.includes(`threaddiff:${thread}`)).length;
+    stand.append(thread, [say("still working")]);
+    await vi.waitFor(() => expect(texts(framed(seen))).toEqual(["still working"]));
+    // As the server says a terminal's work in the thread was kept: the thread changed, its log did not.
+    stand.set(thread, {});
+    await vi.waitFor(() => expect(rereads()).toBeGreaterThan(0));
+    expect(rereads()).toBe(1);
+  });
+
   it("fills in a frame lost on the way when the next one arrives", async () => {
     const { hosted, seen } = await signedIn();
     await hosted.threads.call("events.page", { runId: `hosted:${thread}`, turns: 1 });

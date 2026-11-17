@@ -234,13 +234,7 @@ export class StandInChat {
 
   #send(record: StandInChatRecord, who: string, body: unknown): Reply {
     const fields = body && typeof body === "object" ? body : {};
-    const {
-      parentId: _parent,
-      replyToId: answering,
-      fileIds: chosen,
-      orclingCall,
-      ...words
-    } = { parentId: null, replyToId: null as unknown, fileIds: [] as unknown, orclingCall: null as unknown, ...fields };
+    const { replyToId: answering, fileIds: chosen, orclingCall, ...words } = { replyToId: null as unknown, fileIds: [] as unknown, orclingCall: null as unknown, ...fields };
     const fileIds = Array.isArray(chosen) ? chosen.filter((id): id is string => typeof id === "string") : [];
     const text = { ...words, ...(fileIds.length && { fileIds }), ...(typeof answering === "string" && { replyToId: answering }) };
     const input = teamChatRpcParams["teamChat.send"].safeParse({ ...text, spaceId: record.spaceId, conversationId: record.conversation.id });

@@ -127,7 +127,7 @@ export class TeamChat {
 
   /** A message; one that calls the sender's own Orcling carries the call its app made, secret and all. */
   async send({ spaceId, conversationId, id, body, fileIds, replyToId }: Omit<RpcParams<"teamChat.send">, "orcling">, orclingCall: WireOrclingCall | null = null) {
-    const message = await this.#request(spaceId, CHAT_ROUTES.send(conversationId), { id, body, parentId: null, replyToId: replyToId ?? null, fileIds: fileIds ?? [], orclingCall });
+    const message = await this.#request(spaceId, CHAT_ROUTES.send(conversationId), { id, body, replyToId: replyToId ?? null, fileIds: fileIds ?? [], orclingCall });
     this.#invalidate(spaceId, conversationId);
     return message;
   }

@@ -18,7 +18,8 @@ export function CloudDiffScreen() {
   const diff = read.data;
   return (
     <View className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={fileName(path)} line={path} /> }} />
+      {/* The folder under the name, for a file in one; a file at the top is named once. */}
+      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={fileName(path)} line={fileName(path) === path ? null : path} /> }} />
       {read.error ? <FailedBlock message={read.error.message} onRetry={() => void read.refetch()} /> : null}
       {!diff && !read.error ? (
         <View className="items-center py-10">

@@ -19,6 +19,7 @@ import { OrclingChatPane } from "../orclings/OrclingChatPane";
 import { OrclingHeader } from "../orclings/OrclingHeader";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
+import { NO_CLOUD_FILES } from "../cloud/words";
 import { threadTogetherOf, TogetherContext, turnSeen } from "./cloud-together";
 import { createDisclosure, DisclosureContext } from "./disclosure";
 import { useMarkSeen } from "./mark-seen";
@@ -194,7 +195,6 @@ function submitRequest(input: {
 }
 
 /** A phone's images are files of its Mac, which an OpenOrc Cloud thread cannot read. */
-const NO_CLOUD_FILES = "Files can't be sent to a cloud thread from a phone yet.";
 
 /**
  * The conversation: a thread of this Mac or of OpenOrc Cloud, its transcript and its composer. Covering Home keeps the

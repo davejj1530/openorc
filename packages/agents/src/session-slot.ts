@@ -1,6 +1,6 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash } from "node:crypto";
-import { SESSION_ID, type AgentEvent, type HarnessId, type PermissionPreset, type RunMode } from "@openorc/protocol";
+import { harnessCatalog, SESSION_ID, type AgentEvent, type HarnessId, type PermissionPreset, type RunMode } from "@openorc/protocol";
 
 /** A native session id that is a plain name, so it can name a file. */
 export type SessionId = string & { readonly brand: "SessionId" };
@@ -135,7 +135,9 @@ export function versionReader(): (home: AgentHome) => Promise<string> {
     if (known) return known;
     const version = home.run(["--version"], { timeoutMs: 30_000 }).then(({ code, stdout, stderr }) => {
       const release = code === 0 ? releaseOf(stdout.toString("utf8")) : null;
-      if (!release) throw new SessionRefused(`${home.binary} did not say its version: ${stderr.trim().slice(-200) || `exit ${code}`}`);
+      // The person reads the agent's name and the fix; the CLI's path and what it said are for the log.
+      const said = `${home.binary}: ${stderr.trim().slice(-200) || `exit ${code}`}`;
+      if (!release) throw new SessionRefused(`${harnessCatalog[home.agent].name} didn't say which version it is. Check it in Settings > Connections, then try again.`, { cause: said });
       return release;
     });
     read.set(home, version);

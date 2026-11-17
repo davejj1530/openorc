@@ -57,12 +57,15 @@ export class AgentSessions {
     return saved && { ...saved, cliVersion: await slot.version(home) };
   }
 
-  /** Refuses, before anything is written, a thread whose agent's conversations stay, or whose folders are not here. */
-  assertTakeable(thread: TakenThread): void {
+  /**
+   * Refuses, before anything is asked of the thread's other place, a thread whose agent's conversations stay, whose
+   * folders are not here, or whose CLI here can't say its version, which taking its conversation needs.
+   */
+  async assertTakeable(thread: TakenThread): Promise<void> {
     const slot = slotFor(thread.agent);
     const stays = slot ? slot.stays : STAYS;
     if (stays || !slot) throw new SessionRefused(stays ?? STAYS);
-    this.deps.homes.here(owner(thread, slot));
+    await slot.version(this.deps.homes.here(owner(thread, slot)));
   }
 
   /**

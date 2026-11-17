@@ -65,6 +65,8 @@ const homes: AgentHomes = { here: () => hostHome({ agent: "claude", userHome: ro
 /** The account as far as moves go: a Personal space, a cloud project for the folder, its threads, and what was sent. */
 function account() {
   const sent = {
+    /** Each time the thread's machine was asked to leave with a save, which ends what runs there. */
+    asked: [] as true[],
     arrived: [] as { space: string; id: string; projectId: string }[],
     history: [] as ArrivalLine[],
     session: null as null | { query: { agent: string; sessionId: string; cliVersion: string }; packed: Uint8Array },
@@ -147,7 +149,7 @@ function account() {
     },
     macProjects: {
       workSave: async () => ({ save: cloud.save, current: true, working: false, ends: [] }),
-      ask: async () => ({ asked: true }),
+      ask: async () => (sent.asked.push(true), { asked: true }),
       bundle: async () => new Response(new Uint8Array(await readFile(cloud.bundle))),
     },
   } as unknown as Hosted;
@@ -552,6 +554,20 @@ describe("a cloud thread moving to this Mac", () => {
     const id = await cloudThread(made, project);
     made.rows.set(id, { ...made.rows.get(id)!, space: "acme" });
     expect(await moves(made.hosted).check(id)).toEqual({ to: "mac", can: false, reason: "Only a thread in your own space can move to this Mac." });
+  });
+
+  it("holds a move to this Mac whose agent CLI here can't say its version, before its cloud machine is asked anything", async () => {
+    const project = projects.insert(db, { name: "App", rootPath: folder, gitRemote: "https://github.com/acme/app.git", defaultBranch: "main", settings: {} });
+    const made = account();
+    const id = await cloudThread(made, project);
+    made.cloud.save = { ...made.cloud.save!, savedAt: new Date(0).toISOString() };
+    await writeFile(cli, "#!/bin/sh\nexit 1\n");
+    const words = "Claude Code didn't say which version it is. Check it in Settings > Connections, then try again.";
+    const service = moves(made.hosted);
+    expect(await service.check(id)).toEqual({ to: "mac", can: false, reason: words });
+    await expect(service.move(id, true)).rejects.toThrow(words);
+    expect(made.sent.asked, "nothing running in the cloud was ended").toEqual([]);
+    expect(made.hosted.threads.holds({ thread: id })).toBe(true);
   });
 
   it("names this computer as the app does where it isn't a Mac", async () => {

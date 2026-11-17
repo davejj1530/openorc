@@ -134,7 +134,7 @@ export class CloudMoves {
     const local = this.localProjectOf(hosted, threadId);
     if (!local) return held(`This project isn't on ${this.deps.here.thisComputer}.`);
     try {
-      this.deps.sessions.assertTakeable({ id: threadId, agent: row.settings.agent, claudeAccountId: null, children: [] });
+      await this.deps.sessions.assertTakeable({ id: threadId, agent: row.settings.agent, claudeAccountId: null, children: [] });
     } catch (error) {
       if (error instanceof SessionRefused) return held(error.message);
       throw error;

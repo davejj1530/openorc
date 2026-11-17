@@ -124,13 +124,19 @@ it("refuses a session a newer CLI wrote than the one here, naming what to update
   await take();
 });
 
-it("refuses, before anything is written, a thread whose agent's conversations stay, or whose Claude account is not here", () => {
+it("refuses, before anything is asked of the other place, a thread whose agent's conversations stay, whose Claude account is not here, or whose CLI here can't say its version", async () => {
   const taken = { id: thread.id, claudeAccountId: "gone", children: [] };
-  expect(() => sessions().assertTakeable({ ...taken, agent: "acp" })).toThrow(new SessionRefused("This agent's conversations stay where they started."));
+  await expect(sessions().assertTakeable({ ...taken, agent: "acp" })).rejects.toThrow(new SessionRefused("This agent's conversations stay where they started."));
   const environment = () => ({ env: {}, binaries: { claude: null, codex: null, opencode: null } }) as never;
   const real = new AgentSessions({ db, dataDir: path.join(root, "data"), homes: agentHomes({ environment, claudeFolder: () => null }) });
-  expect(() => real.assertTakeable({ ...taken, agent: "claude" })).toThrow(new SessionRefused("Its Claude account is not here."));
-  expect(() => real.assertTakeable({ ...taken, agent: "codex" })).not.toThrow();
+  await expect(real.assertTakeable({ ...taken, agent: "claude" })).rejects.toThrow(new SessionRefused("Its Claude account is not here."));
+  await expect(sessions().assertTakeable({ ...taken, claudeAccountId: null, agent: "claude" })).resolves.toBeUndefined();
+  await writeFile(cli, "#!/bin/sh\necho 'not a version' >&2\nexit 1\n");
+  const refused = await sessions()
+    .assertTakeable({ ...taken, claudeAccountId: null, agent: "claude" })
+    .catch((error: unknown) => error as SessionRefused);
+  expect(refused).toEqual(new SessionRefused("Claude Code didn't say which version it is. Check it in Settings > Connections, then try again."));
+  expect(String(refused?.cause), "the CLI's path and words, for the log").toContain("not a version");
 });
 
 describe("a take cut short by a crash", () => {

@@ -2,6 +2,7 @@ import { Command } from "cmdk";
 import { HOSTED_REASONS } from "@openorc/protocol";
 import { useRpc } from "../lib/client";
 import { useRouter } from "../lib/router";
+import { useSpaceRpc } from "../lib/space-queries";
 import { HostedControlReason } from "./HostedControlReason";
 
 /**
@@ -15,7 +16,8 @@ export function usePaletteSearch(open: boolean, query: string) {
   const thread = useRpc("threads.get", { id: threadId ?? "" }, { enabled: open && Boolean(threadId) });
   const ready = !threadId || thread.isSuccess;
   // Messages match by prefix from two characters on, across every thread's conversation.
-  const hits = useRpc("threads.search", { query, limit: 20 }, { enabled: open && ready && query.trim().length >= 2, staleTime: 5_000 });
+  // In the window's space, so its cloud threads are searched where they are kept, beside this Mac's.
+  const hits = useSpaceRpc("threads.search", { query, limit: 20 }, { enabled: open && ready && query.trim().length >= 2, staleTime: 5_000 });
   const reason = hits.error?.message === HOSTED_REASONS.search ? HOSTED_REASONS.search : null;
   // Until the open thread's place is known, nothing found earlier is shown.
   return { hits: ready && !reason ? (hits.data ?? []) : [], reason, cloudThread: thread.data?.owner?.brain === "hosted", fetching: hits.isFetching };

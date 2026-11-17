@@ -5,6 +5,7 @@ import { HOSTED_REASONS } from "@openorc/protocol";
 import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 import { useRouter } from "../lib/router";
+import { spaceNavigation } from "../lib/space-navigation";
 import { useUi } from "../lib/ui";
 import { CommandPalette } from "./CommandPalette";
 import { cloudReviewThread, localReviewThread } from "./test-fixtures/hosted-review";
@@ -29,6 +30,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 it.each([true, false])("searches messages from a thread in either place, the cloud's too (cloud=%s)", async (cloud) => {
+  spaceNavigation.setState({ current: "space-1" });
   const thread = cloud ? cloudReviewThread : localReviewThread;
   useRouter.setState({ route: { view: "thread", threadId: thread.id } });
   queryClient.setQueryData(["threads.get", { id: thread.id }], thread);
@@ -53,7 +55,8 @@ it.each([true, false])("searches messages from a thread in either place, the clo
     </QueryClientProvider>,
   );
   fireEvent.change(screen.getByRole("combobox"), { target: { value: "example" } });
-  await vi.waitFor(() => expect(core.call).toHaveBeenCalledWith("threads.search", expect.objectContaining({ query: "example" })));
+  // Asked in the window's space, which is what reaches its cloud threads.
+  await vi.waitFor(() => expect(core.call).toHaveBeenCalledWith("threads.search", expect.objectContaining({ query: "example", spaceId: "space-1" })));
   expect(await screen.findByText("The example match")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Search messages" })).toBeNull();
 });

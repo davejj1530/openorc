@@ -63,6 +63,11 @@ export class PlaceRouter {
     if (chat && isTeamChatMethod(method) && !runsOrcling(method, params)) return this.chatted(teamChatCalls(chat, noOrclingRunner), request, method, params);
     if (typeof params["spaceId"] === "string" && ["threads.list", "threads.resolvedCount", "threads.search", "threads.start", "threads.readyStart", "tasks.list"].includes(method))
       return this.scoped.handle(request, params["spaceId"]);
+    return this.placed(place, request, method, params);
+  }
+
+  /** A call with no space named: the place's own, the starts made there, and what it holds; the rest goes on as before. */
+  private placed(place: HostedThreads | null, request: RpcRequest, method: RpcMethod, params: Record<string, unknown>): Promise<RpcReply> {
     if (method.startsWith("hosted.")) return this.hostedRequest(place, request, method as RoutedMethod, params);
     if (!place?.active) return this.deps.next(request);
     if (method === "projects.get" && place.holds({ project: String(params["id"]) })) return Promise.resolve(result(request, place.project(String(params["id"]))));

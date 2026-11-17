@@ -43,6 +43,14 @@ async function withThread(seed: { status?: "idle" | "working" } = {}) {
   return { hosted, thread, project, run: hostedRunId(thread) };
 }
 
+it("starts in a project the window lists before this Mac's thread list has heard it, as just after sign-in", async () => {
+  const { hosted } = await withThread();
+  // On the server since the thread list was read: the window may list it already, from the spaces' own read.
+  const added = stand.addProject(ADA, { name: "site", fullName: "altalogy/site" });
+  const made = await hosted.threads.call("threads.start", { projectId: `${CLOUD_PROJECT}${added}`, spaceId: SPACE, prompt: "Start the site", ...SETTINGS });
+  expect(made.thread.title).toBe("Start the site");
+});
+
 /** A finished upload of Ada's for a hosted thread, as the composer leaves it: its path in the thread's log form. */
 async function uploaded(hosted: Hosted, project: string, name: string, text: string): Promise<string> {
   const status = hosted.spaces.status();

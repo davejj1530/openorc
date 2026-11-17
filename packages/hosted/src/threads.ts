@@ -278,7 +278,7 @@ export class Threads implements HostedThreads {
   async startThread(params: RpcParams<"threads.start">): Promise<RpcResults["threads.start"]> {
     const settings = startSettings(params);
     if (!isHostedAgent(settings.agent)) throw new Refused(`${harnessShortName(settings.agent)} doesn't run on OpenOrc Cloud.`);
-    const project = this.#projectFor(params.projectId, params.spaceId);
+    const project = await this.#startProject(params.projectId, params.spaceId);
     if (!project) throw new Refused(params.spaceId ? "This project isn't available in this space." : "Add this project to OpenOrc Cloud in Settings first.");
     const under = this.#parentIn(params.parentThreadId, project);
     // The person's own skills are the server's before the thread's first turn: a failure starts no thread.
@@ -331,6 +331,17 @@ export class Threads implements HostedThreads {
   async macStartOffered(macProjectId: string, spaceId?: string): Promise<boolean> {
     const project = this.#projectFor(macProjectId, spaceId);
     return project ? macStartServed(this.deps.session.in(project.space)) : false;
+  }
+
+  /**
+   * The project a start is in. One not heard yet is read for once more before the start is refused: the window lists a
+   * space's projects from the spaces' own read (spaces.ts), which can be ahead of this list, as just after sign-in.
+   */
+  async #startProject(macId: string, spaceId?: string): Promise<HeardProject | null> {
+    const heard = this.#projectFor(macId, spaceId);
+    if (heard) return heard;
+    await this.refresh();
+    return this.#projectFor(macId, spaceId);
   }
 
   /** Explicit scopes select that space's project. Legacy starts prefer Personal, then another matching space. */

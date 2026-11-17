@@ -72,6 +72,7 @@ import { docHref } from "../../data/docs";
     <p>The model reviews in a thread of its own, named <code>Review #&lt;number&gt;: &lt;title&gt;</code>, in Plan mode. It works on a separate copy of the pull request on no branch, so your checkout isn't touched. It records each finding as a draft comment on the changed line and finishes with a summary. Its comments join your draft, labeled with the model's name. A link beside <strong>Reviewer</strong> opens the review thread. It says the model is reviewing while it works, and reads <strong>Review conversation</strong> once it is done.</p>
     <p>After the author pushes again, choose <strong>Review again</strong>. The same thread continues on the new commits, checks whether its earlier findings were addressed and comments only on what is left or new. A draft with comments on the older commits has to be posted or discarded first. If you resolved the review thread, the next review starts a fresh one.</p>
     <p>The model can't post, push or change files. You edit or remove its comments and decide what to submit.</p>
+    <p>For a project that is only on OpenOrc Cloud, with no folder on this computer, the review runs in a cloud thread, and the picker offers the models OpenOrc Cloud runs. OpenOrc Cloud keeps the draft. An Orcling can't review there.</p>
   </section>
 
   <section aria-labelledby="submit">
@@ -92,7 +93,7 @@ import { docHref } from "../../data/docs";
     <h2 id="requirements">What it needs</h2>
     <ul>
       <li>The GitHub CLI, installed and signed in. Run <code>gh auth login</code> in a terminal. Without <code>gh</code>, the view says <strong>GitHub CLI not found</strong>.</li>
-      <li>A project whose remote is on GitHub.</li>
+      <li>A project whose remote is on GitHub, or a GitHub project on OpenOrc Cloud.</li>
       <li>To let a model review, an agent you are signed in to.</li>
       <li>To post as a bot, a reviewer app: in <strong>Settings</strong>, open <strong>Connections</strong>, find <strong>Reviewer app</strong> under GitHub and choose <strong>Set up</strong>. The app can approve only when <strong>Let it approve</strong> is on. See <a href={docHref("settings")}>Settings</a>.</li>
     </ul>

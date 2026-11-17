@@ -74,6 +74,10 @@ import { docHref } from "../../data/docs";
             <td>The tools that run simulators and emulators, and their state, once you turn on device support</td>
           </tr>
           <tr>
+            <td><code>cloud-copies/</code></td>
+            <td>Copies of cloud threads' code, one folder per thread, made by <strong>Open on Mac</strong> and the <strong>Files</strong> tab of a cloud thread, each from the thread's newest saved work</td>
+          </tr>
+          <tr>
             <td><code>kept-sessions/</code></td>
             <td>Copies of an agent's session that a newer copy replaced when a thread moved to or from the cloud, so none is lost. They go when the thread is deleted.</td>
           </tr>
@@ -349,6 +353,7 @@ import { docHref } from "../../data/docs";
       <li><strong>A cloud thread</strong>, deleted by the person who started it or an admin: its conversation, subthreads, changes, saved work, and the files sent to it. Its folder on the machine ends.</li>
       <li><strong>A cloud project</strong>, removed in Settings → Cloud: the project and all its cloud threads. A folder on your Mac stays as it is.</li>
       <li><strong>An organization</strong>, deleted by an admin: its projects, threads, files, and activity, for everyone.</li>
+      <li><strong>Your account</strong>, deleted in Settings → Account: everything in your Personal space, your sign-ins, connectors, skills, and machines, and your place in each organization. See <a href={docHref("cloud") + "#delete"}>Delete your account</a>.</li>
       <li><strong>A sign-in for the cloud</strong>, removed in Settings → Cloud: the server's copy. Revoke it with its provider to stop it working.</li>
     </ul>
     <p class="docs-source">Source: the OpenOrc Cloud server's saves, retention, thread, and upload modules; <code>apps/desktop/src/renderer/src/views/settings-cloud-projects.tsx</code>, <code>dialogs/OrganizationMembershipDialog.tsx</code></p>

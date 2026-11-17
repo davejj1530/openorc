@@ -25,6 +25,15 @@ import { docHref } from "../../data/docs";
     <p>Cloud threads support Claude Code, Codex, and OpenCode. Other agents run on your computer only.</p>
   </section>
 
+  <section aria-labelledby="whats-new">
+    <h2 id="whats-new">After the update</h2>
+    <p>
+      The first time OpenOrc opens after the update that brought OpenOrc Cloud, it shows a few steps, one at a time: threads that keep working with your Mac closed, working with your team, and your cloud threads on your phone. Each has a
+      way to try it, such as <strong>Sign in</strong>, <strong>Open Cloud settings</strong>, <strong>Create organization</strong>, or <strong>Open Phone settings</strong>, and <strong>Next</strong>. Closing them, any way, closes them for
+      good. A phone paired before the update shows its own steps once too.
+    </p>
+  </section>
+
   <section aria-labelledby="account">
     <h2 id="account">Sign in</h2>
     <p>Sign-up is by invitation for now. Someone who uses OpenOrc Cloud invites you to an organization by email, and you sign in with that address.</p>
@@ -108,6 +117,29 @@ import { docHref } from "../../data/docs";
       <a href={docHref("settings") + "#cloud"}>Settings</a> describes every row. Run <strong>Check</strong> first when something about cloud threads doesn't work. It tries <strong>Reach OpenOrc Cloud</strong>, <strong>Your Pro and hours</strong>,
       each agent's sign-in, <strong>Your GitHub</strong>, and <strong>Start a test machine</strong>, which costs you no hours.
     </p>
+  </section>
+
+  <section aria-labelledby="delete">
+    <h2 id="delete">Delete your account</h2>
+    <ol class="docs-steps">
+      <li>Open Settings → <strong>Account</strong> and click <strong>Delete…</strong> beside <strong>Delete account</strong>.</li>
+      <li>Read what goes with it. The dialog lists it, one item to a line.</li>
+      <li>Type your email address to confirm, then click <strong>Send code</strong>.</li>
+      <li>Enter the <strong>Code from your email</strong> and click <strong>Delete account</strong>.</li>
+    </ol>
+    <p>The deletion takes effect at once, with no waiting period, and can't be undone. Every app of yours is signed out. What goes:</p>
+    <ul>
+      <li>Your Personal space, with its cloud threads, projects, and saved work.</li>
+      <li>Your cloud sign-ins, connectors, skills, and machines.</li>
+      <li>Your Pro, ending now without a refund.</li>
+      <li>An organization you are the only member of, with everything in it. Its seats end without a refund.</li>
+      <li>Your place in every other organization. What you wrote there stays, shown without your name.</li>
+    </ul>
+    <p>
+      If you are the only admin of an organization with other members, the deletion waits: <strong>Make someone else an admin first, or remove its other members.</strong> Threads on this computer stay, since they were never in
+      OpenOrc Cloud.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/dialogs/AccountDeletionDialog.tsx</code>, the OpenOrc Cloud server's account deletion module</p>
   </section>
 
   <section aria-labelledby="next-steps">

@@ -76,7 +76,7 @@ import { docHref } from "../../data/docs";
     <h2 id="bring">Bring the work to your Mac</h2>
     <p>
       The <strong>Changes</strong> panel, <strong>Review changes</strong> on a turn, and the <strong>Commits</strong> panel work in a cloud thread as in any thread. <strong>Commits</strong> marks commits that are only <strong>In the
-      cloud</strong> or <strong>Not pushed</strong>, and opens a commit's changes when you click it.
+      cloud</strong> or <strong>Not pushed</strong>, and opens a commit's changes when you click it. A file a command in the thread's terminal changes shows in <strong>Changes</strong> as well.
     </p>
     <ul>
       <li><strong>A GitHub project:</strong> <strong>Commit</strong>, then <strong>Publish branch</strong> or <strong>Push</strong>, then <strong>Open a pull request</strong>. The branch goes to GitHub from the machine.</li>
@@ -86,6 +86,33 @@ import { docHref } from "../../data/docs";
       </li>
     </ul>
     <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/panels/HostedCommitsPanel.tsx</code>, <code>HostedPublishControls.tsx</code>, <code>HostedBring.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="move">
+    <h2 id="move">Move a thread between your Mac and the cloud</h2>
+    <p>A thread can move, with its conversation and its work, between this computer and OpenOrc Cloud. It keeps its place in your list.</p>
+    <ol class="docs-steps">
+      <li>Open the thread's menu. Its first rows say where it works.</li>
+      <li>On a thread on your Mac, point at its branch and choose <strong>Move to OpenOrc Cloud</strong>. On a cloud thread, point at <strong>OpenOrc Cloud</strong> and choose <strong>Move to Mac</strong>. On Windows and Linux, the app says "this computer" where it says Mac here.</li>
+      <li>If the move needs you to know something first, a dialog asks, such as <strong>Move to OpenOrc Cloud?</strong> for a project in an organization, or <strong>Move to this Mac?</strong> with what leaving its cloud machine ends, such as a running terminal. Click <strong>Move</strong>.</li>
+    </ol>
+    <p>While it moves, the menu says <strong>Moving to OpenOrc Cloud</strong> or <strong>Moving to Mac</strong>, and nothing else can be done to the thread. A move that can't go now is dimmed and says why when you point at it:</p>
+    <ul>
+      <li><strong>The agent is still working. Move it once it stops.</strong></li>
+      <li><strong>Add this project to OpenOrc Cloud in Settings first.</strong></li>
+      <li>The thread's agent doesn't run on OpenOrc Cloud, or the project isn't on this computer.</li>
+      <li><strong>Only a thread in your own space can move to this Mac.</strong></li>
+    </ul>
+    <p>
+      A move that fails is undone, and the thread stays where it was. A card above the composer says <strong>Didn't move to OpenOrc Cloud.</strong> or <strong>Didn't move to this Mac.</strong>, with the reason. Subagent threads,
+      Orclings, and threads a task opened don't move.
+    </p>
+    <h3>Read a cloud thread's code on your Mac</h3>
+    <p>
+      To look at a cloud thread's code without moving it, point at <strong>OpenOrc Cloud</strong> in its menu and choose <strong>Open on Mac</strong>. OpenOrc makes a copy of the thread's newest saved work in a folder on this computer,
+      or brings an earlier copy up to date, and opens it in the Finder. The copy is for reading. It needs the project on this computer and a save of the thread's work.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/components/ThreadPlaceItems.tsx</code>, <code>CloudMoveDialog.tsx</code>, <code>HostedSendNotice.tsx</code>, <code>packages/core/src/services/cloud-moves.ts</code></p>
   </section>
 
   <section aria-labelledby="bring-along">
@@ -116,10 +143,16 @@ import { docHref } from "../../data/docs";
       <li><strong>Terminal.</strong> The Terminal opens a shell on the thread's machine. What you run there counts toward your hours, and teammates in the thread can watch it. It ends on its own after a while with nothing typed or printed.</li>
       <li><strong>Subthreads.</strong> Subthreads the agent starts appear under the thread, as on your Mac.</li>
       <li><strong>Compact.</strong> <code>/compact</code> or <strong>Compact context</strong> folds the conversation between turns.</li>
+      <li><strong>Fork.</strong> <strong>Fork</strong> in the thread's menu, or <code>/fork</code>, continues the conversation in a new cloud thread of your own, with a copy of the work on a branch and folder of its own.</li>
+      <li><strong>Models.</strong> The model picker lists the models OpenOrc Cloud runs, read from its machines' own agents, whatever agents your Mac has.</li>
+      <li><strong>Files.</strong> The <strong>Files</strong> tab browses a copy of the thread's newest saved work. Point at <strong>Refresh files</strong> to see how old the copy is, and click it to save the thread's work again and update the copy. If saving would end something running on the machine, a dialog says what first.</li>
+      <li><strong>Whole output.</strong> A step's full tool output opens as it does in a thread on your Mac.</li>
+      <li><strong>Usage.</strong> The account chip in a cloud thread shows the usage of your cloud sign-in for its agent, as the cloud last read it.</li>
+      <li><strong>Search.</strong> The command palette's search finds messages and notes in cloud threads, and opens the thread at the note.</li>
       <li><strong>Tasks.</strong> <strong>Open thread</strong> on a team task puts <code>Work on "…" in this thread.</code> in the composer. Your message then carries the task, and the agent can read and update it.</li>
     </ul>
     <p>
-      Some controls of a Mac thread aren't available in a cloud thread yet. They stay in place, dimmed, and say why when you point at them, such as <strong>Forking a cloud thread isn't available yet.</strong>
+      Some controls of a Mac thread aren't available in a cloud thread yet. They stay in place, dimmed, and say why when you point at them, such as <strong>Memory isn't available in this cloud thread yet.</strong>
     </p>
     <Callout>
       Delete a cloud thread from its menu, as you would any thread. Only the person who started it, or an organization's admin, can delete it. Its conversation, saved work, subthreads, and the files sent to it are deleted from OpenOrc

@@ -94,6 +94,12 @@ it("starts a model on the head the app read, writes the person's comments and su
   expect(seen.pushes.filter((push) => JSON.stringify(push) === JSON.stringify({ type: "invalidate", keys: ["pull-reviews"] }))).toHaveLength(4);
 });
 
+it("has the app read the draft again when the server says on the socket that it changed", async () => {
+  const before = seen.pushes.length;
+  stand.tell(email, ["pull-reviews"]);
+  await vi.waitFor(() => expect(seen.pushes.slice(before)).toContainEqual({ type: "invalidate", keys: ["pull-reviews"] }));
+});
+
 it("refuses a project OpenOrc Cloud doesn't have, asking nothing", async () => {
   await expect(hosted.pullReviews.get({ projectId: "mac-only", number: 7 })).rejects.toThrow("This project isn't on OpenOrc Cloud.");
   expect(requests).toEqual([]);

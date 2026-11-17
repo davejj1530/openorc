@@ -9,6 +9,7 @@
 import type { CorePush, PullRequestDraftComment, PullRequestReview } from "@openorc/protocol";
 import { Refused, type Requests, type Session } from "./session.js";
 import { PULL_REVIEW_ROUTES, type WirePullReview, type WirePullReviewComment } from "./wire-pull-reviews.js";
+import { SOCKET, wireTopics } from "./wire.js";
 
 type Key = { projectId: string; number: number };
 type Reviewer = { agent: string; model: string | null; effort: string | null };
@@ -28,7 +29,13 @@ export class CloudPullReviews {
       project(projectId: string): { id: string; space: string } | null;
       push(push: CorePush): void;
     },
-  ) {}
+  ) {
+    // The server says so on `pull-reviews` whenever the person's draft changes: the model's tools, another of their apps.
+    deps.session.onSocket(SOCKET.changed, (body) => {
+      const topics = wireTopics.safeParse(body);
+      if (topics.success && topics.data.topics.includes("pull-reviews")) this.#changed();
+    });
+  }
 
   async get(key: Key): Promise<PullRequestReview | null> {
     const { on, id } = this.#at(key.projectId);
@@ -84,11 +91,6 @@ export class CloudPullReviews {
       summary: sent.summary,
       modelSummary: sent.modelSummary,
     });
-    this.#changed();
-  }
-
-  /** The draft changed on the server, by the model's tools or another of the person's apps: read it again. */
-  heard(): void {
     this.#changed();
   }
 

@@ -133,6 +133,8 @@ export interface StandIn {
   spaces: StandInSpaces;
   /** Whether someone is at one of the person's computers, as the server asks before an alert: their own live sockets, a second at most. */
   presence(email: string, ms?: number): Promise<boolean>;
+  /** Tells the person's apps that these topics of their own space changed, as the server does of what it keeps for them. */
+  tell(email: string, topics: string[]): void;
   /**
    * Phones registered for alerts about cloud threads, the server's sender state and key, and Apple, which records what
    * `alert` hands it: as the server alerts at an ask or a turn's end, once `sender` is "ready".
@@ -389,8 +391,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     requests,
     ...lifetime,
     connect: (_url, token) => inProcessSocket(token, { holder, peers, admit, serving: isServing, answer: answerSocket }),
-    presence,
-    push,
+    ...tellingFace(presence, push, tell),
   };
 }
 
@@ -548,6 +549,11 @@ type PersonRoute = (method: string, path: string, who: string, body: Record<stri
 /** The routes about the person alone, asked in turn: the first that serves the request answers it. */
 function personRoutes(...routers: { route: PersonRoute }[]): PersonRoute {
   return (method, path, who, body) => routers.reduce<Reply | null>((reply, router) => reply ?? router.route(method, path, who, body), null);
+}
+
+/** What the server says to a person's apps of its own accord: its ask before an alert, their phones' alerts, and topics of their own space. */
+function tellingFace(presence: StandIn["presence"], push: StandIn["push"], tell: (who: string, topics: string[]) => void): Pick<StandIn, "presence" | "push" | "tell"> {
+  return { presence, push, tell: (email, topics) => tell(email.toLowerCase(), topics) };
 }
 
 /** Tells a person's sockets which space changed, defaulting personal topics to their own space. */

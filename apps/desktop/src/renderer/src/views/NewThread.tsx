@@ -21,6 +21,7 @@ import { usePermissionSelection, useRpc, useRpcMutation } from "../lib/client";
 import { useNewThreadHosted } from "../lib/cloud-offered";
 import { CLOUD_MODEL_LIMITS } from "../lib/cloud-model-limits";
 import { useCloudStartReady } from "../lib/use-cloud-start-ready";
+import { useMounted } from "../lib/use-mounted";
 import { usePublishComposerAccount } from "../lib/composer-account";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useDefaultHarness } from "../lib/default-harness";
@@ -163,13 +164,7 @@ function NewThreadProject({
   const [storageError, setStorageError] = useState<string | null>(null);
   const { permission, select: setPermission, error: permissionError, ready: permissionReady } = usePermissionSelection();
   const start = useRpcMutation("threads.start");
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
+  const mounted = useMounted();
   const changeDraft = (patch: Partial<NewThreadDraft>) => {
     const next = { ...draft, ...patch };
     setStorageError(writeNewThreadDraft(next) ? null : "This draft could not be saved on your device. Keep this task open while you work.");

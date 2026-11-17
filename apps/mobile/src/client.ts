@@ -72,10 +72,7 @@ export const cloud = new PhoneCloud({
   kept: keptIn(kept),
   fetch,
   connect: liveSocketOf(io),
-  push: (push) => {
-    routed.cloudPush(push);
-    if (push.type === "invalidate" && push.keys.includes("account")) heldChanged();
-  },
+  push: (push) => routed.cloudPush(push),
   projects: () => macProjects(),
   now: Date.now,
   log: { info: () => undefined, warn: (message) => console.warn(`[OpenOrc] ${message}`) },
@@ -189,7 +186,7 @@ function macProjects() {
   return (client.queryClient.getQueryData<Project[]>(["projects.list", {}]) ?? []).map((project) => ({ id: project.id, name: project.name, remote: project.gitRemote }));
 }
 
-const holds = () => cloud.hosted?.account.status().state === "signed-in";
+const holds = () => cloud.holds;
 // Holding a session of its own, the phone reads the cloud itself: it no longer asks the Mac for cloud threads.
 link.connection.askFor(() => (holds() ? PHONE_CAPABILITIES.filter((capability) => capability !== CLOUD_THREADS) : PHONE_CAPABILITIES));
 /**

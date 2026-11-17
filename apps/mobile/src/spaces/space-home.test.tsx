@@ -118,6 +118,17 @@ it("asks a space for the person's own threads once they choose Mine, and leaves 
   });
 });
 
+it("reads its spaces from a session of its own, though the Mac no longer shares cloud threads with it", async () => {
+  mac.status = ready([personal, birch]);
+  const spaces = renderHook(() => useSpaces(), { wrapper: mac.phone!.wrapper });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(spaces.result.current).toEqual({ state: "none" });
+  act(() => mac.phone!.cloud.hold(true));
+  await waitFor(() => expect(spaces.result.current).toMatchObject({ state: "ready", current: { id: personal.id } }));
+  act(() => mac.phone!.cloud.hold(false));
+  await waitFor(() => expect(spaces.result.current).toEqual({ state: "none" }));
+});
+
 it("shows Personal again when the space chosen on this phone is no longer the person's", async () => {
   mac.phone!.shared.add("cloud-threads");
   mac.status = ready([personal, birch]);

@@ -34,14 +34,30 @@ export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<
   const saved = new Map<string, string>();
   const storage = new ScratchStore({ getString: (key) => saved.get(key), set: (key, value) => void saved.set(key, value), remove: (key) => void saved.delete(key) });
   const link = { connection, getState: () => connected, subscribe: () => () => undefined, retry: async () => undefined };
+  const cloudListeners = new Set<() => void>();
+  const cloud = {
+    holds: false,
+    subscribe: (listener: () => void) => {
+      cloudListeners.add(listener);
+      return () => void cloudListeners.delete(listener);
+    },
+    /** The phone comes to hold a session of its own, or lets it go. */
+    hold(held: boolean) {
+      cloud.holds = held;
+      cloudListeners.forEach((listener) => listener());
+    },
+  };
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: client.queryClient }, children);
   return {
     saved,
     shared,
     wrapper,
+    /** The phone's own cloud as the client sees it: none until a test holds one. */
+    cloud,
     module: {
       client,
       link,
+      cloud,
       queryClient: client.queryClient,
       storage,
       shownMacId: () => "mac-1",

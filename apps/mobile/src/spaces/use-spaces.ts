@@ -1,11 +1,13 @@
 import { CLOUD_THREADS, type OrganizationAccess, type Space } from "@openorc/protocol";
 import { useRpc } from "../client";
 import { useShares } from "../connection/use-shares";
+import { useOwnCloud } from "../cloud/use-own-cloud";
 import { useChosenSpace } from "./space-choice";
 
 /**
- * The OpenOrc account as this phone reads it through the Mac it shows:
- *   none        the Mac shares no cloud threads, has no account, or has not answered yet: Home is the Mac's alone
+ * The OpenOrc account as this phone reads it: from a session of its own, or through the Mac it shows:
+ *   none        no session of its own, and the Mac shares no cloud threads, has no account, or has not answered yet:
+ *               Home is the Mac's alone
  *   signed-out  nobody is signed in on the Mac
  *   ready       the person's spaces, the one Home shows, and whether an organization is open to them
  */
@@ -35,10 +37,12 @@ export function closedToPerson(space: Space, access: OrganizationAccess | null, 
 }
 
 export function useSpaces(): PhoneSpaces {
+  const own = useOwnCloud();
   const shares = useShares(CLOUD_THREADS);
-  const status = useRpc("spaces.status", {}, { enabled: shares === true, refetchInterval: 60_000 }).data;
+  const reads = own || shares === true;
+  const status = useRpc("spaces.status", {}, { enabled: reads, refetchInterval: 60_000 }).data;
   const chosen = useChosenSpace();
-  if (!shares || !status) return { state: "none" };
+  if (!reads || !status) return { state: "none" };
   if (status.state === "signed-out") return { state: "signed-out" };
   if (status.state !== "ready") return { state: "none" };
   const personal = status.spaces.find((space) => space.id === status.personalSpaceId);

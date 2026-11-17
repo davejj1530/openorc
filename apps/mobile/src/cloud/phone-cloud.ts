@@ -54,6 +54,11 @@ export class PhoneCloud {
     return this.#hosted ? this.#server : null;
   }
 
+  /** Whether the phone holds a session of its own that is signed in now. */
+  get holds(): boolean {
+    return this.#hosted?.account.status().state === "signed-in";
+  }
+
   /** The phone's own account while it holds a session; null while it holds none. */
   get hosted(): Hosted | null {
     return this.#hosted;
@@ -123,7 +128,11 @@ export class PhoneCloud {
       projects: this.deps.projects,
       fetch: this.deps.fetch,
       connect: this.deps.connect,
-      push: this.deps.push,
+      push: (push) => {
+        this.deps.push(push);
+        // The account's standing changed, signed out by the server among it: whoever follows the session hears.
+        if (push.type === "invalidate" && push.keys.includes("account")) this.#told();
+      },
       // OS alerts for cloud threads come from the server, not from here.
       notify: () => undefined,
       deviceName: PHONE_DEVICE,

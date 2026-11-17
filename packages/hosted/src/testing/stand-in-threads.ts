@@ -161,6 +161,8 @@ export class StandInThreads {
   readonly #starts = new Map<string, Reply>();
   /** Every ready ask the stand-in stored, in order. */
   readonly readies: { threadId: string; settings: unknown }[] = [];
+  /** Every compaction asked, in order: the agent folds the conversation as the asker's own turn, which tests end with `endTurn`. */
+  readonly compactions: { threadId: string; who: string; body: Record<string, unknown> }[] = [];
   /** Every POST /hosted/threads body, in order, with the space it named. */
   readonly started: { space: string; body: Record<string, unknown> }[] = [];
   /** Capabilities, files on messages and the files unit's rules. */
@@ -258,18 +260,32 @@ export class StandInThreads {
       const read = [...this.#threads.values()].filter((thread) => this.#reads(as.who, thread) && thread.space === as.space).sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
       return { status: 200, body: { threads: read.map((thread) => this.#rowOf(thread, as.who)) } };
     }
-    const match = /^\/hosted\/threads\/([^/]+)(\/events|\/commands\/([^/]+)\/stop)?$/.exec(path);
+    const match = /^\/hosted\/threads\/([^/]+)(\/events|\/compact|\/commands\/([^/]+)\/stop)?$/.exec(path);
     if (!match) return null;
     const thread = this.#readable(as, decodeURIComponent(match[1]!));
     if (!thread) return missing();
     if (method === "GET" && match[2] === "/events") return { status: 200, body: pageOf(thread, query) };
     if (!match[2]) return this.#one(method, thread, as.who, body);
+    if (method === "POST" && match[2] === "/compact") return this.#compact(thread, as.who, body);
     if (method !== "POST" || !match[3]) return null;
     if (thread.owner !== as.who && !this.collaboration.sharedWrites) return READ_ONLY;
     const commandId = decodeURIComponent(match[3]);
     thread.stopped.push(commandId);
     this.#released(thread, commandId);
     return { status: 204, body: null };
+  }
+
+  /** As the server takes Compact: refused while a turn runs, otherwise the asker's own turn, which starts at once. */
+  #compact(thread: Thread, who: string, body: Record<string, unknown>): Reply {
+    if (thread.owner !== who && !this.collaboration.sharedWrites) return READ_ONLY;
+    const again = this.compactions.some((asked) => asked.threadId === thread.id && asked.who === who && asked.body["id"] === body["id"]);
+    this.compactions.push({ threadId: thread.id, who, body });
+    if (again) return { status: 200, body: { compacting: true } };
+    if (thread.turn) return { status: 409, body: { message: "Wait for the current turn to finish before compacting.", statusCode: 409 } };
+    this.#startTurn(thread, who);
+    thread.status = "working";
+    this.#changed(thread);
+    return { status: 200, body: { compacting: true } };
   }
 
   /** A stopped command no longer holds the thread's handoff; once none does, the next sender may start. */

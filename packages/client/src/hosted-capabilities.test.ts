@@ -26,3 +26,10 @@ it("offers a person's subthread in a cloud thread only once its server says so, 
   // A control the server doesn't answer for stays held in the app's words, whatever it answers.
   expect(hostedControlReason(cloud, "fork", served({ available: true }))).toBe(HOSTED_REASONS.fork);
 });
+
+it("offers Compact in a cloud thread only once its server says so, and an older server's thread keeps the app's words", () => {
+  const served = (compact: HostedCapabilities["features"]["compact"]): HostedCapabilities => ({ version: 1, features: { compact } });
+  expect(hostedControlReason(cloud, "compact", served({ available: true }))).toBeNull();
+  expect(hostedControlReason(cloud, "compact", served(undefined))).toBe(HOSTED_REASONS.compact);
+  expect(hostedControlReason(cloud, "compact")).toBe("Checking cloud features…");
+});

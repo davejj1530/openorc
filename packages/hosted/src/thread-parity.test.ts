@@ -43,7 +43,6 @@ it.each([
   ["threads.messages", "Searching this cloud thread's full history isn't available yet."],
   ["threads.plans", "Saved plans aren't available in this cloud thread yet."],
   ["threads.checkpoints", "Restoring a cloud checkpoint isn't available yet."],
-  ["threads.compact", "Manual compaction isn't available for this cloud thread yet."],
   ["threads.fork", "Forking a cloud thread isn't available yet."],
 ] as const)("refuses %s with its specific reason instead of a false empty or generic refusal", async (method, reason) => {
   await expect(hosted.threads.call(method, { id })).rejects.toThrow(reason);
@@ -56,6 +55,16 @@ it.each([
   ["instructions.list", "Editing this cloud workspace's instructions isn't available yet."],
 ] as const)("does not claim unsupported %s is empty or local", async (method, reason) => {
   await expect(hosted.threads.call(method, { threadId: id })).rejects.toThrow(reason);
+});
+
+it("compacts through the server as the asker's own turn, the same request asked again being the same compaction", async () => {
+  const requestKey = crypto.randomUUID();
+  await expect(hosted.threads.call("threads.compact", { id, requestKey })).resolves.toBeNull();
+  await hosted.threads.call("threads.compact", { id, requestKey });
+  expect(stand.compactions).toEqual([expect.objectContaining({ threadId: id, body: { id: requestKey } }), expect.objectContaining({ threadId: id, body: { id: requestKey } })]);
+  await vi.waitFor(async () => expect(await hosted.threads.call("threads.get", { id })).toMatchObject({ activity: "running" }));
+  // A turn runs: the server refuses another compaction in the Mac's words.
+  await expect(hosted.threads.call("threads.compact", { id })).rejects.toThrow("Wait for the current turn to finish before compacting.");
 });
 
 it("refuses full output without substituting a Mac tool result", async () => {

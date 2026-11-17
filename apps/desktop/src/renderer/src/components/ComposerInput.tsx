@@ -20,7 +20,7 @@ import {
 } from "./composer-commands";
 import { ComposerSuggestions } from "./ComposerSuggestions";
 import { useHostedControlReason } from "./HostedConversationBoundary";
-import { blockHostedCommandKey, cloudCommandRows, hostedFileSuggestion, nextCommandSuggestion } from "./HostedComposerControls";
+import { blockHostedCommandKey, cloudCommandRows, holdsRows, hostedFileSuggestion, nextCommandSuggestion, useHeldCommands } from "./HostedComposerControls";
 import { TipAt } from "./TipLayer";
 import { ComposerSuggestionOption } from "./ComposerSuggestionOption";
 import { peopleRows, usePeopleMatches } from "./composer-people";
@@ -134,6 +134,8 @@ function askTook(event: KeyboardEvent, ask: ComposerInputProps["ask"], field: { 
 export function ComposerInput(props: ComposerInputProps) {
   const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, mentions, commands, onCommandsWanted, connectors, onConnectorsWanted } = props;
   const fileReason = useHostedControlReason("fileBrowser");
+  const { compact: heldCompact, fork: heldFork } = useHeldCommands();
+  const held = useMemo(() => ({ compact: heldCompact, fork: heldFork }), [heldCompact, heldFork]);
   const fileSearch = fileReason ? undefined : props.fileSearch;
   const [caret, setCaret] = useState(0);
   const [cursor, setCursor] = useState(0);
@@ -173,7 +175,7 @@ export function ComposerInput(props: ComposerInputProps) {
       ];
     }
     if (members.length) return members;
-    return cloudCommandRows(fileReason, commandMatches, { query: commandQuery, token, caret, value, write }, token);
+    return cloudCommandRows(held, commandMatches, { query: commandQuery, token, caret, value, write }, token);
   }, [
     memberQuery,
     memberMatches,
@@ -192,6 +194,7 @@ export function ComposerInput(props: ComposerInputProps) {
     write,
     picked.pick,
     fileReason,
+    held,
   ]);
   const suggestions = useMemo(() => (scope ? all.filter((row) => ofKind(row, scope)) : all), [all, scope]);
   // The skill under the pointer says what it is for.
@@ -260,7 +263,7 @@ export function ComposerInput(props: ComposerInputProps) {
         }}
         sources={sources}
         onKeyDown={(e) => {
-          if (blockHostedCommandKey(fileReason, value, e)) {
+          if (blockHostedCommandKey(held, value, e)) {
             setChosen(true);
             setKeyed(true);
             return true;
@@ -272,7 +275,7 @@ export function ComposerInput(props: ComposerInputProps) {
             e.preventDefault();
             setChosen(true);
             setKeyed(true);
-            setCursor((current) => nextCommandSuggestion(fileReason, suggestions, current, action === "down" ? 1 : -1));
+            setCursor((current) => nextCommandSuggestion(holdsRows(held, fileReason), suggestions, current, action === "down" ? 1 : -1));
             return true;
           }
           if (action === "pick" || action === "close") {

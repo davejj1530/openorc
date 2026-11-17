@@ -47,8 +47,7 @@ import type { ComposerEditorHandle } from "./composer-editor/ComposerEditor";
 import { ComposerSendCluster } from "./ComposerSendButton";
 import { useDraftNote, type ComposerNotes } from "./composer-notes";
 import { ContextUsage } from "./ContextUsage";
-import { useHostedControlReason } from "./HostedConversationBoundary";
-import { hostedCommandReason } from "./HostedComposerControls";
+import { hostedCommandReason, useHeldCommands, type HeldCommands } from "./HostedComposerControls";
 import { Cloud, Eye, Laptop, Lightbulb, ShieldCheck, ShieldOff } from "./icons";
 import { type PickerAccounts } from "./ModelPickerAccounts";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
@@ -254,7 +253,7 @@ function ComposerAlerts({ message, changes }: { message: ReactNode; changes: Com
 }
 
 export function Composer(props: ComposerProps) {
-  props = guardHostedCommand(props, useHostedControlReason("compact"));
+  props = guardHostedCommand(props, useHeldCommands());
   const isNewThread = props.presentation === "new-thread";
   const shell = useRef<HTMLDivElement>(null);
   const fitBar = useComposerFit();
@@ -456,8 +455,9 @@ function messageSends(
   return Boolean(props.allowEmpty || props.value.trim() || attachments > 0);
 }
 
-function guardHostedCommand(props: ComposerProps, hosted: string | null): ComposerProps {
-  return hosted ? { ...props, disabledReason: props.disabledReason ?? hostedCommandReason(props.value) } : props;
+function guardHostedCommand(props: ComposerProps, held: HeldCommands): ComposerProps {
+  const reason = hostedCommandReason(held, props.value);
+  return reason ? { ...props, disabledReason: props.disabledReason ?? reason } : props;
 }
 
 /** Context remains readable when the composer cannot act; compaction shares the controls' reason. */

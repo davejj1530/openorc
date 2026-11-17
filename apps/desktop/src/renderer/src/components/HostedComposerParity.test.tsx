@@ -2,7 +2,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createRef, useState, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { HOSTED_REASONS } from "@openorc/protocol";
+import { HOSTED_REASONS, type HostedCapabilities } from "@openorc/protocol";
 import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 import { Composer, type ComposerProps } from "./Composer";
@@ -16,9 +16,15 @@ import { PickerAccountRows } from "./ModelPickerAccounts";
 import { cloudReviewThread } from "./test-fixtures/hosted-review";
 import { messageOf, press, type } from "./composer-editor/testing";
 
+/** What the cloud thread's server serves: nothing by default, as a server from before Compact. */
+let served: HostedCapabilities["features"] = {};
 beforeEach(() => {
   queryClient.clear();
-  vi.spyOn(core, "call").mockRejectedValue(new Error("Unexpected read"));
+  served = {};
+  vi.spyOn(core, "call").mockImplementation(async (method: string) => {
+    if (method === "hosted.capabilities") return { version: 1, features: served };
+    throw new Error("Unexpected read");
+  });
 });
 afterEach(() => {
   cleanup();
@@ -43,6 +49,32 @@ it("shows real context while disabling manual compaction with a focusable reason
   expect(await screen.findByText(HOSTED_REASONS.compact)).toBeTruthy();
   fireEvent.click(button);
   expect(compact).not.toHaveBeenCalled();
+});
+
+it("offers Compact context once the cloud thread's server serves it", async () => {
+  served = { compact: { available: true } };
+  const compact = vi.fn();
+  mount(<ContextUsage used={1500} window={10000} onCompact={compact} />);
+  fireEvent.click(screen.getByRole("button", { name: "Context usage" }));
+  await vi.waitFor(() => expect(screen.getByRole("button", { name: "Compact context" }).hasAttribute("disabled")).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: "Compact context" }));
+  expect(compact).toHaveBeenCalledOnce();
+});
+
+it("runs /compact as the app's command once the server serves it, while /fork keeps its reason", async () => {
+  served = { compact: { available: true } };
+  const submit = vi.fn(async () => {});
+  const compact = vi.fn();
+  mount(<Draft onSubmit={submit} commands={[{ name: "compact", hint: "Summarize", run: compact }]} />);
+  const field = screen.getByRole("textbox", { name: "Message" });
+  await act(async () => {});
+  type(field, "/", 1);
+  expect(await screen.findByRole("option", { name: "/compact Summarize" })).toBeTruthy();
+  expect(screen.getByRole("option", { name: "/fork" }).getAttribute("aria-disabled")).toBe("true");
+  type(field, "/compact", 8);
+  press(field, { key: "Enter" });
+  await vi.waitFor(() => expect(compact).toHaveBeenCalledOnce());
+  expect(submit).not.toHaveBeenCalled();
 });
 
 it("keeps project file mentions disabled without disabling uploads", async () => {
@@ -82,7 +114,12 @@ it("does not read or offer another local Claude account for a cloud turn", async
   expect(account.hasAttribute("disabled")).toBe(true);
   await act(async () => account.parentElement?.focus());
   expect(await screen.findByText(HOSTED_REASONS.claudeAccount)).toBeTruthy();
-  expect(core.call).not.toHaveBeenCalled();
+  expect(
+    vi
+      .mocked(core.call)
+      .mock.calls.map(([method]) => method)
+      .filter((method) => method !== "hosted.capabilities"),
+  ).toEqual([]);
 });
 
 const base: ComposerProps = {

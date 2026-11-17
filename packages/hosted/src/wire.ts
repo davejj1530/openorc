@@ -166,6 +166,8 @@ export type WireProject = z.infer<typeof wireProject>;
 export const wireSent = z.discriminatedUnion("sent", [z.object({ sent: z.literal(true), message: wireMessage }), z.object({ sent: z.literal(false), refusal: z.string() })]);
 
 /** A new thread with what became of its first message; a first message refused makes no thread. */
+/** A compaction asked for, or why the person could not start the agent for it now. */
+export const wireCompacting = z.discriminatedUnion("compacting", [z.object({ compacting: z.literal(true) }), z.object({ compacting: z.literal(false), refusal: z.string() })]);
 export const wireCreated = z.object({ thread: wireThread.nullable(), first: wireSent.nullable() });
 
 /** The GitHub accounts OpenOrc's GitHub app is installed on for the space, and whether the server has the app at all. */
@@ -288,6 +290,8 @@ export const ROUTES = {
   ready: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/ready`, null),
   answer: (askId: string) => route("POST", `/hosted/asks/${encodeURIComponent(askId)}/answer`, wireAnswered),
   stopCommand: (id: string, commandId: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/commands/${encodeURIComponent(commandId)}/stop`, null),
+  /** The agent folds the conversation between turns. Asking again with the same id is the same compaction. */
+  compact: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/compact`, wireCompacting),
 } as const;
 
 function stringsOf(from: Record<string, number>): Record<string, string> {

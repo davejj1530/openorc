@@ -4,7 +4,7 @@ import type { PanelTool } from "./panel-tools.js";
 export type HostedControl = HostedUnavailableControl | "changes" | "publishing";
 
 /** The controls each server answers for itself in its capabilities. The rest are held in the app's own words. */
-const SERVED = ["changes", "publishing", "terminal", "personSubthreads"] as const satisfies readonly (HostedControl & keyof HostedCapabilities["features"])[];
+const SERVED = ["changes", "publishing", "terminal", "personSubthreads", "compact"] as const satisfies readonly (HostedControl & keyof HostedCapabilities["features"])[];
 type ServedControl = (typeof SERVED)[number];
 const served = (control: HostedControl): control is ServedControl => (SERVED as readonly HostedControl[]).includes(control);
 

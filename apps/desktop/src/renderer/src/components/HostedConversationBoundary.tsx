@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
-import { hostedControlReason, type HostedControl } from "@openorc/client";
+import type { HostedControl } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
+import { useHostedCapabilities } from "../hooks/useHostedCapabilities";
 
 const HostedConversation = createContext<ThreadSummary | null>(null);
 
@@ -9,8 +10,9 @@ export function HostedConversationBoundary({ thread, children }: { thread: Threa
   return <HostedConversation.Provider value={thread}>{children}</HostedConversation.Provider>;
 }
 
+/** Why a control is held in this cloud conversation, as its server's capabilities say for the controls it serves; null on this Mac. */
 export function useHostedControlReason(control: HostedControl): string | null {
-  return hostedControlReason(useContext(HostedConversation), control);
+  return useHostedCapabilities(useContext(HostedConversation)).reason(control);
 }
 
 export function useHostedConversation(): ThreadSummary | null {

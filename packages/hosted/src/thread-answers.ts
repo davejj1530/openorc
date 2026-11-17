@@ -10,6 +10,7 @@ import { nativeRuns, stopNative } from "./subthreads.js";
 import * as together from "./collaboration.js";
 import * as shared from "./shared-sends.js";
 import * as notes from "./notes.js";
+import { compact } from "./compaction.js";
 
 type Answer<M extends RoutedMethod> = (threads: Threads, params: RpcParams<M>) => Promise<RpcResults[M]> | RpcResults[M];
 
@@ -83,7 +84,7 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "threads.implementPlan": refused(HOSTED_REASONS.plans),
   "threads.exportPlan": refused(HOSTED_REASONS.plans),
   "threads.switchClaudeAccount": refused(HOSTED_REASONS.claudeAccount),
-  "threads.compact": refused(HOSTED_REASONS.compact),
+  "threads.compact": (threads, params) => compact(threads.calls, params),
   "threads.send": refused("Sending to another cloud thread isn't available yet."),
   "threads.turnChanges": review.legacyTurn,
   "threads.fork": refused(HOSTED_REASONS.fork),

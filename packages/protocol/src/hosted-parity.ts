@@ -40,6 +40,8 @@ export const HostedCapabilities = z.object({
   features: z.object({
     changes: availability,
     publishing: availability,
+    /** Compact: the agent folds the conversation between turns, as the asker's own turn. */
+    compact: availability,
     files: availability,
     nativeSubthreads: availability,
     personSubthreads: availability,

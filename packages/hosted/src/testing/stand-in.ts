@@ -114,6 +114,8 @@ export interface StandIn {
   endTurn(threadId: string, status?: "success" | "cancelled"): void;
   /** Every ready ask stored, in order. */
   readies: { threadId: string; settings: unknown }[];
+  /** Every compaction asked, in order. */
+  compactions: { threadId: string; who: string; body: Record<string, unknown> }[];
   /** Every message body posted, in order. */
   sent: { threadId: string; body: Record<string, unknown> }[];
   /** Every answer to an ask, in order, as the server took it. */
@@ -565,7 +567,7 @@ function paymentsFace(billing: Map<string, StandInBilling>, payments: StandInPay
 /** What a test does to the stand-in's threads, as an agent's host or another person would. */
 function threadsFace(
   hosted: StandInThreads,
-): Pick<StandIn, "addThread" | "append" | "set" | "stoppedCommands" | "ask" | "endTurn" | "readies" | "sent" | "answered" | "started" | "threadFiles" | "threadCollaboration"> {
+): Pick<StandIn, "addThread" | "append" | "set" | "stoppedCommands" | "ask" | "endTurn" | "readies" | "compactions" | "sent" | "answered" | "started" | "threadFiles" | "threadCollaboration"> {
   return {
     addThread: (email, seed) => hosted.addThread(email.toLowerCase(), seed),
     append: (threadId, events, options) => hosted.append(threadId, events, options),
@@ -574,6 +576,7 @@ function threadsFace(
     ask: (threadId, request) => hosted.ask(threadId, request),
     endTurn: (threadId, status) => hosted.endTurn(threadId, status),
     readies: hosted.readies,
+    compactions: hosted.compactions,
     sent: hosted.sent,
     answered: hosted.answered,
     started: hosted.started,

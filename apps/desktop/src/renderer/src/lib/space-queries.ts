@@ -17,10 +17,14 @@ export function spaceParams<M extends RpcMethod>(method: M, params: RpcParams<M>
   return spaceId && SCOPED.has(method) ? { ...params, spaceId, ...(["threads.list", "threads.resolvedCount"].includes(method) ? { ownership } : {}) } : params;
 }
 
-/** Whether the space is an organization this person is frozen out of: nothing of it is asked for or shown. */
+/**
+ * Whether the space is an organization closed to this person, frozen out of it or no longer in it (left, removed):
+ * nothing of it is asked for or shown.
+ */
 function useFrozenSpace(spaceId: string | null): boolean {
   const snapshot = useSyncExternalStore(organizationContentGate.subscribe, organizationContentGate.getSnapshot);
-  return organizationContentState(snapshot, spaceId).blocked === "frozen";
+  const blocked = organizationContentState(snapshot, spaceId).blocked;
+  return blocked === "frozen" || blocked === "membership";
 }
 /** An answer that reached the cache after the organization closed is never handed on. */
 const withheld = <T extends { data: unknown }>(result: T): T => ({ ...result, data: undefined });

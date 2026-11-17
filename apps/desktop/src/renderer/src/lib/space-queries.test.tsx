@@ -108,6 +108,21 @@ it("asks a frozen organization nothing, and holds back what a late answer left i
   await waitFor(() => expect(pending.has("birch:everyone")).toBe(true));
 });
 
+it("asks an organization the person has left nothing, while its window still shows it", async () => {
+  inBirch();
+  await hear(active);
+  // The leave closes it at once (OrganizationMembershipDialog); the window moves to Personal only once the server says so.
+  act(() => organizationContentGate.close("birch"));
+  pending.clear();
+  render(
+    <QueryClientProvider client={queryClient}>
+      <Count />
+    </QueryClientProvider>,
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect([...pending.keys()]).toEqual([]);
+});
+
 function Thread() {
   const thread = useSpaceThread("plan");
   const projects = useSpaceProjects();

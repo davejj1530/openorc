@@ -9,7 +9,11 @@ import { OrganizationContext, type OrganizationActions } from "../lib/organizati
 import { core } from "../lib/rpc";
 
 const gate = vi.hoisted(() => ({ state: null as unknown }));
-vi.mock("../lib/organization-content-gate", () => ({ useOrganizationContentGate: () => gate.state }));
+const closed = vi.hoisted(() => [] as string[]);
+vi.mock("../lib/organization-content-gate", () => ({
+  useOrganizationContentGate: () => gate.state,
+  organizationContentGate: { close: (spaceId: string) => void closed.push(spaceId), refresh: async () => {} },
+}));
 vi.mock("./TopBar", () => ({ TopBar: ({ children }: { children: React.ReactNode }) => <header>{children}</header> }));
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(async () => ({})), onReady: () => () => {}, onPush: () => () => {} } }));
 
@@ -97,6 +101,7 @@ it("lets a frozen member leave from the organization page's own menu, which hold
   fireEvent.click(within(dialog).getByRole("button", { name: "Leave organization" }));
   await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
   expect(vi.mocked(core.call)).toHaveBeenCalledWith("organization.leave", { spaceId: "north" });
+  expect(closed).toEqual(["north"]);
 });
 
 it("gives a frozen admin's frozen screen no menu: their own People page keeps the organization's", () => {

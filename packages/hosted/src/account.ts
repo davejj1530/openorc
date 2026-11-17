@@ -92,6 +92,8 @@ export class Account implements HostedAccount {
     deps.session.onSocket(SOCKET.changed, (body) => {
       const topics = wireTopics.safeParse(body);
       if (topics.success && topics.data.topics.some((topic) => topic === "billing" || topic === "sign-ins" || topic === "github" || topic === "spaces")) void this.#refresh();
+      // A cloud turn's end keeps a new reading of the person's agent sign-in after the app last asked.
+      if (topics.success && topics.data.topics.includes("usage")) this.deps.push({ type: "invalidate", keys: ["provider-usage"] });
     });
   }
 

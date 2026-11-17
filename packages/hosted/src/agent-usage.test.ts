@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createHosted, type Hosted } from "./index.js";
 import { hostDeps, newDevice, signInAs } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
@@ -6,9 +6,12 @@ import { standIn, type StandIn } from "./testing/stand-in.js";
 const email = "reader@example.com";
 let stand: StandIn;
 let hosted: Hosted;
+let seen: ReturnType<typeof hostDeps>["seen"];
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
-  const { deps, browser } = hostDeps(stand, newDevice());
+  const made = hostDeps(stand, newDevice());
+  const { deps, browser } = made;
+  seen = made.seen;
   hosted = createHosted(deps);
   await hosted.start();
   await signInAs(hosted, browser, email);
@@ -29,4 +32,10 @@ it("reads none from a server that keeps no readings, and none while signed out",
   await hosted.account.signOut();
   stand.agentUsage.served = true;
   expect(await hosted.account.agentUsage()).toEqual([]);
+});
+
+it("asks again once the server says it kept a new reading, as a turn's end there does", async () => {
+  const before = seen.pushes.length;
+  stand.tell(email, ["usage"]);
+  await vi.waitFor(() => expect(seen.pushes.slice(before)).toContainEqual({ type: "invalidate", keys: ["provider-usage"] }));
 });

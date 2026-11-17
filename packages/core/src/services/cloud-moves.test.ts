@@ -74,7 +74,9 @@ function account() {
     away: [] as string[],
   };
   const fail = { history: null as Error | null };
-  const rows = new Map<string, { id: string; space: string; projectId: string; title: string; settings: { agent: "claude"; model: null; effort: null; mode: "act"; permissionMode: "trusted" } }>();
+  type Row = { id: string; space: string; projectId: string; title: string; settings: { agent: "claude"; model: null; effort: null; mode: "act"; permissionMode: "trusted" } };
+  const rows = new Map<string, Row>();
+  const made = new Map<string, Row>();
   const cloud = {
     save: null as null | { branch: string; head: string; base: string; bundle: boolean; uncommitted: boolean; savedAt: string },
     bundle: "",
@@ -86,10 +88,15 @@ function account() {
     spaces: { status: () => ({ state: "ready", personalSpaceId: "personal" }) },
     threads: {
       holds: ({ thread }: { thread: string }) => rows.has(thread),
-      row: (id: string) => rows.get(id)!,
+      row: (id: string) => {
+        const row = rows.get(id);
+        if (!row) throw new Error("That conversation isn't on OpenOrc Cloud.");
+        return row;
+      },
       summary: (id: string) => ({ id, projectId: cloud.summaryProject }),
       cloudProjectFor: () => ({ id: "cloud-app", space: "personal" }),
-      refresh: async () => {},
+      // The Mac hears a thread made on the server once it reads the server again.
+      refresh: async () => made.forEach((row, id) => rows.set(id, row)),
     },
     moves: {
       arrive: async (space: string, input: { id: string; projectId: string }) => (sent.arrived.push({ space, id: input.id, projectId: input.projectId }), { id: input.id }),
@@ -109,7 +116,7 @@ function account() {
       },
       done: async (_space: string, id: string) => {
         sent.done.push(id);
-        rows.set(id, { id, space: "personal", projectId: "cloud-app", title: "Moved", settings: { agent: "claude", model: null, effort: null, mode: "act", permissionMode: "trusted" } });
+        made.set(id, { id, space: "personal", projectId: "cloud-app", title: "Moved", settings: { agent: "claude", model: null, effort: null, mode: "act", permissionMode: "trusted" } });
         return { id };
       },
       undo: async (_space: string, id: string) => void sent.undone.push(id),

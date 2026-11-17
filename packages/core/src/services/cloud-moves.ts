@@ -204,9 +204,10 @@ export class CloudMoves {
   /** Waits a while for this Mac to hear the cloud thread it just made, reading the server again meanwhile. */
   private async heard(hosted: Hosted, threadId: string): Promise<void> {
     const until = (this.deps.now ?? Date.now)() + HEARD_MS;
-    while (!hosted.threads.row?.(threadId) && (this.deps.now ?? Date.now)() < until) {
-      await hosted.threads.refresh?.();
-      if (!hosted.threads.row?.(threadId)) await new Promise((resolve) => setTimeout(resolve, 500));
+    const known = () => hosted.threads.holds({ thread: threadId });
+    while (!known() && (this.deps.now ?? Date.now)() < until) {
+      await hosted.threads.refresh?.().catch(() => undefined);
+      if (!known()) await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }
 

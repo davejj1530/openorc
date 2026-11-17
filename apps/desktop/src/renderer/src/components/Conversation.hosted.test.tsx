@@ -144,7 +144,7 @@ it("leaves out of a cloud thread's composer what OpenOrc Cloud does not take yet
   expect(props.onCompact).toBeUndefined();
   expect(props.accounts).toBeUndefined();
   expect(props.attachmentsDisabledReason).toBe("Files can't be sent to OpenOrc Cloud yet.");
-  expect(props.modelLimits).toEqual({ harnesses: ["claude", "codex", "opencode"], fast: false });
+  expect(props.modelLimits).toEqual({ harnesses: ["claude", "codex", "opencode"], fast: false, cloud: true });
   expect(props.disabledReason).toBeNull();
   expect(screen.queryByRole("status", { name: "OpenOrc Cloud" })).toBeNull();
 });

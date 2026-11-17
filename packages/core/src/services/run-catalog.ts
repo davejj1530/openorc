@@ -1,6 +1,16 @@
 import { claudeAccountFastBlock, claudeModelsFrom, withClaudeAccountFastMode, withClaudeLegacyModels } from "./claude-model-catalog.js";
 import { ModelCatalogCache, type DiscoveredModels, type CatalogEntry } from "./model-catalog.js";
-import { captureLaunchEnvironment, listClaudeModels, listPiModels, type AcpAdapter, type AgentLaunchEnvironment, type CodexAdapter } from "@openorc/agents";
+import {
+  captureLaunchEnvironment,
+  listClaudeModels,
+  listPiModels,
+  type AcpAdapter,
+  type AcpModel,
+  type AgentLaunchEnvironment,
+  type ClaudeCatalog,
+  type CodexAdapter,
+  type CodexModel,
+} from "@openorc/agents";
 import { ULTRACODE_EFFORT } from "@openorc/protocol";
 import { harnessCatalog, harnessIds, harnessName, isHarnessId, type HarnessId, type ModelCatalog, type ModelOption } from "@openorc/protocol";
 import type { RunHooks } from "./run-types.js";
@@ -90,6 +100,55 @@ function claudeModelList(list: StaticClaudeModel[], installed: string | null, en
   });
 }
 
+/**
+ * Claude's models as people pick them, from Claude Code's own listing (`catalog`) and the version it runs (`installed`),
+ * or, with no listing, the compatibility catalog. A listing read on this Mac and one read on a cloud machine take this
+ * same way.
+ */
+export function claudeOptions(catalog: ClaudeCatalog | null, installed: string | null, env: Readonly<NodeJS.ProcessEnv>): DiscoveredModels {
+  const fallback = claudeModelList(claudeModels, installed, env);
+  const legacy = claudeModelList(claudeLegacyModels, installed, env);
+  if (!catalog)
+    return withClaudeLegacyModels({ models: fallback, message: "Compatibility catalog: live Claude discovery failed. Check the connection or run claude update, then Refresh models." }, legacy);
+  const discovered = withClaudeLegacyModels(claudeModelsFrom(catalog.models, fallback, versionAtLeast(installed, ULTRACODE_MIN_CLI), env), legacy);
+  return withClaudeAccountFastMode(discovered, catalog.fastModeDisabledReason);
+}
+
+/** Codex's models as people pick them, from the Codex CLI's own listing. */
+export function codexOptions(models: readonly CodexModel[]): ModelOption[] {
+  return models.map((m) => ({
+    id: m.model,
+    label: m.displayName || m.model,
+    agent: "codex",
+    provider: harnessCatalog.codex.account,
+    isDefault: m.isDefault,
+    efforts: m.efforts,
+    defaultEffort: m.defaultEffort,
+    ...(m.serviceTiers === undefined && m.additionalSpeedTiers === undefined
+      ? {}
+      : {
+          fastMode:
+            m.serviceTiers?.some((tier) => tier.id === "priority" || tier.id === "fast") || m.additionalSpeedTiers?.includes("fast")
+              ? { supported: true }
+              : { supported: false, reason: "This model does not advertise Fast mode in the installed Codex CLI." },
+        }),
+  }));
+}
+
+/** An agent that runs models through provider accounts of its own, each model listed with the provider it bills, unless `account` bills them all. */
+export function acpOptions(agent: "opencode" | "omp" | "cursor" | "antigravity" | "fx", models: readonly AcpModel[], account: { id: string; label: string } | null): ModelOption[] {
+  return models.map((m) => ({
+    id: m.id,
+    label: m.label,
+    agent,
+    provider: account ?? m.provider,
+    isDefault: m.isDefault,
+    efforts: m.efforts,
+    defaultEffort: m.defaultEffort,
+    fastMode: { supported: false, reason: harnessCatalog[agent].fastModeHint },
+  }));
+}
+
 /** Provider catalog discovery has one owner. */
 export class RunCatalog {
   private readonly modelCache = new ModelCatalogCache();
@@ -171,50 +230,17 @@ export class RunCatalog {
 
   private async discoverClaudeModels(environment: EnvSnapshot, launch: AgentLaunchEnvironment): Promise<DiscoveredModels> {
     const installed = await this.hooks.claudeVersion(environment, launch.env).catch(() => null);
-    const fallback = claudeModelList(claudeModels, installed, launch.env);
-    const legacy = claudeModelList(claudeLegacyModels, installed, launch.env);
-    try {
-      const catalog = await listClaudeModels(launch);
-      const discovered = withClaudeLegacyModels(claudeModelsFrom(catalog.models, fallback, versionAtLeast(installed, ULTRACODE_MIN_CLI), launch.env), legacy);
-      return withClaudeAccountFastMode(discovered, catalog.fastModeDisabledReason);
-    } catch {
-      return withClaudeLegacyModels({ models: fallback, message: "Compatibility catalog: live Claude discovery failed. Check the connection or run claude update, then Refresh models." }, legacy);
-    }
+    return claudeOptions(await listClaudeModels(launch).catch(() => null), installed, launch.env);
   }
 
   private async codexModelList(launch: AgentLaunchEnvironment): Promise<ModelOption[]> {
-    return (await this.codex.listModels(launch)).map((m) => ({
-      id: m.model,
-      label: m.displayName || m.model,
-      agent: "codex",
-      provider: harnessCatalog.codex.account,
-      isDefault: m.isDefault,
-      efforts: m.efforts,
-      defaultEffort: m.defaultEffort,
-      ...(m.serviceTiers === undefined && m.additionalSpeedTiers === undefined
-        ? {}
-        : {
-            fastMode:
-              m.serviceTiers?.some((tier) => tier.id === "priority" || tier.id === "fast") || m.additionalSpeedTiers?.includes("fast")
-                ? { supported: true }
-                : { supported: false, reason: "This model does not advertise Fast mode in the installed Codex CLI." },
-          }),
-    }));
+    return codexOptions(await this.codex.listModels(launch));
   }
 
-  /** An agent that runs models through provider accounts of its own, each model listed with the provider it bills. */
+  /** An agent that runs models through provider accounts of its own, read from its CLI on this Mac. */
   private async acpModelList(agent: "opencode" | "omp" | "cursor" | "antigravity" | "fx", adapter: Pick<AcpAdapter, "listModels">, launch: AgentLaunchEnvironment): Promise<ModelOption[]> {
     let account = agent === "cursor" || agent === "antigravity" ? harnessCatalog[agent].account : null;
     if (agent === "antigravity" && launch.env["GEMINI_API_KEY"]?.trim()) account = { id: "gemini-api", label: "Gemini API account" };
-    return (await adapter.listModels(launch)).map((m) => ({
-      id: m.id,
-      label: m.label,
-      agent,
-      provider: account ?? m.provider,
-      isDefault: m.isDefault,
-      efforts: m.efforts,
-      defaultEffort: m.defaultEffort,
-      fastMode: { supported: false, reason: harnessCatalog[agent].fastModeHint },
-    }));
+    return acpOptions(agent, await adapter.listModels(launch), account);
   }
 }

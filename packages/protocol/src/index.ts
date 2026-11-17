@@ -74,5 +74,6 @@ export * from "./hosted-machines.js";
 export * from "./hosted-check.js";
 export * from "./hosted-mac-projects.js";
 export * from "./cloud-moves.js";
+export * from "./hosted-models.js";
 export * from "./this-computer.js";
 export * from "./hosted-terminals.js";

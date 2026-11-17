@@ -6,6 +6,7 @@ import { createHostedConnectorsHandlers } from "./hosted-connectors.js";
 import { createHostedMachinesHandlers } from "./hosted-machines.js";
 import { createHostedCheckHandlers } from "./hosted-check.js";
 import { createHostedMacStartHandlers } from "./hosted-mac-start.js";
+import { createHostedModelsHandlers } from "./hosted-models.js";
 import { createHostedFilesHandlers } from "./hosted-files.js";
 import { createHostedAccountHandlers } from "./organization-billing.js";
 import { createOnlineTaskHandlers } from "./online-tasks.js";
@@ -26,5 +27,6 @@ export function createHostedHandlers(account: Hosted | null, files: HostedFiles,
     ...createHostedMachinesHandlers(account),
     ...createHostedCheckHandlers(account),
     ...createHostedMacStartHandlers(account, db),
+    ...createHostedModelsHandlers(account),
   };
 }

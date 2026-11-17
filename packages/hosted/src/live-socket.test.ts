@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { liveSocket } from "./openorc-account.js";
+import { liveSocketOf, type SocketIoSocket } from "./live-socket.js";
 
-const socket = vi.hoisted(() => ({ active: false, on: vi.fn(), connect: vi.fn(), close: vi.fn() }));
-vi.mock("socket.io-client", () => ({ io: () => socket }));
+const socket = { active: false, on: vi.fn(), connect: vi.fn(), close: vi.fn() };
+const liveSocket = liveSocketOf(() => socket as unknown as SocketIoSocket);
 function emit(event: string, value?: unknown) {
   for (const [name, listener] of socket.on.mock.calls) if (name === event) listener(value);
 }

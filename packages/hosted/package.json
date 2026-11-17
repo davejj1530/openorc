@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./router": "./src/router/place-router.ts",
+    "./socket": "./src/live-socket.ts",
     "./testing": "./src/testing/stand-in.ts"
   },
   "scripts": {

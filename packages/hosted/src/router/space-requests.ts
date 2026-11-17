@@ -33,6 +33,8 @@ export class SpaceRequests {
         return this.count(request, rpcParams["threads.resolvedCount"].parse(request.params), local);
       case "threads.start":
         return this.start(request, rpcParams["threads.start"].parse(request.params), projects, local);
+      case "threads.readyStart":
+        return this.readyStart(rpcParams["threads.readyStart"].parse(request.params), projects);
       case "threads.search": {
         const { spaceId, ...params } = rpcParams["threads.search"].parse(request.params);
         const ids = local.filter((id) => !params.projectId || id === params.projectId);
@@ -95,6 +97,16 @@ export class SpaceRequests {
     }
     const { spaceId: _space, ...legacy } = params;
     return this.read(request, "threads.start", legacy);
+  }
+
+  /**
+   * A new cloud thread's first message is being written in the space: its place readies the machine when the space
+   * holds the project on OpenOrc Cloud. Answered with nothing either way, and waits on none of it.
+   */
+  private readyStart(params: RpcParams<"threads.readyStart">, projects: SpaceProject[]): null {
+    const place = this.deps.place();
+    if (place?.active && projects.some((project) => project.key === params.projectId && project.hostedProjectId)) void place.readyStart?.(params).catch(() => undefined);
+    return null;
   }
 
   /** The inner routers retain their established request shapes. */

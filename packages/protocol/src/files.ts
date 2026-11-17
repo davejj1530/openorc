@@ -38,6 +38,8 @@ export interface FileEntry {
 
 export interface FileDirectory {
   root: string;
+  /** What the person calls the folder when the last part of `root` is not it, as a cloud thread's copy, its project's. */
+  name?: string;
   entries: FileEntry[];
 }
 

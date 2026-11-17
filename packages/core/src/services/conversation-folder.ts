@@ -16,6 +16,8 @@ export interface ConversationFolder {
   readonly project: Project;
   /** Why files here can't be edited, or null. */
   readonly readOnly: string | null;
+  /** What the person calls the folder when the last part of `root` is not it: a cloud thread's copy is its project's. */
+  readonly name?: string;
 }
 
 /** Who a run works for, as run launch holds it. A comment run has neither and works in the project root it is given. */

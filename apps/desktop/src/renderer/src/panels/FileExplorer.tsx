@@ -158,7 +158,7 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
   const [search, update] = useExplorerSearch(scope, Boolean(selected));
   const input = useRef<HTMLInputElement>(null);
   const results = useRef<HTMLDivElement>(null);
-  const rootName = root.split(/[\\/]/).filter(Boolean).at(-1) ?? "Workspace";
+  const rootName = listing.data?.name ?? root.split(/[\\/]/).filter(Boolean).at(-1) ?? "Workspace";
   useFilesFocus(input, !selected);
   useEffect(() => {
     if (path) useFileExplorer.getState().reveal(key, path);
@@ -176,7 +176,7 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
   };
   return (
     <section aria-label="File explorer" className="file-explorer">
-      <FileExplorerToolbar scope={scope} />
+      <FileExplorerToolbar scope={scope} listed={Boolean(listing.data)} />
       <div className="file-explorer-body">
         <div className="file-explorer-filter">
           <Search size={16} />

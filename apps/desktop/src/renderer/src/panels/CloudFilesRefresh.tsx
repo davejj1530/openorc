@@ -10,8 +10,8 @@ import { Ends } from "./HostedBring";
  * it has the machine leave with newer work first. When leaving would end something running there, it names what and
  * goes on only once the person says so, as Bring does.
  */
-export function CloudFilesRefresh({ threadId }: { threadId: string }) {
-  const copy = useRpc("threads.cloudCopy", { threadId }).data;
+export function CloudFilesRefresh({ threadId, listed }: { threadId: string; listed: boolean }) {
+  const copy = useRpc("threads.cloudCopy", { threadId }, { enabled: listed }).data;
   const refresh = useRpcMutation("threads.cloudCopyRefresh");
   const [confirm, setConfirm] = useState<string[] | null>(null);
   const go = (endsOk: boolean) =>

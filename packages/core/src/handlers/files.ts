@@ -25,7 +25,10 @@ export function createFilesHandlers({
       if (folder.root !== expectedRoot) return { kind: "unavailable", reason: "This conversation changed workspace. Reopen the file to analyze its new workspace." };
       return files.intelligence.query(folder, input);
     },
-    "files.list": async ({ scope, path }) => listDirectory((await folderOf(scope)).root, path),
+    "files.list": async ({ scope, path }) => {
+      const folder = await folderOf(scope);
+      return { ...(await listDirectory(folder.root, path)), ...(folder.name ? { name: folder.name } : {}) };
+    },
     "files.search": async ({ scope, query, limit }) => files.search(await folderOf(scope), query, limit),
     "files.read": async ({ scope, path }) => files.read(await folderOf(scope), path, { outside: true }),
     "files.write": async ({ scope, path, text, expected }) => {

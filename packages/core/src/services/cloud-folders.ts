@@ -6,6 +6,7 @@
  * save; how old it is is the copy's own `asOf`, never passed off as live. Refresh asks the person before it ends anything.
  */
 import { realpath } from "node:fs/promises";
+import path from "node:path";
 import { projects } from "@openorc/db";
 import { HOSTED_REASONS, type CloudCopy, type FileScope } from "@openorc/protocol";
 import { CloudCopies, type CloudCopiesDeps } from "./cloud-copies.js";
@@ -44,7 +45,7 @@ export class CloudFolders {
     const summary = this.deps.hosted()?.threads.summary?.(threadId);
     const project = summary ? projects.get(this.deps.db, summary.projectId) : null;
     if (!project) throw new Error("This thread's project isn't on this computer.");
-    return { root: await realpath(folder), kind: "cloud", project, readOnly: HOSTED_REASONS.fileWrite };
+    return { root: await realpath(folder), kind: "cloud", project, readOnly: HOSTED_REASONS.fileWrite, name: path.basename(project.rootPath) };
   }
 
   /** The file browser's Refresh: the copy brought up to its machine, or what that would end, named unless `endsOk`. */

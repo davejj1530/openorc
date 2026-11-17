@@ -90,7 +90,7 @@ const fix = async (root: string) => readFile(path.join(root, "FIX.md"), "utf8");
 it("reads a cloud thread's files from a copy of its work, read-only, and any other conversation's from its folder here", async () => {
   const { folders } = machine({ current: true });
   const cloud = await folders.of({ kind: "thread", id: ID });
-  expect(cloud).toMatchObject({ root: path.join(root, "cloud-copies", ID), kind: "cloud", readOnly: HOSTED_REASONS.fileWrite });
+  expect(cloud).toMatchObject({ root: path.join(root, "cloud-copies", ID), kind: "cloud", readOnly: HOSTED_REASONS.fileWrite, name: "app" });
   expect(await fix(cloud.root)).toBe("first");
   expect(await readFile(path.join(cloud.root, "README.md"), "utf8")).toBe("# app\n");
   await expect(folders.of({ kind: "project", id: projectId })).resolves.toMatchObject({ root: folder, kind: "checkout" });

@@ -60,7 +60,7 @@ function opened(payload: StandInApnsPayload, phone: { id: string; privateKey: Ke
   }
 }
 
-const ask: StandInNotice = { kind: "approval", threadId: "thread-1", title: "Fix the build", body: "Claude wants to use Bash: ls" };
+const ask: StandInNotice = { kind: "approval", threadId: "thread-1", title: "Fix the build", body: "Claude wants to use Bash: ls", approval: { runId: "hosted:thread-1", approvalId: "ask-1" } };
 const finished = (threadId: string): StandInNotice => ({ kind: "finished", threadId, title: "Fix the build", body: "All green now." });
 const sentTo = (token: string) => stand.push.pushed.filter((pushed) => pushed.token === token).map((pushed) => pushed.payload);
 

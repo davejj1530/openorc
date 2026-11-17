@@ -12,7 +12,8 @@ import { createCipheriv, createHmac, createPublicKey, diffieHellman, generateKey
 
 type Reply = { status: number; body: unknown };
 export type StandInSender = "ready" | "no-key" | "refused";
-export type StandInNotice = { kind: "approval" | "question" | "finished" | "error"; threadId: string; title: string; body: string };
+/** `approval` is on an ask its reader may answer from the alert: the ask's id and the run the apps know the thread's turn by. */
+export type StandInNotice = { kind: "approval" | "question" | "finished" | "error"; threadId: string; title: string; body: string; approval?: { runId: string; approvalId: string } };
 /** The APNs JSON the server hands Apple: fixed words outside, the notice sealed in `o`. */
 export type StandInApnsPayload = {
   aps: { alert: { body: string }; "mutable-content": 1; sound?: "default"; "interruption-level"?: "passive" };

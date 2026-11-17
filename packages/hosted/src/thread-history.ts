@@ -1,6 +1,7 @@
 import { HOSTED_REASONS, hostedThreadOf, type RpcParams, type RpcResults, type ThreadMessage } from "@openorc/protocol";
 import { capabilities } from "./capabilities.js";
-import { Refused } from "./session.js";
+import { READ_LIMIT } from "./follow.js";
+import { Refused, type Requests } from "./session.js";
 import type { HeardRow, Threads } from "./threads.js";
 import { toAppEvent } from "./translate.js";
 import { ROUTES, type WireEvent } from "./wire.js";
@@ -16,6 +17,18 @@ function latestMessage(threadId: string, events: WireEvent[]): ThreadMessage | n
     return { id: event.messageId, role: event.role, text: event.text.slice(0, PREVIEW_CHARS), createdAt: event.ts, ...(event.attachments && { attachments: event.attachments }) };
   }
   return null;
+}
+
+/**
+ * The page a run opens on: from the turn asked, or the newest `turns` in one read. A server from before it read the
+ * newest turns itself answers that read with no `fromTurn`; then the thread's turn ends are read first, as before.
+ */
+export async function firstPage(space: Requests, threadId: string, params: Pick<RpcParams<"events.page">, "fromTurn" | "turns">) {
+  if (params.fromTurn !== undefined || params.turns === undefined) return space.request(ROUTES.events(threadId, { fromTurn: params.fromTurn ?? 0 }, READ_LIMIT));
+  const newest = await space.request(ROUTES.events(threadId, { lastTurns: params.turns }, READ_LIMIT));
+  if (newest.fromTurn !== undefined) return newest;
+  const detail = await space.request(ROUTES.thread(threadId));
+  return space.request(ROUTES.events(threadId, { fromTurn: Math.max(0, detail.turnEnds.length - params.turns) }, READ_LIMIT));
 }
 
 /** A bounded tail read on demand. Replaced or revoked rows cannot reuse an earlier account's preview. */

@@ -15,7 +15,6 @@ import {
   HOSTED_REASONS,
   harnessShortName,
   hostedRunId,
-  hostedSendBlock,
   hostedThreadOf,
   isHostedAgent,
   type AccountReach,
@@ -30,6 +29,7 @@ import { z } from "zod";
 import { ANSWERS, NOT_YET } from "./thread-answers.js";
 import type { HostedDeps, HostedThreads, MergedMethod, PlacePage } from "./index.js";
 import { READ_LIMIT, type Follower } from "./follow.js";
+import { firstPage } from "./thread-history.js";
 import type { Account } from "./account.js";
 import type { SpaceCatalog, Spaces } from "./spaces.js";
 import { scopedProject, spaceProjects } from "./space-projects.js";
@@ -253,17 +253,8 @@ export class Threads implements HostedThreads {
    */
   async readyStart(params: RpcParams<"threads.readyStart">): Promise<void> {
     const settings = startSettings(params);
-    if (!isHostedAgent(settings.agent)) return;
-    const project = this.#projectFor(params.projectId, params.spaceId);
-    if (!project || hostedSendBlock(this.calls.account(), settings, false)) return;
-    const key = `${project.space}/${project.id}`;
-    if (this.calls.now() - (this.readied.get(key) ?? Number.NEGATIVE_INFINITY) < sends.READY_AGAIN_MS) return;
-    this.readied.set(key, this.calls.now());
-    await this.deps.skills.bring(project.space, settings.agent).catch(() => undefined);
-    await this.deps.session
-      .in(project.space)
-      .request(ROUTES.readyMachine, { projectId: project.id, settings })
-      .catch(() => undefined);
+    const project = isHostedAgent(settings.agent) ? this.#projectFor(params.projectId, params.spaceId) : null;
+    if (project) await sends.readyStart(this.calls, this.readied, { ...project, settings }, { skills: this.deps.skills, session: this.deps.session });
   }
 
   /**
@@ -444,24 +435,12 @@ export class Threads implements HostedThreads {
     const row = this.row(threadId);
     const space = this.on(threadId);
     await this.deps.follower.follow(threadId);
-    const first = await this.#firstPage(space, threadId, params);
+    const first = await firstPage(space, threadId, params);
     const fromTurn = first.fromTurn ?? 0;
     const events = await this.#readOn(space, threadId, first.events, first.head);
     this.observed(threadId, events);
     if (!row.parentId) this.#names.observed(threadId, events, fromTurn);
     return { events: events.map((event) => toAppEvent(threadId, event)), fromTurn, live: runsNow(row, this.reach) };
-  }
-
-  /**
-   * The page a run opens on: from the turn asked, or the newest `turns` in one read. A server from before it read the
-   * newest turns itself answers that read with no `fromTurn`; then the thread's turn ends are read first, as before.
-   */
-  async #firstPage(space: Requests, threadId: string, params: RpcParams<"events.page">) {
-    if (params.fromTurn !== undefined || params.turns === undefined) return space.request(ROUTES.events(threadId, { fromTurn: params.fromTurn ?? 0 }, READ_LIMIT));
-    const newest = await space.request(ROUTES.events(threadId, { lastTurns: params.turns }, READ_LIMIT));
-    if (newest.fromTurn !== undefined) return newest;
-    const detail = await space.request(ROUTES.thread(threadId));
-    return space.request(ROUTES.events(threadId, { fromTurn: Math.max(0, detail.turnEnds.length - params.turns) }, READ_LIMIT));
   }
 
   /** Every event of the run after a seq of its log. */

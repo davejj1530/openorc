@@ -46,7 +46,7 @@ export interface Calls {
 
 const GONE = "That conversation isn't on OpenOrc Cloud.";
 /** How often the person writing may ask the thread to be ready: a thread's machine rests two minutes before it sleeps. */
-export const READY_AGAIN_MS = 60_000;
+const READY_AGAIN_MS = 60_000;
 
 const threadOf = (runId: string): string => {
   const threadId = hostedThreadOf(runId);
@@ -191,6 +191,27 @@ export async function answer(calls: Calls, params: RpcParams<"approvals.resolve"
   // A denial's note is the person's next message, as on this Mac: the server joins it to the turn or starts one.
   if (note && !together) return post(calls, threadId, { text: note });
   await calls.refresh();
+}
+
+/**
+ * threads.readyStart for a project of the account: the person began writing a new cloud thread's first message there.
+ * The machine it will run on is made ready, with the person's skills on the server first, at most once a minute for
+ * the project, and never for a start the account would refuse. Nothing comes back of it: the start says what went wrong.
+ */
+export async function readyStart(
+  calls: Calls,
+  readied: Map<string, number>,
+  start: { id: string; space: string; settings: { agent: string; model: string | null } },
+  deps: { skills: { bring(space: string, agent: string): Promise<void> }; session: { in(space: string): Requests } },
+): Promise<void> {
+  const key = `${start.space}/${start.id}`;
+  if (hostedSendBlock(calls.account(), start.settings, false) || calls.now() - (readied.get(key) ?? Number.NEGATIVE_INFINITY) < READY_AGAIN_MS) return;
+  readied.set(key, calls.now());
+  await deps.skills.bring(start.space, start.settings.agent).catch(() => undefined);
+  await deps.session
+    .in(start.space)
+    .request(ROUTES.readyMachine, { projectId: start.id, settings: start.settings })
+    .catch(() => undefined);
 }
 
 /**

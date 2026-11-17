@@ -62,9 +62,9 @@ export function ChatPinsSheet() {
   const lease = useChatLease();
   const bottom = useSheetBottom(16);
   return (
-    <View className="flex-1 bg-bg" onAccessibilityEscape={close}>
+    <ScrollView className="flex-1 bg-bg" stickyHeaderIndices={[0]} contentContainerStyle={{ paddingBottom: bottom }} onAccessibilityEscape={close}>
       <SheetHeader title="Pinned" onClose={close} />
-      <ScrollView contentContainerStyle={{ paddingBottom: bottom }}>{lease ? <Pins lease={lease} conversationId={id} /> : null}</ScrollView>
-    </View>
+      {lease ? <Pins lease={lease} conversationId={id} /> : null}
+    </ScrollView>
   );
 }

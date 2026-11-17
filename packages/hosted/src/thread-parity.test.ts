@@ -94,6 +94,22 @@ it("writes a cloud thread's file on its machine while it is as read, and says th
   expect(await write("three", { kind: "absent" })).toEqual({ kind: "refused", message: "Ben's turn is running. Save again once it ends." });
 });
 
+it("opens a cloud tool call's interactive app where its run is, and every read, action and close names the run", async () => {
+  const runId = `hosted:${id}`;
+  await expect(hosted.threads.call("mcpApps.open", { runId, toolCallId: "call-1" })).rejects.toThrow("Interactive tool apps aren't available in this cloud thread yet.");
+  stand.threadFiles.capabilities = { interactiveApp: { available: true } };
+  stand.mcpApps.apps.set("call-1", { title: "Draw a chart", html: "<p>chart</p>", tools: ["refresh"] });
+  const opened = await hosted.threads.call("mcpApps.open", { runId, toolCallId: "call-1" });
+  expect(opened).toMatchObject({ status: "ready", title: "Draw a chart", html: "<p>chart</p>" });
+  if (opened.status !== "ready") throw new Error("not opened");
+  expect(await hosted.threads.call("mcpApps.call", { runId, viewId: opened.viewId, name: "refresh", arguments: { n: 1 } })).toEqual({ content: [{ type: "text", text: "refresh done" }] });
+  await expect(hosted.threads.call("mcpApps.call", { runId, viewId: opened.viewId, name: "drop_table", arguments: {} })).rejects.toThrow("This tool is not available to this app.");
+  expect(stand.mcpApps.called).toEqual([expect.objectContaining({ name: "refresh", arguments: { n: 1 } })]);
+  await hosted.threads.call("mcpApps.close", { runId, viewId: opened.viewId });
+  await expect(hosted.threads.call("mcpApps.read", { runId, viewId: opened.viewId, uri: "ui://charts/app.html" })).rejects.toThrow("no longer running");
+  expect(await hosted.threads.call("mcpApps.open", { runId, toolCallId: "no-app" })).toEqual({ status: "none" });
+});
+
 it("reads a tool call's whole output from a server that serves it", async () => {
   stand.threadFiles.capabilities = { toolOutput: { available: true } };
   const whole = "line of output\n".repeat(5_000);

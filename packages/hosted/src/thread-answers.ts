@@ -11,6 +11,7 @@ import * as together from "./collaboration.js";
 import * as shared from "./shared-sends.js";
 import * as notes from "./notes.js";
 import { compact } from "./compaction.js";
+import * as apps from "./mcp-apps.js";
 
 type Answer<M extends RoutedMethod> = (threads: Threads, params: RpcParams<M>) => Promise<RpcResults[M]> | RpcResults[M];
 
@@ -117,7 +118,10 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "instructions.list": refused(HOSTED_REASONS.instructions),
   "instructions.save": refused(HOSTED_REASONS.instructions),
   "preview.state": refused(HOSTED_REASONS.previewServer),
-  "mcpApps.open": refused(HOSTED_REASONS.interactiveApp),
+  "mcpApps.open": apps.openApp,
+  "mcpApps.read": apps.readApp,
+  "mcpApps.call": apps.callApp,
+  "mcpApps.close": apps.closeApp,
   // This Mac's own: its folder takes the thread's work (core's macProjects).
   "macProjects.bringState": NOT_ASKED,
   "macProjects.bring": NOT_ASKED,

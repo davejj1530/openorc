@@ -1,23 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 import { AppBridge, PostMessageTransport, type McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { CallToolResultSchema, ReadResourceResultSchema, ToolSchema } from "@modelcontextprotocol/sdk/types.js";
-import { HOSTED_REASONS, hostedThreadOf, type McpAppOpenResult, type McpAppReady } from "@openorc/protocol";
+import { hostedThreadOf, type McpAppOpenResult, type McpAppReady } from "@openorc/protocol";
+import { useHostedCapabilities } from "../hooks/useHostedCapabilities";
+import { useRpc } from "../lib/client";
 import { core } from "../lib/rpc";
 import { HostedControlReason } from "./HostedControlReason";
 
+/** A tool call's interactive app. A cloud run's opens where its agent runs, once its server serves them. */
 export default function McpAppResult({ runId, toolCallId }: { runId: string; toolCallId: string }) {
-  if (hostedThreadOf(runId))
+  const threadId = hostedThreadOf(runId);
+  const thread = useRpc("threads.get", { id: threadId ?? "" }, { enabled: threadId !== null }).data;
+  const reason = useHostedCapabilities(threadId ? thread : null).reason("interactiveApp");
+  if (threadId && (!thread || reason))
     return (
-      <HostedControlReason label="Open interactive app" reason={HOSTED_REASONS.interactiveApp}>
+      <HostedControlReason label="Open interactive app" reason={reason}>
         <button type="button" className="text-xs text-ink-3" disabled>
           Open interactive app
         </button>
       </HostedControlReason>
     );
-  return <LocalMcpAppResult runId={runId} toolCallId={toolCallId} />;
+  return <AppResult runId={runId} toolCallId={toolCallId} />;
 }
 
-function LocalMcpAppResult({ runId, toolCallId }: { runId: string; toolCallId: string }) {
+function AppResult({ runId, toolCallId }: { runId: string; toolCallId: string }) {
   const [result, setResult] = useState<McpAppOpenResult | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [closed, setClosed] = useState(false);
@@ -31,7 +37,7 @@ function LocalMcpAppResult({ runId, toolCallId }: { runId: string; toolCallId: s
       .then((value) => {
         if (value.status === "ready") viewId = value.viewId;
         if (disposed) {
-          if (viewId) void core.call("mcpApps.close", { viewId });
+          if (viewId) void core.call("mcpApps.close", { runId, viewId });
           return;
         }
         setResult(value);
@@ -41,7 +47,7 @@ function LocalMcpAppResult({ runId, toolCallId }: { runId: string; toolCallId: s
       });
     return () => {
       disposed = true;
-      if (viewId) void core.call("mcpApps.close", { viewId });
+      if (viewId) void core.call("mcpApps.close", { runId, viewId });
     };
   }, [runId, toolCallId, attempt, closed]);
   if (closed)
@@ -60,7 +66,7 @@ function LocalMcpAppResult({ runId, toolCallId }: { runId: string; toolCallId: s
         </button>
       </div>
     );
-  return <AppView key={result.viewId} app={result} close={() => setClosed(true)} />;
+  return <AppView key={result.viewId} runId={runId} app={result} close={() => setClosed(true)} />;
 }
 
 function hostContext(app: McpAppReady, width: number): McpUiHostContext {
@@ -76,7 +82,7 @@ function hostContext(app: McpAppReady, width: number): McpUiHostContext {
   };
 }
 
-function AppView({ app, close }: { app: McpAppReady; close: () => void }) {
+function AppView({ runId, app, close }: { runId: string; app: McpAppReady; close: () => void }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(380);
   const [state, setState] = useState("Loading interactive app…");
@@ -101,8 +107,8 @@ function AppView({ app, close }: { app: McpAppReady; close: () => void }) {
         { openLinks: {}, serverTools: {}, serverResources: {}, sandbox: { csp: app.csp, permissions: {} } },
         { hostContext: context() },
       );
-      bridge.oncalltool = async ({ name, arguments: args }) => CallToolResultSchema.parse(await core.call("mcpApps.call", { viewId: app.viewId, name, arguments: args ?? {} }));
-      bridge.onreadresource = async ({ uri }) => ReadResourceResultSchema.parse(await core.call("mcpApps.read", { viewId: app.viewId, uri }));
+      bridge.oncalltool = async ({ name, arguments: args }) => CallToolResultSchema.parse(await core.call("mcpApps.call", { runId, viewId: app.viewId, name, arguments: args ?? {} }));
+      bridge.onreadresource = async ({ uri }) => ReadResourceResultSchema.parse(await core.call("mcpApps.read", { runId, viewId: app.viewId, uri }));
       bridge.onopenlink = async ({ url }) => {
         const link = new URL(url);
         if (!["https:", "http:"].includes(link.protocol) || link.username || link.password) throw new Error("This app link is not a supported web URL.");
@@ -156,7 +162,7 @@ function AppView({ app, close }: { app: McpAppReady; close: () => void }) {
           .finally(() => bridge?.close());
       if (registration) window.openorc.mcpApps.release(registration.id);
     };
-  }, [app]);
+  }, [app, runId]);
   return (
     <section aria-label={`${app.title} interactive app`} className="mcp-app-card my-2 overflow-hidden rounded-2xl">
       <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs text-ink-3">

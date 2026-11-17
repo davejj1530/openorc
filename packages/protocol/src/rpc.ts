@@ -292,9 +292,10 @@ export const rpcParams = {
   "events.page": z.object({ runId: z.string(), fromTurn: z.number().int().nonnegative().optional(), turns: z.number().int().positive().optional() }),
   "events.toolOutput": z.object({ runId: z.string(), toolCallId: z.string() }),
   "mcpApps.open": z.object({ runId: z.string(), toolCallId: z.string() }),
-  "mcpApps.close": z.object({ viewId: z.string().uuid() }),
-  "mcpApps.read": z.object({ viewId: z.string().uuid(), uri: z.string().max(4096) }),
-  "mcpApps.call": z.object({ viewId: z.string().uuid(), name: z.string().max(512), arguments: z.record(z.string(), z.unknown()) }),
+  // A view is its run's, so a cloud run's views are answered where the run is.
+  "mcpApps.close": z.object({ runId: z.string(), viewId: z.string().uuid() }),
+  "mcpApps.read": z.object({ runId: z.string(), viewId: z.string().uuid(), uri: z.string().max(4096) }),
+  "mcpApps.call": z.object({ runId: z.string(), viewId: z.string().uuid(), name: z.string().max(512), arguments: z.record(z.string(), z.unknown()) }),
   "approvals.resolve": z.object({
     runId: z.string(),
     approvalId: z.string(),

@@ -178,6 +178,9 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "instructions.save": here,
   "preview.state": here,
   "mcpApps.open": here,
+  "mcpApps.read": here,
+  "mcpApps.call": here,
+  "mcpApps.close": here,
   // A cloud thread's work brought into this Mac's own folder: only this Mac has it.
   "macProjects.bringState": here,
   "macProjects.bring": here,

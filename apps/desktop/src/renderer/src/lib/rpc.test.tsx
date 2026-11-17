@@ -13,7 +13,7 @@ it("only accepts the preload's window message when connecting the privileged cor
   const trusted = { start: vi.fn(), postMessage: vi.fn(), onmessage: null as ((event: MessageEvent) => void) | null };
   window.dispatchEvent(new MessageEvent("message", { data: "openorc:port", source: window, ports: [trusted as unknown as MessagePort] }));
   expect(trusted.start).toHaveBeenCalledOnce();
-  const pending = core.call("mcpApps.close", { viewId: "00000000-0000-4000-8000-000000000000" });
+  const pending = core.call("mcpApps.close", { runId: "run-1", viewId: "00000000-0000-4000-8000-000000000000" });
   expect(trusted.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: "rpc", method: "mcpApps.close" }));
   const request = trusted.postMessage.mock.calls[0]![0];
   trusted.onmessage!(new MessageEvent("message", { data: { type: "rpc.result", id: request.id, result: null } }));

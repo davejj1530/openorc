@@ -343,6 +343,11 @@ export const ROUTES = {
     ),
   /** One file of a thread's checkout written on its machine, as its host made it. The same id again is the same write. */
   writeFile: (id: string) => route("PUT", `/hosted/threads/${encodeURIComponent(id)}/files`, fileWriteOutcome),
+  /** A tool call's interactive app, opened against the thread's live agent process; then its view's reads, calls and close. */
+  mcpAppOpen: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/mcp-apps`, z.unknown()),
+  mcpAppRead: (id: string, viewId: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/mcp-apps/${encodeURIComponent(viewId)}/read`, z.unknown()),
+  mcpAppCall: (id: string, viewId: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/mcp-apps/${encodeURIComponent(viewId)}/call`, z.unknown()),
+  mcpAppClose: (id: string, viewId: string) => route("DELETE", `/hosted/threads/${encodeURIComponent(id)}/mcp-apps/${encodeURIComponent(viewId)}`, null),
   /** One tool call's whole output, as the server kept it; null output for a call that never ended. */
   toolOutput: (id: string, toolCallId: string) => route("GET", `/hosted/threads/${encodeURIComponent(id)}/tool-calls/${encodeURIComponent(toolCallId)}/output`, z.object({ output: z.unknown() })),
   /** The agent folds the conversation between turns. Asking again with the same id is the same compaction. */

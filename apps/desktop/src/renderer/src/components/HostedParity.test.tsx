@@ -146,11 +146,24 @@ it("reads an omitted cloud tool output when its row opens, as a Mac one's", asyn
   expect(await screen.findByText(/the whole cloud output/)).toBeTruthy();
 });
 
-it("does not open a local interactive tool app for a hosted run", async () => {
-  mount(<McpAppResult runId="hosted:example-thread" toolCallId="call-1" />);
+it("holds a cloud run's interactive app with its reason while its server serves none, opening nothing", async () => {
+  queryClient.setQueryData(["threads.get", { id: cloudReviewThread.id }], cloudReviewThread);
+  mount(<McpAppResult runId={`hosted:${cloudReviewThread.id}`} toolCallId="call-1" />);
   const button = screen.getByRole("button", { name: "Open interactive app" });
   expect(button.hasAttribute("disabled")).toBe(true);
   await act(async () => button.parentElement?.focus());
   expect(await screen.findByText(HOSTED_REASONS.interactiveApp)).toBeTruthy();
-  expect(core.call).not.toHaveBeenCalled();
+  expect(vi.mocked(core.call).mock.calls.map(([method]) => method)).not.toContain("mcpApps.open");
+});
+
+it("opens a cloud run's interactive app where its run is, once its server serves them", async () => {
+  queryClient.setQueryData(["threads.get", { id: cloudReviewThread.id }], cloudReviewThread);
+  vi.mocked(core.call).mockImplementation((async (method: RpcMethod) => {
+    if (method === "hosted.capabilities") return { version: 1, features: { interactiveApp: { available: true } } };
+    if (method === "mcpApps.open") return { status: "unavailable", message: "Interactive apps need the thread's agent running. The saved result is still available." };
+    throw new Error(`Unexpected local read: ${method}`);
+  }) as never);
+  mount(<McpAppResult runId={`hosted:${cloudReviewThread.id}`} toolCallId="call-1" />);
+  expect(await screen.findByText(/Interactive apps need the thread's agent running/)).toBeTruthy();
+  expect(vi.mocked(core.call)).toHaveBeenCalledWith("mcpApps.open", { runId: `hosted:${cloudReviewThread.id}`, toolCallId: "call-1" });
 });

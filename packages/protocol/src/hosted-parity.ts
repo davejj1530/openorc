@@ -53,6 +53,8 @@ export const HostedCapabilities = z.object({
     fileBrowser: availability,
     /** A thread's files written from this Mac, on its machine, by someone in the thread. */
     fileWrite: availability,
+    /** A tool call's interactive MCP app, a view of the thread's live agent process. */
+    interactiveApp: availability,
     files: availability,
     nativeSubthreads: availability,
     personSubthreads: availability,

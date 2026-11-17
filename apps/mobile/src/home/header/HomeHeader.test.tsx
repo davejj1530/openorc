@@ -124,7 +124,7 @@ it("titles Home with the space it shows once the Mac's person is signed in to Op
   expect(screen.getByText("OpenOrc")).toBeTruthy();
   expect(screen.queryByRole("button", { name: /space$/ })).toBeNull();
   unmount();
-  account.spaces = { state: "ready", spaces: [{ id: "personal-me", kind: "personal" }, birch], current: birch, access: null, offline: false };
+  account.spaces = { state: "ready", spaces: [{ id: "personal-me", kind: "personal" }, birch], current: birch, access: null, offline: false, userId: "u-me" };
   render(<HomeBar state={connected} />);
   expect(screen.getByRole("button", { name: "Birch Studio, space" })).toBeTruthy();
   expect(screen.getByText("Birch Studio")).toBeTruthy();
@@ -137,7 +137,7 @@ it("titles Home with the space it shows once the Mac's person is signed in to Op
 
 it("titles Personal as OpenOrc, as the Mac's sidebar heads it, still opening the spaces", () => {
   const personal = { id: "personal-me", kind: "personal" } as const;
-  account.spaces = { state: "ready", spaces: [personal], current: personal, access: null, offline: false };
+  account.spaces = { state: "ready", spaces: [personal], current: personal, access: null, offline: false, userId: "u-me" };
   render(<HomeBar state={connected} />);
   expect(screen.getByRole("button", { name: "OpenOrc, Personal space" })).toBeTruthy();
   expect(screen.getByText("OpenOrc")).toBeTruthy();
@@ -147,7 +147,7 @@ it("titles Personal as OpenOrc, as the Mac's sidebar heads it, still opening the
 it("marks the filter in the accent while a filter narrows the list, and names what does", async () => {
   const { chooseFilter, chooseOwnership } = await import("../filter");
   const birch = { id: "org-birch", kind: "organization", name: "Birch Studio", logo: null, memberId: "member", role: "member", memberCount: 2 } as const;
-  account.spaces = { state: "ready", spaces: [{ id: "personal-me", kind: "personal" }, birch], current: birch, access: null, offline: false };
+  account.spaces = { state: "ready", spaces: [{ id: "personal-me", kind: "personal" }, birch], current: birch, access: null, offline: false, userId: "u-me" };
   const view = render(<HomeBar state={connected} />);
   const mark = () => screen.getByTestId("filter-mark");
   expect(screen.getByRole("button", { name: "Show" })).toBeTruthy();
@@ -173,7 +173,7 @@ it("offers no filter where Home has no list, as for a space shut to the person",
 
 it("lets the status leave whole before a long organization's name loses a letter, at its own type size, in every link state", () => {
   const long = { id: "org-long", kind: "organization", name: "Northern Lights Cooperative Engineering", logo: null, memberId: "member", role: "member", memberCount: 9 } as const;
-  account.spaces = { state: "ready", spaces: [{ id: "personal-me", kind: "personal" }, long], current: long, access: null, offline: false };
+  account.spaces = { state: "ready", spaces: [{ id: "personal-me", kind: "personal" }, long], current: long, access: null, offline: false, userId: "u-me" };
   const reasons: DownReason[] = ["unreachable", "silent", "tailnet", "no-route", "offline", "restarting", "disabled", "busy"];
   const states: LinkState[] = [
     { kind: "connecting", mac: studio, why: "unreachable" },

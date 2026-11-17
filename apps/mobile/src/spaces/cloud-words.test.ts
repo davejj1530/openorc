@@ -9,7 +9,15 @@ vi.mock("./space-choice", () => ({}));
 
 const personal: Space = { id: "personal-me", kind: "personal" };
 const birch: Space = { id: "org-birch", kind: "organization", name: "Birch Studio", logo: null, memberId: "member", role: "member", memberCount: 2 };
-const ready = (facts: Partial<Extract<PhoneSpaces, { state: "ready" }>>): PhoneSpaces => ({ state: "ready", spaces: [personal, birch], current: birch, access: null, offline: false, ...facts });
+const ready = (facts: Partial<Extract<PhoneSpaces, { state: "ready" }>>): PhoneSpaces => ({
+  state: "ready",
+  spaces: [personal, birch],
+  current: birch,
+  access: null,
+  offline: false,
+  userId: "u-me",
+  ...facts,
+});
 const frozen = { state: "frozen", reason: "seat_removed", until: null, message: "Your seat was taken back. Open Account or ask an admin for a seat." } as const;
 
 it("says in the phone's own words why an organization is closed to the person, and never the server's words about buying", () => {

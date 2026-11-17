@@ -5,7 +5,9 @@ import type { LegendListRef } from "@legendapp/list/react-native";
 import { Pressable, RefreshControl, View } from "react-native";
 import { LinearTransition, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { link, queryClient, useLinkState } from "../client";
+import { link, queryClient, teamChat, useLinkState } from "../client";
+import { ChatList } from "../chat/ChatList";
+import { useChatLease } from "../chat/lease";
 import type { LinkState } from "../connection/manager";
 import { Plus } from "../generated/icons";
 import { motion } from "../generated/tokens";
@@ -189,7 +191,10 @@ function PairedHome({ state }: { state: Paired }) {
   const account = useSpaces();
   // Orclings and the Mac's tasks are the person's own, so they stay with Personal; an organization shows its threads.
   const own = account.state !== "ready" || account.current.kind === "personal";
-  const tabs = homeTabs({ orclings: own && orclings.supported, tasks: own && tasks });
+  // An organization's team chat, where its server has one for the person.
+  const chatLease = useChatLease();
+  const chat = teamChat.useChatState(chatLease).data?.state === "ready";
+  const tabs = homeTabs({ orclings: own && orclings.supported, tasks: own && tasks, chat: !own && chat });
   const [chosen, setTab] = useState<HomeTab>("threads");
   // A Mac too old for Orclings and task lists keeps Home as it was: threads alone, under the New thread pill.
   const tab = tabs.includes(chosen) ? chosen : "threads";
@@ -216,6 +221,7 @@ function PairedHome({ state }: { state: Paired }) {
             render={(each) => {
               if (each === "orclings") return <OrclingList chats={byRecent(orclings.chats)} top={HOME_BAR_HEIGHT} bottom={PILL_ROOM} shown={tab === "orclings"} />;
               if (each === "tasks") return <TaskList top={HOME_BAR_HEIGHT} bottom={PILL_ROOM} />;
+              if (each === "chat" && chatLease) return <ChatList lease={chatLease} top={HOME_BAR_HEIGHT} bottom={PILL_ROOM} />;
               return <Threads state={state} {...scroll} header={faces && own ? <OrclingFaces chats={orclings.chats} /> : null} />;
             }}
           />

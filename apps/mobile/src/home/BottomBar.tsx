@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { ListChecks, MessageSquare, Orclings, Plus } from "../generated/icons";
+import { ListChecks, MessageSquare, Orclings, People, Plus } from "../generated/icons";
 import { motion } from "../generated/tokens";
 import { GlassCapsule, liquidGlass } from "../ui/Glass";
 import { haptic } from "../ui/haptics";
@@ -15,7 +15,7 @@ import { useReducedMotion } from "../ui/reduced-motion";
 import { Text } from "../ui/Text";
 import type { NewAction } from "./new-action";
 
-export type HomeTab = "threads" | "orclings" | "tasks";
+export type HomeTab = "threads" | "chat" | "orclings" | "tasks";
 
 /** The bar's height: the tabs' capsule and New, side by side. */
 export const BAR_HEIGHT = 62;
@@ -24,6 +24,7 @@ export const BOTTOM_BAR_ROOM = BAR_HEIGHT + 8;
 
 const TABS: { tab: HomeTab; label: string; icon: ComponentType<IconProps> }[] = [
   { tab: "threads", label: "Threads", icon: MessageSquare },
+  { tab: "chat", label: "Chat", icon: People },
   { tab: "orclings", label: "Orclings", icon: Orclings },
   { tab: "tasks", label: "Tasks", icon: ListChecks },
 ];
@@ -46,7 +47,12 @@ const GLIDE = { duration: motion.duration.swap, dampingRatio: 0.82 };
 const RISE = { duration: motion.duration.arrive, dampingRatio: 0.62 };
 
 /** Threads always, then Orclings and Tasks where the Mac has them; one tab alone is no bar. */
-export const homeTabs = ({ orclings, tasks }: { orclings: boolean; tasks: boolean }): HomeTab[] => ["threads", ...(orclings ? (["orclings"] as const) : []), ...(tasks ? (["tasks"] as const) : [])];
+export const homeTabs = ({ orclings, tasks, chat = false }: { orclings: boolean; tasks: boolean; chat?: boolean }): HomeTab[] => [
+  "threads",
+  ...(chat ? (["chat"] as const) : []),
+  ...(orclings ? (["orclings"] as const) : []),
+  ...(tasks ? (["tasks"] as const) : []),
+];
 
 /** Each tab's width: the tabs share the bar from the leading margin to New, as iOS's tab bar sits beside its search button. */
 export function tabWidth(screen: number, count: number): number {

@@ -22,6 +22,8 @@ export type PhoneSpaces =
       access: OrganizationAccess | null;
       /** The Mac cannot reach OpenOrc Cloud now: what shows is what it last heard. */
       offline: boolean;
+      /** The person's own id on OpenOrc Cloud. */
+      userId: string;
     };
 
 /** What a space is called among the others, as the Mac's space menu names it: the organization's name, or Personal. */
@@ -48,5 +50,5 @@ export function useSpaces(): PhoneSpaces {
   const personal = status.spaces.find((space) => space.id === status.personalSpaceId);
   const current = status.spaces.find((space) => space.id === chosen) ?? personal;
   if (!current) return { state: "none" };
-  return { state: "ready", spaces: status.spaces, current, access: status.organizationAccess ?? null, offline: status.reach !== "live" };
+  return { state: "ready", spaces: status.spaces, current, access: status.organizationAccess ?? null, offline: status.reach !== "live", userId: status.userId };
 }

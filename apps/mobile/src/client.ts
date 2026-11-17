@@ -1,4 +1,4 @@
-import { createClientState, type RpcQueryOptions } from "@openorc/client";
+import { createClientState, createTeamChat, type RpcQueryOptions, type TeamChatDraftStorage } from "@openorc/client";
 import { CLOUD_THREADS, PHONE_CAPABILITIES, type AssetRef, type CloudRemoteMethod, type Project, type RemoteMethod, type RpcMethod, type RpcParams, type RpcResults } from "@openorc/protocol";
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 import Constants from "expo-constants";
@@ -102,6 +102,21 @@ export const client = createClientState(routed, {
   savesDefaultPermission: false,
   reportFrameError: (frame, error) => console.warn("[OpenOrc] Dropped incoming frame", { runId: frame.runId, seq: frame.seq, error: error instanceof Error ? error.name : "Error" }),
 });
+
+/** Team chat's drafts and the messages not yet confirmed sent, in a store of their own, which chat lists by key. */
+const chatKept = createMMKV({ id: "openorc-chat" });
+const chatDrafts: TeamChatDraftStorage = {
+  getItem: (key) => chatKept.getString(key) ?? null,
+  setItem: (key, value) => chatKept.set(key, value),
+  removeItem: (key) => void chatKept.remove(key),
+  key: (index) => chatKept.getAllKeys()[index] ?? null,
+  get length() {
+    return chatKept.getAllKeys().length;
+  },
+};
+
+/** Team chat in the person's organizations, read and written from the phone's own session, or through the Mac. */
+export const teamChat = createTeamChat({ connection: routed, queryClient: client.queryClient, storage: chatDrafts, randomId: () => randomUUID() });
 
 /** Which alerts this phone wants from each Mac, told to the shown one on every session and at once on a change. */
 export const alerts = new PhoneAlerts({ link, platform: pushPlatform, storage });

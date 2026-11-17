@@ -2,6 +2,7 @@ import { snoozeWakeLabel, threadMark, togetherActivity } from "@openorc/client";
 import { isSubagentThread, placeOf, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { router } from "expo-router";
 import { Pressable, View } from "react-native";
+import { useOwnCloud } from "../cloud/use-own-cloud";
 import { useLinkState, useRpc } from "../client";
 import { useLinkWords } from "../connection/use-link-words";
 import { Text } from "../ui/Text";
@@ -46,17 +47,27 @@ function StatusParts({ where, state }: { where: string; state: string | null }) 
   );
 }
 
+/**
+ * The link's words under a thread's title while the Mac's link is in trouble; none for a cloud thread the phone reaches
+ * through its own session, which the Mac's link says nothing of.
+ */
+export function threadLinkLine(link: { tone: string; status: string | null }, thread: Pick<ThreadSummary, "owner">, ownCloud: boolean): string | null {
+  if (ownCloud && thread.owner?.brain === "hosted") return null;
+  return link.tone !== "ok" && link.status ? link.status : null;
+}
+
 /** The thread's title over a faint line of where it lives and what it is doing, or how the link is. Tapping the title renames it. */
 export function ThreadTitle({ thread, onRename }: { thread: ThreadSummary | null; onRename: () => void }) {
   const projects = useRpc("projects.list", {});
   const parentId = isSubagentThread(thread) ? thread?.parentThreadId : null;
   const parent = useRpc("threads.get", { id: parentId ?? "" }, { enabled: Boolean(parentId) });
   const link = useLinkWords(useLinkState());
+  const ownCloud = useOwnCloud();
   const project = projects.data?.find((item) => item.id === thread?.projectId)?.name;
   if (!thread) return null;
   const parts = statusParts(thread, project);
   const place = parentId ? parent.data?.title : statusLine(thread, project);
-  const linkLine = link.tone !== "ok" && link.status ? link.status : null;
+  const linkLine = threadLinkLine(link, thread, ownCloud);
   const line = linkLine ?? place;
   // A cloud thread's title is everyone's in its project; a phone does not change it yet.
   const rename = isSubagentThread(thread) || placeOf(thread).elsewhere ? undefined : onRename;

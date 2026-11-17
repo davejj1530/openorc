@@ -2,6 +2,7 @@
 import type { Block } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act } from "@testing-library/react";
 import { router } from "expo-router";
 import { afterEach, expect, it, vi } from "vitest";
 import { fixtureThreads } from "../home/test-fixtures/threads";
@@ -60,6 +61,19 @@ it("opens the parent and stops only the chosen child, then replaces Stop with it
   view.rerender(<SubagentStatusBar thread={{ ...child, subagent: { ...child.subagent!, status: "stopped", stoppable: false, endedAt: Date.now() } }} onLayout={() => undefined} />);
   expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
   expect(screen.getByText(/Stopped/)).toBeTruthy();
+});
+
+it("offers Stop with the Mac out of reach only for a cloud thread's child the phone reaches through its own session", () => {
+  mac.offline = true;
+  const view = render(<SubagentStatusBar thread={child} onLayout={() => undefined} />, { wrapper: mac.phone!.wrapper });
+  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  const cloudChild = { ...child, owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 1 } };
+  view.rerender(<SubagentStatusBar thread={cloudChild} onLayout={() => undefined} />);
+  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  act(() => mac.phone!.cloud.hold(true));
+  expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
+  act(() => mac.phone!.cloud.hold(false));
+  mac.offline = false;
 });
 
 it("shows a failed Stop without replacing the read-only controls", async () => {

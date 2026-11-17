@@ -10,7 +10,8 @@ import { client, useLinkState, useRpc } from "../client";
 import { useThreadClaudeAccount } from "../composer/claude-account";
 import { Composer } from "../composer/Composer";
 import { useShareSettings } from "../composer/settings-bridge";
-import { linkReason } from "../connection/link-reason";
+import { threadLinkReason } from "../connection/link-reason";
+import { useOwnCloud } from "../cloud/use-own-cloud";
 import type { LinkState } from "../connection/manager";
 import { useCoverHome } from "../home/home-cover";
 import { useThreadOnScreen } from "../notifications/on-screen";
@@ -65,10 +66,16 @@ interface PaneProps {
   followKey: number;
 }
 
-/** Why the composer cannot send now: the link to the Mac first, then the conversation's own state. */
-function sendBlocked(link: LinkState, settings: { permissionReady: boolean; choice: unknown }, runs: { isLoading: boolean; error: unknown }, thread: ThreadSummary | null): string | null {
+/** Why the composer cannot send now: the link to the Mac first, for a thread that needs it, then the conversation's own state. */
+function sendBlocked(
+  link: LinkState,
+  settings: { permissionReady: boolean; choice: unknown },
+  runs: { isLoading: boolean; error: unknown },
+  thread: ThreadSummary | null,
+  ownCloud: boolean,
+): string | null {
   return (
-    linkReason(link) ??
+    threadLinkReason(link, thread, ownCloud) ??
     conversationSendDisabledReason({
       permissionReady: settings.permissionReady,
       historyLoading: runs.isLoading,
@@ -218,6 +225,7 @@ export function ThreadScreen() {
   const menu = useThreadHeaderMenu(cloud ? null : thread, useSnoozeClock(), actions.run);
   const authors = useThreadAuthors(thread);
   const linkState = useLinkState();
+  const ownCloud = useOwnCloud();
   const chat = chatFor(useOrclingChats().chats, id);
   useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
   const { canSteer } = processFit({ live, activeRun, choice: settings.choice, mode: settings.mode, permission: settings.permission, compacting: false });
@@ -266,7 +274,7 @@ export function ThreadScreen() {
               working={working}
               generatingImage={generatingImage}
               canSteer={canSteer}
-              disabledReason={sendBlocked(linkState, settings, runsQuery, thread) ?? threadWriteBlock(thread)}
+              disabledReason={sendBlocked(linkState, settings, runsQuery, thread, ownCloud) ?? threadWriteBlock(thread)}
               onLayout={room.onComposerLayout}
               onSent={room.follow}
               to={chat?.name}

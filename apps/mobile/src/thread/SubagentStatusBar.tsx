@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { Pressable, View, type LayoutChangeEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLinkState, useRpc, useRpcMutation } from "../client";
+import { useOwnCloud } from "../cloud/use-own-cloud";
 import { Text } from "../ui/Text";
 
 export function SubagentStatusBar({ thread, onLayout }: { thread: ThreadSummary; onLayout: (event: LayoutChangeEvent) => void }) {
@@ -12,7 +13,9 @@ export function SubagentStatusBar({ thread, onLayout }: { thread: ThreadSummary;
   const model = models.data?.find((option) => option.agent === thread.agent && option.id === thread.model)?.label ?? thread.model;
   const now = useTicking(child?.status === "running");
   const stop = useRpcMutation("subagents.stop");
-  const connected = useLinkState().kind === "connected";
+  // A sub thread of a cloud thread the phone reaches itself stops without the Mac.
+  const ownCloud = useOwnCloud();
+  const connected = useLinkState().kind === "connected" || (ownCloud && thread.owner?.brain === "hosted");
   const insets = useSafeAreaInsets();
   return (
     <View onLayout={onLayout} className="gap-1 bg-bg px-4 pt-2" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>

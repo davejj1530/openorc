@@ -34,7 +34,7 @@ import { attachedPath, StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInCollaboration } from "./stand-in-collaboration.js";
 import { StandInNotes } from "./stand-in-notes.js";
 import { headOf, lastAgentSeq, messageOf, pageOf, turnEnd, turnEnds, wire } from "./stand-in-thread-log.js";
-import { placeOwn, placeShared } from "./stand-in-thread-placement.js";
+import { parentOf, placeOwn, placeShared } from "./stand-in-thread-placement.js";
 import type { UploadedFile } from "../wire-files.js";
 import type { StandInPeer } from "./stand-in-peer.js";
 
@@ -102,6 +102,8 @@ export interface Thread {
   owner: string;
   projectId: string | null;
   title: string;
+  /** The thread a person started this one under; null for a thread of its own. */
+  parentId?: string | null;
   branch: string;
   agent: string;
   status: string;
@@ -317,6 +319,8 @@ export class StandInThreads {
     const project = this.spaces.project(space, typeof body["projectId"] === "string" ? body["projectId"] : null);
     if (!project || !this.spaces.canRead(space, project.id, who)) return NO_PROJECT;
     const settings = { model: null, effort: null, mode: "act", permissionMode: "trusted", ...(body["settings"] as Record<string, unknown>) } as Thread["settings"] & { agent?: string };
+    const under = parentOf(this.#threads, body["parentThreadId"], space, project.id);
+    if ("refusal" in under) return under.refusal;
     const first = body["first"] as Record<string, unknown> | undefined;
     if (first) {
       const refusal = this.admit(who, { agent: settings.agent ?? "claude", model: settings.model, ...(first["settings"] as object | undefined) });
@@ -326,6 +330,7 @@ export class StandInThreads {
     const id = this.addThread(who, { projectId: project.id, title: typeof body["title"] === "string" ? body["title"] : "", ...(agent && { agent: agent as StandInThreadSeed["agent"] }) });
     const thread = this.#threads.get(id)!;
     thread.settings = rest;
+    thread.parentId = under.parent?.id ?? null;
     if (!first && body["ready"] === true) this.readies.push({ threadId: id, settings: null });
     const sent = first ? this.#send(thread, who, first) : null;
     return { status: 201, body: { thread: this.#rowOf(thread, who), first: (sent?.body as object | undefined) ?? null } };
@@ -723,7 +728,7 @@ export class StandInThreads {
     return {
       id: thread.id,
       projectId: thread.projectId,
-      parentId: null,
+      parentId: thread.parentId ?? null,
       title: this.#title(thread),
       baseBranch: "main",
       branch: thread.branch,

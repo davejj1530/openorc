@@ -253,13 +253,14 @@ export class Threads implements HostedThreads {
     if (!isHostedAgent(settings.agent)) throw new Refused(`${harnessShortName(settings.agent)} doesn't run on OpenOrc Cloud.`);
     const project = this.#projectFor(params.projectId, params.spaceId);
     if (!project) throw new Refused(params.spaceId ? "This project isn't available in this space." : "Add this project to OpenOrc Cloud in Settings first.");
+    const under = this.#parentIn(params.parentThreadId, project);
     // The person's own skills are the server's before the thread's first turn: a failure starts no thread.
     await this.deps.skills.bring(project.space, settings.agent);
     const generation = this.deps.session.generation;
     const on = this.deps.session.in(project.space);
     // From this Mac's folder: its work is packed before anything leaves, and goes up before the first message.
     const mac = await packedFor(this.deps.macWork, params);
-    const body = { projectId: project.id, ...(params.title && { title: params.title }), settings, ready: true };
+    const body = { projectId: project.id, ...under, ...(params.title && { title: params.title }), settings, ready: true };
     const { reply, refusal } = await startWith(on, body, await firstMessage(on, params), settings, mac);
     if (refusal !== null) return sends.refuse(this.calls, refusal, settings);
     if (generation !== this.deps.session.generation) throw new Refused("Your OpenOrc session changed. Try again.");
@@ -274,6 +275,14 @@ export class Threads implements HostedThreads {
     }
     void this.refresh();
     return { thread: this.summary(row.id, params.spaceId), run: toRuns(row, this.reach)[0] ?? null };
+  }
+
+  /** The cloud thread a new one starts under, when it names one: a thread of the same project in the same space. */
+  #parentIn(parentThreadId: string | undefined, project: HeardProject): { parentThreadId?: string } {
+    if (!parentThreadId) return {};
+    const parent = this.#heard?.rows.find((row) => row.id === parentThreadId);
+    if (parent?.projectId !== project.id || parent.space !== project.space) throw new Refused("The parent conversation isn't in this space.");
+    return { parentThreadId };
   }
 
   /** Whether a cloud thread of this Mac project may start from its folder: the project is on OpenOrc Cloud and its server takes one. */

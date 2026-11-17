@@ -1,7 +1,7 @@
 import { spaceNavigation } from "../lib/space-navigation";
 import { useSpaceThread } from "../lib/space-queries";
 import { offeredAccount, projectAccountChoice, type ModelChoice } from "@openorc/client";
-import { executionMode, type Thread } from "@openorc/protocol";
+import { executionMode, placeOf, PLACES, type ThreadSummary } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Composer } from "../components/Composer";
 import { DitherBackdrop } from "../components/DitherBackdrop";
@@ -15,6 +15,7 @@ import { useRpc, useRpcMutation } from "../lib/client";
 import { readDraft, writeDraft } from "../lib/drafts";
 import { openThread, useRouter } from "../lib/router";
 import { useComposerSuggestions } from "../lib/connector-mentions";
+import { useNewThreadFiles } from "../lib/new-thread-files";
 
 const draftKey = (parentId: string) => `subthread.${parentId}`;
 
@@ -41,14 +42,14 @@ export function NewSubthread({ parentId }: { parentId: string }) {
   return parent.data ? <SubthreadComposer key={parent.data.id} parent={parent.data} /> : null;
 }
 
-function SubthreadComposer({ parent }: { parent: Thread }) {
+function SubthreadComposer({ parent }: { parent: ThreadSummary }) {
   const [prompt, setPrompt] = useState(() => readDraft(draftKey(parent.id), { prompt: "" }).prompt);
   const [choice, setChoice] = useState<ModelChoice | null>(() => (parent.model ? { agent: parent.agent, model: parent.model, effort: parent.effort, fastMode: parent.fastMode } : null));
   const [mode, setMode] = useState(parent.mode);
   const [permission, setPermission] = useState(parent.permissionMode);
   const start = useRpcMutation("threads.start");
-  const { list: accounts, picker: accountPicker, claudeAccountId } = useSubthreadAccount(parent, start.isPending, () => start.reset());
-  const accountsMissing = choice?.agent === "claude" && !accounts.data ? (accounts.error?.message ?? "Loading Claude accounts…") : null;
+  const { files, picker: accountPicker, claudeAccountId, missing } = useSubthreadPlace(parent, start.isPending, () => start.reset());
+  const accountsMissing = choice?.agent === "claude" ? missing : null;
   const suggestions = useComposerSuggestions({ kind: "thread", id: parent.id }, choice?.agent, executionMode(mode, permission), claudeAccountId);
   const mounted = useRef(true);
   useEffect(() => {
@@ -104,7 +105,8 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
               ?
             </h1>
             <Composer
-              draftKey={`${draftKey(parent.id)}.attachments`}
+              draftKey={files.draftKey}
+              hostedFiles={files.hostedFiles}
               autoFocus
               value={prompt}
               onChange={changePrompt}
@@ -142,12 +144,25 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
 }
 
 /**
+ * Where a subthread starts and on what. Under a cloud thread it starts on OpenOrc Cloud too, on the person's cloud
+ * sign-in and with the cloud's files; under a thread here, on this Mac with its project's Claude accounts. `missing`
+ * says why a Claude subthread here can't start yet.
+ */
+function useSubthreadPlace(parent: ThreadSummary, starting: boolean, onChoose: () => void) {
+  const cloud = placeOf(parent) === PLACES.hosted;
+  const hosted = useNewThreadFiles(parent.projectId, cloud, parent.id);
+  const { list, picker, claudeAccountId } = useSubthreadAccount(parent, !cloud, starting, onChoose);
+  const files = cloud ? hosted : { draftKey: `${draftKey(parent.id)}.attachments`, hostedFiles: undefined };
+  return { files, picker, claudeAccountId, missing: cloud || list.data ? null : (list.error?.message ?? "Loading Claude accounts…") };
+}
+
+/**
  * The Claude accounts a subthread can start on: the ones its project uses, starting on the parent's while the project
  * still uses it, else on the project's default.
  */
-function useSubthreadAccount(parent: Thread, starting: boolean, onChoose: () => void) {
-  const list = useRpc("claude.accounts.list", {});
-  const project = useRpc("projects.get", { id: parent.projectId });
+function useSubthreadAccount(parent: ThreadSummary, enabled: boolean, starting: boolean, onChoose: () => void) {
+  const list = useRpc("claude.accounts.list", {}, { enabled });
+  const project = useRpc("projects.get", { id: parent.projectId }, { enabled });
   const [chosen, setChosen] = useState(parent.claudeAccountId ?? undefined);
   const choice = list.data && (project.data !== undefined || project.error) ? projectAccountChoice(project.data, list.data) : undefined;
   const claudeAccountId = offeredAccount(choice, chosen) ?? choice?.defaultId;

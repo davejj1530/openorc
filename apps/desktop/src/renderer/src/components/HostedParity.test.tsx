@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { HOSTED_REASONS, type RpcMethod, type RpcResults } from "@openorc/protocol";
 import { queryClient } from "../lib/client";
+import { useRouter } from "../lib/router";
 import { core } from "../lib/rpc";
 import { PanelContent } from "./PanelContent";
 import { PanelNewTab } from "./PanelNewTab";
@@ -87,6 +88,30 @@ it("keeps Fork and New subthread disabled with keyboard-reachable reasons", asyn
   expect(child.getAttribute("aria-disabled")).toBe("true");
   await act(async () => child.focus());
   expect(await screen.findByText(HOSTED_REASONS.personSubthreads)).toBeTruthy();
+});
+
+it("starts a subthread under a cloud thread once its server says it may, as under a thread on this Mac", async () => {
+  vi.mocked(core.call).mockImplementation((async (method: RpcMethod) => {
+    if (method === "hosted.capabilities") return { version: 1, features: { personSubthreads: { available: true } } };
+    throw new Error(`Unexpected local read: ${method}`);
+  }) as never);
+  mount(
+    <Menu.Root open>
+      <Menu.Portal>
+        <CoversPreview />
+        <Menu.Positioner>
+          <Menu.Popup>
+            <ThreadMenuItems thread={cloudReviewThread} parts={Menu} />
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>,
+  );
+  // Held while its server is asked, then offered as on this Mac.
+  await vi.waitFor(() => expect(screen.getByRole("menuitem", { name: /^New subthread$/ }).getAttribute("aria-disabled")).toBeNull());
+  fireEvent.click(screen.getByRole("menuitem", { name: /^New subthread$/ }));
+  expect(useRouter.getState().route).toEqual({ view: "newsubthread", parentId: cloudReviewThread.id });
+  expect(screen.getByRole("menuitem", { name: /^Fork$/ }).getAttribute("aria-disabled")).toBe("true");
 });
 
 it("does not fetch omitted hosted tool output on hover or focus", async () => {

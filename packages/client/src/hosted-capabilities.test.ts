@@ -15,3 +15,14 @@ it("offers a cloud thread's terminal only once its server says so, with the serv
   expect(hostedControlReason({ owner: { brain: "hosted", reach: "offline" } } as never, "terminal", features({ available: true }))).toBe("OpenOrc Cloud can't be reached.");
   expect(hostedControlReason({ owner: null } as never, "terminal")).toBeNull();
 });
+
+it("offers a person's subthread in a cloud thread only once its server says so, with the server's reason otherwise", () => {
+  const served = (personSubthreads: HostedCapabilities["features"]["personSubthreads"]): HostedCapabilities => ({ version: 1, features: { personSubthreads } });
+  expect(hostedControlReason(cloud, "personSubthreads", served({ available: true }))).toBeNull();
+  expect(hostedControlReason(cloud, "personSubthreads", served({ available: false, reason: "New subthreads aren't available in cloud threads yet." }))).toBe(
+    "New subthreads aren't available in cloud threads yet.",
+  );
+  expect(hostedControlReason(cloud, "personSubthreads", served(undefined))).toBe(HOSTED_REASONS.personSubthreads);
+  // A control the server doesn't answer for stays held in the app's words, whatever it answers.
+  expect(hostedControlReason(cloud, "fork", served({ available: true }))).toBe(HOSTED_REASONS.fork);
+});

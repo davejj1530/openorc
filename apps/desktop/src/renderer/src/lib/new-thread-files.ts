@@ -8,14 +8,16 @@ import { forgetHostedIntent, hostedIntentId } from "./hosted-send-intent";
  * under one request id while its words, files and settings stay the same, so sending it again after a lost answer
  * makes no second thread.
  */
-export function useNewThreadFiles(projectId: string, hosted: boolean) {
+export function useNewThreadFiles(projectId: string, hosted: boolean, under?: string) {
   const context = useHostedFileContext({ projectId, enabled: hosted });
   const identity = hosted ? context.identity : null;
-  const key = identity ? `newthread.hosted.${identity.accountId}.${identity.spaceId}.${projectId}` : null;
-  if (!hosted) return { draftKey: `newthread.${projectId}.attachments`, hostedFiles: undefined, requestId: async () => undefined, started: () => undefined };
+  // A subthread's draft is its own, beside the project's new thread's.
+  const named = under ? `${projectId}.under.${under}` : projectId;
+  const key = identity ? `newthread.hosted.${identity.accountId}.${identity.spaceId}.${named}` : null;
+  if (!hosted) return { draftKey: `newthread.${named}.attachments`, hostedFiles: undefined, requestId: async () => undefined, started: () => undefined };
   const hostedFiles: HostedFileScope | null = key ? context.scope : null;
   return {
-    draftKey: `${key ?? `newthread.hosted.${projectId}`}.attachments`,
+    draftKey: `${key ?? `newthread.hosted.${named}`}.attachments`,
     hostedFiles,
     /** The start's request id when it carries cloud files; none otherwise. */
     requestId: async (intent: { text: string; attachments: string[]; settings: unknown }): Promise<string | undefined> =>

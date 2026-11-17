@@ -79,14 +79,14 @@ export class SpaceRequests {
 
   private async start(request: RpcRequest, params: RpcParams<"threads.start">, projects: SpaceProject[], local: string[]) {
     const place = this.deps.place();
-    if (params.hosted) {
+    // A thread under a cloud thread starts on OpenOrc Cloud with it.
+    if (params.hosted || (params.parentThreadId && place?.holds({ thread: params.parentThreadId }))) {
       if (!place?.active) throw new Error("Sign in to OpenOrc to start a thread on OpenOrc Cloud.");
       if (!projects.some((project) => project.key === params.projectId && project.hostedProjectId)) throw new Error("This project isn't available in this space.");
       return place.call("threads.start", params);
     }
     if (!local.includes(params.projectId)) throw new Error("This project isn't available in this space.");
     if (params.parentThreadId) {
-      if (place?.holds({ thread: params.parentThreadId })) throw new Error("An OpenOrc Cloud thread stays on OpenOrc Cloud.");
       const parent = await this.read(request, "threads.get", { id: params.parentThreadId });
       if (!parent || parent.projectId !== params.projectId || !local.includes(parent.projectId)) throw new Error("The parent conversation isn't in this space.");
     }

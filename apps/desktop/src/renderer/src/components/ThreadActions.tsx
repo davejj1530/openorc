@@ -15,6 +15,7 @@ import { AlarmClock, AppWindow, ChevronRight, CircleCheck, Columns2, GitFork, Ma
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { ThreadPlaceItems } from "./ThreadPlaceItems";
 import { HostedMenuReason } from "./HostedMenuReason";
+import { useHostedCapabilities } from "../hooks/useHostedCapabilities";
 import { Button, Dialog } from "./ui";
 
 /** The parts a dropdown and a context menu share, so one item list serves both. */
@@ -183,11 +184,12 @@ function LifecycleItems({ thread, parts: M, disabled, tip, patch }: { thread: Th
   );
 }
 
-/** A sidebar row's menu leads with it; the header's keeps it beside Fork. OpenOrc Cloud starts no thread under another, so it has none. */
+/** A sidebar row's menu leads with it; the header's keeps it beside Fork. In a cloud thread, its server says whether it starts one. */
 function NewSubthreadItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
-  if (placeOf(thread) === PLACES.hosted)
+  const held = useHostedCapabilities(thread).reason("personSubthreads");
+  if (held)
     return (
-      <HostedMenuReason parts={M} reason={HOSTED_REASONS.personSubthreads}>
+      <HostedMenuReason parts={M} reason={held}>
         <PenSquare size={13} /> New subthread
       </HostedMenuReason>
     );

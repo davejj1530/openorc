@@ -75,3 +75,30 @@ it("runs over a phone's link to the Mac: the cloud answers its own threads, the 
   expect(link.asked.map((request) => request.method)).toEqual(["threads.list", "threads.get"]);
   expect(JSON.stringify(link.asked)).not.toContain(cloudThread);
 });
+
+it("starts a person's subthread under a cloud thread on OpenOrc Cloud, never down the link", async () => {
+  const cloudRow = hosted.threads.listed("threads.list", {})!.rows.find((row) => row.id === cloudThread)!;
+  const link = macLink({ ...cloudRow, id: "mac-thread", projectId: MAC_PROJECT, owner: undefined });
+  stand.setBilling(SELF, { pro: true, standing: "live", at: new Date(Date.now() + 20 * 86_400_000).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
+  stand.setSignIns(SELF, [{ agent: "claude" }]);
+  const router = new PlaceRouter({ place: () => hosted.threads, spaces: () => hosted.spaces, next: link.next });
+  const reply = await router.handle({
+    type: "rpc",
+    id: 1,
+    method: "threads.start",
+    params: {
+      spaceId: space,
+      projectId: cloudRow.projectId,
+      parentThreadId: cloudThread,
+      agent: "claude",
+      model: "opus",
+      mode: "act",
+      permissionMode: "trusted",
+      prompt: "Draw the hero",
+      attachments: [],
+    },
+  });
+  if (reply.type === "rpc.error") throw new Error(reply.message);
+  expect((reply.result as { thread: ThreadSummary }).thread).toMatchObject({ parentThreadId: cloudThread, owner: { brain: "hosted" } });
+  expect(link.asked.map((request) => request.method)).not.toContain("threads.start");
+});

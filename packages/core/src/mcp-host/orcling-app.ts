@@ -59,6 +59,7 @@ const ACCESS: { [M in AppMethod]: "reads" | "changes" } = {
   "threads.queue": "changes",
   "threads.unqueue": "changes",
   "threads.sendQueued": "changes",
+  "threads.compact": "changes",
   "approvals.resolve": "changes",
   "review.threadChanges": "reads",
   "review.threadFileDiff": "reads",

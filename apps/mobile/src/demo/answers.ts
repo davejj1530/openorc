@@ -160,6 +160,8 @@ const answers: Answers = {
     return null;
   },
   "threads.queue": (core, { id, text, attachments }) => core.queue(id, text, attachments),
+  // The demo's conversations are short, written ahead: there is nothing to fold, and nothing changes.
+  "threads.compact": () => null,
   "threads.unqueue": (core, { id, messageId }) => core.update(id, { queued: core.thread(id).queued.filter((queued) => queued.id !== messageId) }).queued,
   "threads.sendQueued": (core, { id, messageId }) => {
     const thread = core.thread(id);

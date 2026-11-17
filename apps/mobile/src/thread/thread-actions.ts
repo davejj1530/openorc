@@ -23,7 +23,8 @@ export type ThreadAction =
   | { kind: "open"; label: string; icon: Symbol; url: string }
   | { kind: "parent"; label: string; icon: Symbol; threadId: string }
   | { kind: "screen"; label: string; icon: Symbol; subtitle?: string; pathname: ThreadScreenPath }
-  | { kind: "delete"; label: string; icon: Symbol };
+  | { kind: "delete"; label: string; icon: Symbol }
+  | { kind: "compact"; label: string; icon: Symbol };
 
 /** What deleting a cloud thread removes, in the desktop's words, asked before it goes. */
 export const DELETE_CLOUD_THREAD = "The conversation and its work on OpenOrc Cloud are removed, for everyone in it.";
@@ -47,6 +48,8 @@ export interface ThreadPanels {
   preview: { page: string | null } | null;
   /** How many threads were started from this one. */
   subthreads?: number;
+  /** The thread's place compacts it, and no turn runs: the header offers Compact Context. */
+  compact?: boolean;
 }
 
 const NO_PANELS: ThreadPanels = { uncommitted: null, preview: null };
@@ -56,6 +59,9 @@ function preview(page: string | null): ThreadAction {
   const item: ThreadAction = { kind: "screen", label: panelToolLabels.browser, icon: "globe", pathname: "/preview" };
   return page ? { ...item, subtitle: page } : item;
 }
+
+/** Compact Context, in the header while the thread's place compacts it and no turn runs. */
+const compact = (panels: ThreadPanels): ThreadAction[] => (panels.compact ? [{ kind: "compact", label: "Compact Context", icon: "arrow.down.right.and.arrow.up.left" }] : []);
 
 /** Changes, with the file count beneath it when there is one: a cloud thread's open OpenOrc Cloud's own. */
 function changes(files: number, cloud: boolean): ThreadAction {
@@ -90,7 +96,8 @@ export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, p
       ];
   // A cloud thread is deleted for everyone in it, from wherever its menu opens; a thread of the Mac's only on the Mac.
   const remove: ThreadAction[] = placeOf(thread).elsewhere ? [{ kind: "delete", label: "Delete…", icon: "trash" }] : [];
-  const sections = place === "header" ? [[...screens, rename], family(thread, panels), organize, pull, resolve, remove] : [startUnder(thread), organize, [rename, ...pull], resolve, remove];
+  const sections =
+    place === "header" ? [[...screens, rename], family(thread, panels), compact(panels), organize, pull, resolve, remove] : [startUnder(thread), organize, [rename, ...pull], resolve, remove];
   return sections.filter((section) => section.length > 0);
 }
 

@@ -217,3 +217,15 @@ it("deletes a cloud thread from a phone, and never one of this Mac's", async () 
 it("lets a phone read the models OpenOrc Cloud runs for the person", async () => {
   expect(await refusal(phone.request("cloudModels.catalog", {}))).not.toBe(FROM_PHONE);
 });
+
+it("compacts a cloud thread from a phone through its server, and one of this Mac's on this Mac", async () => {
+  const threadId = at.cloud.threads.mine;
+  await vi.waitFor(async () => {
+    at.stand.endTurn(threadId);
+    expect((await together(threadId, () => true)).live).toBeNull();
+  });
+  const before = at.stand.compactions.length;
+  await phone.request("threads.compact", { id: threadId });
+  expect(at.stand.compactions.slice(before)).toEqual([expect.objectContaining({ threadId })]);
+  expect(await refusal(phone.request("threads.compact", { id: at.mac.threadId }))).not.toBe(FROM_PHONE);
+});

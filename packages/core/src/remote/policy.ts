@@ -221,6 +221,8 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "threads.queue": (params, context) => storedImages(params.attachments, context),
   "threads.unqueue": allow,
   "threads.sendQueued": allow,
+  // The core refuses it while a turn runs, as for the Mac's own windows.
+  "threads.compact": allow,
   "approvals.resolve": allow,
   "attachments.save": (params) => (params.dataBase64.length > MAX_ATTACHMENT_BASE64 ? `Images sent from a phone must be ${REMOTE_ATTACHMENT_BYTES / 1024 / 1024} MB or smaller.` : null),
   // Repository-relative paths and counts.
@@ -316,6 +318,7 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "threads.queue": same,
   "threads.unqueue": same,
   "threads.sendQueued": same,
+  "threads.compact": same,
   "approvals.resolve": same,
   "attachments.save": same,
   "review.threadChanges": same,

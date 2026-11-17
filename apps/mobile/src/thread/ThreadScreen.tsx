@@ -29,6 +29,7 @@ import { useSnoozeClock } from "./snooze-clock";
 import { SubagentStatusBar } from "./SubagentStatusBar";
 import { ThreadTitle } from "./ThreadHeader";
 import { useThreadHeaderMenu } from "./ThreadMenu";
+import { useCompact } from "./compact";
 import { sendBlocked } from "./send-blocked";
 import { NoteReplyContext, useMentionOpening, useNoteReading, useNoteReply, useThreadNotes } from "./thread-notes";
 import { Transcript } from "./Transcript";
@@ -209,8 +210,9 @@ export function ThreadScreen() {
   const voices = useVoices(runs, thread);
   const [disclosure] = useState(createDisclosure);
   const [{ live, working, generatingImage }, setActivity] = useState(IDLE);
-  const actions = useThreadActions(thread, { onUnread: goBack, onDeleted: goBack });
-  const menu = useThreadHeaderMenu(thread, useSnoozeClock(), actions.run);
+  const compact = useCompact(thread);
+  const actions = useThreadActions(thread, { onUnread: goBack, onDeleted: goBack, compact });
+  const menu = useThreadHeaderMenu(thread, useSnoozeClock(), actions.run, compact !== null);
   const authors = useThreadAuthors(thread, together);
   const noteReply = useNoteReply(together);
   const linkState = useLinkState();
@@ -261,6 +263,7 @@ export function ThreadScreen() {
           ) : (
             <Composer
               handle={noteReply.handle}
+              compact={compact}
               thread={thread}
               queued={thread.queued}
               settings={settings}

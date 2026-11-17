@@ -39,6 +39,28 @@ export interface ComposerInput {
   attachTo?: HostedFileScope | null;
   /** In a cloud thread where the reader may post notes: a draft that tags someone posts as a note to them. */
   notes?: ComposerNotes | null;
+  /** Where the thread's place compacts it: a draft that is `/compact` alone folds the conversation so far instead of sending. */
+  compact?: (() => Promise<unknown>) | null;
+}
+
+/** The one command the composer runs itself rather than send. */
+const COMPACT = "/compact";
+
+/** The draft's tags as Reply, the handoff's Tag and a pick from `@` write them. */
+function draftTagWriters(setDraft: (update: (draft: Draft) => Draft) => void) {
+  return {
+    /** Tags a person at the draft's start, as Reply on their note does, which the note then answers. */
+    tag: (person: DraftTag, reply?: DraftReply) =>
+      setDraft((current) => ({ ...current, text: `@${person.name} ${current.text.trimStart()}`, tags: [...(current.tags ?? []), person], ...(reply && { reply }) })),
+    /** Puts a note the server wrote in place of the words, tagging its person, as the handoff's Tag does. */
+    stage: (text: string, person: DraftTag) => setDraft((current) => ({ ...current, text, tags: [person] })),
+    /** Tags a person picked from `@` in place of the `@` word, and where the caret goes after. */
+    pickTag: (person: DraftTag, word: { start: number }, caret: number): number => {
+      const written = `@${person.name} `;
+      setDraft((current) => ({ ...current, text: `${current.text.slice(0, word.start)}${written}${current.text.slice(caret)}`, tags: [...(current.tags ?? []), person] }));
+      return word.start + written.length;
+    },
+  };
 }
 
 /**
@@ -47,7 +69,7 @@ export interface ComposerInput {
  * keyboard stays up, so whatever is written next is the next message. A send that fails puts what it took back, ahead
  * of anything written since, and says why.
  */
-export function useComposer({ threadId, request, live, working, canSteer, disabledReason, onSent, turnSeen = {}, attachRefusal = null, attachTo = null, notes = null }: ComposerInput) {
+export function useComposer({ threadId, request, live, working, canSteer, disabledReason, onSent, turnSeen = {}, attachRefusal = null, attachTo = null, notes = null, compact = null }: ComposerInput) {
   const [draft, setDraft] = useDraft(threadId);
   const [sending, setSending] = useState(false);
   // A second tap can land before the first send renders, so the send in flight is held here as well.
@@ -125,19 +147,10 @@ export function useComposer({ threadId, request, live, working, canSteer, disabl
     /** The main pill: a note to the people it tags; else Stop, or a send into the running turn or the next one. */
     primary: () => {
       if (note) return void post(note);
+      if (compact && !working && draft.text.trim() === COMPACT && !draft.images.length) return void deliver(() => compact());
       return controls.primary === "stop" ? stop() : void send(controls.sendsNow);
     },
-    /** Tags a person at the draft's start, as Reply on their note does, which the note then answers. */
-    tag: (person: DraftTag, reply?: DraftReply) =>
-      setDraft((current) => ({ ...current, text: `@${person.name} ${current.text.trimStart()}`, tags: [...(current.tags ?? []), person], ...(reply && { reply }) })),
-    /** Puts a note the server wrote in place of the words, tagging its person, as the handoff's Tag does. */
-    stage: (text: string, person: DraftTag) => setDraft((current) => ({ ...current, text, tags: [person] })),
-    /** Tags a person picked from `@` in place of the `@` word, and where the caret goes after. */
-    pickTag: (person: DraftTag, word: { start: number }, caret: number): number => {
-      const written = `@${person.name} `;
-      setDraft((current) => ({ ...current, text: `${current.text.slice(0, word.start)}${written}${current.text.slice(caret)}`, tags: [...(current.tags ?? []), person] }));
-      return word.start + written.length;
-    },
+    ...draftTagWriters(setDraft),
     isNote: note !== null,
     /** A tap on the dim pill: says why it is dim, and does nothing else. */
     explainDim: dim.ask,

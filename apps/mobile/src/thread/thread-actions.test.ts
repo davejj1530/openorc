@@ -131,3 +131,18 @@ it("ends a cloud thread's menu with Delete, its Changes opening OpenOrc Cloud's 
   expect(mac.flat().some((item) => item.kind === "delete")).toBe(false);
   expect(mac[0]![0]).toMatchObject({ pathname: "/changes" });
 });
+
+it("offers Compact Context in the header while the thread's place compacts it, and nowhere else", () => {
+  const header = threadMenu(thread("t-plan"), "header", wednesday, { uncommitted: null, preview: null, compact: true });
+  expect(header.flat().find((item) => item.kind === "compact")).toEqual({ kind: "compact", label: "Compact Context", icon: "arrow.down.right.and.arrow.up.left" });
+  expect(
+    threadMenu(thread("t-plan"), "row", wednesday, { uncommitted: null, preview: null, compact: true })
+      .flat()
+      .some((item) => item.kind === "compact"),
+  ).toBe(false);
+  expect(
+    threadMenu(thread("t-plan"), "header", wednesday)
+      .flat()
+      .some((item) => item.kind === "compact"),
+  ).toBe(false);
+});

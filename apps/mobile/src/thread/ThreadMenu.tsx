@@ -75,11 +75,12 @@ export function headerMenu(sections: ThreadAction[][], run: Run): ReactElement {
   );
 }
 
-export function useThreadHeaderMenu(thread: ThreadSummary | null, now: Date, run: Run): ReactElement | null {
+export function useThreadHeaderMenu(thread: ThreadSummary | null, now: Date, run: Run, canCompact = false): ReactElement | null {
   // A cloud thread's Preview and subthreads are the cloud's, which the Mac's reads do not answer; its Changes are OpenOrc Cloud's own.
   const actionable = isSubagentThread(thread) || (thread && placeOf(thread).elsewhere) ? null : thread;
   const uncommitted = useChangesCount(isSubagentThread(thread) ? null : thread);
   const preview = usePreviewPanel(actionable);
   const subthreads = useSubthreads(actionable).subthreads.length;
-  return useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, subthreads }), run), [thread, run, now, uncommitted, preview, subthreads]);
+  const compact = canCompact && thread?.activity !== "running";
+  return useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, subthreads, compact }), run), [thread, run, now, uncommitted, preview, subthreads, compact]);
 }

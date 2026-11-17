@@ -32,7 +32,7 @@ function promptRename(title: string, save: (title: string) => void): void {
  * Runs a thread's menu actions against the Mac. A change the Mac refuses (a thread still working, a thread gone) says
  * why in an alert. `onUnread` hears a thread marked unread, which an open thread would read again at once.
  */
-export function useThreadActions(thread: ThreadSummary | null, { onUnread, onDeleted }: { onUnread?: () => void; onDeleted?: () => void } = {}) {
+export function useThreadActions(thread: ThreadSummary | null, { onUnread, onDeleted, compact }: { onUnread?: () => void; onDeleted?: () => void; compact?: (() => Promise<unknown>) | null } = {}) {
   const { mutate } = useRpcMutation("threads.update");
   const { mutate: remove } = useRpcMutation("threads.delete");
   // Stable while the thread is, so a native menu built from `run` is not set again on every render.
@@ -58,7 +58,8 @@ export function useThreadActions(thread: ThreadSummary | null, { onUnread, onDel
       else if (action.kind === "parent") router.push({ pathname: "/thread/[id]", params: { id: action.threadId } });
       else if (action.kind === "screen") router.push({ pathname: action.pathname, params: { threadId: thread.id } });
       else if (action.kind === "delete") confirmDelete(thread.id);
+      else if (action.kind === "compact") void compact?.().catch((failure: Error) => Alert.alert("Couldn’t compact this thread", failure.message));
     };
     return { run, save, rename };
-  }, [thread, mutate, remove, onUnread, onDeleted]);
+  }, [thread, mutate, remove, onUnread, onDeleted, compact]);
 }

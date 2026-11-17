@@ -182,3 +182,13 @@ it("holds a note that carries images, in the shared words", () => {
   act(() => held.result.current.explainDim());
   expect(held.result.current.dimReason).toBe("Remove the attachments to post a note.");
 });
+
+it("folds the conversation instead of sending a draft that is /compact alone", async () => {
+  const compact = vi.fn(async () => null);
+  const composer = renderHook(() => useComposer({ ...input(), compact }), { wrapper: mac.phone!.wrapper });
+  act(() => composer.result.current.setText("/compact"));
+  act(() => composer.result.current.primary());
+  await waitFor(() => expect(compact).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(composer.result.current.draft.text).toBe(""));
+  expect(mac.starts).toHaveLength(0);
+});

@@ -39,6 +39,8 @@ export const REMOTE_METHODS = [
   "threads.queue",
   "threads.unqueue",
   "threads.sendQueued",
+  // Folds the conversation so far into a summary, as /compact and Compact context do on the Mac.
+  "threads.compact",
   "approvals.resolve",
   "attachments.save",
   // A thread's changes, its commits and what Push would send, then commit, push and a pull request through the

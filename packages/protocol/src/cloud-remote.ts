@@ -159,4 +159,5 @@ export const CLOUD_THREAD_WRITES = [
   "threads.postNote",
   "hosted.review.action",
   "threads.delete",
+  "threads.compact",
 ] as const satisfies readonly RoutedMethod[];

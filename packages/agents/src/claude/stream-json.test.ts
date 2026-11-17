@@ -249,6 +249,33 @@ describe("ClaudeStreamParser", () => {
     expect(p.turns).toBe(4);
   });
 
+  it("says Claude Code's own words when it will not compact, and ends no turn", () => {
+    const p = new ClaudeStreamParser("run-refused");
+    const types = (lines: unknown[]) => lines.flatMap((l) => p.parseLine(line(l), 1000)).filter((e) => e.type !== "raw");
+    const session_id = "c932d530-bb83-4b4c-8928-eb63315bc9b9";
+    p.parseLine(line({ type: "system", subtype: "init", session_id, model: "claude-haiku-5-5" }), 1000);
+    p.parseLine(line({ type: "result", subtype: "success", num_turns: 1, duration_ms: 1 }), 1000);
+    p.expectManualCompaction();
+    // The lines Claude Code 2.1.325 writes for a /compact of a conversation it already folded, as recorded from a live session.
+    const refused = types([
+      { type: "system", subtype: "status", status: "compacting", session_id, uuid: "d27f6302-a65b-41fa-9e69-078c40fe9080" },
+      { type: "system", subtype: "status", status: null, compact_result: "failed", compact_error: "Not enough messages to compact.", session_id, uuid: "efe7fe96-3b35-4c50-89bb-b9cad873abe1" },
+      { type: "system", subtype: "init", session_id, model: "claude-haiku-5-5", tools: [], uuid: "3e0c5d0a" },
+      {
+        type: "assistant",
+        session_id,
+        message: { id: "acdd48cc-84ea-487a-9f95-c7d421c4a8b9", model: "<synthetic>", role: "assistant", type: "message", content: [{ type: "text", text: "Not enough messages to compact." }] },
+      },
+      { type: "result", subtype: "success", is_error: false, num_turns: 0, duration_ms: 1, duration_api_ms: 0, result: "Not enough messages to compact.", session_id },
+    ]);
+    expect(refused.map((e) => [e.type, "status" in e ? e.status : null, "text" in e ? e.text : null])).toEqual([
+      ["activity.updated", "running", null],
+      ["activity.updated", "error", "Not enough messages to compact."],
+    ]);
+    // The next prompt is an ordinary turn again.
+    expect(types([{ type: "system", subtype: "init", session_id, model: "claude-haiku-5-5" }]).map((e) => e.type)).toEqual(["turn.started"]);
+  });
+
   it("reports the compacted size as a change of context, not as the usage of a turn", () => {
     const p = new ClaudeStreamParser("run-compacted");
     const types = (lines: unknown[]) => lines.flatMap((l) => p.parseLine(line(l), 1000)).filter((e) => e.type !== "raw");

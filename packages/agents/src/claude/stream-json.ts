@@ -81,6 +81,11 @@ export class ClaudeStreamParser {
   private manualCompactionRequested = false;
   /** A manual compaction ends with an empty result line that is not a turn. */
   private swallowEmptyResult = false;
+  /**
+   * A /compact the app asked for that Claude Code declined: it announces the session again, says why in a synthetic
+   * reply and ends with a result, none of which is a turn.
+   */
+  private declined = false;
   /** Whether the session currently asks for Fast, so its state lines are worth a notice. */
   private fastMode: boolean;
   /** The last Fast state reported for a run that asked for Fast, with its reason when off. */
@@ -167,6 +172,7 @@ export class ClaudeStreamParser {
         this.streamEvent(msg, now, out);
         break;
       case "assistant":
+        if (this.declined && isRecord(msg["message"]) && msg["message"]["model"] === "<synthetic>") break;
         if (this.accountSignedOut(msg)) this.signInNeeded(msg, now, out);
         else this.assistant(msg, now, out);
         break;
@@ -439,6 +445,10 @@ export class ClaudeStreamParser {
   /** A result settles the current request, then accounts for the turn and Fast state. */
   private result(msg: Record<string, unknown>, now: number, out: AgentEvent[]): void {
     const modelTurns = num(msg["num_turns"]) ?? 0;
+    if (this.declined) {
+      this.declined = false;
+      return;
+    }
     // A manual compaction ends with a result of its own, which answered nothing.
     if (this.swallowEmptyResult) {
       this.swallowEmptyResult = false;
@@ -499,8 +509,8 @@ export class ClaudeStreamParser {
           ...(Array.isArray(msg["tools"]) ? { tools: msg["tools"].filter(isString) } : {}),
         });
       }
-      // Compaction re-announces the session without a prompt; that is not a turn.
-      if (!this.compaction) {
+      // Compaction re-announces the session without a prompt; that is not a turn, nor is a declined one's.
+      if (!this.compaction && !this.declined) {
         this.starts += 1;
         out.push({ type: "turn.started", runId: this.runId, ts: now, turnId: str(msg["uuid"]) ?? `turn-${this.starts}` });
       }
@@ -544,8 +554,10 @@ export class ClaudeStreamParser {
             activityId: this.compaction.id,
             label: "Compacting context",
             status: "error",
-            text: str(msg["error"]) ?? `Compaction ${result ?? "failed"}.`,
+            // Claude Code says why in `compact_error`, as "Not enough messages to compact." for a conversation already folded.
+            text: str(msg["compact_error"]) ?? str(msg["error"]) ?? `Compaction ${result ?? "failed"}.`,
           });
+          this.declined = this.compaction.manual;
           this.compaction = null;
         } else if (this.compaction.manual) this.swallowEmptyResult = true;
       }

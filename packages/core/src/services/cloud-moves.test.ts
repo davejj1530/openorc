@@ -198,6 +198,16 @@ describe("a thread moving from this Mac to OpenOrc Cloud", () => {
     expect(cloudMoves.moving(db, thread.id)).toBeNull();
   });
 
+  it("sends the folder's work of a thread with no base of its own, as one imported from a terminal", async () => {
+    const { thread } = await macThread();
+    threads.update(db, thread.id, { baseSha: null });
+    const { hosted, sent } = account();
+    await moves(hosted).move(thread.id, false);
+    await settled(thread.id);
+    expect(sent.work!.bytes).toBeGreaterThan(0);
+    expect(sent.done).toEqual([thread.id]);
+  });
+
   it("stays where it was, undone on the server, and says why, when a step fails", async () => {
     const { thread } = await macThread();
     const { hosted, sent, fail } = account();

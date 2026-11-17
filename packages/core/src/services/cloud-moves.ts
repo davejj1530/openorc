@@ -163,7 +163,7 @@ export class CloudMoves {
       this.step(move, { step: "packing" });
       const session = await this.deps.sessions.export(thread);
       const folder = thread.worktreePath ?? projects.get(this.deps.db, thread.projectId)?.rootPath;
-      const pack = thread.baseSha && folder ? await packProject(this.deps.db, thread.projectId, [], folder) : null;
+      const pack = folder ? await packProject(this.deps.db, thread.projectId, [], folder) : null;
       const packed = pack && uploadOf(pack);
       if (packed?.refusal) {
         await packed.done();

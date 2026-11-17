@@ -34,4 +34,4 @@ The existing CLI entry keeps the inherited environment. Managed entries remove i
 
 ## Cloud tokens
 
-**Settings → Cloud → Claude accounts** gives each account a token that its agents sign in with inside cloud sandboxes. **Create token** runs `claude setup-token` through that account's own sign-in, in a private window for an added account; you can also paste a token. Each token stays in protected storage (see [credential storage](credential-storage.md)), and removing it does not revoke it at Anthropic.
+**Sign in with Claude** under **Settings → Cloud → OpenOrc Cloud** makes the token your cloud turns sign in with. It runs `claude setup-token` through the account you choose under **Claude account**, when this computer has more than one, and sends the token to OpenOrc Cloud, which keeps it. **Use an API key** takes an Anthropic API key instead. **Remove** deletes the cloud's copy; it does not revoke the token at Anthropic.

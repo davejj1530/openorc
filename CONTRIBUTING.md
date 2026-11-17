@@ -29,11 +29,10 @@ Electron, node-pty, ONNX Runtime, and sqlite-vec include platform-specific depen
 - Git operations and workspace integration: `packages/git`.
 - Client state both the desktop renderer and the phone use: `packages/client`.
 - The encrypted phone session and pairing code: `packages/link`.
-- Cloud sandboxes, the runner inside them, and sync: `packages/cloud`.
+- How the app speaks to OpenOrc Cloud: `packages/hosted`.
 - Desktop windows, OS capabilities, and protected storage: `apps/desktop/src/main`.
 - User interaction and rendering: `apps/desktop/src/renderer/src`.
 - The iPhone app's screens: `apps/mobile/src`.
-- The cloud brain's host process: `apps/brain/src`.
 
 Keep behavior close to the module that owns its invariants. Prefer a small interface that hides meaningful implementation details. Add an adapter seam when there are real alternative implementations, such as the provider adapters or a test transport. Avoid pass-through layers introduced only to make files shorter. A feature that touches agent-specific state, such as sessions, sign-ins, or CLI files, needs a per-agent part that Claude Code, Codex, and OpenCode each implement.
 
@@ -54,7 +53,7 @@ pnpm build
 
 CI runs all of these. [Code quality checks](docs/code-quality.md) explains the lint, formatting, and size rules.
 
-`pnpm test` runs the Vitest suites in every package except `packages/mcp`, and in `apps/desktop`, `apps/mobile`, and `apps/brain`, plus the `node:test` suites in `packages/mcp` and the website's data and search tests in `apps/website`. CI also runs the size-limit, release, notice, and packaging script tests:
+`pnpm test` runs the Vitest suites in every package except `packages/mcp`, and in `apps/desktop` and `apps/mobile`, plus the `node:test` suites in `packages/mcp` and the website's data and search tests in `apps/website`. CI also runs the size-limit, release, notice, and packaging script tests:
 
 ```sh
 node --test scripts/size-limit.test.cjs scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
@@ -106,11 +105,11 @@ Packages switch off Node's inspector, so there are two packaged checks. `pnpm qa
 
 Live-provider modes in the smoke tools can use your authenticated provider account and execute work. Run them deliberately against disposable repositories. Automated checks alone do not establish that a live provider still accepts the integration.
 
-## Phone app and cloud brain
+## Phone app and OpenOrc Cloud
 
 The iPhone app needs Xcode. `pnpm --filter @openorc/mobile ios` generates the ignored `apps/mobile/ios` project, builds a development build, and runs it in the iOS Simulator; `pnpm --filter @openorc/mobile start` serves JavaScript to a development build that is already installed. The phone's colors, icons, and fonts are generated from the desktop's sources. Run `pnpm --filter @openorc/mobile design:sync` after changing them; `design:check` fails when the generated files are stale. App Store builds come from EAS Build with the `production` profile in `apps/mobile/eas.json`, which also submits them to App Store Connect. Phones from the App Store run older client code against newer desktops, so give a new event or result a per-phone capability in `packages/core/src/remote` and keep the phone tolerant of event types it does not know.
 
-Builds that run from the repository, such as `pnpm dev`, install the cloud brain from `apps/brain/dist`, which nothing rebuilds on its own. Run `pnpm --filter @openorc/brain bundle` after changing brain, core, or cloud code. The desktop's `package` scripts bundle the brain first, and packaging refuses an `apps/brain/dist` without exactly one brain archive and one door. The cloud tests use a local stand-in sandbox from `packages/cloud`, which runs on your computer, and fake services, so they need neither account. **Run check** under Settings → Cloud, cloud threads, and the brain use your own Vercel or Agent37 account and can bill it.
+OpenOrc Cloud's server is not in this repository. A development build reaches the server that `OPENORC_ACCOUNT_SERVER` names, from the shell or from `apps/desktop/.env.development.local`, and shows no account or cloud features without it. The tests of `packages/hosted` and of the cloud parts of the core and the apps run against the stand-in server in `packages/hosted/src/testing`, so they need no account.
 
 ## Dependency notices and artwork
 

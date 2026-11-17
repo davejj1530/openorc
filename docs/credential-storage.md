@@ -9,11 +9,9 @@ The data folder holds a separate encrypted file for each kind of secret, created
 - `github-reviewer-app.enc`: the private key of your pull request reviewer app (see below).
 - `remote-access-key.enc`: the desktop's key pair for phone access, which paired phones recognize it by.
 - `apns-key.enc`: the Apple push key you add in **Settings → Phone** for phone notifications.
-- `cloud-credentials.enc`: the Vercel and Agent37 connections cloud threads run on.
-- `claude-cloud-tokens.enc`: each Claude account's token for cloud sandboxes (see [multiple Claude Code accounts](claude-accounts.md#cloud-tokens)).
-- `codex-cloud-login.enc`: the Codex login or OpenAI API key cloud sandboxes use.
-- `opencode-cloud-keys.enc`: the provider keys OpenCode and Oh My Pi use in the cloud.
-- `cloud-brain.enc` and `cloud-brain-move.enc`: the cloud brain's key, team, and region, and a new brain's while it moves to another service.
+- `openorc-account.enc`: the signed-in OpenOrc Cloud session. Only the core reads it; no window is sent it.
+
+The agents' sign-ins for cloud threads are not kept on your computer. OpenOrc Cloud's server keeps them (see [multiple Claude Code accounts](claude-accounts.md#cloud-tokens)). An older profile's files from the removed self-setup cloud, such as `cloud-credentials.enc` and `cloud-brain.enc`, are deleted once at startup.
 
 The memory-extraction key is never written to the SQLite database. Each save writes a new owner-only file, syncs it to disk, replaces the old file, and on macOS and Linux syncs the folder before reporting success. Saves to the same file happen one at a time. Linux's `basic_text` backend, which does not encrypt, is refused. Reading a missing file needs no keychain access; saving or reading a key needs working OS protection.
 
@@ -35,7 +33,7 @@ If protected storage is locked or unavailable, key-based extraction is unavailab
 
 ## The reviewer app's key
 
-**Settings → Connections → GitHub → Reviewer app** creates a GitHub App on your account so that reviews can post as the app rather than as you. Each person creates their own: posting as an app needs its private key, and OpenOrc has no server that could keep a shared app's key private.
+**Settings → Connections → GitHub → Reviewer app** creates a GitHub App on your account so that reviews can post as the app rather than as you. Each person creates their own, because posting as an app needs its private key, and that key stays on your computer.
 
 Setup opens a page that OpenOrc serves on `127.0.0.1` for up to 15 minutes. It sends GitHub the app's description, and GitHub returns a one-time code that OpenOrc exchanges for the key. The key goes straight to `github-reviewer-app.enc` and is used only to sign short-lived tokens; the ones that post a review can reach pull requests in that one repository and nothing else. The app's name and ID sit in the database; the key never does. **Remove** saves an encrypted empty value; the app itself stays on GitHub until you delete it there.
 

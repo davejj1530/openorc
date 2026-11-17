@@ -38,6 +38,4 @@ Oh My Pi has no notion of an untrusted checkout and loads a project's own tools,
 
 ## Cloud
 
-- Sandboxes and the cloud brain install Oh My Pi's prebuilt binary from its build service, checked against the sha256 it publishes. Its npm package needs Bun, which they do not have. The brain installs it only once its Mac has it.
-- Oh My Pi signs in there with the provider keys OpenCode uses in the cloud (Settings → Cloud): Anthropic, OpenAI, OpenRouter, Google, Groq, Mistral, xAI and DeepSeek. Account sign-ins, such as a ChatGPT or Claude plan, stay on this computer.
-- Conversations move with `omp session pack` and `omp session unpack`.
+Oh My Pi runs on this computer only. OpenOrc Cloud's threads run Claude Code, Codex and OpenCode.

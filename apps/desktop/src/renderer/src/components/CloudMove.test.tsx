@@ -176,7 +176,12 @@ it("moves a cloud thread to this computer, naming what leaving its machine ends"
   fireEvent.click(screen.getByRole("menuitem", { name: /Move to Mac/ }));
   const dialog = await screen.findByRole("dialog", { name: "Move to this Mac?" });
   await settled();
-  expect(await within(dialog).findByText("Leaving its cloud machine ends pnpm dev and a terminal.")).toBeTruthy();
+  expect(await within(dialog).findByText("Leaving its cloud machine ends:")).toBeTruthy();
+  expect(
+    within(dialog)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent),
+  ).toEqual(["pnpm dev", "a terminal"]);
   fireEvent.click(within(dialog).getByRole("button", { name: "Move" }));
   await vi.waitFor(() => expect(moves()).toEqual([["threads.move", { threadId: cloudThread.id, endsOk: true }]]));
 });

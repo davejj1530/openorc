@@ -17,8 +17,22 @@ function broughtLine({ branch, commits, uncommitted }: Extract<BringResult, { br
   return uncommitted ? `${came} Changes it didn't commit stayed in the cloud.` : came;
 }
 
-/** Names what would end, as "pnpm dev and a terminal". */
-export const listed = (ends: readonly string[]) => (ends.length < 2 ? (ends[0] ?? "") : `${ends.slice(0, -1).join(", ")} and ${ends.at(-1)}`);
+/**
+ * What leaving the cloud machine would end, one to a line, each as the server names it (a command as its agent
+ * described it, "a terminal"), under the words that say so.
+ */
+export function Ends({ lead, ends }: { lead: string; ends: readonly string[] }) {
+  return (
+    <div className="text-base text-ink-2 break-words">
+      <p>{lead}</p>
+      <ul className="mt-1.5 list-disc pl-5">
+        {ends.map((end) => (
+          <li key={end}>{end}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 /**
  * Brings the thread's newest commits into the folder its project came from, as the thread's branch. Held, with why on
@@ -54,7 +68,7 @@ export function useHostedBring(threadId: string): { mac: boolean; control: React
         </Button>
       </HostedControlReason>
       <Dialog open={confirm !== null} onOpenChange={(open) => (open ? undefined : setConfirm(null))} title="Bring the thread's work to this Mac?">
-        <p className="text-base text-ink-2 break-words">The thread leaves its cloud machine to save its work, which ends {listed(confirm ?? [])}.</p>
+        <Ends lead="The thread leaves its cloud machine to save its work, which ends:" ends={confirm ?? []} />
         <div className="mt-5 flex justify-end gap-2">
           <Button onClick={() => setConfirm(null)}>Cancel</Button>
           <Button variant="primary" disabled={bring.isPending} onClick={() => go(true)}>

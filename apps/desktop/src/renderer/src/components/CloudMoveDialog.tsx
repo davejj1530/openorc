@@ -4,7 +4,7 @@ import { useRpc, useRpcMutation } from "../lib/client";
 import { useOrganization } from "../lib/organization-context";
 import { thisComputer } from "../lib/this-computer";
 import { useUi } from "../lib/ui";
-import { listed } from "../panels/HostedBring";
+import { Ends } from "../panels/HostedBring";
 import { Button, Dialog } from "./ui";
 
 /** Where a thread's move would take it, and why it can't go now; `space` names a team's space it would land in. */
@@ -75,7 +75,11 @@ function MoveDialog({ threadId, failed }: { threadId: string; failed: string | n
     <Dialog open onOpenChange={(open) => (open ? undefined : close())} title={to === "cloud" ? "Move to OpenOrc Cloud?" : `Move to ${thisComputer}?`} width={480}>
       <div>
         {offer?.space ? <p className="mb-3 text-base text-ink-2 break-words">Everyone in {offer.space} can read it there.</p> : null}
-        {offer?.ends.length ? <p className="mb-3 text-base text-ink-2 break-words">Leaving its cloud machine ends {listed(offer.ends)}.</p> : null}
+        {offer?.ends.length ? (
+          <div className="mb-3">
+            <Ends lead="Leaving its cloud machine ends:" ends={offer.ends} />
+          </div>
+        ) : null}
         {offer?.held || move.error || failed ? (
           <p role="alert" className="mb-3 text-sm text-bad break-words">
             {move.error?.message ?? offer?.held ?? failed}

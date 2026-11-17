@@ -103,7 +103,12 @@ it("names what would end and goes on only when the person says so", async () => 
   showBring();
   fireEvent.click(await screen.findByRole("button", { name: "Bring to this Mac" }));
   const sheet = await screen.findByRole("dialog");
-  expect(within(sheet).getByText("The thread leaves its cloud machine to save its work, which ends pnpm dev and a terminal.")).toBeTruthy();
+  expect(within(sheet).getByText("The thread leaves its cloud machine to save its work, which ends:")).toBeTruthy();
+  expect(
+    within(sheet)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent),
+  ).toEqual(["pnpm dev", "a terminal"]);
   fireEvent.click(within(sheet).getByRole("button", { name: "Bring" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("macProjects.bring", { threadId: "thread-1", endsOk: true }));
   expect(await screen.findByText("Brought 1 commit to this Mac as fix-login.")).toBeTruthy();

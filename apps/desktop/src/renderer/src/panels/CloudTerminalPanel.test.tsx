@@ -123,6 +123,25 @@ it("shows its opener their terminal from the start, follows it live by offset, r
   expect(screen.getByRole("button", { name: "Restart terminal" })).toBeTruthy();
 });
 
+it("types on from where the typing stands when its screen is made again, never from the terminal's older record", async () => {
+  listed = { terminals: [terminal({ id: "terminal-again", typed: 5 })], canOpen: true, reason: null, viewer: ANA.id };
+  const first = show();
+  await waitFor(() => expect(screenState.written.join("")).toBe("$ ls\r\n"));
+  act(() => screenState.type("printf hi\r"));
+  await waitFor(() => expect(calls("hosted.terminal.input")).toHaveLength(1));
+  // Away to Changes and back: the screen is made again from the same record, which still says 5.
+  first.unmount();
+  show();
+  await waitFor(() => expect(screenState.written.join("")).toContain("$ ls"));
+  act(() => screenState.type("ls\r"));
+  await waitFor(() =>
+    expect(calls("hosted.terminal.input")).toEqual([
+      { threadId: "thread", terminalId: "terminal-again", at: 5, data: "printf hi\r" },
+      { threadId: "thread", terminalId: "terminal-again", at: 15, data: "ls\r" },
+    ]),
+  );
+});
+
 it("shows a teammate the opener's terminal to watch: no keystrokes, no Restart, and End named for whose it is", async () => {
   listed = { terminals: [terminal()], canOpen: false, reason: "Ana's terminal is open here. End it to open yours.", viewer: BEN.id };
   show();

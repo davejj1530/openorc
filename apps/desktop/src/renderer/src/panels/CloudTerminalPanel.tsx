@@ -259,15 +259,25 @@ function followOutput(term: Xterm, ids: Ids, onChanged: () => void): () => void 
   };
 }
 
+/**
+ * Where each terminal's typing stands as this window last heard it, and the keystrokes still on their way. Kept past a
+ * view: the terminal's record is read only when the terminal changes, never as typing grows, and the server takes a
+ * keystroke from the offset it is sent at, skipping what it already has, so a view made again (after Changes, say)
+ * types on from here, after what the last view sent, never from the record's stale offset.
+ */
+const typing = new Map<string, { at: number; sending: Promise<void> }>();
+
 /** Sends the opener's keystrokes in order, each from where the terminal's typing stands, once more on a failure. */
 function typeInto(term: Xterm, ids: Ids, typed: number): () => void {
-  let at = typed;
-  let sending: Promise<void> = Promise.resolve();
+  const kept = typing.get(ids.terminalId) ?? { at: typed, sending: Promise.resolve() };
+  // Typed somewhere else since (the opener's phone): its record is ahead.
+  kept.at = Math.max(kept.at, typed);
+  typing.set(ids.terminalId, kept);
   const keys = term.onData((data: string) => {
-    sending = sending.then(async () => {
-      const send = () => core.call("hosted.terminal.input", { ...ids, at, data });
+    kept.sending = kept.sending.then(async () => {
+      const send = () => core.call("hosted.terminal.input", { ...ids, at: kept.at, data });
       const answer = await send().catch(() => send().catch(() => null));
-      if (answer) at = answer.at;
+      if (answer) kept.at = Math.max(kept.at, answer.at);
     });
   });
   return () => keys.dispose();

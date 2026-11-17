@@ -226,3 +226,20 @@ it("reads a teammate's note that tags the person from the phone's own session, a
   await call("threads.readNotes", { threadId, ids: [id] });
   await together(threadId, (state) => !state.mentions.unread);
 });
+
+it("finds a teammate to tag and posts a note to them from the phone's own session, which starts no turn", async () => {
+  const threadId = threads.teammate;
+  const people = (await call("threads.people", { threadId, q: "Mar" })) as { people: { id: string; name: string }[] };
+  const maraPerson = people.people.find((person) => person.name === "Mara Okafor")!;
+  expect(maraPerson).toBeDefined();
+  const before = sentTo(threadId).length;
+  const id = crypto.randomUUID();
+  const posted = (await call("threads.postNote", { threadId, id, text: "@Mara Okafor the toggle is on top", mentions: [{ userId: maraPerson.id, start: 0, end: 12 }] })) as { note: { id: string } };
+  expect(posted.note.id).toBe(id);
+  await vi.waitFor(async () =>
+    expect(((await mara.threads.call("threads.notes", { threadId, limit: 200 })) as { notes: { id: string; mentionedYou: boolean }[] }).notes).toContainEqual(
+      expect.objectContaining({ id, mentionedYou: true }),
+    ),
+  );
+  expect(sentTo(threadId).length).toBe(before);
+});

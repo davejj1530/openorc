@@ -87,6 +87,9 @@ const routed = new RoutedConnection(
 );
 
 /** A call outside the client's queries, routed as theirs are: to the phone's own cloud for its threads, else to the Mac. */
+/** A new id, unique as the server needs one, for what the phone makes: a note. */
+export const newId = (): string => randomUUID();
+
 export const call = <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => routed.call(method, params);
 
 /** Client state over the link, built like the desktop's: same tags, same transcript reducer, another connection. */

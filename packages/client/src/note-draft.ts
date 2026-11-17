@@ -5,6 +5,9 @@
  * the person chose.
  */
 
+/** Why a draft that tags someone cannot post: files go with messages to the agent, never with a note. */
+export const NOTE_FILES_HELD = "Remove the attachments to post a note.";
+
 /** A tag of a person as a draft carries it: their identity, never their name. */
 export const PERSON_TAG = /@\[user:([^\]\s]+)\]/g;
 export const personTag = (id: string): string => `@[user:${id}]`;

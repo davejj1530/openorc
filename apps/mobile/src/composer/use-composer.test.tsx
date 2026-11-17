@@ -142,3 +142,43 @@ it("says why Send is dim only when the dim pill is tapped, with a warning tap", 
   expect(composer.result.current.dimReason).toBeNull();
   expect(mac.starts).toHaveLength(0);
 });
+
+it("posts a draft that tags someone as a note to them, even while a turn runs, and puts it back with its tags if it fails", async () => {
+  const posted: unknown[] = [];
+  let refuse = true;
+  const notes = {
+    threadId: "t1",
+    viewerId: "u-riley",
+    post: async (note: unknown) => {
+      posted.push(note);
+      if (refuse) throw new Error("This note tags someone who can't read the thread.");
+    },
+  };
+  const composer = renderHook(() => useComposer({ ...input(), working: true, live: { runId: "r1" }, notes }), { wrapper: mac.phone!.wrapper });
+  act(() => composer.result.current.setText("look at the footer"));
+  act(() => composer.result.current.tag({ id: "u-mara", name: "Mara Okafor" }, { noteId: "n1", authorId: "u-mara" }));
+  expect(composer.result.current.isNote).toBe(true);
+  // A turn runs, yet the pill posts the note rather than stopping the turn or joining it.
+  expect(composer.result.current.controls.primary).not.toBe("stop");
+  act(() => composer.result.current.primary());
+  await waitFor(() => expect(composer.result.current.error).toBe("This note tags someone who can't read the thread."));
+  expect(posted).toEqual([{ text: "@Mara Okafor look at the footer", mentions: [{ userId: "u-mara", start: 0, end: 12 }], replyTo: "n1" }]);
+  expect(composer.result.current.draft).toMatchObject({ text: "@Mara Okafor look at the footer", tags: [{ id: "u-mara", name: "Mara Okafor" }] });
+  refuse = false;
+  act(() => composer.result.current.primary());
+  await waitFor(() => expect(posted).toHaveLength(2));
+  await waitFor(() => expect(composer.result.current.draft.text).toBe(""));
+  expect(mac.starts).toHaveLength(0);
+});
+
+it("holds a note that carries images, in the shared words", () => {
+  const notes = { threadId: "t1", viewerId: null, post: async () => undefined };
+  const composer = renderHook(() => useComposer({ ...input(), notes }), { wrapper: mac.phone!.wrapper });
+  act(() => composer.result.current.stage("@Mara can you retry the save?", { id: "u-mara", name: "Mara" }));
+  expect(composer.result.current.controls.canSend).toBe(true);
+  mac.phone!.saved.set("draft.mac-1.t1", JSON.stringify({ text: "@Mara can you retry the save?", images: [{ path: "/a.png", preview: "a" }], tags: [{ id: "u-mara", name: "Mara" }] }));
+  const held = renderHook(() => useComposer({ ...input(), notes }), { wrapper: mac.phone!.wrapper });
+  expect(held.result.current.controls.canSend).toBe(false);
+  act(() => held.result.current.explainDim());
+  expect(held.result.current.dimReason).toBe("Remove the attachments to post a note.");
+});

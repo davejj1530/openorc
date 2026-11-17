@@ -57,7 +57,7 @@ const thread = (block: ThreadCollaboration["handoff"]) =>
       },
     },
   }) as unknown as ThreadSummary;
-const show = (block: ThreadCollaboration["handoff"]) => render(<HandoffCard thread={thread(block)} />, { wrapper: mac.phone!.wrapper });
+const show = (block: ThreadCollaboration["handoff"], onTag = vi.fn(), draft = "") => render(<HandoffCard thread={thread(block)} draft={draft} onTag={onTag} />, { wrapper: mac.phone!.wrapper });
 
 it("stops each command the last turn left running, from the card that says what holds the turn", async () => {
   show(handoff({ commandIds: ["c1", "c2"] }));
@@ -83,10 +83,17 @@ it("retries the save and stops the work, and says the server's words when a move
   expect(await screen.findByRole("alert")).toHaveProperty("textContent", "That work already ended.");
 });
 
-it("gives a reader with nothing to press the words alone, and nothing for a thread no handoff holds", () => {
+it("gives a reader with nothing else to press Tag, which puts the server's note to the person who can in the composer", () => {
   const note = { to: MARA, text: "@Mara the thread's work could not be saved. Can you retry the save?", mention: { start: 0, end: 5 } };
-  show(handoff({ code: "handoff_save", message: "The thread's work could not be saved. Mara can retry the save.", note }));
+  const onTag = vi.fn();
+  show(handoff({ code: "handoff_save", message: "The thread's work could not be saved. Mara can retry the save.", note }), onTag);
   expect(screen.getByText("The thread's work could not be saved. Mara can retry the save.")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Tag Mara" }));
+  expect(onTag).toHaveBeenCalledWith(note.text, { id: MARA.id, name: "Mara" });
+  expect(mac.calls).toEqual([]);
+  cleanup();
+  // Staged in the composer, it is posted from there: the card keeps its words alone.
+  show(handoff({ code: "handoff_save", message: "The thread's work could not be saved. Mara can retry the save.", note }), onTag, note.text);
   expect(screen.queryByRole("button")).toBeNull();
   cleanup();
   const { container } = show(null);

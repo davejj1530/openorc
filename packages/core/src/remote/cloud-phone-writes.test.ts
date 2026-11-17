@@ -179,3 +179,14 @@ it("reads a teammate's note that tags the person through the Mac, and marks it r
   await phone.call("threads.readNotes", { threadId, ids: [id] });
   await together(threadId, (state) => !state.mentions.unread);
 });
+
+it("finds a teammate to tag and posts a note to them through the Mac, which starts no turn", async () => {
+  const threadId = at.cloud.threads.teammate;
+  const { people } = await phone.call("threads.people", { threadId, q: "Mar" });
+  const mara = people.find((person) => person.name === "Mara Okafor")!;
+  const before = sentTo(threadId).length;
+  const id = crypto.randomUUID();
+  const { note } = await phone.call("threads.postNote", { threadId, id, text: "@Mara Okafor the footer is done", mentions: [{ userId: mara.id, start: 0, end: 12 }] });
+  expect(note).toMatchObject({ id, text: "@Mara Okafor the footer is done", mentions: [expect.objectContaining({ userId: mara.id, start: 0, end: 12 })] });
+  expect(sentTo(threadId).length).toBe(before);
+});

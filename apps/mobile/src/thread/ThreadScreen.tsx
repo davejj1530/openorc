@@ -31,7 +31,7 @@ import { useSnoozeClock } from "./snooze-clock";
 import { SubagentStatusBar } from "./SubagentStatusBar";
 import { ThreadTitle } from "./ThreadHeader";
 import { useThreadHeaderMenu } from "./ThreadMenu";
-import { useMentionOpening, useNoteReading, useThreadNotes } from "./thread-notes";
+import { NoteReplyContext, useMentionOpening, useNoteReading, useNoteReply, useThreadNotes } from "./thread-notes";
 import { Transcript } from "./Transcript";
 import { useThreadActions } from "./use-thread-actions";
 import { VoicesContext, type Voice, type Voices } from "./voices";
@@ -228,6 +228,7 @@ export function ThreadScreen() {
   const actions = useThreadActions(thread, { onUnread: goBack });
   const menu = useThreadHeaderMenu(thread, useSnoozeClock(), actions.run);
   const authors = useThreadAuthors(thread, together);
+  const noteReply = useNoteReply(together);
   const linkState = useLinkState();
   const ownCloud = useOwnCloud();
   const files = useThreadFiles(cloud ? id : null);
@@ -244,23 +245,25 @@ export function ThreadScreen() {
           <TogetherContext.Provider value={together}>
             <VoicesContext.Provider value={voices}>
               <CloudFileScopeContext.Provider value={files.readable}>
-                {thread ? (
-                  <ConversationPane
-                    chat={chat}
-                    threadId={id}
-                    thread={thread}
-                    runs={runs}
-                    loading={runsQuery.isLoading}
-                    failed={Boolean(runsQuery.error)}
-                    retry={() => void runsQuery.refetch()}
-                    onActivity={setActivity}
-                    composerInset={room.composerInset}
-                    listRef={room.listRef}
-                    followKey={room.sends}
-                  />
-                ) : (
-                  <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <Spinner /> : <Text className="text-ink-4">Thread not found</Text>}</View>
-                )}
+                <NoteReplyContext.Provider value={noteReply.value}>
+                  {thread ? (
+                    <ConversationPane
+                      chat={chat}
+                      threadId={id}
+                      thread={thread}
+                      runs={runs}
+                      loading={runsQuery.isLoading}
+                      failed={Boolean(runsQuery.error)}
+                      retry={() => void runsQuery.refetch()}
+                      onActivity={setActivity}
+                      composerInset={room.composerInset}
+                      listRef={room.listRef}
+                      followKey={room.sends}
+                    />
+                  ) : (
+                    <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <Spinner /> : <Text className="text-ink-4">Thread not found</Text>}</View>
+                  )}
+                </NoteReplyContext.Provider>
               </CloudFileScopeContext.Provider>
             </VoicesContext.Provider>
           </TogetherContext.Provider>
@@ -273,6 +276,7 @@ export function ThreadScreen() {
             <SubagentStatusBar thread={thread} onLayout={room.onComposerLayout} />
           ) : (
             <Composer
+              handle={noteReply.handle}
               thread={thread}
               queued={thread.queued}
               settings={settings}

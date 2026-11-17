@@ -82,6 +82,9 @@ const cloudReplies: { [M in CloudRemoteMethod]: Reply<M> } = {
   // Notes as the server gives them to everyone in the thread: words, tags and their authors by name and picture.
   "threads.notes": same,
   "threads.readNotes": same,
+  // Who can be tagged, as the server gives them to everyone in the thread: an address only beside a name two people share.
+  "threads.people": same,
+  "threads.postNote": same,
 };
 
 export function cloudReply<M extends CloudRemoteMethod>(method: M, result: RpcResults[M], context: PhoneShaping): RpcResults[M] {

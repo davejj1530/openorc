@@ -1,7 +1,8 @@
 import { threadTogether } from "@openorc/client";
-import type { ThreadNote, ThreadSummary } from "@openorc/protocol";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ThreadCollaboration, ThreadNote, ThreadSummary } from "@openorc/protocol";
+import { createContext, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useRpc, useRpcMutation } from "../client";
+import type { ComposerHandle } from "../composer/Composer";
 
 /** The most notes one read brings, the newest. */
 const NOTES_PER_READ = 200;
@@ -76,4 +77,30 @@ export function useMentionOpening(thread: ThreadSummary | null | undefined): str
     return first;
   }
   return opening?.noteId ?? null;
+}
+
+/** Reply on a note, for the reader who may post notes: a note back to its author, never to the reader's own. */
+export interface NoteReply {
+  viewerId: string | null;
+  reply: (note: ThreadNote) => void;
+}
+
+export const NoteReplyContext = createContext<NoteReply | null>(null);
+
+/** Reply on the thread's notes, which tags the note's author at the start of the composer's draft; none where the reader cannot post notes. */
+export function useNoteReply(together: ThreadCollaboration | null): { handle: RefObject<ComposerHandle | null>; value: NoteReply | null } {
+  const handle = useRef<ComposerHandle>(null);
+  const viewerId = together?.viewer?.id ?? null;
+  const canPost = Boolean(together?.canPostNote);
+  const value = useMemo(
+    () =>
+      canPost
+        ? {
+            viewerId,
+            reply: (note: ThreadNote) => note.author && handle.current?.tag({ id: note.author.id, name: note.author.name }, { noteId: note.id, authorId: note.author.id }),
+          }
+        : null,
+    [canPost, viewerId],
+  );
+  return { handle, value };
 }

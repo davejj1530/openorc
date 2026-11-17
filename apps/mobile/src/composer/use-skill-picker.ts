@@ -14,6 +14,10 @@ export interface SkillPicker {
   selection: { start: number; end: number } | undefined;
   onSelectionChange: (caret: number) => void;
   pick: (skill: SkillCommand) => void;
+  /** Where the caret is in the message. */
+  caret: number;
+  /** Puts the caret here, as a pick does after writing in the message. */
+  place: (caret: number) => void;
 }
 
 /**
@@ -69,6 +73,11 @@ export function useSkillPicker({
       onText(next.text);
       setCaret(next.caret);
       setSelection({ start: next.caret, end: next.caret });
+    },
+    caret,
+    place: (at) => {
+      setCaret(at);
+      setSelection({ start: at, end: at });
     },
   };
 }

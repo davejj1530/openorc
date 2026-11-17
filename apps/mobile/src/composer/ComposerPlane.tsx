@@ -7,6 +7,8 @@ import { fonts } from "../generated/tokens";
 import { ComposerChips } from "./ComposerChips";
 import { ComposerImages } from "./ComposerImages";
 import type { Draft } from "./drafts";
+import { tagRuns, tagWordAt, type DraftTag } from "./note-draft";
+import { PeoplePicker } from "./PeoplePicker";
 import type { ComposerSettings } from "./settings-bridge";
 import { SkillPicker } from "./SkillPicker";
 import { useSkillPicker } from "./use-skill-picker";
@@ -34,6 +36,16 @@ export interface ComposerPlaneProps {
   chips?: boolean;
   /** The bar's end: activity, then the actions, the ink pill last. */
   children: ReactNode;
+  /** In a cloud thread where the reader may post notes: `@` offers its people, and a pick tags one in the draft. */
+  tagging?: Tagging | null;
+}
+
+/** Tagging people in a draft: the thread whose people `@` offers, the reader it leaves out, and a pick's tag. */
+export interface Tagging {
+  threadId: string;
+  viewerId: string | null;
+  /** Writes the person's tag in place of the `@` word, and says where the caret goes after it. */
+  onPick: (person: DraftTag, word: { start: number }, caret: number) => number;
 }
 
 /**
@@ -56,12 +68,22 @@ export function ComposerPlane({
   attachDimmed = false,
   chips = true,
   children,
+  tagging = null,
 }: ComposerPlaneProps) {
   const [focused, setFocused] = useState(Boolean(autoFocus));
   const picker = useSkillPicker({ scope: skillScope, agent: settings.choice?.agent, claudeAccountId: settings.claudeAccount?.chosen ?? settings.claudeAccountId, text: draft.text, onText });
+  const word = tagging ? tagWordAt(draft.text, picker.caret) : null;
   return (
     <>
-      {focused ? <SkillPicker matches={picker.matches} notice={picker.notice} onPick={picker.pick} /> : null}
+      {focused && tagging && word ? (
+        <PeoplePicker
+          threadId={tagging.threadId}
+          viewerId={tagging.viewerId}
+          query={word.query}
+          onPick={(person) => picker.place(tagging.onPick({ id: person.id, name: person.name }, word, picker.caret))}
+        />
+      ) : null}
+      {focused && !word ? <SkillPicker matches={picker.matches} notice={picker.notice} onPick={picker.pick} /> : null}
       <View className="gap-3.5 rounded-3xl bg-composer-input pb-3 pl-4 pr-3 pt-3.5">
         <ComposerImages images={draft.images} uploading={uploading} onRemove={onRemoveImage} />
         <TextInput
@@ -91,7 +113,17 @@ export function ComposerPlane({
                 {segment.text}
               </NativeText>
             ) : (
-              <NativeText key={index}>{segment.text}</NativeText>
+              <NativeText key={index}>
+                {tagRuns(segment.text, draft.tags ?? []).map((run, at) =>
+                  run.tag ? (
+                    <NativeText key={at} className="text-mention-ink">
+                      {run.text}
+                    </NativeText>
+                  ) : (
+                    run.text
+                  ),
+                )}
+              </NativeText>
             ),
           )}
         </TextInput>

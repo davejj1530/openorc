@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { shownMacId, storage } from "../client";
+import type { DraftReply, DraftTag } from "./note-draft";
 
 /** An image in a draft: where the Mac saved it, and the resized copy the phone shows. */
 export interface DraftImage {
@@ -10,6 +11,10 @@ export interface DraftImage {
 export interface Draft {
   text: string;
   images: DraftImage[];
+  /** In a cloud thread with notes: the people the words tag, which make the draft a note to them. */
+  tags?: DraftTag[];
+  /** The note the draft answers, by Reply on it. */
+  reply?: DraftReply;
 }
 
 const EMPTY: Draft = { text: "", images: [] };

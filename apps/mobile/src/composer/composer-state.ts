@@ -40,7 +40,14 @@ export function composerControls(state: ComposerState) {
 
 export type ComposerControls = ReturnType<typeof composerControls>;
 
-/** What a send that failed puts back: the text and images it took, ahead of anything written or attached since. */
+/** What a send that failed puts back: the text, images and tags it took, ahead of anything written or attached since. */
 export function unsent(taken: Draft, since: Draft): Draft {
-  return { text: [taken.text, since.text].filter((text) => text.trim()).join("\n"), images: [...taken.images, ...since.images] };
+  const tags = [...(taken.tags ?? []), ...(since.tags ?? [])];
+  const reply = taken.reply ?? since.reply;
+  return {
+    text: [taken.text, since.text].filter((text) => text.trim()).join("\n"),
+    images: [...taken.images, ...since.images],
+    ...(tags.length && { tags }),
+    ...(reply && { reply }),
+  };
 }

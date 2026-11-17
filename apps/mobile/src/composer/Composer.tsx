@@ -1,6 +1,6 @@
 import { composerActivity, conversationPlaceholder, type ClientState } from "@openorc/client";
 import type { QueuedMessage, ThreadSummary } from "@openorc/protocol";
-import { useState } from "react";
+import { useImperativeHandle, useState, type Ref } from "react";
 import { Pressable, View, type LayoutChangeEvent } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,13 +10,20 @@ import { cn } from "../ui/cn";
 import { Text } from "../ui/Text";
 import { ComposerPlane } from "./ComposerPlane";
 import { SendButton } from "./SendButton";
+import { useComposerNotes } from "./composer-notes";
 import { HandoffCard } from "./HandoffCard";
+import type { DraftReply, DraftTag } from "./note-draft";
 import { ThreadQueue } from "./ThreadQueue";
 import { useComposer, type ComposerInput } from "./use-composer";
 
 type Settings = ReturnType<ClientState["useConversationSettings"]>;
 
-export interface ComposerProps extends Omit<ComposerInput, "threadId"> {
+/** What the thread around the composer asks of it: Reply on a note tags its author, and answers that note. */
+export interface ComposerHandle {
+  tag: (person: DraftTag, reply?: DraftReply) => void;
+}
+
+export interface ComposerProps extends Omit<ComposerInput, "threadId" | "notes"> {
   thread: ThreadSummary;
   /** The messages waiting above the composer. */
   queued: QueuedMessage[];
@@ -29,6 +36,7 @@ export interface ComposerProps extends Omit<ComposerInput, "threadId"> {
    * left to it.
    */
   to?: string;
+  handle?: Ref<ComposerHandle>;
 }
 
 /** What holds the composer back, in words: a failure in red, else why its send is dimmed. */
@@ -52,9 +60,11 @@ function ComposerNotice({ failure, dim }: { failure: string | null | undefined; 
  * bar of attach, model and mode on the left, and activity, Queue, Stop and the send pill on the right. What a send does
  * (into the turn, after it, the warm process or a new one) is the desktop's send tree.
  */
-export function Composer({ thread, queued, settings, generatingImage, onLayout, to, ...input }: ComposerProps) {
+export function Composer({ thread, queued, settings, generatingImage, onLayout, to, handle, ...input }: ComposerProps) {
   const insets = useSafeAreaInsets();
-  const composer = useComposer({ ...input, threadId: thread.id });
+  const notes = useComposerNotes(thread);
+  const composer = useComposer({ ...input, threadId: thread.id, notes });
+  useImperativeHandle(handle, () => ({ tag: composer.tag }), [composer.tag]);
   const [typing, setTyping] = useState(false);
   const { controls } = composer;
   const activity = composerActivity({ stopping: composer.stopping, submitting: composer.sending, generatingImage });
@@ -64,7 +74,7 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
       <View onLayout={onLayout} className="gap-2 bg-bg px-3 pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
         <ThreadQueue thread={thread} queued={queued} canSteer={input.canSteer} typing={typing} onSent={input.onSent} />
         {typing || input.working ? null : <SessionRecovery thread={thread} request={input.request} disabled={input.disabledReason !== null} onSent={input.onSent} />}
-        <HandoffCard thread={thread} />
+        <HandoffCard thread={thread} draft={composer.draft.text} onTag={composer.stage} />
         <ComposerNotice failure={failure} dim={composer.dimReason} />
         <ComposerPlane
           composerId={thread.id}
@@ -79,6 +89,7 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
           onAttach={composer.chooseImages}
           attachDimmed={composer.attachDimmed}
           chips={!to}
+          tagging={notes && { threadId: notes.threadId, viewerId: notes.viewerId, onPick: composer.pickTag }}
         >
           {activity ? <Text className="text-sm text-ink-4">{activity}</Text> : null}
           {controls.stop ? (

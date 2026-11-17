@@ -37,3 +37,12 @@ export function useTeamChatFilePlace(scope: TeamChatContextValue, conversationId
     ...(organization?.role === "admin" && { addSeats: () => useRouter.getState().navigate({ view: "people", spaceId: scope.spaceId, section: "seats" }) }),
   };
 }
+
+/** The attachment lists of an organization's chat drafts, forgotten when the person leaves it, as its words are. */
+export const teamChatFileDrafts = {
+  forgetSpace(accountId: string, spaceId: string, storage: Pick<Storage, "key" | "length" | "removeItem"> = localStorage): void {
+    const prefix = `openorc.draft.${teamChatFilesDraftKey({ accountId, spaceId }, "").slice(0, -3)}`;
+    const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter((key): key is string => key?.startsWith(prefix) ?? false);
+    for (const key of keys) storage.removeItem(key);
+  },
+};

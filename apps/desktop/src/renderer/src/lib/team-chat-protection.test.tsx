@@ -1,3 +1,5 @@
+import { readDraft, writeDraft } from "./drafts";
+import { teamChatFileDrafts, teamChatFilesDraftKey } from "./team-chat-files";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 import type { SpacesStatus } from "@openorc/protocol";
@@ -48,7 +50,7 @@ async function fixture() {
   const queries = new QueryClient();
   const drafts = new TeamChatDrafts(localStorage);
   const closedGroups = new TeamChatClosedGroups(localStorage);
-  const protection = new TeamChatProtection({ gate, queries, drafts, closedGroups, navigation: spaceNavigation });
+  const protection = new TeamChatProtection({ gate, queries, drafts, closedGroups, navigation: spaceNavigation, fileDrafts: teamChatFileDrafts });
   stops.push(
     () => gate.dispose(),
     () => queries.clear(),
@@ -61,6 +63,8 @@ async function fixture() {
   drafts.write(other, "Other team draft");
   closedGroups.close(target, group);
   closedGroups.close(other, group);
+  writeDraft(teamChatFilesDraftKey(target, target.conversationId), { attachments: ["plans.pdf"] });
+  writeDraft(teamChatFilesDraftKey(other, other.conversationId), { attachments: ["other.pdf"] });
   return {
     gate,
     queries,
@@ -90,6 +94,7 @@ it("closes cached history before rendering at the offline grace deadline and pre
   expect(cachedAtClosure).toBe(0);
   expect(f.scope.current()).toBe(false);
   expect(f.drafts.read(target).text).toBe("Keep through a frozen seat");
+  expect(readDraft(teamChatFilesDraftKey(target, target.conversationId), null)).toEqual({ attachments: ["plans.pdf"] });
   expect(f.closedGroups.isClosed(target, group)).toBe(true);
   f.answer(status());
   await f.gate.refresh();
@@ -116,6 +121,8 @@ it("forgets only a removed membership's drafts and clears protected history", as
   expect(f.closedGroups.isClosed(target, group)).toBe(false);
   expect(f.closedGroups.isClosed(other, group)).toBe(true);
   expect(f.drafts.read(other).text).toBe("Other team draft");
+  expect(readDraft(teamChatFilesDraftKey(target, target.conversationId), null)).toBeNull();
+  expect(readDraft(teamChatFilesDraftKey(other, other.conversationId), null)).toEqual({ attachments: ["other.pdf"] });
   expect(f.queries.getQueryCache().getAll()).toEqual([]);
   expect(f.scope.current()).toBe(false);
 });

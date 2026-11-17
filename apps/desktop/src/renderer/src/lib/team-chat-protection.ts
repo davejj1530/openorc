@@ -13,6 +13,7 @@ interface Dependencies {
   queries: QueryClient;
   drafts: TeamChatDrafts;
   closedGroups: TeamChatClosedGroups;
+  fileDrafts: { forgetSpace(accountId: string, spaceId: string): void };
 }
 
 /** Chat leases combine the shared account authority with this window's selected space. */
@@ -49,6 +50,7 @@ export class TeamChatProtection {
       for (const spaceId of removed) {
         drafts.forgetSpace(accountId, spaceId);
         this.deps.closedGroups.forgetSpace(accountId, spaceId);
+        this.deps.fileDrafts.forgetSpace(accountId, spaceId);
       }
     });
     const selected = navigation.subscribe((next, before) => {

@@ -1,3 +1,4 @@
+import { teamChatFileDrafts } from "../lib/team-chat-files";
 import { useLayoutEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { queryClient, useRpc } from "../lib/client";
 import { organizationContentGate, useOrganizationContentGate } from "../lib/organization-content-gate";
@@ -13,7 +14,15 @@ export function TeamChatProvider({ children }: { children: ReactNode }) {
   const status = useRpc("spaces.status", {}).data;
   useOrganizationContentGate(spaceId);
   const [protection] = useState(
-    () => new TeamChatProtection({ gate: organizationContentGate, navigation: spaceNavigation, queries: queryClient, drafts: teamChatDrafts, closedGroups: teamChatClosedGroups }),
+    () =>
+      new TeamChatProtection({
+        gate: organizationContentGate,
+        navigation: spaceNavigation,
+        queries: queryClient,
+        drafts: teamChatDrafts,
+        closedGroups: teamChatClosedGroups,
+        fileDrafts: teamChatFileDrafts,
+      }),
   );
   useSyncExternalStore(protection.subscribe, protection.getSnapshot);
   useLayoutEffect(() => protection.connect(), [protection]);

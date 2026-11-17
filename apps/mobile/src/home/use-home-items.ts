@@ -1,44 +1,34 @@
 import {
   cachedListPage,
+  moreRows,
   NEEDS_YOU_PAGE,
   resolvedBefore,
   resolvedRows,
   SIDEBAR_LIST,
   sidebarDayList,
-  sidebarListGrows,
+  sidebarGroupsGrow,
   sidebarSectionOpen,
   sidebarThreadPage,
   THREAD_PAGE,
   threadFoldIds,
   useChildThreadPages,
   useSidebarNow,
+  type ListLayout,
   type SidebarFilter,
 } from "@openorc/client";
-import { WORKSPACE_ID, type InboxList, type ThreadSummary } from "@openorc/protocol";
+import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRpc, useRpcs } from "../client";
 import { projectChoices } from "../projects";
 import { macScope, spaceScope } from "../spaces/list-scope";
 import { useSpaces } from "../spaces/use-spaces";
-import { homeItems, type HomeList, type HomeOptions } from "./home-items";
+import { homeItems, homeLayout, type HomeList, type HomeOptions } from "./home-items";
 import { useHomeFilter } from "./filter";
 import { pruneMissingFolds, toggleFold, toggleThreadChildren, useFolds } from "./folds";
 
 /** How long rows a reader unfolds take to rise in. */
 const OPENING_MS = 500;
-const NO_IDS: string[] = [];
-
-/** The threads the host's inbox says wait on you that no loaded page lists, read one by one. */
-function useWaitingElsewhere(inbox: InboxList | undefined, listed: ReadonlySet<string>): ThreadSummary[] {
-  const ids = inbox ? [...new Set(inbox.items.flatMap((item) => (item.kind === "thread" ? [item.thread.id] : [])))].filter((id) => !listed.has(id)) : NO_IDS;
-  const reads = useRpcs(
-    "threads.get",
-    ids.map((id) => ({ id })),
-  );
-  return reads.flatMap((read) => (read.data ? [read.data] : []));
-}
-
 /** The part a reader just unfolded, for a moment, so only a fold they open animates. */
 function useOpening(): [string | null, (key: string) => void] {
   const [opened, setOpened] = useState<string | null>(null);
@@ -50,7 +40,7 @@ function useOpening(): [string | null, (key: string) => void] {
   return [opened, setOpened];
 }
 
-/** The open thread's family when no loaded page holds it, so it shows in its day. */
+/** The open thread's family when no loaded page holds it, so it shows in its project's group. */
 function useSelectedFamily(selected: ThreadSummary | null, filter: SidebarFilter, listed: ReadonlySet<string>, children: ReturnType<typeof useChildThreadPages>, space: { spaceId?: string }) {
   return useRpc(
     "threads.list",
@@ -71,8 +61,8 @@ function useListScope() {
 
 /**
  * The threads of the Mac, or of the space Home shows, as one list across projects, newest work first, read a page at a time; pins come from their
- * own read so an old pin still leads, and so do the threads that need you, so a folded day can still show them, and,
- * while Resolved is open, the threads put there. The list reads on by itself until every open day is whole, and
+ * own read so an old pin still leads, and so do the threads that need you, so their groups show them however far back
+ * they lie, and, while Resolved is open, the threads put there. The list reads on by itself until every group is whole, and
  * Resolved pages on request.
  */
 function useThreadList(connected: boolean, selectedId: string | undefined, resolvedOpen: boolean) {
@@ -104,11 +94,11 @@ function useThreadList(connected: boolean, selectedId: string | undefined, resol
   const putRows = resolvedRows(resolvedOpen, resolved.data, selected);
   const resolvedPage = putRows && page(putRows, "archived", resolvedLimit);
   const days = sidebarDayList({ pages, pins: apart(pins.data), needsYou: apart(needsYou.data), resolved: resolvedPage, pinnedOnly, activeId: selectedId, now });
-  const read = [...(pins.data ?? []), ...(needsYou.data ?? []), ...fetched.flatMap((page) => page?.rows ?? [])];
   const list: HomeList = {
     days,
-    read,
     names: scope.names,
+    groups: scope.groups,
+    groupOf: scope.groupOf,
     failed: connected && (lists.some((each) => each.isError) || spaceFailed),
     listed: fetched.every(Boolean),
     resolvedCount: resolvedCount.data,
@@ -131,6 +121,20 @@ function useThreadList(connected: boolean, selectedId: string | undefined, resol
 }
 
 /**
+ * Which rows each project shows and the projects' order, kept from one settled read to the next, so work in one project
+ * never moves it past another and a thread "Show N more" reached stays. Before the lists settle, nothing is kept.
+ */
+function useHomeLayout(list: HomeList, now: number, ready: boolean): { layout: ListLayout; reach(ids: readonly string[]): void } {
+  const [reached, setReached] = useState<readonly string[]>([]);
+  const remembered = useRef<ListLayout | null>(null);
+  const layout = homeLayout(list, { now, reached }, ready ? remembered.current : null);
+  useEffect(() => {
+    if (ready) remembered.current = layout;
+  });
+  return { layout, reach: (ids) => setReached((old) => [...old, ...ids]) };
+}
+
+/**
  * Home's rows from the shown Mac's lists, folded as the reader left them. While the phone is not `connected` a list
  * that fails keeps the threads it had and shows no retry: the header says once why.
  */
@@ -147,23 +151,29 @@ export function useHomeItems(connected: boolean, selected: Pick<HomeOptions, "se
   useEffect(() => {
     if (connected) pruneMissingFolds(new Set(JSON.parse(missingKey) as string[]));
   }, [connected, missingKey]);
-  const grows = !pinnedOnly && !pending && sidebarListGrows({ end: list.days.end, hasMore: list.days.hasMore, collapsed, limit });
+  // Every group whole: the list reads on by itself until its threads reach Resolved.
+  const grows = !pinnedOnly && !pending && sidebarGroupsGrow({ end: list.days.end, hasMore: list.days.hasMore, limit });
   useEffect(() => {
     if (grows) showMore();
   }, [grows, limit, showMore]);
   const [opened, setOpened] = useOpening();
-  const inbox = useRpc("inbox.list", {}, { refetchInterval: 60_000 });
-  const waiting = useWaitingElsewhere(inbox.data, new Set(list.read.map((thread) => thread.id)));
-  const options: HomeOptions = { now: Date.now(), pinnedOnly, collapsed, waiting, projectsFailed: connected && projects.isError, opened, childLimits: children.limits, ...selected };
+  const now = Date.now();
+  const { layout, reach } = useHomeLayout(list, now, !pending);
+  const options: HomeOptions = { now, pinnedOnly, collapsed, projectsFailed: connected && projects.isError, opened, layout, childLimits: children.limits, ...selected };
   const items = homeItems(list, options);
   return {
     items,
     showMore,
+    /** The next ten of a project's threads, the most recently active of those without a row. */
+    showMoreInGroup: (projectId: string) => {
+      const roots = list.days.rest.filter((root) => (list.groupOf.get(root.projectId) ?? root.projectId) === projectId);
+      reach(moreRows(roots, layout.rows.get(projectId) ?? []));
+    },
     showMoreChildren: children.showMore,
     toggleThread: (id: string, expanded: boolean) => toggleThreadChildren(id, expanded),
     /** Folds or opens a part of the list by its key; a part the reader opens rises its rows in. */
     toggle: (key: string) => {
-      if (items.some((item) => item.kind === "section" && item.key === key && !item.open)) setOpened(key);
+      if (items.some((item) => (item.kind === "section" || item.kind === "project") && item.key === key && !item.open)) setOpened(key);
       toggleFold(key);
     },
     /** Asks the host again for a list it could not give: the projects, or the threads. */

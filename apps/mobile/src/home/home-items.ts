@@ -1,25 +1,31 @@
 import {
+  listLayout,
+  projectRows,
+  rootStatuses,
   SIDEBAR_LIST,
-  sidebarDayKey,
-  sidebarDayOpen,
   sidebarFoldKey,
   sidebarSectionOpen,
   threadTreeRows,
-  threadWaitsOnYou,
-  visibleThreadForest,
+  waitingRoots,
+  type ListLayout,
   type SidebarDayList,
   type ThreadTreeRow,
 } from "@openorc/client";
-import type { ThreadSummary } from "@openorc/protocol";
+import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
+
+/** A project as its group heads Home's list: the key every id of it maps to, its name, and whether only OpenOrc Cloud has it. */
+export type HomeProject = { id: string; name: string; cloud?: true };
 
 /** What Home read from a host: its threads as the sidebar lists them, and every project's name. */
 export interface HomeList {
-  /** Pins, the rest in their days, snoozed threads and Resolved, as the desktop's sidebar shows them. */
+  /** Pins, the rest, snoozed threads and Resolved, as the desktop's sidebar reads them. */
   days: SidebarDayList;
   /** Every project's name by id, Workspace's included. */
   names: ReadonlyMap<string, string>;
-  /** Every thread the lists read, a page's lookahead past its end included, for Needs you. */
-  read: readonly ThreadSummary[];
+  /** The projects Home groups threads by, in the space's order, less the workspaces the person hid. */
+  groups: readonly HomeProject[];
+  /** The group key of every id a thread may carry for its project; a project of this Mac is its own key. */
+  groupOf: ReadonlyMap<string, string>;
   /** The host could not list its threads. */
   failed: boolean;
   /** The host answered with its list, so Resolved has a place to stand. */
@@ -28,18 +34,24 @@ export interface HomeList {
   resolvedCount?: number;
 }
 
-/** One row of Home's list. Headings and threads share one flat list so the virtualizer can recycle by kind. */
+/** A part of the list that folds under its label: Pinned, Snoozed or Resolved. */
+export type HomePart = "pinned" | "snoozed" | "resolved";
+
+/** One row of Home's list. Labels and threads share one flat list so the virtualizer can recycle by kind. */
 export type HomeItem =
-  /** Needs you's heading: what waits on you across projects. It never folds. */
-  | { kind: "heading"; key: string; title: string; count: number }
-  /** A part of the list that folds under its label: Pinned, a day, Snoozed or Resolved. `count` where it is the part's whole. */
-  | { kind: "section"; key: string; label: string; count?: number; open: boolean }
+  /** Pinned, Snoozed or Resolved's label. `count` where it is the part's whole. */
+  | { kind: "section"; key: string; part: HomePart; label: string; count?: number; open: boolean }
+  /** A project's label over its threads, with how many of them wait on the person. */
+  | { kind: "project"; key: string; project: HomeProject; open: boolean; waiting: number }
   /**
-   * `project` is the name a root row shows under its title; sub threads show none. `arriving` rises it in.
+   * `project` is the name a root row shows, outside its project's group; rows in their group, and sub threads, show
+   * none. `arriving` rises it in.
    */
   | { kind: "thread"; key: string; thread: ThreadSummary; tree: ThreadTreeRow; project: string | null; arriving: boolean }
   /** The foot of Resolved (or of Pinned, under the pinned filter) while the host has more threads to give. */
   | { kind: "more"; key: string }
+  /** The foot of a project's group while it holds more threads than it shows. */
+  | { kind: "group-more"; key: string; projectId: string; count: number }
   | { kind: "children-more"; key: string; tree: ThreadTreeRow; count: number }
   /** A list the host could not give: the projects, or the threads. */
   | { kind: "retry"; key: string; projects: boolean };
@@ -50,39 +62,46 @@ export interface HomeOptions {
   pinnedOnly: boolean;
   /** The reader's saved fold keys. */
   collapsed: readonly string[];
-  /** Threads the host's inbox says wait on you, which may lie past the pages loaded so far. */
-  waiting: readonly ThreadSummary[];
   /** The host could not list its projects. */
   projectsFailed: boolean;
   /** The part the reader just opened, by its fold key, whose rows rise in. */
   opened: string | null;
+  /** Which rows each project shows and the projects' order: `homeLayout`'s, kept from one read to the next. */
+  layout: ListLayout;
   childLimits?: Readonly<Record<string, number>>;
   selectedId?: string;
 }
 
-/** A thread waiting on you, with the project it is in. */
-export interface Waiting {
-  thread: ThreadSummary;
-  project: string | null;
+/** What the No project group is called: the Workspace's threads, which belong to no project. */
+const NO_PROJECT = "No project";
+
+/** A project's threads' roots, the most recently active first, as the day list orders them. */
+type Group = { project: HomeProject; roots: ThreadSummary[] };
+
+/** The roots in their projects' groups, in the space's order. A root of a project the space does not name is left out. */
+function groupsOf(list: HomeList): Group[] {
+  const byGroup = new Map<string, ThreadSummary[]>(list.groups.map((project) => [project.id, []]));
+  for (const root of list.days.rest) byGroup.get(list.groupOf.get(root.projectId) ?? root.projectId)?.push(root);
+  return list.groups.map((project) => ({ project, roots: byGroup.get(project.id) ?? [] }));
 }
 
-const newestFirst = (a: ThreadSummary, b: ThreadSummary) => b.lastActivityAt - a.lastActivityAt;
+/** The open thread's tree among the roots, which a folded group still shows, as the sidebar keeps where you are. */
+const holding = (list: HomeList) => new Set(list.days.shown(list.days.rest, false).map((root) => root.id));
 
 /**
- * This host's threads waiting on you, once each, newest first: from every thread the lists read and from the inbox,
- * whose reads skip what a list already read.
+ * Which rows each project shows and the order of the projects, as the desktop's sidebar keeps them: a project's four
+ * most recently active threads and every one that is not quiet, plus those `reached` by "Show N more" and the open
+ * thread's; the projects in the order the day first found them, one added since on top. `previous` is the layout of the
+ * last read, null at first.
  */
-export function homeWaiting(list: HomeList, options: HomeOptions): Waiting[] {
-  const all = visibleThreadForest([...new Map([...options.waiting, ...list.read].map((thread) => [thread.id, thread])).values()], false, options.now);
-  return all
-    .filter((thread) => threadWaitsOnYou(thread) && !thread.archivedAt && !thread.teamInstanceId)
-    .sort(newestFirst)
-    .map((thread) => ({ thread, project: list.names.get(thread.projectId) ?? null }));
+export function homeLayout(list: HomeList, { now, reached }: { now: number; reached: readonly string[] }, previous: ListLayout | null): ListLayout {
+  const statuses = rootStatuses(list.days.rest, list.days.all);
+  return listLayout(previous, { groups: groupsOf(list), quiet: (root) => !statuses.get(root.id), now, held: false, own: [...reached, ...holding(list)] });
 }
 
 /** Rows for some roots and their trees, each parent's next page of sub threads at the foot of its tree. */
-function treeRows(roots: readonly ThreadSummary[], all: readonly ThreadSummary[], list: HomeList, options: HomeOptions, arriving: boolean): HomeItem[] {
-  const trees = threadTreeRows(roots, all, options.collapsed, options.selectedId ? [options.selectedId] : [], options.childLimits);
+function treeRows(roots: readonly ThreadSummary[], list: HomeList, options: HomeOptions, { named, arriving }: { named: boolean; arriving: boolean }): HomeItem[] {
+  const trees = threadTreeRows(roots, list.days.all, options.collapsed, options.selectedId ? [options.selectedId] : [], options.childLimits);
   const items: HomeItem[] = [];
   const pages: ThreadTreeRow[] = [];
   const end = () => {
@@ -91,7 +110,8 @@ function treeRows(roots: readonly ThreadSummary[], all: readonly ThreadSummary[]
   };
   for (const tree of trees) {
     while (pages.length && pages.at(-1)!.depth >= tree.depth) end();
-    items.push({ kind: "thread", key: tree.thread.id, thread: tree.thread, tree, project: tree.depth ? null : (list.names.get(tree.thread.projectId) ?? null), arriving });
+    const project = named && !tree.depth ? (list.names.get(tree.thread.projectId) ?? null) : null;
+    items.push({ kind: "thread", key: tree.thread.id, thread: tree.thread, tree, project, arriving });
     if (tree.expanded && tree.hiddenChildren) pages.push(tree);
   }
   while (pages.length) end();
@@ -100,90 +120,76 @@ function treeRows(roots: readonly ThreadSummary[], all: readonly ThreadSummary[]
 
 /** One part that folds: its label, then its rows while open (a folded one keeps the open thread), then its paging. */
 interface Part {
-  key: string;
+  part: HomePart;
   label: string;
   roots: readonly ThreadSummary[];
-  open: boolean;
   /** Shows how many roots it holds: Pinned and Snoozed, whose rows are all loaded. */
   counted?: boolean;
-  /** How many it holds in all, as the host counts them: Resolved, whose rows load a page at a time. */
-  total?: number;
   more?: boolean;
   /** Resolved stands with none of it loaded, since it reads its threads once opened. */
   standsEmpty?: boolean;
-  /** A day, which folded still shows the threads that need you. */
-  day?: boolean;
 }
 
-/** The count a part's heading shows: what it lists where that is all of it, else the host's total when there is one. */
-function countOf(part: Part, roots: readonly ThreadSummary[]): { count?: number } {
-  if (part.counted) return { count: roots.length };
-  return part.total === undefined ? {} : { count: part.total };
-}
-
-function partItems(part: Part, list: HomeList, options: HomeOptions, waitingRoots: ReadonlySet<string>): HomeItem[] {
-  const roots = part.roots.filter((thread) => !waitingRoots.has(thread.id));
-  if (!roots.length && !part.standsEmpty) return [];
-  const all = list.days.all.filter((thread) => !waitingRoots.has(thread.id));
+function partItems({ part, label, roots, counted, more, standsEmpty }: Part, list: HomeList, options: HomeOptions): HomeItem[] {
+  if (!roots.length && !standsEmpty) return [];
+  const key = sidebarFoldKey[part](SIDEBAR_LIST);
+  const open = sidebarSectionOpen(options.collapsed, part, SIDEBAR_LIST);
   return [
-    { kind: "section", key: part.key, label: part.label, open: part.open, ...countOf(part, roots) },
-    ...treeRows((part.day ? list.days.shownInDay : list.days.shown)(roots, part.open), all, list, options, options.opened === part.key),
-    ...(part.open && part.more ? [{ kind: "more", key: `more:${part.key}` } as const] : []),
+    { kind: "section", key, part, label, open, ...(counted ? { count: roots.length } : {}) },
+    ...treeRows(list.days.shown(roots, open), list, options, { named: true, arriving: options.opened === key }),
+    ...(open && more ? [{ kind: "more", key: `more:${key}` } as const] : []),
   ];
-}
-
-/** Needs you's heading and rows, this host's waiting threads, newest first. */
-function needsYouItems(waiting: readonly Waiting[]): HomeItem[] {
-  if (!waiting.length) return [];
-  const items: HomeItem[] = [{ kind: "heading", key: "needs-you", title: "Needs you", count: waiting.length }];
-  for (const { thread, project } of waiting)
-    for (const tree of threadTreeRows([thread], [thread], [])) items.push({ kind: "thread", key: tree.thread.id, thread: tree.thread, tree, project: tree.depth ? null : project, arriving: false });
-  return items;
 }
 
 /**
- * Home, as the desktop's sidebar lists threads: every thread waiting on you first, across projects,
- * then pinned threads, then the rest by when they last saw work (the last three hours and today open, yesterday
- * folded), then snoozed threads and Resolved, which holds everything older, folded at the foot. A waiting thread appears
- * once, under Needs you, which never folds.
+ * Each project's group in the layout's order: its label with what waits on the person counted, then its rows, then
+ * "Show N more". A group with nothing in it stands only when it is the only project's.
+ */
+function groupItems(list: HomeList, options: HomeOptions): HomeItem[] {
+  // No project stands only while it holds threads, as on the Mac's sidebar.
+  const all = groupsOf(list).filter((group) => group.project.id !== WORKSPACE_ID || group.roots.length);
+  const groups = all.length === 1 ? all : all.filter((group) => group.roots.length);
+  const place = (group: Group) => options.layout.projects.indexOf(group.project.id);
+  const active = holding(list);
+  return [...groups]
+    .sort((a, b) => place(a) - place(b))
+    .flatMap(({ project, roots }) => {
+      const key = sidebarFoldKey.project(project.id);
+      const open = sidebarSectionOpen(options.collapsed, "project", project.id);
+      const shown = projectRows(roots, { rows: options.layout.rows.get(project.id) ?? [], open, holdsActive: (root) => active.has(root.id) });
+      const label = project.id === WORKSPACE_ID ? { ...project, name: NO_PROJECT } : project;
+      return [
+        { kind: "project", key, project: label, open, waiting: waitingRoots(roots, list.days.all) } as const,
+        ...treeRows(shown.rows, list, options, { named: false, arriving: options.opened === key }),
+        ...(shown.hidden ? [{ kind: "group-more", key: `group-more:${project.id}`, projectId: project.id, count: shown.hidden } as const] : []),
+      ];
+    });
+}
+
+/**
+ * Home, as the desktop's sidebar lists threads since its redesign: pinned threads first, then each project's group, then
+ * snoozed threads and Resolved, which holds everything quiet since before yesterday, folded at the foot. Under the
+ * pinned filter, the pins alone.
  */
 export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {
   const { days } = list;
-  const waiting = homeWaiting(list, options);
-  const waitingRoots = new Set(waiting.map(({ thread }) => thread.id));
-  const pinsKey = sidebarFoldKey.pinned(SIDEBAR_LIST);
-  const snoozedKey = sidebarFoldKey.snoozed(SIDEBAR_LIST);
-  const resolvedKey = sidebarFoldKey.resolved(SIDEBAR_LIST);
-  const parts: Part[] = [
-    { key: pinsKey, label: "Pinned", roots: days.pinned, open: sidebarSectionOpen(options.collapsed, "pinned", SIDEBAR_LIST), counted: true, more: options.pinnedOnly && days.hasMore },
-    ...days.sections.map(({ day, label, roots }) => ({
-      key: sidebarDayKey(day),
-      label,
-      roots,
-      open: sidebarDayOpen(options.collapsed, day),
-      day: true,
-    })),
-  ];
   return [
-    ...needsYouItems(waiting),
     ...(options.projectsFailed ? [{ kind: "retry", key: "retry:projects", projects: true } as const] : []),
-    ...parts.flatMap((part) => partItems(part, list, options, waitingRoots)),
+    ...partItems({ part: "pinned", label: "Pinned", roots: days.pinned, counted: true, more: options.pinnedOnly && days.hasMore }, list, options),
+    ...(options.pinnedOnly ? [] : groupItems(list, options)),
     ...(list.failed ? [{ kind: "retry", key: "retry:threads", projects: false } as const] : []),
-    ...partItems({ key: snoozedKey, label: "Snoozed", roots: days.snoozed, open: sidebarSectionOpen(options.collapsed, "snoozed", SIDEBAR_LIST), counted: true }, list, options, waitingRoots),
+    ...partItems({ part: "snoozed", label: "Snoozed", roots: days.snoozed, counted: true }, list, options),
     ...partItems(
       {
-        key: resolvedKey,
+        part: "resolved",
         label: "Resolved",
         roots: days.resolved.roots,
-        open: sidebarSectionOpen(options.collapsed, "resolved", SIDEBAR_LIST),
         more: days.resolved.hasMore,
-        total: list.resolvedCount,
-        // Not once the host says it holds nothing: an empty fold at the foot says only "0".
+        // Not once the host says it holds nothing: an empty fold at the foot opens on nothing.
         standsEmpty: list.listed && !options.pinnedOnly && list.resolvedCount !== 0,
       },
       list,
       options,
-      waitingRoots,
     ),
   ];
 }

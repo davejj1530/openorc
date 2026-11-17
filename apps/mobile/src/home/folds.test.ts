@@ -18,23 +18,23 @@ beforeEach(() => {
 });
 
 it("keeps folds per Mac in the desktop's keys, across launches", () => {
-  toggleFold("day-open:yesterday");
+  toggleFold("project:openorc");
   toggleFold("snoozed-open:threads");
-  expect(phone.saved.get("home.collapsed.studio")).toBe(JSON.stringify(["day-open:yesterday", "snoozed-open:threads"]));
+  expect(phone.saved.get("home.collapsed.studio")).toBe(JSON.stringify(["project:openorc", "snoozed-open:threads"]));
   phone.mac = "laptop";
   expect(savedFolds()).toEqual([]);
   phone.mac = "studio";
-  expect(savedFolds()).toEqual(["day-open:yesterday", "snoozed-open:threads"]);
+  expect(savedFolds()).toEqual(["project:openorc", "snoozed-open:threads"]);
   expect(savedFolds()).toBe(savedFolds());
-  toggleFold("day-open:yesterday");
+  toggleFold("project:openorc");
   expect(savedFolds()).toEqual(["snoozed-open:threads"]);
 });
 
-it("drops the folds of the project groups Home used to show, and keeps sub thread folds", () => {
+it("drops the folds of the days Home used to group by, and keeps project and sub thread folds", () => {
   phone.saved.set("home.collapsed.studio", JSON.stringify(["project:openorc", "pinned:openorc", "thread-closed:parent", "day-closed:today"]));
-  expect(savedFolds()).toEqual(["thread-closed:parent", "day-closed:today"]);
-  toggleFold("day-open:older");
-  expect(JSON.parse(phone.saved.get("home.collapsed.studio")!)).toEqual(["thread-closed:parent", "day-closed:today", "day-open:older"]);
+  expect(savedFolds()).toEqual(["project:openorc", "thread-closed:parent"]);
+  toggleFold("resolved-open:threads");
+  expect(JSON.parse(phone.saved.get("home.collapsed.studio")!)).toEqual(["project:openorc", "thread-closed:parent", "resolved-open:threads"]);
 });
 
 it("forgets a Mac's folds with the Mac", () => {

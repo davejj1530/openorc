@@ -21,7 +21,7 @@ import { useNewAction } from "./new-action";
 import { TabLayers } from "./TabLayers";
 import { HOME_BAR_HEIGHT, HomeBar } from "./header/HomeBar";
 import type { HomeScroll } from "./header/MacLine";
-import { HomeHeading, RetryRow, SectionToggle, ShowMore, ShowMoreChildren, type HeadingRoom } from "./HomeHeading";
+import { ProjectLabel, RetryRow, SectionToggle, ShowMore, ShowMoreChildren, ShowMoreInGroup, type HeadingRoom } from "./HomeHeading";
 import type { HomeItem } from "./home-items";
 import { refreshHome } from "./refresh";
 import { ThreadRow } from "./ThreadRow";
@@ -45,23 +45,25 @@ type Fold = (key: string, open: boolean) => void;
 /** Rows slide to their new places as a fold opens or closes, over the desktop's resize time. */
 const slide = LinearTransition.duration(motion.duration.resize).easing(ease.outTiming);
 
-/** The room above the heading or part at `index`: none right under another, so a run of folded days stacks tight. */
+/** The room above the label at `index`: none right under another, so a run of folded groups stacks tight. */
 function headingRoom(items: readonly HomeItem[], index: number): HeadingRoom {
   if (index === 0) return "first";
   const before = items[index - 1]!.kind;
-  return before === "heading" || before === "section" ? "after-heading" : "after-rows";
+  return before === "section" || before === "project" ? "after-heading" : "after-rows";
 }
 
 function HomeRow({ item, home, index, motion, fold }: { item: HomeItem; home: Home; index: number; motion: RowMotion; fold: Fold }) {
   switch (item.kind) {
-    case "heading":
-      return <HomeHeading heading={item} room={headingRoom(home.items, index)} />;
+    case "project":
+      return <ProjectLabel group={item} room={headingRoom(home.items, index)} motion={motion} onToggle={() => fold(item.key, !(item.open && !motion.folding))} />;
     case "section":
       return <SectionToggle section={item} room={headingRoom(home.items, index)} motion={motion} onToggle={() => fold(item.key, !(item.open && !motion.folding))} />;
     case "thread":
       return <ThreadRow thread={item.thread} project={item.project} arriving={item.arriving} tree={item.tree} motion={motion} onFold={fold} />;
     case "more":
       return <ShowMore motion={motion} onPress={home.showMore} />;
+    case "group-more":
+      return <ShowMoreInGroup count={item.count} motion={motion} onPress={() => home.showMoreInGroup(item.projectId)} />;
     case "children-more":
       return <ShowMoreChildren item={item} motion={motion} onPress={() => home.showMoreChildren(item.tree.thread.projectId, item.tree.thread.id)} />;
     case "retry":
@@ -74,7 +76,7 @@ function useHomeFolds(home: Home) {
   return useFoldMotion(home.items, (key, open) => {
     const item = home.items.find((each) => (each.kind === "thread" ? each.thread.id : each.key) === key);
     if (item?.kind === "thread") home.toggleThread(item.thread.id, !open);
-    else if (item?.kind === "section") home.toggle(item.key);
+    else if (item?.kind === "section" || item?.kind === "project") home.toggle(item.key);
   });
 }
 
@@ -169,7 +171,7 @@ const PILL_ROOM = BOTTOM_BAR_ROOM + 32;
 const newThread = () => router.push("/new");
 
 /**
- * A paired Mac's threads by the day they last saw work on the tile ground, under the pinned bar, with New thread as the screen's
+ * A paired Mac's threads by project on the tile ground, under the pinned bar, with New thread as the screen's
  * one ink pill; a two-finger double tap starts one. Where the list has scrolled lives here, so a Mac shown again after
  * none starts at the top.
  */

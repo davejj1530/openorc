@@ -59,12 +59,20 @@ afterEach(() => {
 });
 
 const lists = () => mac.calls.filter((call) => call.method === "threads.list").map((call) => call.params);
-const rows = (items: ReturnType<typeof useHomeItems>["items"]) => items.flatMap((item) => (item.kind === "thread" ? [`${item.thread.id}:${item.project}`] : []));
+/** Each thread with the project it is listed under: its group's label, or the name its row carries outside one. */
+const rows = (items: ReturnType<typeof useHomeItems>["items"]) => {
+  let group: string | null = null;
+  return items.flatMap((item) => {
+    if (item.kind === "project") group = item.project.name;
+    else if (item.kind === "section") group = null;
+    return item.kind === "thread" ? [`${item.thread.id}:${item.project ?? group}`] : [];
+  });
+};
 
 it("asks a Mac that shares no cloud threads nothing of spaces, and lists that Mac's projects as before", async () => {
   mac.status = ready([personal, birch]);
   const home = renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
-  await waitFor(() => expect(rows(home.result.current.items)).toEqual(["workspace-thread:Workspace"]));
+  await waitFor(() => expect(rows(home.result.current.items)).toEqual(["workspace-thread:No project"]));
   expect(mac.calls.filter((call) => call.method.startsWith("spaces."))).toEqual([]);
   expect(lists().every((params) => Array.isArray(params["projectIds"]) && !("spaceId" in params))).toBe(true);
 });
@@ -74,7 +82,7 @@ it("lists Personal first, then the space the person chooses, every list naming i
   mac.status = ready([personal, birch]);
   const home = renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
   await waitFor(() => expect(lists().some((params) => params["spaceId"] === personal.id)).toBe(true));
-  await waitFor(() => expect(rows(home.result.current.items)).toEqual(["workspace-thread:Workspace"]));
+  await waitFor(() => expect(rows(home.result.current.items)).toEqual(["workspace-thread:No project"]));
 
   mac.calls.length = 0;
   act(() => chooseSpace(birch.id));
@@ -105,7 +113,7 @@ it("lists the Mac alone while nobody is signed in on it, or it has no account", 
     mac.calls.length = 0;
     mac.phone!.module.queryClient.clear();
     const home = renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
-    await waitFor(() => expect(rows(home.result.current.items)).toEqual(["workspace-thread:Workspace"]));
+    await waitFor(() => expect(rows(home.result.current.items)).toEqual(["workspace-thread:No project"]));
     expect(lists().every((params) => !("spaceId" in params))).toBe(true);
     home.unmount();
   }

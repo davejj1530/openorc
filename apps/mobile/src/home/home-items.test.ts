@@ -1,31 +1,42 @@
-import { sidebarDayList, sidebarThreadPage, THREAD_PAGE, type SidebarFilter } from "@openorc/client";
+import { sidebarDayList, sidebarThreadPage, THREAD_PAGE, type ListLayout, type SidebarFilter } from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { homeItems, type HomeItem, type HomeList, type HomeOptions } from "./home-items";
+import { homeItems, homeLayout, type HomeItem, type HomeList, type HomeOptions, type HomeProject } from "./home-items";
 import { fixtureProjects, fixtureThreads } from "./test-fixtures/threads";
 
 const outline = (items: HomeItem[]) =>
   items.map((item) => {
-    if (item.kind === "heading") return `# ${item.title} (${item.count})`;
     if (item.kind === "section") return `§ ${item.label}${item.count === undefined ? "" : ` ${item.count}`}${item.open ? "" : " folded"}`;
+    if (item.kind === "project") return `# ${item.project.name}${item.waiting ? ` (${item.waiting})` : ""}${item.open ? "" : " folded"}`;
+    if (item.kind === "group-more") return `show ${item.count} more`;
     if (item.kind === "children-more") return `more ${item.count} in ${item.tree.thread.id}`;
     if (item.kind === "more") return "more";
     if (item.kind === "retry") return `retry ${item.projects ? "projects" : "threads"}`;
     return item.project ? `${item.thread.id} @ ${item.project}` : item.thread.id;
   });
-/** The rows alone, where which day a fixture falls in depends on the machine's time zone. */
-const rows = (items: HomeItem[]) => outline(items).filter((line) => !line.startsWith("§"));
+/** The project labels and their rows alone. */
+const groups = (items: HomeItem[]) => {
+  const lines = outline(items);
+  return lines.slice(
+    lines.findIndex((line) => line.startsWith("#")),
+    lines.findIndex((line) => line.startsWith("§ Snoozed") || line.startsWith("§ Resolved")),
+  );
+};
 
 const now = Date.UTC(2026, 9, 23, 12);
 const names = new Map([[WORKSPACE_ID, "Workspace"], ...fixtureProjects.map(({ id, name }): [string, string] => [id, name])]);
-/** Every day and Resolved open, so tests about something else see every row whatever the time zone. */
-const allOpen = ["day-open:yesterday", "resolved-open:threads"];
+const projects: HomeProject[] = [...fixtureProjects.map(({ id, name }) => ({ id, name })), { id: WORKSPACE_ID, name: "Workspace" }];
+/** Resolved open, so tests about something else see every row. */
+const allOpen = ["resolved-open:threads"];
 
 /** What a host's lists give Home: one page across projects, newest work first, and every pin from its own read. */
-function list(threads: readonly ThreadSummary[] = fixtureThreads, more: { pinnedOnly?: boolean; limit?: number; failed?: boolean; activeId?: string; at?: number } = {}): HomeList {
-  const { pinnedOnly = false, limit = 100, failed = false, activeId, at = now } = more;
+function list(
+  threads: readonly ThreadSummary[] = fixtureThreads,
+  more: { pinnedOnly?: boolean; limit?: number; failed?: boolean; activeId?: string; at?: number; groups?: HomeProject[] } = {},
+): HomeList {
+  const { pinnedOnly = false, limit = 100, failed = false, activeId, at = now, groups: shown = projects } = more;
   const sorted = threads.filter((thread) => !pinnedOnly || thread.pinnedAt).sort((a, b) => b.lastActivityAt - a.lastActivityAt);
-  const page = (filter: SidebarFilter, rows: readonly ThreadSummary[], shown: number) => sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: rows, selected: null, filter, limit: shown, now: at });
+  const page = (filter: SidebarFilter, rows: readonly ThreadSummary[], count: number) => sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: rows, selected: null, filter, limit: count, now: at });
   const pins = pinnedOnly
     ? undefined
     : page(
@@ -34,119 +45,138 @@ function list(threads: readonly ThreadSummary[] = fixtureThreads, more: { pinned
         Number.MAX_SAFE_INTEGER,
       );
   const resolved = pinnedOnly ? undefined : page("archived", sorted, limit);
-  return { days: sidebarDayList({ pages: [page("active", sorted, limit)], pins, resolved, pinnedOnly, activeId, now: at }), names, read: sorted, failed, listed: !failed };
+  return {
+    days: sidebarDayList({ pages: [page("active", sorted, limit)], pins, resolved, pinnedOnly, activeId, now: at }),
+    names,
+    groups: shown,
+    groupOf: new Map(shown.map(({ id }) => [id, id])),
+    failed,
+    listed: !failed,
+  };
 }
-const options = (more: Partial<HomeOptions> = {}): HomeOptions => ({ now, pinnedOnly: false, collapsed: allOpen, waiting: [], projectsFailed: false, opened: null, ...more });
+const options = (listed: HomeList, more: Partial<HomeOptions> & { reached?: string[]; previous?: ListLayout } = {}): HomeOptions => {
+  const { reached = [], previous = null, ...rest } = more;
+  const at = rest.now ?? now;
+  return { now: at, pinnedOnly: false, collapsed: allOpen, projectsFailed: false, opened: null, layout: homeLayout(listed, { now: at, reached }, previous), ...rest };
+};
+const items = (listed: HomeList, more: Parameters<typeof options>[1] = {}) => homeItems(listed, options(listed, more));
+
+/** A quiet thread in `projectId`, `minutesAgo` old. */
+const quiet = (id: string, projectId: string, minutesAgo: number): ThreadSummary => ({
+  ...fixtureThreads[0]!,
+  id,
+  projectId,
+  pinnedAt: null,
+  unread: false,
+  activity: "idle",
+  lastActivityAt: now - minutesAgo * 60_000,
+});
 
 describe("homeItems", () => {
-  it("keeps a teammate's ask in its day and out of Needs you, including an inbox copy", () => {
-    const shared: ThreadSummary = {
-      ...fixtureThreads[0]!,
-      id: "shared",
-      projectId: "project",
-      pinnedAt: null,
-      lastActivityAt: now,
-      activity: "waiting",
-      owner: { brain: "hosted", reach: "live", heardAt: 1, startedBy: { name: "Morgan Reed", image: null } },
-    };
-    const items = homeItems(list([shared]), options({ waiting: [shared] }));
-    expect(items.some((item) => item.kind === "heading" && item.title === "Needs you")).toBe(false);
-    expect(items.filter((item) => item.kind === "thread").map((item) => item.thread.id)).toEqual(["shared"]);
-  });
-
-  it("lists what waits on you first across projects, then pins, then the rest newest first, each row naming its project", () => {
-    const items = homeItems(list(), options());
-    expect(rows(items)).toEqual([
-      "# Needs you (2)",
-      "t-pairing @ openorc",
-      "t-docs @ website",
-      "t-notes @ openorc",
-      "t-headline @ openorc",
-      "t-paging @ openorc",
-      "t-hero @ website",
-      "t-slack @ Workspace",
-      "t-ledger @ openorc",
-      "t-plan @ Workspace",
-      "t-phone @ website",
-      "t-tokens @ immaculate",
-      "t-settings @ openorc",
-      "t-canvas @ immaculate",
+  it("lists Pinned first, then each project's group in the space's order with the rest newest first, then Snoozed and Resolved", () => {
+    const lines = outline(items(list()));
+    expect(lines.slice(0, 3)).toEqual(["§ Pinned 2", "t-notes @ openorc", "t-headline @ openorc"]);
+    // Inside its group a row names no project; the Workspace's threads are No project's, last.
+    expect(groups(items(list()))).toEqual([
+      "# openorc (2)",
+      "t-paging",
+      "t-pairing",
+      "t-ledger",
+      "t-settings",
+      "# website (2)",
+      "t-hero",
+      "t-docs",
+      "t-phone",
+      "# immaculate",
+      "t-tokens",
+      "# No project",
+      "t-slack",
+      "t-plan",
     ]);
-    expect(outline(items)[3]).toBe("§ Pinned 2");
+    // Resolved, open here, holds what has been quiet since before yesterday, each row naming its project.
+    expect(lines.slice(-2)).toEqual(["§ Resolved", "t-canvas @ immaculate"]);
   });
 
-  it("groups the rest into the last hours, today and yesterday, and Resolved before that, keeping the open thread", () => {
-    const at = new Date(2026, 9, 23, 20).getTime();
-    const base = { ...fixtureThreads[0]!, pinnedAt: null };
-    const threads = [
-      { ...base, id: "a", lastActivityAt: new Date(2026, 9, 23, 19).getTime() },
-      { ...base, id: "e", lastActivityAt: new Date(2026, 9, 23, 10).getTime() },
-      { ...base, id: "b", lastActivityAt: new Date(2026, 9, 22, 10).getTime() },
-      { ...base, id: "c", lastActivityAt: new Date(2026, 9, 20, 10).getTime() },
-      { ...base, id: "d", lastActivityAt: new Date(2026, 9, 1, 10).getTime() },
-    ];
-    expect(outline(homeItems(list(threads, { at }), options({ now: at, collapsed: [] })))).toEqual([
-      "§ Recent",
-      "a @ Workspace",
-      "§ Today",
-      "e @ Workspace",
-      "§ Yesterday folded",
-      "§ Resolved folded",
-    ]);
-    expect(outline(homeItems(list(threads, { at, activeId: "d" }), options({ now: at, collapsed: [], selectedId: "d" }))).slice(-2)).toEqual(["§ Resolved folded", "d @ Workspace"]);
-    const opened = homeItems(list(threads, { at }), options({ now: at, collapsed: ["day-open:yesterday"], opened: "day-open:yesterday" }));
-    expect(opened.filter((item) => item.kind === "thread" && item.arriving).map((item) => item.key)).toEqual(["b"]);
+  it("shows a project's four latest threads and every one that is not quiet, then Show N more, which brings ten more", () => {
+    const many = [...Array.from({ length: 16 }, (_, index) => quiet(`q-${index}`, "website", 10 + index)), { ...quiet("busy", "website", 200), activity: "running" as const }];
+    const listed = list(many);
+    expect(groups(items(listed))).toEqual(["# website", "q-0", "q-1", "q-2", "q-3", "busy", "show 12 more"]);
+    const reached = ["q-4", "q-5", "q-6", "q-7", "q-8", "q-9", "q-10", "q-11", "q-12", "q-13"];
+    // Rows keep the order of their work: the reached ones fall in among the rest.
+    expect(groups(items(listed, { reached }))).toEqual(["# website", "q-0", "q-1", "q-2", "q-3", ...reached, "busy", "show 2 more"]);
   });
 
-  it("folds Pinned behind its count, and keeps snoozed threads folded at the foot until opened", () => {
+  it("keeps the projects in the order the day found them while work moves, and puts a project added since on top", () => {
+    const two = projects.filter(({ id }) => id === "openorc" || id === "website");
+    const first = list([quiet("w", "website", 5), quiet("o", "openorc", 50)], { groups: two });
+    const kept = homeLayout(first, { now, reached: [] }, null);
+    expect(groups(items(first)).filter((line) => line.startsWith("#"))).toEqual(["# openorc", "# website"]);
+    const moved = list([quiet("w", "website", 50), quiet("o", "openorc", 1), quiet("i", "immaculate", 2)]);
+    expect(groups(items(moved, { previous: kept })).filter((line) => line.startsWith("#"))).toEqual(["# immaculate", "# openorc", "# website"]);
+  });
+
+  it("leaves out a project with nothing in it, unless it is the only one", () => {
+    expect(groups(items(list([quiet("o", "openorc", 5)]))).filter((line) => line.startsWith("#"))).toEqual(["# openorc"]);
+    const alone = outline(items(list([], { groups: [{ id: "website", name: "website" }] })));
+    expect(alone).toContain("# website");
+  });
+
+  it("counts on a label what waits on the person: a question or a failure, never a teammate's ask or an unread result", () => {
+    const teammate: ThreadSummary = { ...quiet("shared", "website", 1), activity: "waiting", owner: { brain: "hosted", reach: "live", heardAt: 1, startedBy: { name: "Morgan Reed", image: null } } };
+    const unread = { ...quiet("unread", "website", 2), unread: true };
+    const failed = { ...quiet("failed", "website", 3), session: { status: "error" as const, message: null } };
+    expect(groups(items(list([teammate, unread, failed])))[0]).toBe("# website (1)");
+  });
+
+  it("folds a project to the open thread's tree, and rises a project's rows as the reader opens it", () => {
+    const listed = list(fixtureThreads, { activeId: "t-docs" });
+    const folded = groups(items(listed, { collapsed: [...allOpen, "project:website"], selectedId: "t-docs" }));
+    expect(folded.slice(folded.indexOf("# website (2) folded"), folded.indexOf("# immaculate"))).toEqual(["# website (2) folded", "t-docs"]);
+    const opened = items(listed, { opened: "project:website" });
+    expect(opened.filter((item) => item.kind === "thread" && item.arriving).map((item) => item.key)).toEqual(["t-hero", "t-docs", "t-phone"]);
+  });
+
+  it("folds Pinned behind its count, and keeps snoozed threads folded at the foot until opened, each naming its project", () => {
     const snoozed = fixtureThreads.map((thread) => (thread.id === "t-ledger" || thread.id === "t-headline" ? { ...thread, snoozedUntil: now + 3_600_000 } : thread));
-    const open = outline(homeItems(list(snoozed), options()));
-    expect(open.slice(open.indexOf("§ Pinned 1"), open.indexOf("§ Pinned 1") + 2)).toEqual(["§ Pinned 1", "t-notes @ openorc"]);
+    const open = outline(items(list(snoozed)));
+    expect(open.slice(0, 2)).toEqual(["§ Pinned 1", "t-notes @ openorc"]);
     expect(open[open.indexOf("§ Resolved") - 1]).toBe("§ Snoozed 2 folded");
-    const folded = outline(homeItems(list(snoozed), options({ collapsed: [...allOpen, "pinned:threads", "snoozed-open:threads"] })));
-    expect(folded[folded.indexOf("§ Pinned 1 folded") + 1]).not.toBe("t-notes @ openorc");
+    const folded = outline(items(list(snoozed), { collapsed: [...allOpen, "pinned:threads", "snoozed-open:threads"] }));
+    expect(folded[1]).not.toBe("t-notes @ openorc");
     const snoozedAt = folded.indexOf("§ Snoozed 2");
     expect(folded.slice(snoozedAt, snoozedAt + 4)).toEqual(["§ Snoozed 2", "t-ledger @ openorc", "t-headline @ openorc", "§ Resolved"]);
   });
 
-  it("puts a waiting thread the inbox knows about under Needs you, even past the loaded page, once", () => {
-    const elsewhere = { ...fixtureThreads[0]!, id: "t-far", projectId: "immaculate", title: "Old question", activity: "waiting" as const, lastActivityAt: now };
-    const items = rows(homeItems(list(), options({ waiting: [elsewhere, fixtureThreads.find((thread) => thread.id === "t-docs")!, { ...elsewhere, id: "t-gone", archivedAt: 1 }] })));
-    expect(items.slice(0, 4)).toEqual(["# Needs you (3)", "t-far @ immaculate", "t-pairing @ openorc", "t-docs @ website"]);
-  });
-
-  it("puts a waiting thread just past a page's end under Needs you, and shows more in Resolved while the host lists more", () => {
-    const many: ThreadSummary[] = Array.from({ length: THREAD_PAGE + 1 }, (_, index) => ({ ...fixtureThreads[1]!, id: `w-${index}`, unread: false, lastActivityAt: Date.UTC(2026, 8, 1) - index }));
-    many[THREAD_PAGE] = { ...many[THREAD_PAGE]!, activity: "waiting" };
-    const items = outline(homeItems(list(many, { limit: THREAD_PAGE }), options()));
-    expect(items.slice(0, 2)).toEqual(["# Needs you (1)", `w-${THREAD_PAGE} @ Workspace`]);
-    expect(items.slice(2, 4)).toEqual(["§ Resolved", "w-0 @ Workspace"]);
-    expect(items.at(-1)).toBe("more");
-    expect(outline(homeItems(list(many, { limit: THREAD_PAGE }), options({ collapsed: [] }))).at(-1)).toBe("§ Resolved folded");
+  it("shows more in Resolved while the host lists more, and names no count on it", () => {
+    const many: ThreadSummary[] = Array.from({ length: THREAD_PAGE + 1 }, (_, index) => ({ ...quiet(`w-${index}`, WORKSPACE_ID, 0), lastActivityAt: Date.UTC(2026, 8, 1) - index }));
+    const lines = outline(homeItems({ ...list(many, { limit: THREAD_PAGE }), resolvedCount: 120 }, options(list(many, { limit: THREAD_PAGE }))));
+    expect(lines[0]).toBe("§ Resolved");
+    expect(lines[1]).toBe("w-0 @ Workspace");
+    expect(lines.at(-1)).toBe("more");
+    expect(outline(items(list(many, { limit: THREAD_PAGE }), { collapsed: [] })).at(-1)).toBe("§ Resolved folded");
   });
 
   it("offers a retry where the host could not list its threads, or its projects", () => {
-    const items = outline(homeItems(list(fixtureThreads, { failed: true }), options({ projectsFailed: true })));
-    expect(items.slice(3, 5)).toEqual(["retry projects", "§ Pinned 2"]);
-    expect(items.indexOf("retry threads")).toBeGreaterThan(items.indexOf("§ Pinned 2"));
-    expect(items.indexOf("retry threads")).toBeLessThan(items.indexOf("§ Resolved"));
+    const lines = outline(items(list(fixtureThreads, { failed: true }), { projectsFailed: true }));
+    expect(lines.slice(0, 2)).toEqual(["retry projects", "§ Pinned 2"]);
+    expect(lines.indexOf("retry threads")).toBeGreaterThan(lines.indexOf("# No project"));
+    expect(lines.indexOf("retry threads")).toBeLessThan(lines.indexOf("§ Resolved"));
   });
 
-  it("lists only the pinned threads, and puts the resolved ones in Resolved at the foot, out of Needs you and their days", () => {
-    expect(outline(homeItems(list(fixtureThreads, { pinnedOnly: true }), options({ pinnedOnly: true })))).toEqual(["§ Pinned 2", "t-notes @ openorc", "t-headline @ openorc"]);
+  it("lists only the pinned threads under the pinned filter, and puts the resolved ones in Resolved at the foot", () => {
+    expect(outline(items(list(fixtureThreads, { pinnedOnly: true }), { pinnedOnly: true }))).toEqual(["§ Pinned 2", "t-notes @ openorc", "t-headline @ openorc"]);
     const resolved = fixtureThreads.map((thread) => (thread.projectId === "website" ? { ...thread, archivedAt: 1, pinnedAt: null } : thread));
-    const items = outline(homeItems(list(resolved), options()));
-    const website = items.flatMap((line, index) => (line.endsWith("@ website") ? [index] : []));
-    // The heading carries the host's own count, since Resolved loads a page at a time.
-    expect(outline(homeItems({ ...list(resolved), resolvedCount: 120 }, options({ collapsed: [] }))).at(-1)).toBe("§ Resolved 120 folded");
+    const lines = outline(items(list(resolved)));
+    expect(lines).not.toContain("# website");
+    const website = lines.flatMap((line, index) => (line.endsWith("@ website") ? [index] : []));
     expect(website).toHaveLength(3);
-    expect(website.every((index) => index > items.indexOf("§ Resolved"))).toBe(true);
+    expect(website.every((index) => index > lines.indexOf("§ Resolved"))).toBe(true);
   });
 
   it("leaves Resolved out once the host says it holds nothing, and keeps it while the host has not said", () => {
     const current = fixtureThreads.map((thread) => ({ ...thread, archivedAt: null, lastActivityAt: now }));
-    expect(outline(homeItems({ ...list(current), resolvedCount: 0 }, options())).filter((line) => line.startsWith("§ Resolved"))).toEqual([]);
-    expect(outline(homeItems(list(current), options())).at(-1)).toBe("§ Resolved");
+    expect(outline(homeItems({ ...list(current), resolvedCount: 0 }, options(list(current)))).filter((line) => line.startsWith("§ Resolved"))).toEqual([]);
+    expect(outline(items(list(current))).at(-1)).toBe("§ Resolved");
   });
 });
 
@@ -163,7 +193,7 @@ it("pages each parent's newest children with separate Show more rows, keeps olde
   const nested = Array.from({ length: 8 }, (_, i): ThreadSummary => ({ ...children[0]!, id: `nested-${i}`, parentThreadId: children[19]!.id, createdAt: i, activity: "idle" }));
   const listed = list([parent, ...children, ...nested]);
   const open = { collapsed: [...allOpen, "thread-open:child-19"] };
-  const first = homeItems(listed, options(open));
+  const first = items(listed, open);
   expect(first.filter((item) => item.kind === "children-more").map((item) => [item.tree.thread.id, item.count])).toEqual([
     ["child-19", 3],
     ["parent", 14],
@@ -171,19 +201,19 @@ it("pages each parent's newest children with separate Show more rows, keeps olde
   const threads = first.filter((item) => item.kind === "thread");
   expect(threads.map((item) => item.thread.id)).toEqual(["parent", "child-19", "nested-7", "nested-6", "nested-5", "nested-4", "nested-3", "child-18", "child-17", "child-16", "child-15", "child-0"]);
   expect(threads.at(-1)?.tree.last).toBe(true);
-  expect(threads[0]).toMatchObject({ project: "Workspace" });
-  expect(threads[1]).toMatchObject({ project: null });
+  // In its group a root names no project, nor does a sub thread anywhere.
+  expect(threads.every((item) => item.project === null)).toBe(true);
   expect(
-    homeItems(listed, options({ ...open, childLimits: { parent: 17, "child-19": 17 } }))
+    items(listed, { ...open, childLimits: { parent: 17, "child-19": 17 } })
       .filter((item) => item.kind === "children-more")
       .map((item) => item.count),
   ).toEqual([2]);
   expect(
-    homeItems(listed, options({ selectedId: "nested-0" }))
+    items(listed, { selectedId: "nested-0" })
       .filter((item) => item.kind === "thread")
       .map((item) => item.thread.id),
   ).toContain("nested-0");
-  expect(homeItems(listed, options({ collapsed: [...allOpen, "thread-closed:parent"] })).some((item) => item.kind === "children-more")).toBe(false);
+  expect(items(listed, { collapsed: [...allOpen, "thread-closed:parent"] }).some((item) => item.kind === "children-more")).toBe(false);
 });
 
 it("nests children and a grandchild in place, preserving continuation lanes and manual folds", () => {
@@ -192,7 +222,7 @@ it("nests children and a grandchild in place, preserving continuation lanes and 
   const grandchild: ThreadSummary = { ...child, id: "grandchild", parentThreadId: child.id, activity: "running" };
   const sibling = { ...child, id: "sibling", createdAt: 2 };
   const listed = list([sibling, grandchild, parent, child]);
-  const threads = homeItems(listed, options()).filter((item) => item.kind === "thread");
+  const threads = items(listed).filter((item) => item.kind === "thread");
   expect(threads.map((item) => [item.thread.id, item.tree.depth])).toEqual([
     ["parent", 0],
     ["sibling", 1],
@@ -203,17 +233,10 @@ it("nests children and a grandchild in place, preserving continuation lanes and 
   expect(threads[1]!.tree.last).toBe(false);
   expect(threads[3]!.tree.last).toBe(true);
   expect(
-    homeItems(listed, options({ collapsed: [...allOpen, "thread-closed:parent"] }))
+    items(listed, { collapsed: [...allOpen, "thread-closed:parent"] })
       .filter((item) => item.kind === "thread")
       .map((item) => item.thread.id),
   ).toEqual(["parent"]);
   const finished = list([parent, child, sibling, { ...grandchild, activity: "idle" }]);
-  expect(homeItems(finished, options()).filter((item) => item.kind === "thread")).toHaveLength(1);
-});
-
-it("lists the waiting child itself in Needs you even when its parent and its day are folded", () => {
-  const parent = { ...fixtureThreads[0]!, id: "parent", parentThreadId: null };
-  const child: ThreadSummary = { ...parent, id: "child", parentThreadId: parent.id, parentRelation: "started", activity: "waiting" };
-  const listed = homeItems(list([]), options({ waiting: [child, parent], collapsed: ["day-closed:today", "thread-closed:parent"] }));
-  expect(listed.filter((item) => item.kind === "thread").map((item) => [item.thread.id, item.tree.depth])).toEqual([["child", 0]]);
+  expect(items(finished).filter((item) => item.kind === "thread")).toHaveLength(1);
 });

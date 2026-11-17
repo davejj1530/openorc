@@ -1,12 +1,12 @@
-import { liveSidebarFold, pruneThreadFolds, toggleSidebarFold, toggleThreadTree } from "@openorc/client";
+import { liveGroupedFold, pruneThreadFolds, toggleSidebarFold, toggleThreadTree } from "@openorc/client";
 import { useSyncExternalStore } from "react";
 import { shownMacId, storage } from "../client";
 import { foldsKey } from "./fold-keys";
 
 /*
- * Which of Home's parts the reader folded, per Mac, in the desktop sidebar's keys (days, the list's pinned and snoozed
- * parts, sub thread trees). The desktop keeps its folds on the Mac's own screen and does not sync them, so neither does
- * this. Keys of the project groups Home used to show are dropped as they are read.
+ * Which of Home's parts the reader folded, per Mac, in the desktop sidebar's keys (projects' groups, the list's pinned,
+ * snoozed and resolved parts, sub thread trees). The desktop keeps its folds on the Mac's own screen and does not sync
+ * them, so neither does this. Keys of the days Home used to group by are dropped as they are read.
  */
 
 const NONE: readonly string[] = [];
@@ -18,7 +18,7 @@ function parse(raw: string | undefined): readonly string[] {
   if (raw === undefined) return NONE;
   try {
     const saved: unknown = JSON.parse(raw);
-    return Array.isArray(saved) ? saved.filter((key): key is string => typeof key === "string" && liveSidebarFold(key)) : NONE;
+    return Array.isArray(saved) ? saved.filter((key): key is string => typeof key === "string" && liveGroupedFold(key)) : NONE;
   } catch {
     return NONE;
   }

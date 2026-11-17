@@ -1,6 +1,9 @@
 import { useState, type ReactNode } from "react";
 import { View } from "react-native";
-import { ChevronDown } from "../generated/icons";
+import { AlarmClock, ChevronDown, CircleCheck, Cloud, Folder, Globe, Pin } from "../generated/icons";
+import { WORKSPACE_ID } from "@openorc/protocol";
+import type { ComponentType } from "react";
+import type { IconProps } from "../ui/icon";
 import { cn } from "../ui/cn";
 import { ListPressable } from "../ui/ListPressable";
 import { useReducedMotion } from "../ui/reduced-motion";
@@ -12,8 +15,8 @@ import type { HomeItem } from "./home-items";
 import { MARGIN, ROW_INSET, TEXT_X, titleMid } from "./grid";
 import { ThreadBranch, treeIndent } from "./ThreadBranch";
 
-type Heading = Extract<HomeItem, { kind: "heading" }>;
 type Section = Extract<HomeItem, { kind: "section" }>;
+type Group = Extract<HomeItem, { kind: "project" }>;
 
 /** Where a root row's title starts, inside the row's inset: labels of the list's parts line up with it. */
 const LABEL_PAD = MARGIN - ROW_INSET;
@@ -22,56 +25,110 @@ const LABEL_PAD = MARGIN - ROW_INSET;
 export type HeadingRoom = "first" | "after-rows" | "after-heading";
 const rooms: Record<HeadingRoom, string> = { first: "mt-1", "after-rows": "mt-3", "after-heading": "" };
 
-/**
- * Needs you's heading, in the form of the list's parts: its label where titles start, and how many wait in the
- * attention tone. It never folds, so it holds no chevron.
- */
-export function HomeHeading({ heading, room = "after-rows" }: { heading: Heading; room?: HeadingRoom }) {
-  return (
-    <View
-      accessible
-      accessibilityRole="header"
-      accessibilityLabel={`${heading.title}, ${heading.count}`}
-      className={cn("mx-3 min-h-touch flex-row items-center gap-1.5", rooms[room])}
-      style={{ paddingLeft: LABEL_PAD }}
-    >
-      <Text className="text-detail text-ink-4">{heading.title}</Text>
-      <Text className="text-detail text-warn tabular-nums">{heading.count}</Text>
-    </View>
-  );
-}
-
 /** A row the fold motion moves: rising in as its fold opens, fading as it closes. */
 function Moving({ motion, children }: { motion: RowMotion; children: ReactNode }) {
   return <Animated.View style={movingStyle(motion, useReducedMotion())}>{children}</Animated.View>;
 }
 
+const partMarks: Record<Section["part"], ComponentType<IconProps>> = { pinned: Pin, snoozed: AlarmClock, resolved: CircleCheck };
+
 /**
- * A part of the list that folds: Pinned, a day, or Snoozed. Its label (and, for Pinned and Snoozed, its count) where
- * titles start, and the chevron the sub threads use in the action column, turning as the part opens.
+ * A label that folds what is under it, in one shape for every part of the list, as the desktop's sidebar heads its
+ * groups: a mark where the rows' titles start, the words, what it counts, the chevron after them turning as it folds,
+ * and at the end an amber count of what waits on the person.
  */
-export function SectionToggle({ section, room = "after-rows", motion, onToggle }: { section: Section; room?: HeadingRoom; motion: RowMotion; onToggle: () => void }) {
-  const open = section.open && !motion.folding;
+function FoldLabel({
+  mark: Mark,
+  words,
+  spoken,
+  count,
+  waiting = 0,
+  open,
+  room,
+  onToggle,
+}: {
+  mark: ComponentType<IconProps>;
+  words: string;
+  spoken: string;
+  count?: number;
+  waiting?: number;
+  open: boolean;
+  room: HeadingRoom;
+  onToggle: () => void;
+}) {
   const still = useReducedMotion();
   return (
     <ListPressable
       accessibilityRole="button"
       accessibilityState={{ expanded: open }}
-      accessibilityLabel={section.count === undefined ? section.label : `${section.label}, ${section.count}`}
+      accessibilityLabel={spoken}
       onPress={onToggle}
-      className={cn("mx-3 min-h-touch flex-row items-center gap-1.5 rounded-lg pr-5 active:bg-surface-2", rooms[room])}
+      className={cn("mx-3 min-h-touch flex-row items-center gap-2 rounded-lg pr-5 active:bg-surface-2", rooms[room])}
       style={{ paddingLeft: LABEL_PAD }}
     >
-      <Text className="text-detail text-ink-4">{section.label}</Text>
-      <Text className="flex-1 text-detail text-ink-4 tabular-nums">{section.count ?? ""}</Text>
+      <Mark size={16} className="text-ink-3" />
+      <Text numberOfLines={1} className="shrink text-detail text-ink-3">
+        {words}
+      </Text>
+      {count === undefined ? null : <Text className="text-detail tabular-nums text-ink-4">{count}</Text>}
       <Animated.View style={turn(open, still)}>
-        <ChevronDown size={16} className="text-ink-4" />
+        <ChevronDown size={14} className="text-ink-4" />
       </Animated.View>
+      <View className="flex-1" />
+      {waiting ? <Text className="text-detail tabular-nums text-warn">{waiting}</Text> : null}
     </ListPressable>
   );
 }
 
-/** The foot of Older while the host has more threads to give: the next page, as the sidebar loads more. */
+/** Pinned, Snoozed or Resolved: its mark, its label and, for Pinned and Snoozed, how many it holds. */
+export function SectionToggle({ section, room = "after-rows", motion, onToggle }: { section: Section; room?: HeadingRoom; motion: RowMotion; onToggle: () => void }) {
+  return (
+    <FoldLabel
+      mark={partMarks[section.part]}
+      words={section.label}
+      spoken={section.count === undefined ? section.label : `${section.label}, ${section.count}`}
+      count={section.count}
+      open={section.open && !motion.folding}
+      room={room}
+      onToggle={onToggle}
+    />
+  );
+}
+
+/** A project's mark: the cloud for one only OpenOrc Cloud has, the globe for No project, else a folder. */
+export function projectMark(project: { id: string; cloud?: true }): ComponentType<IconProps> {
+  if (project.cloud) return Cloud;
+  return project.id === WORKSPACE_ID ? Globe : Folder;
+}
+
+/** A project's label over its threads: its mark (a folder, or the cloud for a project only OpenOrc Cloud has), its name, and what in it waits on the person. */
+export function ProjectLabel({ group, room = "after-rows", motion, onToggle }: { group: Group; room?: HeadingRoom; motion: RowMotion; onToggle: () => void }) {
+  const mark = projectMark(group.project);
+  return (
+    <FoldLabel
+      mark={mark}
+      words={group.project.name}
+      spoken={group.waiting ? `${group.project.name}, ${group.waiting} need you` : group.project.name}
+      waiting={group.waiting}
+      open={group.open && !motion.folding}
+      room={room}
+      onToggle={onToggle}
+    />
+  );
+}
+
+/** The foot of a project's group while it holds more: the next ten, where titles start. */
+export function ShowMoreInGroup({ count, motion, onPress }: { count: number; motion: RowMotion; onPress: () => void }) {
+  return (
+    <Moving motion={motion}>
+      <ListPressable accessibilityRole="button" onPress={onPress} className="mx-3 min-h-touch justify-center rounded-lg active:bg-surface-2" style={{ paddingLeft: LABEL_PAD }}>
+        <Text className="text-detail text-ink-4">Show {count} more</Text>
+      </ListPressable>
+    </Moving>
+  );
+}
+
+/** The foot of Resolved, or of Pinned under the pinned filter, while the host has more threads to give: the next page. */
 export function ShowMore({ motion, onPress }: { motion: RowMotion; onPress: () => void }) {
   return (
     <Moving motion={motion}>

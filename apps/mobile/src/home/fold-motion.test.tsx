@@ -29,28 +29,28 @@ const rows = threadTreeRows([parent, family[4]!], family, ["thread-open:parent",
 const thread = (tree: (typeof rows)[number]): HomeItem => ({ kind: "thread", key: tree.thread.id, thread: tree.thread, tree, project: null, arriving: false });
 // As Home lists them: the parent's children with the grandchild under its own parent, the parent's next page, the sibling root.
 const items: HomeItem[] = [
-  { kind: "section", key: "day-closed:today", label: "Today", open: true },
+  { kind: "project", key: "project:openorc", project: { id: "openorc", name: "openorc" }, open: true, waiting: 0 },
   ...rows.slice(0, 4).map(thread),
   { kind: "children-more", key: "children-more:parent", tree: rows[0]!, count: 2 },
   thread(rows[4]!),
-  { kind: "section", key: "day-open:yesterday", label: "Yesterday", open: true },
+  { kind: "section", key: "snoozed-open:threads", part: "snoozed", label: "Snoozed", open: true },
 ];
 const order = items.map((item) => item.key);
 
 it("fades a closing parent's whole tree, its next page included, and marks the parent so its chevron turns at once", () => {
   const motions = foldMotions(items, { key: "parent", open: false });
-  expect(order).toEqual(["day-closed:today", "parent", "a", "a1", "b", "children-more:parent", "sibling", "day-open:yesterday"]);
+  expect(order).toEqual(["project:openorc", "parent", "a", "a1", "b", "children-more:parent", "sibling", "snoozed-open:threads"]);
   expect(motions.get("parent")).toEqual({ folding: true });
   expect(["a", "a1", "b", "children-more:parent"].map((key) => motions.get(key))).toEqual([{ leave: true }, { leave: true }, { leave: true }, { leave: true }]);
   expect(motions.has("sibling")).toBe(false);
-  expect(motions.has("day-open:yesterday")).toBe(false);
+  expect(motions.has("snoozed-open:threads")).toBe(false);
 });
 
-it("rises an opening fold's rows in one after another, and a day holds its rows up to the next day", () => {
-  const motions = foldMotions(items, { key: "day-closed:today", open: true });
+it("rises an opening fold's rows in one after another, and a project holds its rows up to the next label", () => {
+  const motions = foldMotions(items, { key: "project:openorc", open: true });
   expect(order.slice(1, 7).map((key) => motions.get(key)?.arrive)).toEqual([0, 1, 2, 3, 4, 5]);
-  expect(motions.has("day-closed:today")).toBe(false);
-  expect(motions.has("day-open:yesterday")).toBe(false);
+  expect(motions.has("project:openorc")).toBe(false);
+  expect(motions.has("snoozed-open:threads")).toBe(false);
   expect(foldMotions(items, null).size).toBe(0);
 });
 
@@ -79,7 +79,7 @@ it("commits a pending close when another fold moves, and every fold at once unde
   const commit = vi.fn();
   const { result } = renderHook(() => useFoldMotion(items, commit));
   act(() => result.current.toggle("parent", false));
-  act(() => result.current.toggle("day-open:yesterday", false));
+  act(() => result.current.toggle("snoozed-open:threads", false));
   expect(commit).toHaveBeenCalledExactlyOnceWith("parent", false);
   motion.reduced = true;
   const still = renderHook(() => useFoldMotion(items, commit));

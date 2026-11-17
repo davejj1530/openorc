@@ -10,13 +10,16 @@ import { useHomeItems } from "./use-home-items";
 import { useChildThreadPages } from "@openorc/client";
 
 /** A Mac with only Workspace, whose pages of threads arrive when the test sends them, by how many each asked for. */
-const mac = vi.hoisted(() => ({ phone: null as FakeMac | null, pages: new Map<number, (threads: ThreadSummary[]) => void>(), failing: false, waiting: [] as ThreadSummary[] }));
+const mac = vi.hoisted(() => ({ phone: null as FakeMac | null, pages: new Map<number, (threads: ThreadSummary[]) => void>(), failing: false, waiting: [] as ThreadSummary[], inboxReads: 0 }));
 
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
   mac.phone = fakeMac((method, params) => {
     if (method === "projects.list") return Promise.resolve([]);
-    if (method === "inbox.list") return Promise.resolve({ items: mac.waiting.map((thread) => ({ kind: "thread", thread })) });
+    if (method === "inbox.list") {
+      mac.inboxReads++;
+      return Promise.resolve({ items: [] });
+    }
     if (method === "threads.get") return Promise.resolve(mac.waiting.find((thread) => thread.id === (params as { id: string }).id) ?? null);
     if (mac.failing) return Promise.reject(new Error("The phone is not connected to its Mac."));
     return new Promise((resolve) => mac.pages.set((params as { limit: number }).limit, resolve as (threads: ThreadSummary[]) => void));
@@ -76,35 +79,35 @@ afterEach(() => {
 
 /** Today's threads, so they list under Today, which starts open. */
 const threads: ThreadSummary[] = Array.from({ length: THREAD_PAGE + 4 }, (_, index) => ({ ...fixtureThreads[0]!, id: `w-${index}`, lastActivityAt: Date.now() - (index + 1) * 1000 }));
-const outline = (items: HomeItem[]) => items.map((item) => (item.kind === "thread" ? item.thread.id : item.kind));
+const outline = (items: HomeItem[]) =>
+  items.map((item) => {
+    if (item.kind === "thread") return item.thread.id;
+    return item.kind === "group-more" ? `more ${item.count}` : item.kind;
+  });
 /** The Mac answers the read behind a page of `limit` threads, which asks for one more. */
 const answer = (limit: number) => act(async () => mac.pages.get(limit + 1)!(threads.slice(0, limit + 1)));
 
-it("reads just the waiting thread outside the page and shows a started child whose parent is absent", async () => {
-  mac.waiting = [{ ...threads[0]!, id: "waiting-child", activity: "waiting", parentRelation: "started", parentThreadId: "archived-parent" }];
+it("lists a waiting started child whose parent is absent from the read of what needs the person, and never reads the inbox", async () => {
+  const child = { ...threads[0]!, id: "waiting-child", activity: "waiting" as const, parentRelation: "started" as const, parentThreadId: "archived-parent" };
   const home = renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
+  await waitFor(() => expect(mac.pages.has(NEEDS_YOU_PAGE)).toBe(true));
+  await act(async () => mac.pages.get(NEEDS_YOU_PAGE)!([child]));
   await waitFor(() => expect(outline(home.result.current.items)).toContain("waiting-child"));
-  expect(mac.phone!.module.queryClient.getQueryData(["threads.get", { id: "waiting-child" }])).toMatchObject({ id: "waiting-child" });
-  expect(
-    mac
-      .phone!.module.queryClient.getQueryCache()
-      .findAll({ queryKey: ["threads.list"] })
-      .some((query) => (query.queryKey[1] as { selectedId?: string }).selectedId),
-  ).toBe(false);
+  expect(mac.inboxReads).toBe(0);
 });
 
-it("reads the next page by itself while today is unfinished, keeping its rows meanwhile, then adds the page", async () => {
+it("reads the next page by itself until the threads reach Resolved, keeping its rows meanwhile, then adds the page", async () => {
   const home = renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
   await waitFor(() => expect(mac.pages.has(THREAD_PAGE + 1)).toBe(true));
   await answer(THREAD_PAGE);
-  const first = ["section", ...threads.slice(0, THREAD_PAGE).map((thread) => thread.id), "section"];
+  const shown = threads.slice(0, 4).map((thread) => thread.id);
   await waitFor(() => expect(mac.pages.has(THREAD_PAGE * 2 + 1)).toBe(true));
-  expect(outline(home.result.current.items)).toEqual(first);
+  expect(outline(home.result.current.items)).toEqual(["project", ...shown, `more ${THREAD_PAGE - 4}`, "section"]);
   await answer(THREAD_PAGE * 2);
-  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["section", ...threads.map((thread) => thread.id), "section"]));
+  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["project", ...shown, `more ${threads.length - 4}`, "section"]));
 });
 
-it("shows a thread that needs you from past the loaded pages in its folded day, and nothing else of that day", async () => {
+it("shows a thread that needs you from past the loaded pages in its project's group, beside the group's latest", async () => {
   const days = (count: number) => Date.now() - count * 86_400_000;
   const yesterday = Array.from({ length: THREAD_PAGE + 1 }, (_, index): ThreadSummary => ({ ...threads[0]!, id: `yesterday-${index}`, lastActivityAt: days(1) - index }));
   const unread = { ...threads[0]!, id: "unread-past-page", unread: true, lastActivityAt: days(1) - 1000 };
@@ -112,9 +115,7 @@ it("shows a thread that needs you from past the loaded pages in its folded day, 
   await waitFor(() => expect(mac.pages.has(THREAD_PAGE + 1) && mac.pages.has(NEEDS_YOU_PAGE)).toBe(true));
   await act(async () => mac.pages.get(THREAD_PAGE + 1)!(yesterday));
   await act(async () => mac.pages.get(NEEDS_YOU_PAGE)!([unread]));
-  // Yesterday folded with the unread thread, then Resolved.
-  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["section", "unread-past-page", "section"]));
-  expect(mac.pages.has(THREAD_PAGE * 2 + 1)).toBe(false);
+  await waitFor(() => expect(outline(home.result.current.items).slice(0, 6)).toEqual(["project", "yesterday-0", "yesterday-1", "yesterday-2", "yesterday-3", "unread-past-page"]));
 });
 
 it("asks again for a list that failed while connected, and leaves a failure while not connected to the header", async () => {
@@ -136,14 +137,14 @@ it("asks again for a list that failed while connected, and leaves a failure whil
   await waitFor(() => expect(outline(online.result.current.items)).toEqual(["retry"]), { timeout: 3_000 });
 });
 
-it("prunes only deleted thread folds after checking the Mac, leaving off-page and day folds", async () => {
+it("prunes only deleted thread folds after checking the Mac, leaving off-page and project folds", async () => {
   const { toggleFold, savedFolds } = await import("./folds");
   mac.waiting = [{ ...threads[0]!, id: "kept" }];
   toggleFold("thread-open:deleted");
   toggleFold("thread-closed:kept");
-  toggleFold("day-open:yesterday");
+  toggleFold("project:openorc");
   renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
   await waitFor(() => expect(savedFolds()).not.toContain("thread-open:deleted"));
   expect(savedFolds()).toContain("thread-closed:kept");
-  expect(savedFolds()).toContain("day-open:yesterday");
+  expect(savedFolds()).toContain("project:openorc");
 });

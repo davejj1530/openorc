@@ -40,6 +40,8 @@ export const HostedCapabilities = z.object({
     publishing: availability,
     /** Compact: the agent folds the conversation between turns, as the asker's own turn. */
     compact: availability,
+    /** Fork: a new thread of the asker's own that carries on the conversation from a turn's end, on a branch of its own. */
+    fork: availability,
     /** One tool call's whole output, read from the server. */
     toolOutput: availability,
     /** A search of the person's cloud threads' messages, as the palette searches a Mac's. */

@@ -87,7 +87,7 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "threads.compact": (threads, params) => compact(threads.calls, params),
   "threads.send": refused("Sending to another cloud thread isn't available yet."),
   "threads.turnChanges": review.legacyTurn,
-  "threads.fork": refused(HOSTED_REASONS.fork),
+  "threads.fork": (threads, params) => threads.forkThread(params),
   "subagents.stop": stopNative,
   "runs.close": refused("Closing a cloud agent session isn't available yet."),
   "events.toolOutput": toolOutput,

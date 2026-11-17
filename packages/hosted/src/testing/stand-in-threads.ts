@@ -36,10 +36,13 @@ import { StandInNotes } from "./stand-in-notes.js";
 import { headOf, lastAgentSeq, messageOf, pageOf, toolOutputOf, turnEnd, turnEnds, wire } from "./stand-in-thread-log.js";
 import { parentOf, placeOwn, placeShared, startTurn } from "./stand-in-thread-placement.js";
 import { StandInCompactions } from "./stand-in-compactions.js";
+import { StandInForks } from "./stand-in-forks.js";
 import type { UploadedFile } from "../wire-files.js";
 import type { StandInPeer } from "./stand-in-peer.js";
 
 export interface StandInThreadSeed {
+  /** The id the app chose, as for a fork; a new one otherwise. */
+  id?: string;
   projectId: string | null;
   title: string;
   createdAt?: string;
@@ -163,6 +166,7 @@ export class StandInThreads {
   /** Every ready ask the stand-in stored, in order. */
   readonly readies: { threadId: string; settings: unknown }[] = [];
   readonly compactions = new StandInCompactions();
+  readonly forks = new StandInForks();
   /** Every POST /hosted/threads body, in order, with the space it named. */
   readonly started: { space: string; body: Record<string, unknown> }[] = [];
   /** Capabilities, files on messages and the files unit's rules. */
@@ -262,12 +266,13 @@ export class StandInThreads {
       const read = [...this.#threads.values()].filter((thread) => this.#reads(as.who, thread) && thread.space === as.space).sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
       return { status: 200, body: { threads: read.map((thread) => this.#rowOf(thread, as.who)) } };
     }
-    const match = /^\/hosted\/threads\/([^/]+)(\/events|\/compact|\/commands\/([^/]+)\/stop|\/tool-calls\/([^/]+)\/output)?$/.exec(path);
+    const match = /^\/hosted\/threads\/([^/]+)(\/events|\/compact|\/fork|\/commands\/([^/]+)\/stop|\/tool-calls\/([^/]+)\/output)?$/.exec(path);
     if (!match) return null;
     const thread = this.#readable(as, decodeURIComponent(match[1]!));
     if (!thread) return missing();
     if (method === "GET" && match[2] === "/events") return { status: 200, body: pageOf(thread, query, this.log.newestTurns) };
     if (match[4]) return { status: 200, body: toolOutputOf(thread, decodeURIComponent(match[4])) };
+    if (method === "POST" && match[2] === "/fork") return this.#fork(thread, as.who, body);
     if (!match[2]) return this.#one(method, thread, as.who, body);
     return method === "POST" ? this.#act(thread, as.who, match[3] ? decodeURIComponent(match[3]) : null, body) : null;
   }
@@ -279,6 +284,17 @@ export class StandInThreads {
     thread.stopped.push(commandId);
     this.#released(thread, commandId);
     return { status: 204, body: null };
+  }
+
+  /** A fork of a thread its asker reads: theirs, on a branch named after the parent's (stand-in-forks.ts). */
+  #fork(parent: Thread, who: string, body: Record<string, unknown>): Reply {
+    const made = this.forks.take(parent, who, body, (id) => {
+      const held = this.#threads.get(id);
+      if (held) return held;
+      this.addThread(who, { id, projectId: parent.projectId, title: `${parent.title || "Thread"} (fork)`, branch: `${parent.branch}-fork-${id.slice(0, 8)}`, agent: parent.agent as StandInThreadSeed["agent"] });
+      return this.#threads.get(id)!;
+    });
+    return made.fork ? { status: 200, body: this.#rowOf(made.fork, who) } : made;
   }
 
   /** A stopped command no longer holds the thread's handoff; once none does, the next sender may start. */
@@ -672,7 +688,7 @@ export class StandInThreads {
 
   /** A thread the person started, in the space of its project. Answers its id. */
   addThread(email: string, seed: StandInThreadSeed): string {
-    const id = randomUUID();
+    const id = seed.id ?? randomUUID();
     const at = seed.createdAt ?? new Date().toISOString();
     const thread: Thread = {
       id,

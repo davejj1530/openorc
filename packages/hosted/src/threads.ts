@@ -40,7 +40,7 @@ import * as sends from "./sends.js";
 import type { Skills } from "./skills.js";
 import { TerminalWatch } from "./thread-terminals.js";
 import { Refused, type Requests, type Session, type SessionChange } from "./session.js";
-import { CLOUD_PROJECT, githubRepoOf, listRows, projectPairs, resolvedCount, runsNow, starterOf, toAppEvent, toRuns, toSummary } from "./translate.js";
+import { CLOUD_PROJECT, githubRepoOf, listRows, projectPairs, resolvedCount, runsNow, starterOf, toAppEvent, toRuns, toSummary, wireMessageId } from "./translate.js";
 import { ROUTES, SOCKET, wireThread, wireTopics, type WireEvent, type WireThread } from "./wire.js";
 import type { QueuedStart } from "./shared-sends.js";
 
@@ -221,17 +221,31 @@ export class Threads implements HostedThreads {
   /** Deletes a thread. Its removal may be heard before the server's reply; either way, it is gone once the reply comes. */
   async remove(threadId: string): Promise<null> {
     await this.deps.session.in(this.row(threadId).space).request(ROUTES.remove(threadId));
-    const heard = this.#heard;
-    if (heard) {
-      heard.rows = heard.rows.filter((row) => row.id !== threadId);
-      this.#tickets.delete(threadId);
-      this.deps.follower.forget([threadId]);
-      this.voices.forget([threadId]);
-      delete heard.here[threadId];
-      this.#save();
-      this.#tell();
-    }
+    this.letGo(threadId);
     return null;
+  }
+
+  /**
+   * The thread is gone from the server, deleted or moved to this Mac: it and its subthreads leave the list now, so no
+   * read of them goes to the server before its word of it comes.
+   */
+  letGo(threadId: string): void {
+    const heard = this.#heard;
+    if (!heard) return;
+    const gone = new Set([threadId]);
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const row of heard.rows) if (row.parentId && gone.has(row.parentId) && !gone.has(row.id)) grew = Boolean(gone.add(row.id));
+    }
+    heard.rows = heard.rows.filter((row) => !gone.has(row.id));
+    for (const id of gone) {
+      this.#tickets.delete(id);
+      delete heard.here[id];
+    }
+    this.deps.follower.forget([...gone]);
+    this.voices.forget([...gone]);
+    this.#save();
+    this.#tell();
   }
 
   nativeStopRequest(threadId: string, expectedRunId: string): string {
@@ -289,6 +303,28 @@ export class Threads implements HostedThreads {
     }
     void this.refresh();
     return { thread: this.summary(row.id, params.spaceId), run: toRuns(row, this.reach)[0] ?? null };
+  }
+
+  /**
+   * A fork of a cloud thread: a new thread of the asker's own on the server, which carries on the conversation from a
+   * turn's end with a copy of the work on a branch of its own. It lists at once; its copy lands as soon as it can.
+   * Asking again with the same request key is the same fork.
+   */
+  async forkThread({ id, requestKey }: RpcParams<"threads.fork">): Promise<RpcResults["threads.fork"]> {
+    const parent = this.#heard?.rows.find((row) => row.id === id);
+    if (!parent) throw new Refused("That conversation isn't available on OpenOrc Cloud.");
+    const generation = this.deps.session.generation;
+    const forked = await this.deps.session.in(parent.space).request(ROUTES.fork(id), { id: wireMessageId(requestKey) ?? crypto.randomUUID() });
+    if (generation !== this.deps.session.generation) throw new Refused("Your OpenOrc session changed. Try again.");
+    const row = { ...forked, space: parent.space };
+    const heard = this.#heard;
+    if (heard && !heard.rows.some((each) => each.id === row.id)) {
+      heard.rows = [row, ...heard.rows];
+      this.#save();
+      this.#tell();
+    }
+    void this.refresh();
+    return this.summary(row.id);
   }
 
   /** The cloud thread a new one starts under, when it names one: a thread of the same project in the same space. */

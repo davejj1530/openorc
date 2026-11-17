@@ -50,6 +50,8 @@ export interface ThreadPanels {
   subthreads?: number;
   /** The thread's place compacts it, and no turn runs: the header offers Compact Context. */
   compact?: boolean;
+  /** A cloud thread's server starts a thread under it: the header offers New Subthread. */
+  startsUnder?: boolean;
 }
 
 const NO_PANELS: ThreadPanels = { uncommitted: null, preview: null };
@@ -103,17 +105,18 @@ export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, p
 
 /**
  * New Subthread, as the desktop's menus offer it: a thread started under this one, in its folder. A team's thread and
- * an Orcling's conversation start none from a phone, and OpenOrc Cloud starts no thread under another.
+ * an Orcling's conversation start none from a phone; a cloud thread starts one where its server says it does, which
+ * only its header has asked.
  */
-function startUnder(thread: ThreadSummary): ThreadAction[] {
-  if (thread.teamInstanceId || thread.orclingId || placeOf(thread).elsewhere) return [];
+function startUnder(thread: ThreadSummary, panels: ThreadPanels = NO_PANELS): ThreadAction[] {
+  if (thread.teamInstanceId || thread.orclingId || (placeOf(thread).elsewhere && !panels.startsUnder)) return [];
   return [{ kind: "screen", label: "New Subthread", icon: "square.and.pencil", pathname: "/new-subthread" }];
 }
 
 /** A thread's family in its header: a new subthread, the thread it came from, and the subthreads it has. */
 function family(thread: ThreadSummary, panels: ThreadPanels): ThreadAction[] {
   return [
-    ...startUnder(thread),
+    ...startUnder(thread, panels),
     ...(thread.parentThreadId ? [{ kind: "parent", label: "Open Parent Thread", icon: "arrow.turn.up.left", threadId: thread.parentThreadId } as const] : []),
     ...(panels.subthreads ? [{ kind: "screen", label: "Subthreads", icon: "arrow.triangle.branch", subtitle: String(panels.subthreads), pathname: "/subthreads" } as const] : []),
   ];

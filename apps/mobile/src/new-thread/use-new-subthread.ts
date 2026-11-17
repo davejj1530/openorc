@@ -1,7 +1,8 @@
 import { targetModel } from "@openorc/client";
-import type { PermissionPreset, RpcParams, ThreadSummary } from "@openorc/protocol";
+import { placeOf, type PermissionPreset, type RpcParams, type ThreadSummary } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { useRpcMutation } from "../client";
+import { useCloudFiles } from "../cloud/cloud-files";
 import { OLDER_MAC_SUBTHREADS } from "../connection/link-connection";
 import { useShares } from "../connection/use-shares";
 import { composerControls } from "../composer/composer-state";
@@ -61,11 +62,19 @@ export function useNewSubthread(parent: ThreadSummary) {
     setDraft((current) => ({ ...current, ...patch }));
     setError(null);
   };
-  const { uploading, chooseImages } = useImageAttach({ onImage: (image) => setDraft((current) => ({ ...current, images: [...current.images, image] })), onError: setError });
+  // Under a cloud thread, the subthread is OpenOrc Cloud's too: its images go there through the phone's own session.
+  const cloud = placeOf(parent).elsewhere;
+  const files = useCloudFiles(cloud ? { threadId: parent.id } : null);
+  const attach = useImageAttach({ onImage: (image) => setDraft((current) => ({ ...current, images: [...current.images, image] })), onError: setError, cloud: files.scope });
+  const { uploading } = attach;
+  const chooseImages = cloud && !files.scope ? () => void (files.refusal && setError(files.refusal)) : attach.chooseImages;
   const claudeAccountId = useNewThreadClaudeAccount(parent.projectId, draft.claudeAccountId);
-  const startsUnder = useShares(SUBTHREAD_STARTS);
+  // An older Mac starts none for a phone; a cloud thread's own server starts one under it.
+  const shared = useShares(SUBTHREAD_STARTS);
+  const olderMac = !cloud && shared === false;
   const settings: ComposerSettings = {
     choice: targetModel(draft.target),
+    cloud,
     mode: draft.mode,
     permission,
     selectModel: (choice) => change({ target: { kind: "model", choice } }),
@@ -75,7 +84,7 @@ export function useNewSubthread(parent: ThreadSummary) {
     },
     claudeAccount: { chosen: claudeAccountId, select: (claudeAccountId) => change({ claudeAccountId }), projectId: parent.projectId },
   };
-  const blocker = startsUnder === false ? OLDER_MAC_SUBTHREADS : startBlocker(draft, { permissionReady: true });
+  const blocker = olderMac ? OLDER_MAC_SUBTHREADS : startBlocker(draft, { permissionReady: true });
   const controls = composerControls({
     text: draft.prompt,
     attachments: draft.images.length,
@@ -128,7 +137,7 @@ export function useNewSubthread(parent: ThreadSummary) {
     starting,
     error,
     /** Why Start is dim: said at once for a Mac that cannot start subthreads, else once a tap on it asked. */
-    dimReason: startsUnder === false ? OLDER_MAC_SUBTHREADS : dim.shown,
+    dimReason: olderMac ? OLDER_MAC_SUBTHREADS : dim.shown,
     explainDim: dim.ask,
     submit,
   };

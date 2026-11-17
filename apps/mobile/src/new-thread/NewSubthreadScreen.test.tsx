@@ -28,13 +28,17 @@ const parent = {
 const mac = vi.hoisted(() => ({
   phone: null as FakeMac | null,
   shares: true,
+  parentOwner: null as unknown,
   start: null as unknown as ReturnType<typeof vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>>,
 }));
 
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
   const reads: Record<string, unknown> = {
-    "threads.get": parent,
+    get "threads.get"() {
+      return mac.parentOwner ? { ...parent, owner: mac.parentOwner } : parent;
+    },
+    "cloudModels.catalog": null,
     "projects.list": [{ id: "openorc", name: "openorc", defaultBranch: "main" }],
     "agents.models": [{ id: "opus", label: "Opus", agent: "claude", isDefault: true, efforts: ["high"], defaultEffort: "high" }],
     "agents.availability": [{ id: "claude", state: "ready" }],
@@ -59,6 +63,7 @@ beforeEach(() => {
   mac.phone!.saved.clear();
   mac.phone!.module.queryClient.clear();
   mac.shares = true;
+  mac.parentOwner = null;
   mac.start = vi.fn();
   vi.mocked(router.replace).mockClear();
 });
@@ -111,4 +116,17 @@ it("says at once that an older Mac cannot start subthreads from a phone, and hol
   expect(start().getAttribute("aria-disabled")).toBe("true");
   await act(async () => fireEvent.click(start()));
   expect(mac.start).not.toHaveBeenCalled();
+});
+
+it("starts one under a cloud thread, which its own server starts, whatever the Mac's age", async () => {
+  mac.shares = false;
+  mac.parentOwner = { brain: "hosted", reach: "live", heardAt: 0 };
+  render(<NewSubthreadScreen />, { wrapper: mac.phone!.wrapper });
+  await screen.findByLabelText("Message");
+  expect(screen.queryByText("Update OpenOrc on your Mac to start subthreads from your phone.")).toBeNull();
+  write("Check the footer copy");
+  await waitFor(() => expect(start().getAttribute("aria-disabled")).toBe("false"));
+  mac.start.mockResolvedValue({ thread: { id: "child-2" } });
+  await act(async () => fireEvent.click(start()));
+  await waitFor(() => expect(mac.start).toHaveBeenCalledWith(expect.objectContaining({ parentThreadId: "parent-1", prompt: "Check the footer copy" })));
 });

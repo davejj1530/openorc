@@ -5,6 +5,7 @@ import { Link, Stack } from "expo-router";
 import { useMemo, type ReactElement } from "react";
 import { useSubthreads } from "./subthreads";
 import { threadMenu, type ThreadAction } from "./thread-actions";
+import { useServed } from "./served";
 
 type Run = (action: ThreadAction) => void;
 
@@ -82,5 +83,9 @@ export function useThreadHeaderMenu(thread: ThreadSummary | null, now: Date, run
   const preview = usePreviewPanel(actionable);
   const subthreads = useSubthreads(actionable).subthreads.length;
   const compact = canCompact && thread?.activity !== "running";
-  return useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, subthreads, compact }), run), [thread, run, now, uncommitted, preview, subthreads, compact]);
+  const startsUnder = useServed(thread, "personSubthreads");
+  return useMemo(
+    () => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, subthreads, compact, startsUnder }), run),
+    [thread, run, now, uncommitted, preview, subthreads, compact, startsUnder],
+  );
 }

@@ -38,6 +38,14 @@ describe("a thread's menu on the phone", () => {
     }
   });
 
+  it("starts one under a cloud thread from its header once its server serves it, never from its row", () => {
+    const cloud = { ...thread("t-plan"), owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 0 } };
+    const panels = { uncommitted: null, preview: null };
+    expect(outline(threadMenu(cloud, "header", wednesday, panels)).flat()).not.toContain("New Subthread");
+    expect(outline(threadMenu(cloud, "header", wednesday, { ...panels, startsUnder: true })).flat()).toContain("New Subthread");
+    expect(outline(threadMenu(cloud, "row", wednesday)).flat()).not.toContain("New Subthread");
+  });
+
   it("puts Changes first in the header of a thread with Git, the uncommitted files beneath it, and keeps the rest in order", () => {
     const menu = threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: 3, preview: null });
     const [, ...rest] = outline(threadMenu(thread("t-settings"), "header", wednesday));

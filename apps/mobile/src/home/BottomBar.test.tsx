@@ -76,15 +76,17 @@ it("keeps the lens over the tabs however far a finger goes past their ends", () 
   expect(tabAt(1000, width, 3)).toBe(2);
 });
 
-it("sizes the tabs to fit centered with New clear of them, from a small phone to a large one", () => {
-  for (const screenWidth of [375, 393, 402, 440]) {
-    const width = tabWidth(screenWidth, 3);
-    const capsuleEnd = screenWidth / 2 + (3 * width + 8) / 2;
-    const newStart = screenWidth - 16 - BAR_HEIGHT;
-    expect(newStart - capsuleEnd, `${screenWidth}`).toBeGreaterThanOrEqual(24);
-  }
-  expect(tabWidth(440, 3)).toBe(74);
-  expect(tabWidth(375, 3)).toBeGreaterThanOrEqual(52);
+it("spreads the tabs from the leading margin to New, on a small phone and a large one, two tabs or three", () => {
+  for (const screenWidth of [375, 393, 402, 440])
+    for (const count of [2, 3]) {
+      const width = tabWidth(screenWidth, count);
+      const capsuleEnd = 16 + count * width + 8;
+      const newStart = screenWidth - 16 - BAR_HEIGHT;
+      // The capsule ends 12 points before New, less what whole-point tabs leave over.
+      expect(newStart - capsuleEnd, `${screenWidth}, ${count}`).toBeGreaterThanOrEqual(12);
+      expect(newStart - capsuleEnd, `${screenWidth}, ${count}`).toBeLessThan(12 + count);
+    }
+  expect(tabWidth(440, 3)).toBe(108);
 });
 
 it("does what the tab in front makes at a tap, or opens a menu of it", () => {

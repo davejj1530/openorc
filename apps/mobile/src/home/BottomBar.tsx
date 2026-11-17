@@ -28,12 +28,12 @@ const TABS: { tab: HomeTab; label: string; icon: ComponentType<IconProps> }[] = 
   { tab: "tasks", label: "Tasks", icon: ListChecks },
 ];
 
-/** The capsule's inset around its tabs, New's distance from the trailing edge, and the least room between the two. */
+/** The capsule's inset around its tabs, the bar's margin at either edge, and the narrowest a tab may be. */
 const INSET = 4;
 const SIDE = 16;
-const GAP = 24;
 const TAB_MIN = 52;
-const TAB_MAX = 74;
+/** The room between the tabs' capsule and New. */
+const BESIDE = 12;
 const GLYPH = 26;
 /** How much the lens grows past the platter while held, rising over the bar's edges as iOS's tab bar lens does. */
 const LIFT = 0.3;
@@ -48,10 +48,10 @@ const RISE = { duration: motion.duration.arrive, dampingRatio: 0.62 };
 /** Threads always, then Orclings and Tasks where the Mac has them; one tab alone is no bar. */
 export const homeTabs = ({ orclings, tasks }: { orclings: boolean; tasks: boolean }): HomeTab[] => ["threads", ...(orclings ? (["orclings"] as const) : []), ...(tasks ? (["tasks"] as const) : [])];
 
-/** Each tab's width: as wide as fits with the tabs centered on the screen and New clear of them at the trailing edge. */
+/** Each tab's width: the tabs share the bar from the leading margin to New, as iOS's tab bar sits beside its search button. */
 export function tabWidth(screen: number, count: number): number {
-  const room = screen - 2 * (SIDE + BAR_HEIGHT + GAP) - 2 * INSET;
-  return Math.max(TAB_MIN, Math.min(TAB_MAX, Math.floor(room / Math.max(1, count))));
+  const room = screen - 2 * SIDE - BAR_HEIGHT - BESIDE - 2 * INSET;
+  return Math.max(TAB_MIN, Math.floor(room / Math.max(1, count)));
 }
 
 /** Where the lens sits for a touch `px` across the capsule: centered under the finger, kept over the tabs. */
@@ -270,7 +270,7 @@ function NewButton({ action }: { action: NewAction }) {
 }
 
 /**
- * Home's floating bar: the tabs as glyphs on one Liquid Glass capsule centered on the screen, and New at the trailing
+ * Home's floating bar: the tabs as glyphs on one Liquid Glass capsule that runs from the leading margin to New, and New at the trailing
  * edge as a round glass button that starts what the tab in front makes (`action`). The chosen tab sits on a quiet platter; a touch
  * raises a glass lens from it that can be held and slid across the tabs, choosing the one it is let go over. `badge`
  * counts the Orclings that need the person, for when their faces are not on Threads. Without Liquid Glass the capsule
@@ -292,7 +292,7 @@ export function BottomBar({ tab, tabs, onTab, badge, action }: { tab: HomeTab; t
   return (
     <View className="mb-2 justify-center self-stretch" style={{ height: BAR_HEIGHT }}>
       <GestureDetector gesture={gesture}>
-        <View accessibilityRole="tablist" style={{ width: shown.length * width + INSET * 2, height: BAR_HEIGHT, padding: INSET }} className="flex-row items-center self-center">
+        <View accessibilityRole="tablist" style={{ width: shown.length * width + INSET * 2, height: BAR_HEIGHT, padding: INSET, marginLeft: SIDE }} className="flex-row items-center self-start">
           <GlassCapsule fallback="bg-surface" />
           <Platter width={width} lens={lens} />
           <LensView width={width} lens={lens} />

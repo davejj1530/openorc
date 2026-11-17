@@ -16,12 +16,16 @@ let connection: CoreConnection;
 let folder: string;
 let stored: string | null;
 const releases: (() => void)[] = [];
+/** What each test made, closed last first: only what its setup got to, should the setup not finish. */
+const closers: (() => unknown)[] = [];
 
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
+  closers.push(() => stand.close());
   stand.setBilling(EMAIL, { pro: true, standing: "live", at: new Date(Date.now() + 86_400_000).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
   stand.setSignIns(EMAIL, [{ agent: "claude" }]);
   folder = await mkdtemp(path.join(tmpdir(), "hosted-conversation-"));
+  closers.push(() => rm(folder, { recursive: true, force: true }));
   const listeners = new Set<(push: ClientPush) => void>();
   let nextId = 0;
   connection = {
@@ -46,9 +50,15 @@ beforeEach(async () => {
       throw error;
     },
   });
+  closers.push(() => {
+    client.queryClient.clear();
+    client.runs.reset();
+  });
   stored = null;
   core = await OpenOrc.create({
     dataDir: folder,
+    // No login shell to wait for: this process's environment, and the ledger in memory.
+    ephemeral: true,
     accountServer: stand.url,
     accountSecrets: {
       load: async () => stored,
@@ -65,15 +75,12 @@ beforeEach(async () => {
       },
     },
   });
+  closers.push(() => core.close());
 });
 
 afterEach(async () => {
   for (const release of releases.splice(0)) release();
-  client.queryClient.clear();
-  await core.close();
-  await stand.close();
-  client.runs.reset();
-  await rm(folder, { recursive: true, force: true });
+  for (const close of closers.splice(0).reverse()) await close();
 });
 
 function watch<M extends RpcMethod>(method: M, params: RpcParams<M>) {

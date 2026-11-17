@@ -190,3 +190,17 @@ it("finds a teammate to tag and posts a note to them through the Mac, which star
   expect(note).toMatchObject({ id, text: "@Mara Okafor the footer is done", mentions: [expect.objectContaining({ userId: mara.id, start: 0, end: 12 })] });
   expect(sentTo(threadId).length).toBe(before);
 });
+
+it("lets a phone read a cloud thread's work and ask for a commit, push or pull request, which the server decides", async () => {
+  const threadId = at.cloud.threads.mine;
+  const before = at.stand.requests.length;
+  const asked = await Promise.all([
+    refusal(phone.request("hosted.review.state", { threadId })),
+    refusal(phone.request("hosted.review.changes", { threadId })),
+    refusal(phone.request("hosted.review.commits", { threadId })),
+    refusal(phone.request("hosted.review.action", { threadId, action: { kind: "push", id: crypto.randomUUID() } })),
+  ]);
+  expect(asked.filter((answer) => answer === FROM_PHONE)).toEqual([]);
+  const paths = at.stand.requests.slice(before).map((request) => request.path.split("?")[0]);
+  expect(paths).toEqual(expect.arrayContaining([expect.stringContaining(`/hosted/threads/${threadId}/`)]));
+});

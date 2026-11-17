@@ -85,6 +85,13 @@ const cloudReplies: { [M in CloudRemoteMethod]: Reply<M> } = {
   // Who can be tagged, as the server gives them to everyone in the thread: an address only beside a name two people share.
   "threads.people": same,
   "threads.postNote": same,
+  // A cloud thread's work as its windows read it: paths, diffs, commits and the branch's state on GitHub.
+  "hosted.review.changes": same,
+  "hosted.review.file": same,
+  "hosted.review.commits": same,
+  "hosted.review.commit": same,
+  "hosted.review.state": same,
+  "hosted.review.action": same,
   // Team chat as the server gives it to every member who may read it: people by id, name and picture, never an address.
   "teamChat.state": same,
   "teamChat.openDm": same,

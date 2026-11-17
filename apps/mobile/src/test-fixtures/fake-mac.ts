@@ -68,6 +68,7 @@ export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<
       useRpcs: client.useRpcs,
       useRpcMutation: client.useRpcMutation,
       newId: () => crypto.randomUUID(),
+      call: connection.call,
     },
   };
 }

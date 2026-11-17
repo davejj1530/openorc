@@ -53,7 +53,7 @@ export function NoticeText({ notice, threadId }: { notice: Notice; threadId: str
 }
 
 /** A pill of the bar: the next step in ink and flexing, the one after it plain at its own width. A dim one still says why. */
-function BarButton({ pill, busy, onPress }: { pill: BarPill; busy: boolean; onPress: () => void }) {
+export function BarButton({ pill, busy, onPress }: { pill: BarPill; busy: boolean; onPress: () => void }) {
   const dim = Boolean(pill.reason) || busy;
   return (
     <Pressable

@@ -72,6 +72,14 @@ export const CLOUD_REMOTE_METHODS = [
   "threads.readNotes",
   "threads.people",
   "threads.postNote",
+  // A cloud thread's work: its changes, a file's diff, its commits, where it stands on GitHub, and commit, push or a
+  // pull request.
+  "hosted.review.changes",
+  "hosted.review.file",
+  "hosted.review.commits",
+  "hosted.review.commit",
+  "hosted.review.state",
+  "hosted.review.action",
   // The organization's team chat, as the person's own window has it. The server decides each call; a message that calls
   // the person's Orcling runs it on this Mac, which holds it.
   "teamChat.state",
@@ -113,14 +121,19 @@ export const CLOUD_THREAD_READS = [
   "threads.authors",
   "threads.notes",
   "threads.people",
+  "hosted.review.changes",
+  "hosted.review.file",
+  "hosted.review.commits",
+  "hosted.review.commit",
+  "hosted.review.state",
 ] as const satisfies readonly RoutedMethod[];
 
 /**
  * What such a session may change in an OpenOrc Cloud thread, as the person signed in on the Mac: start one, send, queue,
  * take a waiting message back, start a paused one, stop a turn, answer an ask, release a turn a handoff holds, post a
- * note and mark notes read, and keep the thread as its windows do. Stop and an answer must name the turn and the ask
- * the phone saw, and a send into a running turn names its turn: a phone's screen is always a moment behind the Mac.
- * Sending a queued message now is left to the Mac, which sees the turn it would join.
+ * note and mark notes read, commit, push or open a pull request, and keep the thread as its windows do. Stop and an
+ * answer must name the turn and the ask the phone saw, and a send into a running turn names its turn: a phone's screen
+ * is always a moment behind the Mac. Sending a queued message now is left to the Mac, which sees the turn it would join.
  */
 export const CLOUD_THREAD_WRITES = [
   "threads.start",
@@ -137,4 +150,5 @@ export const CLOUD_THREAD_WRITES = [
   "threads.stopCommand",
   "threads.readNotes",
   "threads.postNote",
+  "hosted.review.action",
 ] as const satisfies readonly RoutedMethod[];

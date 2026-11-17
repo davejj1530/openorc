@@ -60,8 +60,10 @@ export default function RootLayout() {
             <Stack.Screen name="task-description" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
             <Stack.Screen name="subthreads" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="changes" dangerouslySingular={onePerPanel} options={pushed} />
+            <Stack.Screen name="cloud-changes" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="preview" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="diff" options={pushed} />
+            <Stack.Screen name="cloud-diff" options={pushed} />
             <Stack.Screen name="new" dangerouslySingular options={pushed} />
             <Stack.Screen name="new-subthread" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="new-task" dangerouslySingular options={pushed} />
@@ -76,6 +78,8 @@ export default function RootLayout() {
             <Stack.Screen name="project" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1], contentStyle: { backgroundColor: colors.surface } }} />
             <Stack.Screen name="commit" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
             <Stack.Screen name="pull-request" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
+            <Stack.Screen name="cloud-commit" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
+            <Stack.Screen name="cloud-pull-request" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
             <Stack.Screen name="branch" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
             <Stack.Screen name="details" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
             <Stack.Screen name="orcling" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />

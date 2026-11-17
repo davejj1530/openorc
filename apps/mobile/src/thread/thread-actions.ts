@@ -9,7 +9,7 @@ export type OrganizePatch = Pick<RpcParams<"threads.update">["patch"], "pinned" 
 type Symbol = NonNullable<ComponentProps<typeof Link.MenuAction>["icon"]>;
 
 /** The screens a thread's menu opens over the thread: the desktop's side panel tools a phone has. */
-export type ThreadScreenPath = "/changes" | "/preview" | "/subthreads" | "/new-subthread";
+export type ThreadScreenPath = "/changes" | "/cloud-changes" | "/preview" | "/subthreads" | "/new-subthread";
 
 /**
  * One item of a thread's menu: a change to save, a snooze (its time counted when it is chosen, as a row keeps its menu
@@ -53,9 +53,9 @@ function preview(page: string | null): ThreadAction {
   return page ? { ...item, subtitle: page } : item;
 }
 
-/** Changes, with the uncommitted file count beneath it when there is one. */
-function changes(files: number): ThreadAction {
-  const item: ThreadAction = { kind: "screen", label: panelToolLabels.changes, icon: "plus.forwardslash.minus", pathname: "/changes" };
+/** Changes, with the file count beneath it when there is one: a cloud thread's open OpenOrc Cloud's own. */
+function changes(files: number, cloud: boolean): ThreadAction {
+  const item: ThreadAction = { kind: "screen", label: panelToolLabels.changes, icon: "plus.forwardslash.minus", pathname: cloud ? "/cloud-changes" : "/changes" };
   return files ? { ...item, subtitle: fileCount(files) } : item;
 }
 
@@ -70,7 +70,7 @@ export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, p
   if (isSubagentThread(thread)) return thread.parentThreadId ? [[{ kind: "parent", label: "Open parent", icon: "arrow.turn.up.left", threadId: thread.parentThreadId }]] : [];
   const team = Boolean(thread.teamInstanceId);
   const rename: ThreadAction = { kind: "rename", label: "Rename…", icon: "pencil" };
-  const screens: ThreadAction[] = [...(panels.uncommitted === null ? [] : [changes(panels.uncommitted)]), ...(panels.preview ? [preview(panels.preview.page)] : [])];
+  const screens: ThreadAction[] = [...(panels.uncommitted === null ? [] : [changes(panels.uncommitted, placeOf(thread).elsewhere)]), ...(panels.preview ? [preview(panels.preview.page)] : [])];
   const organize: ThreadAction[] = [
     thread.pinnedAt ? { kind: "patch", label: "Unpin", icon: "pin.slash", patch: { pinned: false } } : { kind: "patch", label: "Pin", icon: "pin", patch: { pinned: true } },
     ...(team ? [] : [snooze(thread, now)]),

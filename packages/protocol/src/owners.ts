@@ -89,6 +89,7 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "threads.start": { by: "start" },
   "threads.list": { by: "merge" },
   "threads.resolvedCount": { by: "merge" },
+  "threads.search": { by: "merge" },
   "inbox.list": { by: "merge" },
   "threads.get": byId,
   "threads.messages": byId,

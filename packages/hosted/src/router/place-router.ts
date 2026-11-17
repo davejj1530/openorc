@@ -10,7 +10,18 @@
  *      the person did not choose.
  */
 import type { HostedSpaces, HostedThreads } from "../index.js";
-import { mergeThreadPages, ownerRoute, rpcParams, type RoutedMethod, type RpcMethod, type RpcParams, type RpcReply, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
+import {
+  mergeThreadPages,
+  ownerRoute,
+  rpcParams,
+  type RoutedMethod,
+  type RpcMethod,
+  type RpcParams,
+  type RpcReply,
+  type RpcRequest,
+  type ThreadSearchHit,
+  type ThreadSummary,
+} from "@openorc/protocol";
 import { SpaceRequests } from "./space-requests.js";
 import { HostedCallGuard, heldHereCall } from "./hosted-call-guard.js";
 
@@ -70,6 +81,7 @@ export class PlaceRouter {
         if (id) return place.holds({ thread: id }) ? ask() : this.deps.next(request);
         if (method === "threads.list") return this.list(place, request, params as RpcParams<"threads.list">);
         if (method === "threads.resolvedCount") return this.resolvedCount(place, request, params as RpcParams<"threads.resolvedCount">);
+        if (method === "threads.search") return this.search(place, request, params as RpcParams<"threads.search">);
         return this.deps.next(request);
       }
       default:
@@ -106,6 +118,19 @@ export class PlaceRouter {
       "mac",
     );
     return result(request, rows.slice(offset));
+  }
+
+  /** Message search with no space chosen: this Mac's hits and those of every cloud thread the account lists, newest first. */
+  private async search(place: HostedThreads, request: RpcRequest, params: RpcParams<"threads.search">): Promise<RpcReply> {
+    if (!place.search) return this.deps.next(request);
+    try {
+      const [base, cloud] = await Promise.all([this.deps.next(request), place.search(undefined, params)]);
+      if (base.type === "rpc.error") return base;
+      const hits = [...(base.result as ThreadSearchHit[]), ...cloud].sort((a, b) => b.ts - a.ts || a.messageId.localeCompare(b.messageId));
+      return result(request, hits.slice(0, params.limit ?? 30));
+    } catch (error) {
+      return { type: "rpc.error", id: request.id, message: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   /** Resolved's count: this Mac's and the place's quiet rows, so the count and the drawer agree. */

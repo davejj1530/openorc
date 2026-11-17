@@ -263,8 +263,8 @@ export interface HostedThreads {
   project(id: string): Project | null;
   /** Whether a cloud thread of this Mac project may start from its folder (mac-start.ts). */
   macStartOffered?(macProjectId: string, spaceId?: string): Promise<boolean>;
-  /** The palette's search of the space's cloud threads, in the app's shape: only threads the account lists. */
-  search?(spaceId: string, params: Omit<RpcParams<"threads.search">, "spaceId">): Promise<ThreadSearchHit[]>;
+  /** The palette's search of a space's cloud threads, or with none named every space's, in the app's shape: only threads the account lists. */
+  search?(spaceId: string | undefined, params: Omit<RpcParams<"threads.search">, "spaceId">): Promise<ThreadSearchHit[]>;
   /** This place's rows of a merged list, from what it last heard, at once. Null with none to add. */
   listed<M extends MergedMethod>(method: M, params: RpcParams<M>): PlacePage<M> | null;
 }

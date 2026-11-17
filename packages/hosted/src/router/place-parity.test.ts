@@ -56,3 +56,38 @@ describe("hosted calls normally served here", () => {
     }
   });
 });
+
+describe("message search with no space chosen", () => {
+  const hit = (threadId: string, ts: number, runId: string) => ({
+    threadId,
+    threadTitle: "Example",
+    projectId: "p",
+    runId,
+    messageId: `m-${ts}`,
+    turn: 0,
+    role: "user" as const,
+    snippet: "Example",
+    ts,
+    taskId: null,
+    taskTitle: null,
+    member: null,
+  });
+
+  it("answers this Mac's hits and every cloud thread's, newest first, cut to the limit", async () => {
+    const search = vi.fn(async () => [hit("cloud-thread", 30, "hosted:cloud-thread"), hit("cloud-thread", 10, "hosted:cloud-thread")]);
+    const next = vi.fn(async () => ({ type: "rpc.result" as const, id: 4, result: [hit("local-thread", 20, "run-1")] }));
+    const router = new PlaceRouter({ place: () => ({ ...place, search }), next });
+    const reply = await router.handle({ type: "rpc", id: 4, method: "threads.search", params: { query: "example", limit: 2 } });
+    expect(reply).toMatchObject({ type: "rpc.result", result: [{ messageId: "m-30" }, { messageId: "m-20" }] });
+    expect(search).toHaveBeenCalledWith(undefined, { query: "example", limit: 2 });
+  });
+
+  it("says a cloud server's refusal rather than this Mac's hits alone", async () => {
+    const search = vi.fn(async () => Promise.reject(new Error("Searching this cloud thread's full history isn't available yet.")));
+    const router = new PlaceRouter({ place: () => ({ ...place, search }), next: vi.fn(async () => ({ type: "rpc.result" as const, id: 5, result: [] })) });
+    expect(await router.handle({ type: "rpc", id: 5, method: "threads.search", params: { query: "example" } })).toMatchObject({
+      type: "rpc.error",
+      message: "Searching this cloud thread's full history isn't available yet.",
+    });
+  });
+});

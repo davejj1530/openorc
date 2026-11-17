@@ -343,20 +343,27 @@ export class Threads implements HostedThreads {
   }
 
   /**
-   * The palette's search of a space's cloud threads (`threads.search`): the server's hits in the app's shape, each in a
-   * thread the account lists, under the project the sidebar shows it in. A server without the search says so in the
-   * app's words rather than finding nothing.
+   * The palette's search of a space's cloud threads (`threads.search`), or with no space named of every space the
+   * account lists threads in: the server's hits in the app's shape, each in a thread the account lists, under the
+   * project the sidebar shows it in. A server without the search says so in the app's words rather than finding nothing.
    */
-  async search(spaceId: string, { query, projectId, limit = 30 }: Omit<RpcParams<"threads.search">, "spaceId">): Promise<ThreadSearchHit[]> {
+  async search(spaceId: string | undefined, { query, projectId, limit = 30 }: Omit<RpcParams<"threads.search">, "spaceId">): Promise<ThreadSearchHit[]> {
     const listed = new Map(this.#summaries(spaceId).map((summary) => [summary.id, summary]));
-    const found = await this.deps.session
-      .in(spaceId)
-      .request(ROUTES.search(query, projectId ? 100 : limit))
-      .catch((error: unknown) => {
-        if (error instanceof Refused && error.status === 404) throw new Refused(HOSTED_REASONS.search);
-        throw error;
-      });
-    return found.hits
+    const spaces = spaceId ? [spaceId] : [...new Set(this.#heard?.rows.map((row) => row.space) ?? [])];
+    const asked = projectId ? 100 : limit;
+    const pages = await Promise.all(
+      spaces.map((space) =>
+        this.deps.session
+          .in(space)
+          .request(ROUTES.search(query, asked))
+          .catch((error: unknown) => {
+            if (error instanceof Refused && error.status === 404) throw new Refused(HOSTED_REASONS.search);
+            throw error;
+          }),
+      ),
+    );
+    return pages
+      .flatMap((page) => page.hits)
       .flatMap((hit): ThreadSearchHit[] => {
         const thread = listed.get(hit.threadId);
         if (!thread || (projectId && thread.projectId !== projectId)) return [];
@@ -377,6 +384,7 @@ export class Threads implements HostedThreads {
           },
         ];
       })
+      .sort((a, b) => b.ts - a.ts)
       .slice(0, limit);
   }
 

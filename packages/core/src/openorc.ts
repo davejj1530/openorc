@@ -2,7 +2,18 @@ import { captureLaunchEnvironment, claudeConfigDir, recoverAgentProcesses } from
 import { claudeAccounts as storedClaudeAccounts, cloudMoves as moveJournal, Db, LedgerWriter, plans, redact, settings as storedSettings } from "@openorc/db";
 import type { Hosted, HostedThreads, OwnSkills } from "@openorc/hosted";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
-import { harnessAvailability, harnessInfo, harnessLoggedIn, rpcParams, type CloudSessionGrant, type CloudSessionOwner, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
+import {
+  computerNames,
+  harnessAvailability,
+  harnessInfo,
+  harnessLoggedIn,
+  rpcParams,
+  type CloudSessionGrant,
+  type CloudSessionOwner,
+  type HarnessId,
+  type RpcMethod,
+  type RpcRequest,
+} from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -365,7 +376,7 @@ export class OpenOrc {
       workspaces: this.workspaces,
       deleteThread: (id) => this.threads.delete(id),
       changed: (id) => this.options.transport.push({ type: "invalidate", keys: ["threads", `thread:${id}`] }),
-      machine: process.platform === "darwin" ? "this Mac" : "this computer",
+      here: computerNames(process.platform),
       log: this.log,
     });
     return this.cloudMoveService;

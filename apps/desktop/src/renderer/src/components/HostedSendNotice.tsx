@@ -17,17 +17,18 @@ import {
   type SendBlockAction,
   type SendPayer,
 } from "@openorc/client";
-import { movingHold, type HarnessId, type PermissionPreset, type RunMode, type ThreadSummary } from "@openorc/protocol";
+import { movingHold, type HarnessId, type PermissionPreset, type RunMode, type ThreadMoving, type ThreadSummary } from "@openorc/protocol";
 import type { ReactNode, RefObject } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
 import { CLOUD_MODEL_LIMITS } from "../lib/cloud-model-limits";
 import { useRouter } from "../lib/router";
-import { machine, thisComputer } from "../lib/this-computer";
-import { useUi } from "../lib/ui";
+import { homeRelative } from "../lib/home-path";
+import { machine, revealLabel, thisComputer } from "../lib/this-computer";
+import { useCloudMove, useStartCloudMove } from "./CloudMoveDialog";
 import type { ComposerHandle } from "./Composer";
 import type { ModelChoice } from "./ModelPicker";
-import { Button } from "./ui";
+import { Button, TextButton } from "./ui";
 
 const card = "rounded-xl bg-surface px-3.5 py-1.5 text-base";
 const FILES = "Files can't be sent to OpenOrc Cloud yet.";
@@ -204,22 +205,36 @@ function readOnlyReason(thread: ThreadSummary | null, writeBlock: string | null)
 
 /** Why the thread's last move between this computer and the cloud stopped, with the move again; null otherwise. */
 function moveFailedCard(thread: ThreadSummary | null): ReactNode {
-  return thread?.moving?.failed ? <MoveFailedCard threadId={thread.id} to={thread.moving.to} words={thread.moving.failed} /> : null;
+  return thread?.moving?.failed ? <MoveFailedCard thread={thread} moving={{ ...thread.moving, failed: thread.moving.failed }} /> : null;
 }
 
-/** Why the thread's last move between this computer and OpenOrc Cloud stopped, where it left it, with the move again. */
-function MoveFailedCard({ threadId, to, words }: { threadId: string; to: "cloud" | "mac"; words: string }) {
+/**
+ * Why the thread's last move between this computer and OpenOrc Cloud stopped, where it left it, with the move again. A
+ * folder here that stopped it is named as the person reads paths, the whole path on demand, and opens in the file
+ * manager.
+ */
+function MoveFailedCard({ thread, moving }: { thread: ThreadSummary; moving: ThreadMoving & { failed: string } }) {
   const dismiss = useRpcMutation("threads.moveDismiss");
+  const offer = useCloudMove(thread);
+  const start = useStartCloudMove();
+  const folder = moving.folder;
   return (
     <section role="status" aria-label="Move" data-plane className={cn(card, "flex flex-wrap items-center justify-between gap-x-3")}>
-      <div className="min-w-0 py-1.5 text-ink break-words">
-        Didn't move to {to === "cloud" ? "OpenOrc Cloud" : thisComputer}. {dismiss.error?.message ?? words}
+      <div className="min-w-0 py-1.5">
+        <div className="text-ink break-words">
+          Didn't move to {moving.to === "cloud" ? "OpenOrc Cloud" : thisComputer}. {dismiss.error?.message ?? moving.failed}
+        </div>
+        {folder ? (
+          <TextButton tone="muted" className="max-w-full truncate text-sm" data-tip={folder} aria-label={`${revealLabel()}: ${folder}`} onClick={() => window.openorc.revealFile(folder)}>
+            {homeRelative(folder)}
+          </TextButton>
+        ) : null}
       </div>
       <div className="flex gap-2">
-        <Button variant="ghost" disabled={dismiss.isPending} onClick={() => dismiss.mutate({ threadId })}>
+        <Button variant="ghost" disabled={dismiss.isPending} onClick={() => dismiss.mutate({ threadId: thread.id })}>
           Dismiss
         </Button>
-        <Button variant="secondary" onClick={() => useUi.getState().setCloudMove(threadId)}>
+        <Button variant="secondary" disabled={!offer} onClick={() => start(thread.id, offer)}>
           Try again
         </Button>
       </div>

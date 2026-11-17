@@ -1,4 +1,5 @@
 import { harnessCatalog, type AgentSkill, type FileScope, type HarnessId, type SkillFile } from "@openorc/protocol";
+import { homeRelative } from "../lib/home-path";
 
 /** Where the page reads skills: one agent's, as it resolves them in one project. Reads wait while the page is hidden. */
 export interface SkillsPlace {
@@ -73,7 +74,7 @@ const parentFolder = (path: string) => path.replace(/[\\/][^\\/]*$/, "");
 export const mainFile = (skill: AgentSkill) => fileName(skill.path);
 
 /** The skill's folder, with the home folder as `~`. */
-export const skillFolder = (skill: AgentSkill) => parentFolder(skill.path).replace(/^(?:\/(?:Users|home)\/[^/]+|[A-Za-z]:\\Users\\[^\\]+)(?=[\\/]|$)/, "~");
+export const skillFolder = (skill: AgentSkill) => homeRelative(parentFolder(skill.path));
 export const absoluteFolder = (skill: AgentSkill) => parentFolder(skill.path);
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;

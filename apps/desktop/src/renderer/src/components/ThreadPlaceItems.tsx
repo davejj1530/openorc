@@ -1,7 +1,7 @@
 import { threadPlace } from "@openorc/client";
 import type { ThreadSummary, WorktreeBlock } from "@openorc/protocol";
 import { HOSTED_REASONS, movingHold, placeOf, WORKSPACE_ID, WORKTREE_BLOCK_WORDS } from "@openorc/protocol";
-import { useCloudMove } from "./CloudMoveDialog";
+import { useCloudMove, useStartCloudMove } from "./CloudMoveDialog";
 import { HostedMenuReason } from "./HostedMenuReason";
 import type { ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
@@ -54,6 +54,7 @@ function HostedPlaceRow({ thread, parts: M }: { thread: ThreadSummary; parts: Me
 /** Moves the thread between this computer and OpenOrc Cloud, by way of one confirm; held, with why, when it can't go now. */
 function CloudMoveItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
   const offer = useCloudMove(thread);
+  const start = useStartCloudMove();
   const hosted = thread.owner?.brain === "hosted";
   if (!offer && !hosted) return null;
   const label = hosted ? (
@@ -72,7 +73,7 @@ function CloudMoveItem({ thread, parts: M }: { thread: ThreadSummary; parts: Men
       </HostedMenuReason>
     );
   return (
-    <M.Item className={menuItem} disabled={!offer} onClick={() => useUi.getState().setCloudMove(thread.id)}>
+    <M.Item className={menuItem} disabled={!offer} onClick={() => start(thread.id, offer)}>
       {label}
     </M.Item>
   );

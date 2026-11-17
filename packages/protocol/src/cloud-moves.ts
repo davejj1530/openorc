@@ -8,8 +8,11 @@ import { z } from "zod";
 /** What a thread moving to the cloud says where it would take a message: it takes none until it is there. */
 export const MOVING_TO_CLOUD = "Moving to OpenOrc Cloud";
 
-/** Where a thread is moving, or why its last move stopped and left it where it was. */
-export const ThreadMoving = z.object({ to: z.enum(["cloud", "mac"]), failed: z.string().nullable() });
+/**
+ * Where a thread is moving, or why its last move stopped and left it where it was; `folder`, a folder on this computer
+ * that stopped it, for the person to open.
+ */
+export const ThreadMoving = z.object({ to: z.enum(["cloud", "mac"]), failed: z.string().nullable(), folder: z.string().nullish() });
 export type ThreadMoving = z.infer<typeof ThreadMoving>;
 
 /** What a thread under way to `machine` or the cloud says where it would take a message or another move; null otherwise. */

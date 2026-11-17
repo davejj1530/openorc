@@ -3,6 +3,7 @@ import type { MacProjectRow, MacProjects } from "@openorc/protocol";
 import { Button, Dialog, TextButton } from "../components/ui";
 import { ProjectEnvironmentDialog } from "../dialogs/ProjectEnvironmentDialog";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
+import { homeRelative } from "../lib/home-path";
 import { Failure } from "./settings-secret-field";
 import { SettingRow, Status } from "./settings-shared";
 
@@ -23,12 +24,6 @@ const pathParts = (folder: string) =>
       </span>
     </span>
   ));
-
-/** A folder's path with the home folder as ~, as the Finder's people read it. */
-function nearby(folder: string): string {
-  const home = /^\/Users\/[^/]+/.exec(folder)?.[0];
-  return home ? `~${folder.slice(home.length)}` : folder;
-}
 
 /** This Mac's mac projects and the folders that could be one; read again each second while a history is on its way. */
 export function useMacProjects(active: boolean) {
@@ -76,7 +71,7 @@ function RemoveMacProject({ project, onClose }: { project: MacProjectRow; onClos
 function hintOf(project: MacProjectRow) {
   if (project.sending.at === "sending") return `${megabytes(project.sending.sent)} of ${megabytes(project.sending.total)}`;
   if (project.sending.at === "failed") return <span className="text-bad">Couldn't send: {project.sending.error}</span>;
-  return project.folder ? <>No remote · {pathParts(nearby(project.folder))}</> : "No remote";
+  return project.folder ? <>No remote · {pathParts(homeRelative(project.folder))}</> : "No remote";
 }
 
 /** One Personal project from a folder of this Mac: its history's way up, its environment, and Remove. */

@@ -5,7 +5,7 @@ import path from "node:path";
 import { claudeSessionFile, hostHome, packSession, unpackSession, type SessionId } from "@openorc/agents";
 import { cloudMoves, Db, LedgerWriter, listEvents, projects, runs, threads } from "@openorc/db";
 import type { ArrivalLine, Hosted } from "@openorc/hosted";
-import type { AgentEvent } from "@openorc/protocol";
+import { computerNames, type AgentEvent } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentSessions, type AgentHomes } from "./agent-sessions.js";
 import { CloudMoves } from "./cloud-moves.js";
@@ -142,7 +142,7 @@ function account() {
   return { hosted, sent, fail, rows, cloud };
 }
 
-function moves(hosted: Hosted, deleted: string[] = [], changed: (id: string) => void = () => {}) {
+function moves(hosted: Hosted, deleted: string[] = [], changed: (id: string) => void = () => {}, platform = "darwin") {
   return new CloudMoves({
     db,
     hosted: () => hosted,
@@ -154,7 +154,7 @@ function moves(hosted: Hosted, deleted: string[] = [], changed: (id: string) => 
       threads.delete(db, id);
     },
     changed,
-    machine: "this Mac",
+    here: computerNames(platform),
     log: quiet,
   });
 }
@@ -342,7 +342,11 @@ describe("a cloud thread moving to this Mac", () => {
     await writeFile(path.join(at, "MINE.md"), "someone's own work\n");
     await service.move(id, false);
     await settled(id);
-    expect(cloudMoves.moving(db, id)).toEqual({ to: "mac", failed: `A folder for this thread is already at ${at} with other work in it. Move that work aside, then try again.` });
+    expect(cloudMoves.moving(db, id)).toEqual({
+      to: "mac",
+      failed: "A folder for this thread is already where its worktree goes, with other work in it. Move that work aside, then try again.",
+      folder: at,
+    });
     expect(made.sent.away).toEqual([]);
     expect(threads.get(db, id)).toBeNull();
     expect(await readFile(path.join(at, "MINE.md"), "utf8")).toBe("someone's own work\n");
@@ -354,5 +358,14 @@ describe("a cloud thread moving to this Mac", () => {
     const id = await cloudThread(made, project);
     made.rows.set(id, { ...made.rows.get(id)!, space: "acme" });
     expect(await moves(made.hosted).check(id)).toEqual({ to: "mac", can: false, reason: "Only a thread in your own space can move to this Mac." });
+  });
+
+  it("names this computer as the app does where it isn't a Mac", async () => {
+    const project = projects.insert(db, { name: "App", rootPath: folder, gitRemote: "https://github.com/acme/app.git", defaultBranch: "main", settings: {} });
+    const made = account();
+    const id = await cloudThread(made, project);
+    made.rows.set(id, { ...made.rows.get(id)!, space: "team" });
+    expect(await moves(made.hosted, [], () => {}, "linux").check(id)).toEqual({ to: "mac", can: false, reason: "Only a thread in your own space can move to this computer." });
+    expect(await moves(made.hosted, [], () => {}, "win32").check(id)).toEqual({ to: "mac", can: false, reason: "Only a thread in your own space can move to this PC." });
   });
 });

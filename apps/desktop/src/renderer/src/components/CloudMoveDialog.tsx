@@ -38,13 +38,30 @@ export function useCloudMove(thread: Pick<ThreadSummary, "id" | "projectId" | "a
   return { to: "cloud", held: gate.blocked?.words ?? (check.can ? null : check.reason), space: team, ends: [] };
 }
 
-/** One confirm for a thread moving between this computer and OpenOrc Cloud: where it lands, and what leaving its cloud machine ends. */
-export function CloudMoveDialog() {
-  const id = useUi((state) => state.cloudMoveThreadId);
-  return id ? <MoveDialog key={id} threadId={id} /> : null;
+/**
+ * Starts a thread's move. A move can be undone by moving back, so it asks first only when there is something to know:
+ * a team's space it lands in, or what leaving its cloud machine ends (also when that turns up only as it starts). A
+ * start that fails opens the confirm with why.
+ */
+export function useStartCloudMove(): (threadId: string, offer: CloudMoveOffer | null) => void {
+  const move = useRpcMutation("threads.move");
+  return (threadId, offer) => {
+    const ui = useUi.getState();
+    if (offer?.space || offer?.ends.length) return ui.setCloudMove(threadId);
+    move.mutateAsync({ threadId, endsOk: false }).then(
+      (started) => ("confirm" in started ? ui.setCloudMove(threadId) : undefined),
+      (error: unknown) => ui.setCloudMove(threadId, error instanceof Error ? error.message : String(error)),
+    );
+  };
 }
 
-function MoveDialog({ threadId }: { threadId: string }) {
+/** The confirm for a thread moving between this computer and OpenOrc Cloud: the team's space it lands in, and what leaving its cloud machine ends. */
+export function CloudMoveDialog() {
+  const asked = useUi((state) => state.cloudMove);
+  return asked ? <MoveDialog key={asked.threadId} threadId={asked.threadId} failed={asked.error} /> : null;
+}
+
+function MoveDialog({ threadId, failed }: { threadId: string; failed: string | null }) {
   const thread = useRpc("threads.get", { id: threadId }).data;
   const offer = useCloudMove(thread ?? undefined, threadId);
   const move = useRpcMutation("threads.move");
@@ -57,12 +74,11 @@ function MoveDialog({ threadId }: { threadId: string }) {
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : close())} title={to === "cloud" ? "Move to OpenOrc Cloud?" : `Move to ${thisComputer}?`} width={480}>
       <div>
-        {thread ? <p className="mb-3 text-sm text-ink-3 break-words">{thread.title}</p> : null}
         {offer?.space ? <p className="mb-3 text-base text-ink-2 break-words">Everyone in {offer.space} can read it there.</p> : null}
         {offer?.ends.length ? <p className="mb-3 text-base text-ink-2 break-words">Leaving its cloud machine ends {listed(offer.ends)}.</p> : null}
-        {offer?.held || move.error ? (
+        {offer?.held || move.error || failed ? (
           <p role="alert" className="mb-3 text-sm text-bad break-words">
-            {move.error?.message ?? offer?.held}
+            {move.error?.message ?? offer?.held ?? failed}
           </p>
         ) : null}
         <div className="mt-5 flex justify-end gap-2">

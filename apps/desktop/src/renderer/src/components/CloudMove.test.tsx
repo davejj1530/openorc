@@ -2,7 +2,7 @@ import { Menu } from "@base-ui/react/menu";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { MOVING_TO_CLOUD, type AccountStatus, type CloudMoveCheck, type RpcMethod, type RpcResults, type SpacesStatus, type ThreadSummary } from "@openorc/protocol";
+import { MOVING_TO_CLOUD, type AccountStatus, type CloudMoveCheck, type CloudMoveStart, type RpcMethod, type RpcResults, type SpacesStatus, type ThreadSummary } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { queryClient } from "../lib/client";
@@ -53,6 +53,7 @@ const spaces = {
 } as unknown as SpacesStatus;
 
 let check: CloudMoveCheck;
+let moveAnswer: CloudMoveStart;
 let account: AccountStatus;
 
 beforeEach(() => {
@@ -61,12 +62,13 @@ beforeEach(() => {
   useUi.getState().setCloudMove(null);
   check = { to: "cloud", can: true, space: { id: "personal", personal: true } };
   account = pro;
+  moveAnswer = { started: true };
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M, params?: unknown): Promise<RpcResults[M]> => {
     const answer: Partial<Record<RpcMethod, unknown>> = {
       "threads.moveCheck": check,
       "account.status": account,
       "threads.get": (params as { id: string }).id === cloudThread.id ? cloudThread : macThread,
-      "threads.move": { started: true },
+      "threads.move": moveAnswer,
       "threads.moveDismiss": null,
       "projects.checkoutBranch": "main",
       "projects.get": null,
@@ -112,27 +114,38 @@ function openMenu(thread: ThreadSummary) {
 const settled = () => vi.waitFor(() => expect(queryClient.isFetching()).toBe(0));
 const moves = () => vi.mocked(core.call).mock.calls.filter(([method]) => method === "threads.move");
 
-it("moves a Mac thread to OpenOrc Cloud from its branch's submenu, through one confirm", async () => {
+it("moves a Mac thread of the person's own space to OpenOrc Cloud from its branch's submenu, asking nothing", async () => {
+  openMenu(macThread);
+  fireEvent.click(screen.getByText("example"));
+  await settled();
+  fireEvent.click(screen.getByRole("menuitem", { name: /Move to OpenOrc Cloud/ }));
+  await vi.waitFor(() => expect(moves()).toEqual([["threads.move", { threadId: macThread.id, endsOk: false }]]));
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("names the team's space a move to the cloud lands in before the move", async () => {
+  check = { to: "cloud", can: true, space: { id: "acme", personal: false } };
   openMenu(macThread);
   fireEvent.click(screen.getByText("example"));
   await settled();
   fireEvent.click(screen.getByRole("menuitem", { name: /Move to OpenOrc Cloud/ }));
   const dialog = await screen.findByRole("dialog", { name: "Move to OpenOrc Cloud?" });
-  expect(await within(dialog).findByText(macThread.title)).toBeTruthy();
+  expect(await within(dialog).findByText("Everyone in Acme Robotics can read it there.")).toBeTruthy();
   const move = within(dialog).getByRole("button", { name: "Move" });
   await vi.waitFor(() => expect(move.hasAttribute("disabled")).toBe(false));
-  expect(within(dialog).queryByText(/can read it there/)).toBeNull();
   fireEvent.click(move);
   await vi.waitFor(() => expect(moves()).toEqual([["threads.move", { threadId: macThread.id, endsOk: true }]]));
-  await vi.waitFor(() => expect(useUi.getState().cloudMoveThreadId).toBeNull());
+  await vi.waitFor(() => expect(useUi.getState().cloudMove).toBeNull());
 });
 
-it("names the team's space a move to the cloud lands in before the move", async () => {
-  check = { to: "cloud", can: true, space: { id: "acme", personal: false } };
-  useUi.getState().setCloudMove(macThread.id);
-  mount(null);
-  const dialog = await screen.findByRole("dialog", { name: "Move to OpenOrc Cloud?" });
-  expect(await within(dialog).findByText("Everyone in Acme Robotics can read it there.")).toBeTruthy();
+it("asks after all when leaving the cloud machine turns out to end something as the move starts", async () => {
+  check = { to: "mac", can: true, ends: [] };
+  moveAnswer = { confirm: ["pnpm dev"] };
+  openMenu(cloudThread);
+  fireEvent.click(screen.getByText("OpenOrc Cloud"));
+  await settled();
+  fireEvent.click(screen.getByRole("menuitem", { name: /Move to Mac/ }));
+  await vi.waitFor(() => expect(useUi.getState().cloudMove).toEqual({ threadId: cloudThread.id, error: null }));
 });
 
 it("holds a move to the cloud with the words a cloud start is held with", async () => {
@@ -209,6 +222,19 @@ it("says why a move stopped above the composer, puts it away, and moves again", 
   expect(screen.getByRole("status", { name: "Move" }).textContent).toContain("Didn't move to OpenOrc Cloud. The thread didn't leave its cloud machine in time.");
   fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
   await vi.waitFor(() => expect(vi.mocked(core.call)).toHaveBeenCalledWith("threads.moveDismiss", { threadId: macThread.id }));
+  await settled();
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-  expect(await screen.findByRole("dialog", { name: "Move to OpenOrc Cloud?" })).toBeTruthy();
+  await vi.waitFor(() => expect(moves()).toEqual([["threads.move", { threadId: macThread.id, endsOk: false }]]));
+});
+
+it("names the folder that stopped a move as the person reads paths, and opens it", async () => {
+  const folder = "/Users/ada/Library/Application Support/OpenOrc/worktrees/app-1a2b3c/thread-fix-the-login-6f1c2d";
+  const revealFile = vi.fn();
+  Object.assign(window, { openorc: { ...window.openorc, revealFile } });
+  mount(<Composer thread={{ ...cloudThread, moving: { to: "mac", failed: "A folder for this thread is already where its worktree goes, with other work in it.", folder } }} />);
+  const path = screen.getByRole("button", { name: `Show in Finder: ${folder}` });
+  expect(path.textContent).toBe("~/Library/Application Support/OpenOrc/worktrees/app-1a2b3c/thread-fix-the-login-6f1c2d");
+  expect(path.getAttribute("data-tip")).toBe(folder);
+  fireEvent.click(path);
+  expect(revealFile).toHaveBeenCalledWith(folder);
 });

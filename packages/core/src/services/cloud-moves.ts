@@ -25,7 +25,19 @@ import { packSession, SessionRefused, unpackSession, type PackedSession } from "
 import { cloudMoves, listEvents, orclings, projects, runs, threads, type CloudMove, type Db, type LedgerWriter } from "@openorc/db";
 import { bringIntoFolder, git } from "@openorc/git";
 import type { ArrivalLine, ArrivalSettings, Hosted } from "@openorc/hosted";
-import { harnessShortName, isHostedAgent, movingHold, WORKSPACE_ID, type AgentEvent, type CloudMoveCheck, type CloudMoveStart, type Project, type Thread, type ThreadMoving } from "@openorc/protocol";
+import {
+  harnessShortName,
+  isHostedAgent,
+  movingHold,
+  WORKSPACE_ID,
+  type AgentEvent,
+  type CloudMoveCheck,
+  type CloudMoveStart,
+  type ComputerNames,
+  type Project,
+  type Thread,
+  type ThreadMoving,
+} from "@openorc/protocol";
 import type { AgentSessions } from "./agent-sessions.js";
 import { packProject, uploadOf } from "./mac-work.js";
 import type { WorkspaceService } from "./workspace.js";
@@ -33,8 +45,13 @@ import type { WorkspaceService } from "./workspace.js";
 const WORKING = "The agent is still working. Move it once it stops.";
 const NOT_IN_CLOUD = "Add this project to OpenOrc Cloud in Settings first.";
 const SIGN_IN = "Sign in to OpenOrc to move this thread.";
-const ONLY_OWN_SPACE = "Only a thread in your own space can move to this Mac.";
-const NOT_HERE = "This project isn't on this Mac.";
+/** A folder here where the thread's worktree goes, holding work of its own: a move never overwrites it. */
+class FolderInTheWay extends Error {
+  constructor(readonly folder: string) {
+    super("A folder for this thread is already where its worktree goes, with other work in it. Move that work aside, then try again.");
+  }
+}
+
 /** How long a move to this Mac waits for the thread to leave its cloud machine with a save. */
 const CURRENT_MS = 3 * 60_000;
 /** How long a move waits for this Mac's list of cloud threads to take the thread in, or let it go. */
@@ -56,7 +73,8 @@ export interface CloudMovesDeps {
   /** The thread's place changed: its lists and its own view read it again. */
   changed(threadId: string): void;
   /** This Mac's name, for what a move to it says. */
-  machine: string;
+  /** What the app calls this computer, in the words a move says. */
+  here: ComputerNames;
   now?: () => number;
   log: { info(message: string): void; warn(message: string): void };
 }
@@ -83,7 +101,7 @@ export class CloudMoves {
     const thread = threads.get(this.deps.db, threadId);
     if (!thread || thread.projectId === WORKSPACE_ID || thread.parentRelation === "subagent" || this.ofTask(threadId) || orclings.forThread(this.deps.db, threadId)) return { to: "none" };
     const held = (reason: string): CloudMoveCheck => ({ to: "cloud", can: false, reason });
-    const moving = movingHold(this.moving(threadId), this.deps.machine);
+    const moving = movingHold(this.moving(threadId), this.deps.here.machine);
     if (moving) return held(moving);
     if (!hosted || hosted.spaces.status().state !== "ready") return held(SIGN_IN);
     if (!isHostedAgent(thread.agent)) return held(`${harnessShortName(thread.agent)} doesn't run on OpenOrc Cloud.`);
@@ -98,11 +116,11 @@ export class CloudMoves {
     const held = (reason: string): CloudMoveCheck => ({ to: "mac", can: false, reason });
     const row = hosted.threads.row!(threadId);
     const status = hosted.spaces.status();
-    const moving = movingHold(this.moving(threadId), this.deps.machine);
+    const moving = movingHold(this.moving(threadId), this.deps.here.machine);
     if (moving) return held(moving);
-    if (status.state !== "ready" || row.space !== status.personalSpaceId) return held(ONLY_OWN_SPACE);
+    if (status.state !== "ready" || row.space !== status.personalSpaceId) return held(`Only a thread in your own space can move to ${this.deps.here.thisComputer}.`);
     const local = this.localProjectOf(hosted, threadId);
-    if (!local) return held(NOT_HERE);
+    if (!local) return held(`This project isn't on ${this.deps.here.thisComputer}.`);
     try {
       this.deps.sessions.assertTakeable({ id: threadId, agent: row.settings.agent, claudeAccountId: null, children: [] });
     } catch (error) {
@@ -259,8 +277,8 @@ export class CloudMoves {
       await hosted.moves.movedAway(row.space, threadId);
     } catch (error) {
       if (written) await this.deps.deleteThread(threadId).catch(() => undefined);
-      this.step(move, { phase: "abandoned", step: null, error: words(error) });
-      this.deps.log.warn(`thread ${threadId} didn't move to ${this.deps.machine}: ${words(error)}`);
+      this.step(move, { phase: "abandoned", step: null, error: words(error), folder: error instanceof FolderInTheWay ? error.folder : null });
+      this.deps.log.warn(`thread ${threadId} didn't move to ${this.deps.here.thisComputer}: ${words(error)}`);
       return;
     } finally {
       await rm(temp, { recursive: true, force: true });
@@ -272,6 +290,8 @@ export class CloudMoves {
 
   /** A thread whose cloud folder held nothing beyond its base works here from that base, in a worktree of its own. */
   private async worktreeAt(thread: Thread, project: Project, base: string | null): Promise<void> {
+    const folder = this.deps.workspaces.threadPath(thread, project);
+    if (await stat(folder).catch(() => null)) throw new FolderInTheWay(folder);
     const held = base !== null && (await git(project.rootPath, ["cat-file", "-e", `${base}^{commit}`], { okCodes: [0, 1, 128] })).code === 0;
     await this.deps.workspaces.prepareThread(thread, project, held ? base : undefined);
   }
@@ -345,7 +365,7 @@ export class CloudMoves {
     if (await stat(folder).catch(() => null)) {
       const branch = (await git(folder, ["symbolic-ref", "--quiet", "--short", "HEAD"], { okCodes: [0, 1, 128] })).stdout.trim();
       const changed = (await git(folder, ["status", "--porcelain"], { okCodes: [0, 128] })).stdout.trim();
-      if (branch !== placed.branch || changed) throw new Error(`A folder for this thread is already at ${folder} with other work in it. Move that work aside, then try again.`);
+      if (branch !== placed.branch || changed) throw new FolderInTheWay(folder);
       threads.update(this.deps.db, thread.id, { worktreePath: folder });
     } else {
       await this.deps.workspaces.prepareThread(named, project, placed.branch);

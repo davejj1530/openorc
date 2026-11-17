@@ -15,6 +15,7 @@ import { Text } from "../ui/Text";
 import { openInApp } from "../ui/web";
 import { chatItems, type ChatItem } from "./chat-items";
 import { useChatLease } from "./lease";
+import { useMessageReveal, type ChatJump } from "./reveal";
 import { Reactions } from "./Reactions";
 
 /** A message the draft began, on its way or kept after it did not go. */
@@ -216,7 +217,7 @@ function ChatComposer({ target, title, failure, self, onSend, onFocus }: { targe
 }
 
 /** One conversation of the organization's chat, in the desktop's shape: its messages live, earlier ones a tap away, and a composer that keeps its draft. */
-function Conversation({ lease, conversationId, title, newFrom }: { lease: TeamChatLease; conversationId: string; title: string; newFrom: number | null }) {
+function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: TeamChatLease; conversationId: string; title: string; newFrom: number | null; jump: ChatJump | null }) {
   const insets = useSafeAreaInsets();
   const target = useMemo(() => ({ accountId: lease.accountId, spaceId: lease.spaceId, conversationId }), [lease, conversationId]);
   teamChat.useWatch(lease, conversationId);
@@ -226,9 +227,12 @@ function Conversation({ lease, conversationId, title, newFrom }: { lease: TeamCh
   const chat = state?.state === "ready" ? state.chat : null;
   const joined = chat?.conversations.find((each) => each.id === conversationId)?.joined === true;
   const list = useRef<ScrollViewInstance>(null);
-  // Following the end until the reader scrolls up; an unread conversation opens at its New messages line instead.
-  const atEnd = useRef(true);
-  const opened = useRef(false);
+  // Following the end until the reader scrolls up; an unread conversation opens at its New messages line instead, and
+  // a search hit at its message.
+  const atEnd = useRef(jump === null);
+  const opened = useRef(jump !== null);
+  const revealId = useMessageReveal(lease, conversationId, timeline.data, jump);
+  const revealed = useRef(false);
   const messages = useMemo(() => timeline.data?.messages ?? [], [timeline.data]);
   const sent = new Set(messages.map((message) => message.id));
   const items = useMemo(() => chatItems(messages, lease.accountId, newFrom), [messages, lease.accountId, newFrom]);
@@ -249,6 +253,11 @@ function Conversation({ lease, conversationId, title, newFrom }: { lease: TeamCh
     if (!message) return;
     atEnd.current = true;
     send(message);
+  };
+  const revealAt = (y: number) => {
+    if (revealed.current) return;
+    revealed.current = true;
+    list.current?.scrollTo({ y: Math.max(0, y - 96), animated: false });
   };
   const openAtNew = (y: number) => {
     if (opened.current) return;
@@ -279,7 +288,7 @@ function Conversation({ lease, conversationId, title, newFrom }: { lease: TeamCh
         {timeline.error ? <Text className="px-5 py-10 text-center text-ink-4">{timeline.error.message}</Text> : null}
         {timeline.data && !messages.length && !draft.pending.length ? <Text className="py-10 text-center text-ink-4">No messages yet</Text> : null}
         {items.map((item) => (
-          <View key={item.key} style={{ paddingTop: item.gap }}>
+          <View key={item.key} style={{ paddingTop: item.gap }} onLayout={"message" in item && item.message.id === revealId ? ({ nativeEvent }) => revealAt(nativeEvent.layout.y) : undefined}>
             <Row item={item} moves={moves} onNew={openAtNew} />
           </View>
         ))}
@@ -312,7 +321,8 @@ const conversationTitle = (conversation: TeamConversation, self: string): string
 
 /** A conversation of the shown organization's team chat, pushed over Home from its Chat tab, named as the list names it. */
 export function ChatScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, message, seq } = useLocalSearchParams<{ id: string; message?: string; seq?: string }>();
+  const jump = useMemo(() => (message && seq ? { id: message, seq: Number(seq) } : null), [message, seq]);
   const lease = useChatLease();
   const state = teamChat.useChatState(lease).data;
   const conversation = state?.state === "ready" ? state.chat.conversations.find((each) => each.id === id) : undefined;
@@ -325,7 +335,11 @@ export function ChatScreen() {
   return (
     <>
       <Stack.Screen options={{ headerTitle: title }} />
-      {lease && newFrom !== undefined ? <Conversation key={`${lease.generation}:${id}`} lease={lease} conversationId={id} title={title} newFrom={newFrom} /> : <View className="flex-1 bg-bg" />}
+      {lease && newFrom !== undefined ? (
+        <Conversation key={`${lease.generation}:${id}`} lease={lease} conversationId={id} title={title} newFrom={newFrom} jump={jump} />
+      ) : (
+        <View className="flex-1 bg-bg" />
+      )}
     </>
   );
 }

@@ -8,6 +8,7 @@ import { failureMessage } from "../failure";
 import { ListPressable } from "../ui/ListPressable";
 import { Text } from "../ui/Text";
 import { ConversationFace, type ChatPresence } from "./ChatFace";
+import { ChatSearchField, ChatSearchHits, SHORTEST_SEARCH } from "./ChatSearch";
 
 /** One conversation: its face, its title, and what is unread in it, an @ where it tags the person. */
 function ChatRow({ row, self, presence, onOpen }: { row: TeamChatListRow; self: string; presence: ChatPresence; onOpen: (row: TeamChatListRow) => void }) {
@@ -38,7 +39,10 @@ export function ChatList({ lease, top, bottom }: { lease: TeamChatLease; top: nu
   const state = teamChat.useChatState(lease);
   const [failure, setFailure] = useState<string | null>(null);
   const rows = teamChatList(state.data, lease.accountId);
-  const presence = teamChat.usePresence(lease, state.data?.state === "ready" && state.data.chat.features.includes("presence"));
+  const chat = state.data?.state === "ready" ? state.data.chat : null;
+  const presence = teamChat.usePresence(lease, Boolean(chat?.features.includes("presence")));
+  const [query, setQuery] = useState("");
+  const searching = query.trim().length >= SHORTEST_SEARCH;
   const open = async (row: TeamChatListRow) => {
     setFailure(null);
     try {
@@ -49,12 +53,20 @@ export function ChatList({ lease, top, bottom }: { lease: TeamChatLease; top: nu
     }
   };
   return (
-    <ScrollView contentContainerStyle={{ paddingTop: insets.top + top, paddingBottom: insets.bottom + bottom }} accessibilityLabel="Chat">
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      contentContainerStyle={{ paddingTop: insets.top + top, paddingBottom: insets.bottom + bottom }}
+      accessibilityLabel="Chat"
+    >
       {failure ? <Text className="px-5 pb-2 text-sm text-bad">{failure}</Text> : null}
       {state.error ? <Text className="px-5 py-10 text-center text-ink-4">{state.error.message}</Text> : null}
-      {rows.map((row) => (
-        <ChatRow key={row.id} row={row} self={lease.accountId} presence={presence} onOpen={(each) => void open(each)} />
-      ))}
+      {chat?.features.includes("search") ? <ChatSearchField query={query} onChange={setQuery} /> : null}
+      {searching && chat ? (
+        <ChatSearchHits lease={lease} query={query} conversations={chat.conversations} />
+      ) : (
+        rows.map((row) => <ChatRow key={row.id} row={row} self={lease.accountId} presence={presence} onOpen={(each) => void open(each)} />)
+      )}
     </ScrollView>
   );
 }

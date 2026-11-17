@@ -1,6 +1,6 @@
 import { onlineTaskTags } from "@openorc/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import type { OnlineTaskExecutionRpcResults, OnlineTaskRef, OnlineTaskRpcResults, RpcParams, RpcResults } from "@openorc/protocol";
+import type { OnlineTaskAvailability, OnlineTaskExecutionRpcResults, OnlineTaskRef, OnlineTaskRpcResults, RpcParams, RpcResults } from "@openorc/protocol";
 import { core } from "./rpc";
 import { invalidateTags } from "./client";
 import { useSpaceNavigation } from "./space-navigation";
@@ -30,13 +30,27 @@ export function useTaskOnlineMutation<M extends Method>(scope: TaskOnlineScope, 
     onSuccess: (_result, input) => invalidateTags(taskOnlineTags(input.spaceId), { immediate: true }),
   });
 }
-/** No online request is added to the unchanged, unscoped Personal screen. */
-export function useTaskOnlineScope() {
+/** Whether a space is the person's own Personal one, whose tasks nobody else reads, so none is assigned. */
+export function usePersonalSpace(spaceId: string): boolean {
+  return useSpaceNavigation((state) => state.inventory.find((space) => space.id === spaceId)?.personal === true);
+}
+
+/**
+ * The current space's tasks on OpenOrc Cloud. An organization's are its whole list; the person's Personal space's own sit
+ * beside this Mac's tasks (`personal`), with no assignment, since nobody else reads them. Signed out, there are none.
+ */
+export function useTaskOnlineScope(): {
+  scope: (TaskOnlineScope & { personal: boolean }) | null;
+  availability: OnlineTaskAvailability | null;
+  status: ReturnType<typeof useTaskOnlineQuery<"tasks.online.state">>;
+} {
   const space = useSpaceNavigation((state) => state.inventory.find((space) => space.id === state.current));
-  const gate = useTaskContentGate(space && !space.personal ? space.id : null);
-  const enabled = Boolean(space?.accountId && !space.personal && gate.allowed);
+  const personal = Boolean(space?.personal);
+  // A Personal space waits for the same account read as an organization's, which lists it as the person's own.
+  const gate = useTaskContentGate(space?.id ?? null);
+  const enabled = Boolean(space?.accountId && gate.allowed);
   const candidate = enabled && space?.accountId ? { accountId: space.accountId, spaceId: space.id } : null;
   const status = useTaskOnlineQuery(candidate, "tasks.online.state", { spaceId: space?.id ?? "" });
   const ready = enabled && !status.error && status.data?.state === "ready" && status.data.accountId === space?.accountId ? status.data : null;
-  return { scope: ready ? { accountId: ready.accountId, spaceId: ready.spaceId } : null, availability: ready, status };
+  return { scope: ready ? { accountId: ready.accountId, spaceId: ready.spaceId, personal } : null, availability: ready, status };
 }

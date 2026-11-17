@@ -104,7 +104,8 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
 
 function NewTaskSource({ projectId, threadId }: { projectId?: string; threadId?: string }) {
   const { scope, status } = useTaskOnlineScope();
-  if (scope) return <OnlineNewTask key={JSON.stringify([scope.accountId, scope.spaceId, projectId, threadId])} scope={scope} projectId={projectId} threadId={threadId} />;
+  // A Personal task is this Mac's, as it always was; its cloud agents add tasks of their own beside it.
+  if (scope && !scope.personal) return <OnlineNewTask key={JSON.stringify([scope.accountId, scope.spaceId, projectId, threadId])} scope={scope} projectId={projectId} threadId={threadId} />;
   if (status.isLoading) return <div className="document-skeleton" aria-label="Loading projects" />;
   if (status.error)
     return (

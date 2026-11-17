@@ -50,7 +50,9 @@ export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
 function TaskListContent({ onNewTask }: { onNewTask: () => void }) {
   const projectId = useLayout(focusedProject);
   const { scope } = useTaskOnlineScope();
-  const filters = useTaskListFilters(scope);
+  // An organization's tasks are assigned and filtered by project; Personal ones are nobody else's.
+  const shared = scope && !scope.personal ? scope : null;
+  const filters = useTaskListFilters(shared);
   const tasks = useTaskListSource(projectId, filters.assigned, filters.shelf);
   const projects = useSpaceProjects();
   const { shelf, stage } = filters;
@@ -61,7 +63,7 @@ function TaskListContent({ onNewTask }: { onNewTask: () => void }) {
       <TopBar
         actions={
           <>
-            {scope && filters.assigned ? (
+            {shared && filters.assigned ? (
               <Button size="sm" onClick={() => filters.patch({ assigned: false })}>
                 Assigned to me <X size={12} />
               </Button>
@@ -72,8 +74,8 @@ function TaskListContent({ onNewTask }: { onNewTask: () => void }) {
               stage={stage}
               onShelf={(value) => filters.patch({ shelf: value, stage: null })}
               onStage={(value) => filters.patch({ stage: value })}
-              assignment={scope ? { value: filters.assigned, onChange: (value) => filters.patch({ assigned: value }) } : undefined}
-              project={scope ? { id: projectId, projects: projects.data ?? [], onChange: (id) => useLayout.getState().setWorkspace(id ?? ALL_WORKSPACES) } : undefined}
+              assignment={shared ? { value: filters.assigned, onChange: (value) => filters.patch({ assigned: value }) } : undefined}
+              project={shared ? { id: projectId, projects: projects.data ?? [], onChange: (id) => useLayout.getState().setWorkspace(id ?? ALL_WORKSPACES) } : undefined}
             />
             <Button variant="primary" size="lg" className="ml-1 pl-2.5" onClick={onNewTask}>
               <Plus size={14} />

@@ -151,3 +151,56 @@ it("replaces an open protected document with the shared frozen screen while reta
   ).toHaveLength(0);
   expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "tasks.update" || method === "tasks.online.update")).toBe(false);
 });
+
+it("lists the person's own Personal cloud tasks beside this Mac's, with no assignment, and opens one with no assignee", async () => {
+  navigation.inventory = [...navigation.inventory, { id: "personal-a", accountId: "account-a", personal: true, projects: [], threads: [], taskIds: [] }];
+  navigation.current = "personal-a";
+  // As the server lists them: one Personal space, beside the organizations.
+  access = { ...access, spaces: [...access.spaces, { id: "personal-a", kind: "personal" }] };
+  const personal = { ...onlineReference, spaceId: "personal-a", id: "task-personal" };
+  const mine = onlineTask({ id: personal.id, spaceId: personal.spaceId, title: "Draft the launch post" });
+  const local = {
+    id: "local-task",
+    projectId: "project-a",
+    title: "Tidy the README",
+    spec: null,
+    status: "backlog",
+    priority: "none",
+    labels: [],
+    workspaceMode: "current",
+    baseRef: null,
+    baseSha: null,
+    branch: null,
+    worktreePath: null,
+    parentTaskId: null,
+    threadId: null,
+    executionThreadId: null,
+    origin: "user",
+    reviewedSnapshotId: null,
+    costUsd: 0,
+    createdAt: 1,
+    updatedAt: 1,
+    completedAt: null,
+  };
+  vi.mocked(core.call).mockImplementation(async (method) => {
+    if (method === "spaces.refresh") return { ...access, heardAt: Date.now() };
+    if (method === "tasks.online.state") return { state: "ready", accountId: "account-a", spaceId: "personal-a", execution: false, personal: true };
+    if (method === "tasks.online.list") return { accessRevision: 1, tasks: [mine], cursor: null };
+    if (method === "tasks.online.get" || method === "tasks.online.seen") return { accessRevision: 1, task: mine };
+    if (method === "tasks.online.attention") return { accessRevision: 1, count: 0 };
+    if (method === "tasks.online.context") return { accessRevision: 1, task: mine, context: null };
+    if (method === "tasks.list") return [local];
+    if (method === "spaces.projects" || method === "projects.list") return [];
+    throw new Error(`Unexpected RPC: ${method}`);
+  });
+  const list = render(wrap(<TaskListView onNewTask={() => {}} />));
+  expect(await screen.findByText("Draft the launch post")).toBeTruthy();
+  expect(screen.getByText("Tidy the README")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /^Filter tasks/ }));
+  await screen.findAllByRole("menuitemradio");
+  expect(screen.queryByText("Assigned to me")).toBeNull();
+  list.unmount();
+  render(wrap(<OnlineTaskView reference={personal} tab="spec" />));
+  await screen.findByRole("textbox", { name: "Task title" });
+  expect(screen.queryByRole("button", { name: /^Assignee/ })).toBeNull();
+});

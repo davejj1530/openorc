@@ -10,6 +10,7 @@ import { TaskSaveConflict } from "./TaskSaveConflict";
 import { TaskLinks } from "./TaskLinks";
 import { TaskOnlineDelete } from "./TaskDelete";
 import { TaskThreadLink } from "./TaskThreadLink";
+import { usePersonalSpace } from "../../lib/task-online-query";
 
 export function OnlineTaskDocument({
   reference,
@@ -24,6 +25,8 @@ export function OnlineTaskDocument({
 }) {
   const { controller, state, pending } = save;
   const task = state.task;
+  // A Personal task is the person's own: nobody else to assign it to.
+  const personal = usePersonalSpace(reference.spaceId);
   const document = useTaskDocumentDraft(task, {
     storageId: taskRefKey(reference),
     save: { mutateAsync: ({ patch }) => controller.save(patch), isPending: state.saving, error: state.error, edited: save.edited, clean: save.clean },
@@ -55,13 +58,15 @@ export function OnlineTaskDocument({
             disabled={!task.viewer.mayEdit}
             error={state.propertyError}
             assignee={
-              <TaskAssignee
-                scope={reference}
-                projectId={reference.projectId}
-                value={task.assignee}
-                disabled={pending || !task.viewer.mayEdit}
-                onChange={(person) => void controller.property({ assigneeMemberId: person?.memberId ?? null })}
-              />
+              personal ? undefined : (
+                <TaskAssignee
+                  scope={reference}
+                  projectId={reference.projectId}
+                  value={task.assignee}
+                  disabled={pending || !task.viewer.mayEdit}
+                  onChange={(person) => void controller.property({ assigneeMemberId: person?.memberId ?? null })}
+                />
+              )
             }
             imageUnavailableReason="Images aren’t available in shared task documents yet."
             onStatus={(status) => void controller.property({ status })}

@@ -360,8 +360,7 @@ export class CloudMoves {
       const reason = "This move stopped when OpenOrc closed. Try again.";
       try {
         if (move.direction === "to-cloud") {
-          const there = hosted?.threads.row?.(move.threadId);
-          if (there) {
+          if (hosted?.threads.holds({ thread: move.threadId })) {
             cloudMoves.set(this.deps.db, move.id, { phase: "done", step: null });
             await this.deps.deleteThread(move.threadId).catch(() => undefined);
           } else {
@@ -370,7 +369,7 @@ export class CloudMoves {
             if (move.phase === "sending" && hosted && space && status?.state === "ready") await hosted.moves.undo(space, move.threadId).catch(() => undefined);
             cloudMoves.set(this.deps.db, move.id, { phase: "abandoned", step: null, error: reason });
           }
-        } else if (move.phase === "received" && !hosted?.threads.row?.(move.threadId)) {
+        } else if (move.phase === "received" && !hosted?.threads.holds({ thread: move.threadId })) {
           cloudMoves.set(this.deps.db, move.id, { phase: "done", step: null });
         } else {
           if (move.phase === "received") await this.deps.deleteThread(move.threadId).catch(() => undefined);

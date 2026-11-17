@@ -214,6 +214,21 @@ describe("a thread moving from this Mac to OpenOrc Cloud", () => {
     expect(cloudMoves.moving(db, thread.id)).toBeNull();
   });
 
+  it("picks up a move OpenOrc closed on: one the server finished goes from this Mac, one it didn't stays here, undone there", async () => {
+    const { project, thread: finished } = await macThread();
+    const left = threads.insert(db, { projectId: project.id, title: "Draft the notes", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "current" });
+    const { hosted, sent } = account();
+    await hosted.moves.done("personal", finished.id);
+    cloudMoves.begin(db, { threadId: finished.id, direction: "to-cloud", projectId: project.id });
+    const cut = cloudMoves.begin(db, { threadId: left.id, direction: "to-cloud", projectId: project.id });
+    cloudMoves.set(db, cut.id, { phase: "sending", step: "history" });
+    const deleted: string[] = [];
+    await moves(hosted, deleted).resume();
+    expect(deleted).toEqual([finished.id]);
+    expect(sent.undone).toEqual([left.id]);
+    expect(cloudMoves.moving(db, left.id)).toEqual({ to: "cloud", failed: "This move stopped when OpenOrc closed. Try again." });
+  });
+
   it("holds a thread that isn't the account's to move, with why", async () => {
     const { thread } = await macThread();
     const { hosted } = account();

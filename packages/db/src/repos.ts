@@ -355,8 +355,11 @@ export interface ThreadInsert {
 }
 
 /** Raw rows remain available internally; user inventories exclude retired records. */
-/** A thread coming here from OpenOrc Cloud is its cloud thread's until it is whole here (thread-relocations.ts). */
-const ARRIVING = "SELECT thread_id FROM thread_relocations WHERE role = 'coordinator' AND direction = 'to-mac' AND phase IN ('asking', 'received')";
+/**
+ * A thread coming here from OpenOrc Cloud is hidden while its rows are written. Once they are whole it shows, and its
+ * reads still go to the cloud for as long as the cloud holds it, so it is never in neither place (thread-relocations.ts).
+ */
+const ARRIVING = "SELECT thread_id FROM thread_relocations WHERE role = 'coordinator' AND direction = 'to-mac' AND phase = 'asking'";
 const VISIBLE = `id NOT IN (${retiredThreadIds}) AND id NOT IN (${ARRIVING})`;
 
 export const threads = {

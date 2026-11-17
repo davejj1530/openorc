@@ -7,7 +7,7 @@ import type { Db } from "./database.js";
  * (relocation-schema.ts), one row per move, written by this Mac alone (role `coordinator`):
  *
  *   to-cloud   frozen (packing; the thread takes no message) -> sending (the arrival is made on the server) -> done
- *   to-mac     asking (the thread leaves its machine with a save) -> received (its rows are here, hidden) -> done
+ *   to-mac     asking (the thread leaves its machine with a save; its rows here hidden) -> received (whole here) -> done
  *
  * Either ends `abandoned` with the words why when it stops before its commit point, and the thread is where it was.
  * One open move per thread, by the table's own index.

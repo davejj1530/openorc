@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Db } from "./database.js";
+import { projects, threads } from "./repos.js";
 import { cloudMoves } from "./thread-relocations.js";
 
 let db: Db;
@@ -27,5 +28,15 @@ describe("this Mac's journal of a thread moving to and from the cloud", () => {
     expect(() => cloudMoves.set(db, back.id, { phase: "sending" })).toThrow();
     cloudMoves.forget(db, "t1");
     expect(cloudMoves.latest(db, "t1")).toBeNull();
+  });
+
+  it("hides a thread coming from the cloud while its rows are written, and shows it once they are whole", () => {
+    const project = projects.insert(db, { name: "App", rootPath: "/app", gitRemote: null, defaultBranch: "main", settings: {} });
+    const move = cloudMoves.begin(db, { threadId: "t2", direction: "to-mac", projectId: project.id });
+    threads.insert(db, { id: "t2", projectId: project.id, title: "From the cloud", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+    const listed = () => threads.list(db, {}).map((thread) => thread.id);
+    expect(listed()).toEqual([]);
+    cloudMoves.set(db, move.id, { phase: "received" });
+    expect(listed()).toEqual(["t2"]);
   });
 });

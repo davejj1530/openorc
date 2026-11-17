@@ -11,7 +11,8 @@
  *                  when something running would end, as Bring does); its save's commits come into the project's folder
  *                  as its branch, checked, and a worktree on it gets its uncommitted work back; its transcript becomes
  *                  a run here, its conversation is taken into the agent's folders with a resume check; all of it hidden
- *                  until the server lets the cloud thread go
+ *                  until whole, then shown while its reads still go to the cloud, until the server lets the cloud
+ *                  thread go and this Mac's list of cloud threads drops it
  *
  * This Mac's journal (`cloudMoves`, thread_relocations) says where each move stands. A move that stops before its
  * commit point is undone, the thread stays where it was, and its place row says why ("Didn't move: …").

@@ -5,15 +5,16 @@ import { cn } from "../lib/cn";
 import { useTeamChatVisible } from "../lib/team-chat-visibility";
 import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { Copy, SmilePlus } from "./icons";
-import { menuItem, menuPopup } from "./menu";
+import { menuPopup } from "./menu";
+import { TeamChatMessageActions, TeamChatMessageMenuItems } from "./TeamChatMessageControls";
 import { TeamChatFiles } from "./TeamChatFiles";
 import { TeamChatReactionPicker, TeamChatReactions } from "./TeamChatReactions";
+import { TeamChatReplyQuote } from "./TeamChatReplyQuote";
 import { defaultRehypePlugins } from "streamdown";
 import { holdPersonTags, personTagText, rehypePersonTags } from "../lib/rehype-person-tags";
 import { RichText } from "./RichText";
 import { ThreadRichText, threadMarkdownComponents, threadUrlTransform } from "./ThreadImages";
-import { Tooltip } from "./ui";
+import "../styles/team-chat-replies.css";
 
 export function TeamChatMessage({
   message,
@@ -21,12 +22,20 @@ export function TeamChatMessage({
   people,
   reason,
   onReact,
+  onReply,
+  onOpenAnswered,
+  found,
 }: {
   message: TeamMessage;
   self: string;
   people: readonly TeamChatPerson[];
   reason: string | null;
   onReact(emoji: TeamChatReaction): void;
+  /** Answering this message from the composer; absent where replies aren't available. */
+  onReply?: () => void;
+  onOpenAnswered?: () => void;
+  /** Shown in place just now, from a reply, a pin or a search. */
+  found?: true;
 }) {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -60,40 +69,31 @@ export function TeamChatMessage({
   return (
     <div
       ref={row}
-      className={cn("orcling-bubble-row team-chat-message", mine && "team-chat-message-mine", withFiles && "team-chat-message-files")}
+      className={cn("orcling-bubble-row team-chat-message", mine && "team-chat-message-mine", withFiles && "team-chat-message-files", message.replyTo && "team-chat-message-reply")}
       data-open={(open && !reason) || undefined}
+      data-found={found}
       data-message-id={message.id}
     >
-      <ContextMenu.Root open={menuOpen && visible} onOpenChange={setMenuOpen}>
-        <ContextMenu.Trigger className={cn("orcling-bubble", mine && "message-bubble")} tabIndex={0} aria-label={`${message.actor.person?.name ?? "Former member"}: ${words}`}>
-          <BubbleContent message={message} people={people} words={words} />
-          <TeamChatReactions reactions={message.reactions} people={people} self={self} onReact={onReact} reason={reason} side={mine ? "start" : "end"} />
-        </ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <CoversPreview />
-          <ContextMenu.Positioner collisionPadding={8} className="z-40">
-            <ContextMenu.Popup ref={floatingGround} className={menuPopup}>
-              <ContextMenu.Item className={menuItem} onClick={copy}>
-                <Copy size={14} />
-                Copy text
-              </ContextMenu.Item>
-              <Tooltip label={reason ?? "React"}>
-                <ContextMenu.Item className={menuItem} disabled={Boolean(reason)} onClick={() => setOpen(true)}>
-                  <SmilePlus size={14} />
-                  React
-                </ContextMenu.Item>
-              </Tooltip>
-            </ContextMenu.Popup>
-          </ContextMenu.Positioner>
-        </ContextMenu.Portal>
-      </ContextMenu.Root>
+      {message.replyTo ? <TeamChatReplyQuote answered={message.replyTo} self={self} people={people} onOpen={onOpenAnswered} /> : null}
+      <div className="team-chat-bubble-line">
+        <ContextMenu.Root open={menuOpen && visible} onOpenChange={setMenuOpen}>
+          <ContextMenu.Trigger className={cn("orcling-bubble", mine && "message-bubble")} tabIndex={0} aria-label={`${message.actor.person?.name ?? "Former member"}: ${words}`}>
+            <BubbleContent message={message} people={people} words={words} />
+            <TeamChatReactions reactions={message.reactions} people={people} self={self} onReact={onReact} reason={reason} side={mine ? "start" : "end"} />
+          </ContextMenu.Trigger>
+          <ContextMenu.Portal>
+            <CoversPreview />
+            <ContextMenu.Positioner collisionPadding={8} className="z-40">
+              <ContextMenu.Popup ref={floatingGround} className={menuPopup}>
+                <TeamChatMessageMenuItems reason={reason} onReply={onReply} onCopy={copy} onReact={() => setOpen(true)} />
+              </ContextMenu.Popup>
+            </ContextMenu.Positioner>
+          </ContextMenu.Portal>
+        </ContextMenu.Root>
+        <TeamChatMessageActions reason={reason} onReply={onReply} reacting={open} onReacting={setOpen} />
+        <TeamChatReactionPicker open={open && !reason} reactions={message.reactions} self={self} onReact={onReact} onClose={() => setOpen(false)} />
+      </div>
       {withFiles ? <TeamChatFiles files={message.files} conversationId={message.channelId} /> : null}
-      <Tooltip label={reason ?? "React"}>
-        <button type="button" className="orcling-react-open" aria-label="React" aria-expanded={open} disabled={Boolean(reason)} onClick={() => setOpen(!open)}>
-          <SmilePlus size={16} />
-        </button>
-      </Tooltip>
-      <TeamChatReactionPicker open={open && !reason} reactions={message.reactions} self={self} onReact={onReact} onClose={() => setOpen(false)} />
       {copyError ? (
         <span role="status" className="team-chat-message-error">
           Text could not be copied.

@@ -14,6 +14,7 @@ export async function sendTeamMessage(scope: TeamChatContextValue, target: TeamC
       id: message.id,
       body: message.body,
       ...(message.files.length && { fileIds: message.files.map((file) => file.id) }),
+      ...(message.replyTo && { replyToId: message.replyTo.id }),
     });
     if (!scope.current()) {
       teamChatDrafts.failed(target, message.id, "Delivery couldn't be confirmed.");

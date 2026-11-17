@@ -1,4 +1,4 @@
-import type { TeamChatFile, TeamConversation } from "@openorc/protocol";
+import type { TeamChatAnswered, TeamChatFile, TeamConversation } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { teamChatShortNames, teamConversationTitle } from "@openorc/client";
 import { TopBar } from "./TopBar";
@@ -25,6 +25,9 @@ export interface TeamChatProps extends TeamChatTranscriptProps {
   tags?: boolean;
   /** Where this conversation's files go, when the server's files capability is on and the person has joined. */
   files?: TeamChatComposerFiles | null;
+  /** The message the next send answers, and the way to answer none. */
+  replyTo?: TeamChatAnswered | null;
+  onCancelReply?: () => void;
 }
 export function TeamChat(props: TeamChatProps) {
   const title = teamConversationTitle(props.conversation, props.self);
@@ -75,6 +78,7 @@ export function TeamChat(props: TeamChatProps) {
               taggable={props.tags ? taggable(props.conversation, props.people, props.self) : []}
               named={props.tags ? props.people : []}
               files={props.files ?? null}
+              replying={props.replyTo && props.onCancelReply ? { answered: props.replyTo, self: props.self, people: props.people, onCancel: props.onCancelReply } : null}
             />
           ))
         : null}

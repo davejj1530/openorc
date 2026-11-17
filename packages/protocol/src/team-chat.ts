@@ -7,7 +7,7 @@ const id = z.string().min(1).max(200);
 const seq = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const TeamChatPerson = z.object({ id, name: z.string(), image: z.string().nullable() });
 export type TeamChatPerson = z.infer<typeof TeamChatPerson>;
-export const TeamChatFeature = z.enum(["base", "channels", "groups", "files", "presence", "unread", "orcling"]);
+export const TeamChatFeature = z.enum(["base", "channels", "groups", "files", "presence", "unread", "replies", "orcling"]);
 export type TeamChatFeature = z.infer<typeof TeamChatFeature>;
 export const TeamChatReaction = z.enum(["👍", "❤️", "😄", "🎉", "👀", "✅"]);
 export type TeamChatReaction = z.infer<typeof TeamChatReaction>;
@@ -54,6 +54,10 @@ export const TeamChatFile = z.object({
 });
 export type TeamChatFile = z.infer<typeof TeamChatFile>;
 
+/** The message a reply answers, as the reply shows it: who wrote it and its first words, empty when it is only files. */
+export const TeamChatAnswered = z.object({ id, seq, person: TeamChatPerson.nullable(), excerpt: z.string(), files: seq });
+export type TeamChatAnswered = z.infer<typeof TeamChatAnswered>;
+
 /** Human messages have their own projection, independent of work runs and agent events. */
 export const TeamMessage = z.object({
   id,
@@ -63,6 +67,8 @@ export const TeamMessage = z.object({
   body: z.string(),
   files: z.array(TeamChatFile),
   reactions: z.array(z.object({ emoji: z.string(), userIds: z.array(id) })),
+  /** A server without replies sends none. */
+  replyTo: TeamChatAnswered.nullable().default(null),
   call: z.null(),
   createdAt: z.iso.datetime(),
 });
@@ -74,13 +80,14 @@ export const PendingTeamMessage = z.object({
   id: z.uuid(),
   body: z.string(),
   files: z.array(TeamChatFile).max(10).default([]),
+  replyTo: TeamChatAnswered.nullable().default(null),
   createdAt: z.string(),
   state: z.enum(["sending", "failed"]),
   error: z.string().nullable(),
 });
 export type PendingTeamMessage = z.infer<typeof PendingTeamMessage>;
 /** Local words and stable send identities, without an authorized history cache. */
-export const TeamChatDraft = z.object({ text: z.string(), pending: z.array(PendingTeamMessage) });
+export const TeamChatDraft = z.object({ text: z.string(), replyTo: TeamChatAnswered.nullable().default(null), pending: z.array(PendingTeamMessage) });
 export type TeamChatDraft = z.infer<typeof TeamChatDraft>;
 export type TeamChatStatus = { state: "unavailable" } | { state: "ready"; accountId: string; spaceId: string; reach: "live" | "offline"; chat: TeamChatState };
 
@@ -96,7 +103,7 @@ export const teamChatRpcParams = {
     .strict()
     .refine((value) => value.beforeSeq === undefined || value.afterSeq === undefined),
   "teamChat.send": z
-    .object({ ...conversation, id: z.uuid(), body: z.string().max(10_000), fileIds: z.array(id).max(10).optional() })
+    .object({ ...conversation, id: z.uuid(), body: z.string().max(10_000), fileIds: z.array(id).max(10).optional(), replyToId: id.optional() })
     .strict()
     .refine((value) => value.body.trim().length > 0 || (value.fileIds?.length ?? 0) > 0, "Write something or attach a file."),
   "teamChat.react": z.object({ ...conversation, messageId: id, emoji: TeamChatReaction }).strict(),

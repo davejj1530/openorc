@@ -146,6 +146,7 @@ it("keeps a frozen draft while a late private page cannot enter the cache", asyn
     body: "Private history",
     files: [],
     reactions: [],
+    replyTo: null,
     call: null,
     createdAt: new Date(0).toISOString(),
   };
@@ -200,6 +201,7 @@ it("shows one bubble when an unconfirmed send is found by a live refresh", async
           body: String(params.body),
           files: [],
           reactions: [],
+          replyTo: null,
           call: null,
           createdAt: new Date(0).toISOString(),
         },
@@ -231,6 +233,7 @@ it("fills every missed page when reconnecting after more than sixty messages", a
     body: `Message ${index + 1}`,
     files: [],
     reactions: [],
+    replyTo: null,
     call: null,
     createdAt: new Date(0).toISOString(),
   }));

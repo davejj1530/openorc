@@ -21,6 +21,7 @@ export function TeamChatConversation({
   groups,
   unread = false,
   files = false,
+  replies = false,
 }: {
   scope: TeamChatContextValue;
   target: TeamChatRoute;
@@ -30,8 +31,9 @@ export function TeamChatConversation({
   groups: boolean;
   unread?: boolean;
   files?: boolean;
+  replies?: boolean;
 }) {
-  const content = useTeamChatConversation(scope, target, conversation, unread);
+  const content = useTeamChatConversation(scope, target, conversation, { unread, replies });
   const fileScope = useTeamChatFileScope(scope, conversation.id, files && conversation.joined);
   const organization = useOrganization()?.organization;
   const place = fileScope

@@ -19,6 +19,7 @@ export class StandInChat {
   groupsEnabled = false;
   unreadEnabled = false;
   filesEnabled = false;
+  repliesEnabled = false;
   readonly reads = new StandInChatReads();
   /** Takes a message's uploaded files (StandInUploads.attachChat); null refuses them. */
   attachFiles: ((input: { who: string; space: string; ids: string[]; messageId: string; conversationId: string }) => TeamMessage["files"] | null) | null = null;
@@ -67,6 +68,7 @@ export class StandInChat {
       ["groups", this.groupsEnabled],
       ["unread", this.unreadEnabled],
       ["files", this.filesEnabled],
+      ["replies", this.repliesEnabled],
     ];
     return ["base", ...flags.flatMap(([name, on]) => (on ? [name] : []))];
   }
@@ -206,13 +208,15 @@ export class StandInChat {
 
   #send(record: StandInChatRecord, who: string, body: unknown): Reply {
     const fields = body && typeof body === "object" ? body : {};
-    const { parentId: _parent, fileIds: chosen, ...words } = { parentId: null, fileIds: [] as unknown, ...fields };
+    const { parentId: _parent, replyToId: answering, fileIds: chosen, ...words } = { parentId: null, replyToId: null as unknown, fileIds: [] as unknown, ...fields };
     const fileIds = Array.isArray(chosen) ? chosen.filter((id): id is string => typeof id === "string") : [];
-    const text = { ...words, ...(fileIds.length && { fileIds }) };
+    const text = { ...words, ...(fileIds.length && { fileIds }), ...(typeof answering === "string" && { replyToId: answering }) };
     const input = teamChatRpcParams["teamChat.send"].safeParse({ ...text, spaceId: record.spaceId, conversationId: record.conversation.id });
     if (!input.success) return { status: 400, body: { message: "Write a message first." } };
     const refusal = this.unreadEnabled ? this.reads.refusal(record, input.data.body, this.people(record.spaceId)) : null;
     if (refusal) return refusal;
+    const replyTo = this.#answered(record, input.data.replyToId);
+    if (replyTo === undefined) return { status: 400, body: { message: "That message isn't in this conversation." } };
     const previous = this.#replay(record, who, input.data.id, input.data.body);
     if (previous) return previous;
     const files = fileIds.length ? this.attachFiles?.({ who, space: record.spaceId, ids: fileIds, messageId: input.data.id, conversationId: record.conversation.id }) : [];
@@ -225,6 +229,7 @@ export class StandInChat {
       body: input.data.body,
       files,
       reactions: [],
+      replyTo,
       call: null,
       createdAt: new Date().toISOString(),
     };
@@ -232,6 +237,13 @@ export class StandInChat {
     record.conversation.lastMessageAt = message.createdAt;
     this.#deliver(record, message);
     return { status: 201, body: message };
+  }
+
+  /** The message a reply names, as the reply shows it: null for none, undefined when it isn't this conversation's. */
+  #answered(record: StandInChatRecord, id: string | undefined): TeamMessage["replyTo"] | undefined {
+    if (id === undefined) return null;
+    const answered = this.repliesEnabled ? record.messages.find((message) => message.id === id) : undefined;
+    return answered && { id: answered.id, seq: answered.seq, person: answered.actor.person, excerpt: excerpt(answered.body), files: answered.files.length };
   }
 
   /** The same id again answers the stored message to its sender in this conversation, and refuses anything else. */
@@ -278,3 +290,11 @@ export function socketAnswers(hosted: StandInThreads, chat: StandInChat): (peer:
     return { ok: false };
   };
 }
+
+/** A message's first words on one line, as the server's reply shows them. */
+const excerpt = (body: string) => {
+  const line = body.replace(/\s+/g, " ").trim();
+  if (line.length <= 140) return line;
+  const space = line.lastIndexOf(" ", 140);
+  return `${line.slice(0, space > 0 ? space : 140).trimEnd()}…`;
+};

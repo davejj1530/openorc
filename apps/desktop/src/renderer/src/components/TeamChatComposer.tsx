@@ -1,10 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TeamChatFile, TeamChatPerson } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { useTagging } from "../lib/team-chat-tagging";
 import { ComposerEditor, type ComposerEditorHandle } from "./composer-editor/ComposerEditor";
 import { ArrowUp } from "./icons";
 import { TeamChatTagPicker } from "./TeamChatTagPicker";
+import { TeamChatReplyingLine, type TeamChatReplying } from "./TeamChatReplyQuote";
 import { TeamChatAttach, TeamChatAttachments, useTeamChatDraftFiles, type TeamChatComposerFiles } from "./TeamChatComposerFiles";
 import { Tooltip } from "./ui";
 
@@ -22,14 +23,20 @@ export interface TeamChatComposerProps {
   named?: readonly TeamChatPerson[];
   /** Attaching, which the server's files capability brings; absent offers no attach control. */
   files?: TeamChatComposerFiles | null;
+  /** The message the next send answers, while the person is replying. */
+  replying?: TeamChatReplying | null;
 }
 
-export function TeamChatComposer({ text, placeholder, reason, onChange, onSend, taggable = [], named = [], files: place = null }: TeamChatComposerProps) {
+export function TeamChatComposer({ text, placeholder, reason, onChange, onSend, taggable = [], named = [], files: place = null, replying = null }: TeamChatComposerProps) {
   const editor = useRef<ComposerEditorHandle>(null);
   const shell = useRef<HTMLDivElement>(null);
   const [caret, setCaret] = useState<number | null>(null);
   const tags = useTagging({ text, caret, taggable, named, editor });
   const draft = useTeamChatDraftFiles(place);
+  const answering = replying?.answered.id;
+  useEffect(() => {
+    if (answering) editor.current?.focus();
+  }, [answering]);
   const why = reason ?? draft.reason ?? (text.length > 10_000 ? "Messages can have up to 10,000 characters." : null);
   const disabled = Boolean(why) || (!text.trim() && !draft.ready.length);
   const send = () => {
@@ -45,6 +52,7 @@ export function TeamChatComposer({ text, placeholder, reason, onChange, onSend, 
       <div className="mx-auto max-w-chat w-full composer">
         <div className="composer-shell" ref={shell}>
           {tags.matches.length ? <TeamChatTagPicker anchor={shell} people={tags.matches} cursor={tags.cursor} onCursor={tags.setCursor} onPick={tags.pick} onDismiss={tags.dismiss} /> : null}
+          {replying ? <TeamChatReplyingLine {...replying} /> : null}
           {place ? <TeamChatAttachments place={place} draft={draft} /> : null}
           <div className="composer-prompt">
             <ComposerEditor
@@ -57,6 +65,10 @@ export function TeamChatComposer({ text, placeholder, reason, onChange, onSend, 
               sources={tags.sources}
               onKeyDown={(event) => {
                 if (tags.onKey(event)) return true;
+                if (event.key === "Escape" && replying) {
+                  replying.onCancel();
+                  return true;
+                }
                 if (event.key !== "Enter" || event.shiftKey || event.isComposing) return false;
                 event.preventDefault();
                 send();

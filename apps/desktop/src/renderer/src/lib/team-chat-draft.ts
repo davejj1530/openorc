@@ -1,4 +1,4 @@
-import { TeamChatDraft, type PendingTeamMessage } from "@openorc/protocol";
+import { TeamChatDraft, type PendingTeamMessage, type TeamChatAnswered } from "@openorc/protocol";
 export type { TeamChatDraft, PendingTeamMessage } from "@openorc/protocol";
 export interface TeamChatTarget {
   accountId: string;
@@ -24,7 +24,7 @@ export class TeamChatDrafts {
     const key = keyOf(at);
     const cached = this.#memory.get(key);
     if (cached) return cached;
-    let saved: TeamChatDraft = { text: "", pending: [] };
+    let saved: TeamChatDraft = { text: "", replyTo: null, pending: [] };
     try {
       const parsed = TeamChatDraft.safeParse(JSON.parse(this.storage.getItem(key) ?? "null"));
       if (parsed.success) saved = { ...parsed.data, pending: parsed.data.pending.map((message) => ({ ...message, state: "failed", error: "Delivery couldn't be confirmed." })) };
@@ -37,11 +37,15 @@ export class TeamChatDrafts {
   write(at: TeamChatTarget, text: string): void {
     this.#save(at, { ...this.read(at), text });
   }
+  /** The message the next send answers, or null to answer none. */
+  reply(at: TeamChatTarget, replyTo: TeamChatAnswered | null): void {
+    this.#save(at, { ...this.read(at), replyTo });
+  }
   begin(at: TeamChatTarget, files: PendingTeamMessage["files"] = []): PendingTeamMessage | null {
     const current = this.read(at);
     if (!current.text.trim() && !files.length) return null;
-    const message: PendingTeamMessage = { id: crypto.randomUUID(), body: current.text, files, createdAt: new Date().toISOString(), state: "sending", error: null };
-    this.#save(at, { text: "", pending: [...current.pending, message] });
+    const message: PendingTeamMessage = { id: crypto.randomUUID(), body: current.text, files, replyTo: current.replyTo, createdAt: new Date().toISOString(), state: "sending", error: null };
+    this.#save(at, { text: "", replyTo: null, pending: [...current.pending, message] });
     return message;
   }
   attempt(at: TeamChatTarget, id: string): void {
@@ -74,7 +78,7 @@ export class TeamChatDrafts {
     this.#emit();
   }
   #forgetKey(key: string): void {
-    const empty = { text: "", pending: [] };
+    const empty = { text: "", replyTo: null, pending: [] };
     this.#memory.set(key, empty);
     try {
       this.storage.removeItem(key);

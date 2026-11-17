@@ -1,0 +1,141 @@
+/* A bubble and the round buttons beside it, so the buttons centre on the bubble, not on a reply's quote or files. */
+.team-chat-bubble-line {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+}
+.team-chat-message-actions {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 6px);
+  display: flex;
+  gap: 2px;
+  translate: 0 -50%;
+}
+.team-chat-message-mine .team-chat-message-actions {
+  left: auto;
+  right: calc(100% + 4px);
+  flex-direction: row-reverse;
+}
+.team-chat .team-chat-message-actions .orcling-react-open {
+  position: static;
+  translate: none;
+}
+
+/* A reply: the message it answers on one quiet line above its bubble, on the bubble's side. */
+.team-chat-message.team-chat-message-reply {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.team-chat-message-mine.team-chat-message-reply {
+  align-items: flex-end;
+}
+.team-chat-reply-quote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(100%, 44ch);
+  min-width: 0;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.team-chat-reply-quote > svg {
+  flex-shrink: 0;
+  color: var(--ink-4);
+}
+.team-chat-reply-quote:not(:disabled):hover {
+  background: var(--surface-3);
+  color: var(--ink-2);
+}
+.team-chat-reply-quote:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.team-chat-reply-name {
+  flex-shrink: 0;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.team-chat-reply-words {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A message just opened in place, from a reply, a pin or a search: a soft fill around its bubble that fades. */
+.team-chat-bubble-line {
+  isolation: isolate;
+}
+.team-chat-bubble-line::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  opacity: 0;
+  transition: opacity 1200ms var(--ease-out);
+  pointer-events: none;
+}
+.team-chat-message[data-found] .team-chat-bubble-line::before {
+  opacity: 1;
+  transition-duration: var(--duration-quick);
+}
+
+/* The composer's line naming the message the next send answers. */
+.team-chat-replying {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-right: -4px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+}
+.team-chat-replying > svg {
+  flex-shrink: 0;
+  color: var(--ink-4);
+}
+.team-chat-replying-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-chat-replying-text strong {
+  margin-right: 6px;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.team-chat-replying button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-4);
+}
+.team-chat-replying button:hover {
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.team-chat-replying button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* A reply still sending or not sent keeps its quote on the person's own side, above the bubble. */
+.team-chat-pending > .team-chat-reply-quote {
+  margin: 0 0 6px auto;
+}

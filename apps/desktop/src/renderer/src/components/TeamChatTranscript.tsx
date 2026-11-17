@@ -1,12 +1,13 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { stretchTime } from "@openorc/client";
-import type { PendingTeamMessage, TeamChatPerson, TeamChatReaction, TeamMessage } from "@openorc/protocol";
+import type { PendingTeamMessage, TeamChatAnswered, TeamChatPerson, TeamChatReaction, TeamMessage } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { teamChatGroups } from "../lib/team-chat-groups";
 import { useTeamChatVisible } from "../lib/team-chat-visibility";
 import { lastDisplayed, useWindowAttention } from "../lib/team-chat-seen";
 import { AccountFace } from "./AccountFace";
 import { TeamChatMessage } from "./TeamChatMessage";
+import { TeamChatReplyQuote } from "./TeamChatReplyQuote";
 import { Tooltip } from "./ui";
 import "../styles/team-chat-unread.css";
 
@@ -26,6 +27,12 @@ export interface TeamChatTranscriptProps {
   newFrom?: number | null;
   /** The latest message this window shows while focused and visible. */
   onShown?: (message: TeamMessage) => void;
+  /** Answering a message from the composer; absent where replies aren't available. */
+  onReply?: (message: TeamMessage) => void;
+  onOpenAnswered?: (answered: TeamChatAnswered) => void;
+  /** A message to bring into view and mark, once it is on the page. */
+  reveal?: { id: string; nonce: number } | null;
+  onRevealed?: (nonce: number) => void;
 }
 export function TeamChatTranscript(props: TeamChatTranscriptProps) {
   const visible = useTeamChatVisible();
@@ -78,6 +85,7 @@ export function TeamChatTranscript(props: TeamChatTranscriptProps) {
       resized?.disconnect();
     };
   }, [visible, attending, onShown, messages]);
+  const found = useRevealed(viewport, visible, props.reveal ?? null, props.onRevealed, pinned);
   const groups = teamChatGroups(props.messages);
   const sent = new Set(props.messages.map((message) => message.id));
   return (
@@ -105,25 +113,35 @@ export function TeamChatTranscript(props: TeamChatTranscriptProps) {
               </div>,
             ];
           const split = firstNew ? group.messages.findIndex((message) => message.id === firstNew.id) : -1;
-          if (split < 0) return [<SpeakerGroup key={group.id} {...props} messages={group.messages} />];
+          if (split < 0) return [<SpeakerGroup key={group.id} {...props} found={found} messages={group.messages} />];
           return [
-            ...(split > 0 ? [<SpeakerGroup key={group.id} {...props} messages={group.messages.slice(0, split)} />] : []),
+            ...(split > 0 ? [<SpeakerGroup key={group.id} {...props} found={found} messages={group.messages.slice(0, split)} />] : []),
             <div key="new" className="team-chat-new" role="separator">
               <span>New messages</span>
             </div>,
-            <SpeakerGroup key={`${group.id}:new`} {...props} messages={group.messages.slice(split)} />,
+            <SpeakerGroup key={`${group.id}:new`} {...props} found={found} messages={group.messages.slice(split)} />,
           ];
         })}
         {props.pending
           .filter((message) => !sent.has(message.id))
           .map((message) => (
-            <PendingBubble key={message.id} message={message} reason={props.reason} onRetry={() => props.onRetry(message)} />
+            <PendingBubble key={message.id} message={message} self={props.self} people={props.people} reason={props.reason} onRetry={() => props.onRetry(message)} />
           ))}
       </div>
     </div>
   );
 }
-function SpeakerGroup({ messages, self, people, reason, names, onReact }: Pick<TeamChatTranscriptProps, "messages" | "self" | "people" | "reason" | "names" | "onReact">) {
+function SpeakerGroup({
+  messages,
+  self,
+  people,
+  reason,
+  names,
+  onReact,
+  onReply,
+  onOpenAnswered,
+  found,
+}: Pick<TeamChatTranscriptProps, "messages" | "self" | "people" | "reason" | "names" | "onReact" | "onReply" | "onOpenAnswered"> & { found: string | null }) {
   const person = messages[0]?.actor.person;
   const mine = person?.id === self;
   return (
@@ -132,15 +150,26 @@ function SpeakerGroup({ messages, self, people, reason, names, onReact }: Pick<T
       {!mine && names ? <div className="orcling-run-name">{person?.name ?? "Former member"}</div> : null}
       <div className="orcling-run-bubbles">
         {messages.map((message) => (
-          <TeamChatMessage key={message.id} message={message} self={self} people={people} reason={reason} onReact={(emoji) => onReact(message, emoji)} />
+          <TeamChatMessage
+            key={message.id}
+            message={message}
+            self={self}
+            people={people}
+            reason={reason}
+            onReact={(emoji) => onReact(message, emoji)}
+            {...(onReply && { onReply: () => onReply(message) })}
+            {...(onOpenAnswered && message.replyTo && { onOpenAnswered: () => onOpenAnswered(message.replyTo!) })}
+            found={found === message.id || undefined}
+          />
         ))}
       </div>
     </div>
   );
 }
-function PendingBubble({ message, reason, onRetry }: { message: PendingTeamMessage; reason: string | null; onRetry(): void }) {
+function PendingBubble({ message, self, people, reason, onRetry }: { message: PendingTeamMessage; self: string; people: readonly TeamChatPerson[]; reason: string | null; onRetry(): void }) {
   return (
     <div className="team-chat-pending journal-prompt">
+      {message.replyTo ? <TeamChatReplyQuote answered={message.replyTo} self={self} people={people} /> : null}
       <div className="journal-message-body">
         {message.body.trim() ? <div className="message-bubble whitespace-pre-wrap">{message.body}</div> : null}
         {message.files.length ? <div className="team-chat-pending-files">{message.files.map((file) => file.name).join(", ")}</div> : null}
@@ -163,4 +192,31 @@ function PendingBubble({ message, reason, onRetry }: { message: PendingTeamMessa
       )}
     </div>
   );
+}
+
+/** Brings a requested message into view once it is drawn and marks it for a moment; the mark is its id. */
+function useRevealed(
+  viewport: RefObject<HTMLDivElement | null>,
+  visible: boolean,
+  reveal: { id: string; nonce: number } | null,
+  onRevealed: ((nonce: number) => void) | undefined,
+  pinned: RefObject<boolean>,
+) {
+  const [found, setFound] = useState<{ id: string; nonce: number } | null>(null);
+  useLayoutEffect(() => {
+    const element = viewport.current;
+    if (!reveal || !element || !visible) return;
+    const row = [...element.querySelectorAll<HTMLElement>("[data-message-id]")].find((candidate) => candidate.dataset["messageId"] === reveal.id);
+    if (!row) return;
+    row.scrollIntoView({ block: "center" });
+    pinned.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
+    setFound(reveal);
+    onRevealed?.(reveal.nonce);
+  }, [viewport, visible, reveal, onRevealed, pinned]);
+  useEffect(() => {
+    if (!found) return;
+    const fade = setTimeout(() => setFound(null), 1600);
+    return () => clearTimeout(fade);
+  }, [found]);
+  return found?.id ?? null;
 }

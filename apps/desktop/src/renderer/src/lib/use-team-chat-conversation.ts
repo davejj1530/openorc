@@ -1,16 +1,23 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import type { TeamConversation } from "@openorc/protocol";
+import type { TeamChatAnswered, TeamConversation } from "@openorc/protocol";
 import type { TeamChatProps } from "../components/TeamChat";
 import type { TeamChatRoute } from "./team-chat-route";
 import type { TeamChatContextValue } from "./team-chat-context";
 import { earlierTeamMessages, teamChatDrafts, useTeamChatTimeline } from "./team-chat-queries";
 import { reactToTeamMessage, sendTeamMessage } from "./team-chat-actions";
 import { useNewFrom, useTeamChatSeen } from "./team-chat-seen";
+import { jumpToTeamMessage, useTeamMessageReveal } from "./team-chat-jump";
+import { answeredOf } from "./team-chat-replies";
 
-export function useTeamChatConversation(scope: TeamChatContextValue, target: TeamChatRoute, conversation: TeamConversation, unread = false): Omit<TeamChatProps, "conversation" | "people" | "names"> {
+export function useTeamChatConversation(
+  scope: TeamChatContextValue,
+  target: TeamChatRoute,
+  conversation: TeamConversation,
+  features: { unread: boolean; replies: boolean },
+): Omit<TeamChatProps, "conversation" | "people" | "names"> {
   const timeline = useTeamChatTimeline(scope, target.conversationId, true);
-  const newFrom = useNewFrom(conversation, unread);
-  const seen = useTeamChatSeen(scope, target, conversation, unread && scope.reach !== "offline");
+  const newFrom = useNewFrom(conversation, features.unread);
+  const seen = useTeamChatSeen(scope, target, conversation, features.unread && scope.reach !== "offline");
   const first = timeline.data?.messages[0]?.seq;
   // The reading place must be on the page before anything is acknowledged: fetch back to it first.
   const placeLoaded = newFrom === null || first === undefined || first <= newFrom + 1 || !timeline.data?.older;
@@ -31,6 +38,7 @@ export function useTeamChatConversation(scope: TeamChatContextValue, target: Tea
         timeline.data.messages.map((message) => message.id),
       );
   }, [timeline.data, target]);
+  const revealing = useTeamMessageReveal({ target, page: timeline.data, paging: loadingOlder, failed: actionError !== null, loadOlder: () => void older() });
   const older = async () => {
     setLoadingOlder(true);
     setActionError(null);
@@ -70,6 +78,8 @@ export function useTeamChatConversation(scope: TeamChatContextValue, target: Tea
     onOlder: () => {
       void older();
     },
+    ...revealing,
+    ...replying(target, draft.replyTo, features.replies, conversation.joined),
     onReact: (message, emoji) => {
       void reactToTeamMessage(scope, target, message, emoji).catch((error) => {
         if (scope.current()) setActionError(error instanceof Error ? error.message : "The reaction couldn't be saved.");
@@ -77,3 +87,14 @@ export function useTeamChatConversation(scope: TeamChatContextValue, target: Tea
     },
   };
 }
+
+/** Answering a message from the composer, and showing the message a reply answers. */
+const replying = (target: TeamChatRoute, replyTo: TeamChatAnswered | null, replies: boolean, joined: boolean): Pick<TeamChatProps, "replyTo" | "onReply" | "onCancelReply" | "onOpenAnswered"> =>
+  replies && joined
+    ? {
+        replyTo,
+        onReply: (message) => teamChatDrafts.reply(target, answeredOf(message)),
+        onCancelReply: () => teamChatDrafts.reply(target, null),
+        onOpenAnswered: (answered) => jumpToTeamMessage(target, answered),
+      }
+    : {};

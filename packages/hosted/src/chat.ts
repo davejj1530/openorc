@@ -125,8 +125,8 @@ export class TeamChat {
     return this.#change(spaceId, CHAT_ROUTES.removeMember(conversationId, userId));
   }
 
-  async send({ spaceId, conversationId, id, body, fileIds }: RpcParams<"teamChat.send">) {
-    const message = await this.#request(spaceId, CHAT_ROUTES.send(conversationId), { id, body, parentId: null, fileIds: fileIds ?? [] });
+  async send({ spaceId, conversationId, id, body, fileIds, replyToId }: RpcParams<"teamChat.send">) {
+    const message = await this.#request(spaceId, CHAT_ROUTES.send(conversationId), { id, body, parentId: null, replyToId: replyToId ?? null, fileIds: fileIds ?? [] });
     this.#invalidate(spaceId, conversationId);
     return message;
   }

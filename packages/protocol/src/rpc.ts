@@ -154,6 +154,11 @@ export const rpcParams = {
       .max(500)
       .regex(/^[^/]+\/.+$/)
       .optional(),
+    /**
+     * The person's sign-in on OpenOrc Cloud, as the agent's CLI there last answered after one of their turns, with when.
+     * Never a read of this Mac's CLI, whose sign-in it is not.
+     */
+    cloud: z.literal(true).optional(),
     /** A report this young, from any reader, answers at once instead of asking the CLI again; none means a live read. */
     maxAgeMs: z
       .number()

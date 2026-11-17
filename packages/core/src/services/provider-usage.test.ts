@@ -314,3 +314,34 @@ it("keeps live reads, streamed fallback and run counts separate for three accoun
   expect((await restarted.service.read("claude", ids[1])).windows[0]?.usedPercent).toBe(20);
   expect((await restarted.service.read("claude", "claude-cli")).windows).toEqual([]);
 });
+
+describe("an agent sign-in on OpenOrc Cloud", () => {
+  const cloudService = (readings: Awaited<ReturnType<NonNullable<ProviderUsageReaders["cloud"]>>>) => {
+    const db = Db.memory();
+    databases.push(db);
+    const system = { info: vi.fn(async () => connected), infoFor: vi.fn(async () => connected) };
+    const claude = vi.fn(async (): Promise<ClaudeUsageResult> => ({ status: "ok", usage: account, plan: "Ultra" }));
+    const codex = vi.fn(async () => ({ account: null, limits: null }));
+    return { claude, codex, system, service: new ProviderUsageService(db, system, { claude, codex, cloud: async () => readings }, undefined, () => at) };
+  };
+
+  it("shapes the cloud CLI's last answer as a reading here is, with when it was read, and never asks this Mac's CLI", async () => {
+    const { claude, codex, system, service } = cloudService([
+      { agent: "claude", readAt: at - 120_000, reading: { status: "ok", usage: account, plan: "Max" } },
+      { agent: "codex", readAt: at - 60_000, reading: { account: { type: "chatgpt", planType: "pro" }, limits: { rateLimits: { primary: window } } } },
+    ]);
+    const local = await setup().service.read("claude");
+    const cloud = await service.cloud("claude");
+    expect(cloud).toMatchObject({ provider: "claude", status: "available", plan: "Max", context: "OpenOrc Cloud · Claude Max", refreshedAt: at - 120_000 });
+    expect(cloud.windows).toEqual(local.windows.map((each) => ({ ...each, observedAt: at - 120_000 })));
+    expect(await service.cloud("codex")).toMatchObject({ provider: "codex", status: "available", plan: "Pro", refreshedAt: at - 60_000 });
+    expect(claude).not.toHaveBeenCalled();
+    expect(codex).not.toHaveBeenCalled();
+    expect(system.info).not.toHaveBeenCalled();
+  });
+
+  it("reports nothing for an agent with no cloud reading, rather than a guess", async () => {
+    const report = await cloudService([]).service.cloud("claude");
+    expect(report).toMatchObject({ status: "unavailable", windows: [], refreshedAt: null, message: null });
+  });
+});

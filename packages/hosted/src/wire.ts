@@ -288,8 +288,12 @@ export const ROUTES = {
   stop: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/stop`, null),
   /** The person is about to write: the thread's machine wakes and its agent starts waiting. Answered with nothing. */
   ready: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/ready`, null),
+  /** The person began writing a new thread's first message in a project: their machine is made ready for it. Answered with nothing. */
+  readyMachine: route("POST", "/hosted/machines/ready", null),
   answer: (askId: string) => route("POST", `/hosted/asks/${encodeURIComponent(askId)}/answer`, wireAnswered),
   stopCommand: (id: string, commandId: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/commands/${encodeURIComponent(commandId)}/stop`, null),
+  /** The person's agent sign-ins' usage on OpenOrc Cloud, as each CLI there last answered after their turns. */
+  agentUsage: route("GET", "/hosted/usage", z.object({ agents: z.array(z.object({ agent: z.string(), readAt: z.iso.datetime(), reading: z.unknown() })) })),
   /** The person's cloud threads' messages in the space that hold the words, newest first. */
   search: (q: string, limit: number) =>
     route(

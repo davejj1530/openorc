@@ -45,6 +45,8 @@ export const HostedCapabilities = z.object({
     toolOutput: availability,
     /** A search of the person's cloud threads' messages, as the palette searches a Mac's. */
     search: availability,
+    /** Each person's agent sign-in usage, as the cloud's CLI last read it after their turn. */
+    agentUsage: availability,
     files: availability,
     nativeSubthreads: availability,
     personSubthreads: availability,

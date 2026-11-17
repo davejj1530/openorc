@@ -152,6 +152,8 @@ export interface HostedAccount {
   cancelSigningIn(): void;
   /** Forgets the session and the kept answers first, then tells the server, so a server out of reach still signs out here. */
   signOut(): Promise<void>;
+  /** The person's agent sign-ins' usage on OpenOrc Cloud, as each CLI there last answered after one of their turns. */
+  agentUsage(): Promise<{ agent: string; readAt: number; reading: unknown }[]>;
   /**
    * As the signed-in person, grants another of their devices, such as their phone, a session of its own: the server
    * answers a one-time code for the challenge of a verifier only that device holds, which it trades with

@@ -1,5 +1,15 @@
 import { CodexResetService, type ResetInput } from "./provider-resets.js";
-import { captureLaunchEnvironment, readClaudeUsage, readCodexUsage, consumeCodexReset, readAntigravityUsage, readFxUsage, type AntigravityQuotaGroup } from "@openorc/agents";
+import {
+  captureLaunchEnvironment,
+  readClaudeUsage,
+  readCodexUsage,
+  consumeCodexReset,
+  readAntigravityUsage,
+  readFxUsage,
+  type AntigravityQuotaGroup,
+  type ClaudeUsageResult,
+  type CodexAccountReport,
+} from "@openorc/agents";
 import { settings, runs, claudeAccounts, type Db } from "@openorc/db";
 import {
   DEFAULT_CLAUDE_ACCOUNT,
@@ -198,6 +208,53 @@ export function normalizeAntigravity(groups: AntigravityQuotaGroup[], at: number
   );
 }
 
+/**
+ * A Claude Code usage answer in the report, wherever its CLI was asked: true once it said what the account has, its
+ * plan windows or that plan allowances do not apply; false when it said nothing the report can use.
+ */
+function withClaudeAnswer(result: ProviderUsage, live: ClaudeUsageResult | { status: "error" }, at: number): boolean {
+  if (live.status === "ok") {
+    Object.assign(result, normalizeClaudeAccount(live.usage, at));
+    result.plan = live.plan;
+    result.context = result.plan ? `Claude ${result.plan}` : "Claude Code login";
+    result.refreshedAt = at;
+    result.status = result.windows.length ? "available" : "unavailable";
+    result.message ??= result.status === "unavailable" ? "The account returned no allowance metrics. Check your account usage page." : null;
+    return true;
+  }
+  if (live.status === "unsupported") {
+    result.context = "API key or cloud provider";
+    result.message = "This Claude Code login bills through an API key or a cloud provider, so plan allowances do not apply. Check that provider's billing dashboard.";
+    return true;
+  }
+  return false;
+}
+
+/**
+ * A Codex account answer in the report, wherever its CLI was asked: true for a ChatGPT plan, whose windows and credits
+ * it fills; false, with the words that say why, for no account or one billed through an API.
+ */
+function withCodexAnswer(result: ProviderUsage, { account, limits }: CodexAccountReport, at: number): boolean {
+  const a = record(account);
+  if (!account) {
+    result.status = "disconnected";
+    result.message = "No Codex account was reported. Run codex login, or check your custom provider configuration, then refresh.";
+    return false;
+  }
+  if (a["type"] !== "chatgpt") {
+    result.context = a["type"] === "apiKey" ? "OpenAI API key" : "External API provider";
+    result.accountUrl = "https://platform.openai.com/usage";
+    result.message = "API spending, remaining credits, and reset times are unavailable through Codex. Check your API provider’s billing dashboard.";
+    return false;
+  }
+  const plan = text(a["planType"]);
+  result.plan = plan && capitalized(plan);
+  result.context = `ChatGPT · ${plan ?? "plan unavailable"}${text(a["email"]) ? ` · ${text(a["email"])}` : ""}`;
+  Object.assign(result, normalizeCodex(limits, at));
+  result.refreshedAt = at;
+  return true;
+}
+
 export interface ProviderUsageReaders {
   codex?: typeof readCodexUsage;
   consumeReset?: typeof consumeCodexReset;
@@ -205,6 +262,15 @@ export interface ProviderUsageReaders {
   antigravity?: typeof readAntigravityUsage;
   fx?: typeof readFxUsage;
   apiKey?: () => Promise<Pick<MemorySettings, "hasApiKey" | "apiKeyError">>;
+  /** The person's agent sign-ins' readings on OpenOrc Cloud, as its CLIs last answered after their turns. */
+  cloud?: () => Promise<CloudUsageReading[]>;
+}
+
+/** One reading of an agent sign-in on OpenOrc Cloud: the CLI's own answer, in its reader's shape, and when. */
+export interface CloudUsageReading {
+  agent: string;
+  readAt: number;
+  reading: unknown;
 }
 
 /** How one installed harness reports its account allowance. */
@@ -231,6 +297,7 @@ export class ProviderUsageService {
   private readonly claudeAccount: typeof readClaudeUsage;
   private readonly fxAccount: typeof readFxUsage;
   private readonly antigravityAccount: typeof readAntigravityUsage;
+  private readonly cloudReadings: NonNullable<ProviderUsageReaders["cloud"]>;
   private readonly harnesses: Record<HarnessId, HarnessUsageReader> = {
     fx: {
       source: "fx CLI · account usage",
@@ -303,6 +370,7 @@ export class ProviderUsageService {
     this.claudeAccount = readers.claude ?? readClaudeUsage;
     this.fxAccount = readers.fx ?? readFxUsage;
     this.antigravityAccount = readers.antigravity ?? readAntigravityUsage;
+    this.cloudReadings = readers.cloud ?? (async () => []);
   }
 
   /** Claude Code's stream carries the account's rate limits; no other harness reports them this way. */
@@ -391,21 +459,8 @@ export class ProviderUsageService {
   private async readClaude(result: ProviderUsage, at: number, snapshot: EnvSnapshot | undefined): Promise<ProviderUsage> {
     const launch = snapshot ? captureLaunchEnvironment("claude", snapshot) : undefined;
     const live = await this.claudeAccount(launch ? { binary: launch.binary, env: launch.env } : undefined).catch((): { status: "error" } => ({ status: "error" }));
-    if (live.status === "ok") {
-      Object.assign(result, normalizeClaudeAccount(live.usage, at));
-      result.source = "Claude Code · live account usage";
-      result.plan = live.plan;
-      result.context = result.plan ? `Claude ${result.plan}` : "Claude Code login";
-      result.refreshedAt = at;
-      result.status = result.windows.length ? "available" : "unavailable";
-      result.message ??= result.status === "unavailable" ? "The account returned no allowance metrics. Check your account usage page." : null;
-      return result;
-    }
-    if (live.status === "unsupported") {
-      result.context = "API key or cloud provider";
-      result.message = "This Claude Code login bills through an API key or a cloud provider, so plan allowances do not apply. Check that provider's billing dashboard.";
-      return result;
-    }
+    if (live.status === "ok") result.source = "Claude Code · live account usage";
+    if (withClaudeAnswer(result, live, at)) return result;
     result.windows = [...this.windows(result.claudeAccountId).values()];
     result.refreshedAt = result.windows.length ? Math.max(...result.windows.map((w) => w.observedAt)) : null;
     result.status = observedUsageStatus(result.windows.length > 0, live.status === "error");
@@ -448,27 +503,46 @@ export class ProviderUsageService {
   private async readCodex(result: ProviderUsage, snapshot: EnvSnapshot | undefined): Promise<ProviderUsage> {
     this.resets.observeRevision(snapshot?.revision);
     const launch = snapshot ? captureLaunchEnvironment("codex", snapshot) : undefined;
-    const { account, limits } = await this.codex(launch ? { binary: launch.binary, env: launch.env } : undefined);
-    const a = record(account);
-    if (!account) {
-      result.status = "disconnected";
-      result.message = "No Codex account was reported. Run codex login, or check your custom provider configuration, then refresh.";
-      return result;
-    }
-    if (a["type"] !== "chatgpt") {
-      result.context = a["type"] === "apiKey" ? "OpenAI API key" : "External API provider";
-      result.accountUrl = "https://platform.openai.com/usage";
-      result.message = "API spending, remaining credits, and reset times are unavailable through Codex. Check your API provider’s billing dashboard.";
-      return result;
-    }
-    const plan = text(a["planType"]);
-    result.plan = plan && capitalized(plan);
-    result.context = `ChatGPT · ${plan ?? "plan unavailable"}${text(a["email"]) ? ` · ${text(a["email"])}` : ""}`;
-    Object.assign(result, normalizeCodex(limits, this.now()));
-    result.resets = this.resets.describe({ account, limits }, launch?.binary ?? "codex");
-    result.refreshedAt = this.now();
+    const report = await this.codex(launch ? { binary: launch.binary, env: launch.env } : undefined);
+    if (!withCodexAnswer(result, report, this.now())) return result;
+    result.resets = this.resets.describe(report, launch?.binary ?? "codex");
     result.status = result.windows.length || result.credits.length || result.resets.availableCount !== null ? "available" : "unavailable";
     result.message ??= result.status === "unavailable" ? "The provider returned no allowance metrics. Check your account usage page." : null;
+    return result;
+  }
+
+  /**
+   * The person's agent sign-in on OpenOrc Cloud, shaped from the cloud CLI's last answer as a reading here is, with
+   * when it was read. With no reading, as for someone who ran no cloud turn, it reports nothing rather than a guess.
+   * Never a read of this Mac's CLI: the sign-in is not here.
+   */
+  async cloud(provider: ProviderUsage["provider"]): Promise<ProviderUsage> {
+    const at = this.now();
+    const result: ProviderUsage = {
+      provider,
+      status: "unavailable",
+      source: "OpenOrc Cloud · the agent's CLI after your last turn",
+      context: "OpenOrc Cloud",
+      plan: null,
+      checkedAt: at,
+      refreshedAt: null,
+      message: null,
+      windows: [],
+      credits: [],
+      accountUrl: provider === "anthropic-api" ? "" : harnessCatalog[provider].accountUsageUrl,
+      localRuns: null,
+    };
+    const found = (await this.cloudReadings()).find((each) => each.agent === provider);
+    if (!found) return result;
+    const answered =
+      provider === "claude"
+        ? withClaudeAnswer(result, found.reading as ClaudeUsageResult, found.readAt)
+        : provider === "codex"
+          ? withCodexAnswer(result, found.reading as CodexAccountReport, found.readAt)
+          : false;
+    if (provider === "codex" && answered) result.status = result.windows.length || result.credits.length ? "available" : "unavailable";
+    result.context = `OpenOrc Cloud · ${result.context}`;
+    result.refreshedAt = found.readAt;
     return result;
   }
 

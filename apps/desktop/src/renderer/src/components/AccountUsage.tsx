@@ -1,5 +1,5 @@
 import { Popover } from "@base-ui/react/popover";
-import { DEFAULT_CLAUDE_ACCOUNT, harnessCatalog, isHarnessId, percentLeft, sessionWindow, weeklyWindow, type AllowanceWindow, type ProviderUsage } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, harnessCatalog, isHarnessId, type HarnessId, percentLeft, sessionWindow, weeklyWindow, type AllowanceWindow, type ProviderUsage } from "@openorc/protocol";
 import { allowanceState, conversationCost, creditBalanceLabel, formatCost, formatUsageTime, usageResetLabel } from "@openorc/client";
 import { useEffect, useState, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
@@ -12,7 +12,6 @@ import { HarnessLogo } from "./HarnessLogo";
 import { AmountShare } from "./ContextUsage";
 import { Signal } from "./icons";
 import { Tooltip } from "./ui";
-import { HostedAccountUsage } from "./HostedAccountUsage";
 
 /** The footer's glyph size, the same as the sidebar's other tools. */
 const USAGE_ICON = 16;
@@ -120,11 +119,7 @@ function usageRows(accounts: UsageAccountReport[]) {
 /** Every account's 5-hour and weekly limits in one table, the open thread's account first and marked. */
 function UsageTable({ current }: { current: UsageAccount }) {
   const read = useUsageAccounts(current);
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(timer);
-  }, []);
+  const now = useNow();
   const accounts = read.accounts.filter((account) => account.provider !== "fx");
   const currentId = usageAccountId(current);
   return (
@@ -134,42 +129,7 @@ function UsageTable({ current }: { current: UsageAccount }) {
         .map((account) => (
           <FxAccountUsage key={account.id} account={account} now={now} />
         ))}
-      {accounts.length > 0 && (
-        <table className="usage-table">
-          <thead>
-            <tr>
-              <th scope="col">Account</th>
-              <th scope="col">5 hours</th>
-              <th scope="col">Week</th>
-            </tr>
-          </thead>
-          <tbody>
-            {usageRows(accounts).map((account) => (
-              <tr key={account.key} data-current={account.id === currentId || undefined} aria-current={account.id === currentId || undefined} aria-busy={account.status === "loading"}>
-                <th scope="row">
-                  <span className="usage-table-account">
-                    <HarnessLogo id={account.provider} size={16} className="shrink-0" />
-                    <span className="usage-table-name">
-                      <span className="truncate">{account.name}</span>
-                      {account.detail ? <span className="usage-table-plan">{account.detail}</span> : null}
-                    </span>
-                  </span>
-                </th>
-                {account.windows.length ? (
-                  <>
-                    <LimitCell window={sessionWindow(account.windows)} now={now} />
-                    <LimitCell window={weeklyWindow(account.windows)} now={now} />
-                  </>
-                ) : (
-                  <td className="usage-table-cell" data-empty colSpan={2}>
-                    {emptyWords[account.status]}
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      {accounts.length > 0 && <LimitsTable accounts={accounts} currentId={currentId} now={now} />}
       {read.accounts.length === 0 && (
         <p className="usage-table-note" role="status">
           {noteWords(read.failed, !read.pending)}
@@ -184,6 +144,56 @@ function UsageTable({ current }: { current: UsageAccount }) {
         Usage in Settings
       </button>
     </div>
+  );
+}
+
+/** The time a table's resets count from, moved on every half minute. */
+function useNow(): number {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
+/** Accounts' 5-hour and weekly limits, a row for each pool, with the current account's marked. */
+function LimitsTable({ accounts, currentId, now }: { accounts: UsageAccountReport[]; currentId: string; now: number }) {
+  return (
+    <table className="usage-table">
+      <thead>
+        <tr>
+          <th scope="col">Account</th>
+          <th scope="col">5 hours</th>
+          <th scope="col">Week</th>
+        </tr>
+      </thead>
+      <tbody>
+        {usageRows(accounts).map((account) => (
+          <tr key={account.key} data-current={account.id === currentId || undefined} aria-current={account.id === currentId || undefined} aria-busy={account.status === "loading"}>
+            <th scope="row">
+              <span className="usage-table-account">
+                <HarnessLogo id={account.provider} size={16} className="shrink-0" />
+                <span className="usage-table-name">
+                  <span className="truncate">{account.name}</span>
+                  {account.detail ? <span className="usage-table-plan">{account.detail}</span> : null}
+                </span>
+              </span>
+            </th>
+            {account.windows.length ? (
+              <>
+                <LimitCell window={sessionWindow(account.windows)} now={now} />
+                <LimitCell window={weeklyWindow(account.windows)} now={now} />
+              </>
+            ) : (
+              <td className="usage-table-cell" data-empty colSpan={2}>
+                {emptyWords[account.status]}
+              </td>
+            )}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -289,12 +299,54 @@ function fxMark(account: UsageAccount, windows: AllowanceWindow[], credits: Usag
 /** Where the table opens: over the sidebar's footer. */
 const PLACE = { side: "top", align: "start", sideOffset: 8 } as const;
 
-/** Allowances and balances for the selected account, alongside reported conversation costs. */
+/**
+ * Allowances and balances for the selected account, alongside reported conversation costs. On a cloud thread the
+ * account is the agent sign-in its turns run on there; nothing is shown while the thread's place is still read.
+ */
 export function AccountUsage() {
+  const place = useOpenThreadPlace();
+  if (place === "reading") return null;
+  return place === "mac" ? <LocalAccountUsage /> : <CloudAccountUsage agent={place.cloud} />;
+}
+
+/** Where the open thread runs: this Mac, off a thread too, or OpenOrc Cloud with the agent its turns run. */
+function useOpenThreadPlace(): "reading" | "mac" | { cloud: HarnessId } {
+  const threadId = useRouter((state) => (state.route.view === "thread" ? state.route.threadId : null));
+  const thread = useRpc("threads.get", { id: threadId ?? "" }, { enabled: Boolean(threadId) }).data;
+  if (!threadId) return "mac";
+  if (thread?.id !== threadId) return "reading";
+  return thread.owner?.brain === "hosted" && isHarnessId(thread.agent) ? { cloud: thread.agent } : "mac";
+}
+
+/**
+ * The cloud thread's agent sign-in on OpenOrc Cloud, as the agent's CLI there last read it after one of the person's
+ * turns. A reading grows out of date as a reading here does; with none, nothing is shown.
+ */
+function CloudAccountUsage({ agent }: { agent: HarnessId }) {
+  const usage = useRpc("providers.usage", { provider: agent, cloud: true }, { staleTime: USAGE_MAX_AGE_MS });
+  const now = useNow();
+  const account: UsageAccount = { provider: agent, name: `${harnessCatalog[agent].name} · OpenOrc Cloud` };
+  const mark = accountMark(account, usage.data, null);
+  if (!mark || !usage.data) return null;
+  const report: UsageAccountReport = { ...account, id: agent, plan: usage.data.plan, windows: usage.data.windows, credits: usage.data.credits, context: usage.data.context, status: usage.data.status };
   return (
-    <HostedAccountUsage>
-      <LocalAccountUsage />
-    </HostedAccountUsage>
+    <Popover.Root>
+      <Tooltip label={mark.tooltip} side="top">
+        <Popover.Trigger className="sidebar-tool account-usage-button no-drag" data-low={mark.low || undefined} aria-label={mark.label}>
+          {mark.mark}
+        </Popover.Trigger>
+      </Tooltip>
+      <Popover.Portal>
+        <CoversPreview />
+        <Popover.Positioner {...PLACE} collisionPadding={8} className="z-50">
+          <Popover.Popup ref={floatingGround} className="floating-popover account-usage-popup" aria-label="Usage">
+            <div className="usage-table-wrap">
+              <LimitsTable accounts={[report]} currentId={report.id} now={now} />
+            </div>
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

@@ -197,6 +197,21 @@ export class Account implements HostedAccount {
     this.#hear(email, { userId: person.id, person: { name: person.name, image: toImage(person.image) } });
   }
 
+  /**
+   * The person's agent sign-ins' usage on OpenOrc Cloud, as each agent's CLI there last answered after one of their
+   * turns, with when. None while signed out, and none from a server that keeps no reading.
+   */
+  async agentUsage(): Promise<{ agent: string; readAt: number; reading: unknown }[]> {
+    if (!this.deps.session.state.signedIn) return [];
+    try {
+      const { agents } = await this.deps.session.request(ROUTES.agentUsage);
+      return agents.map(({ agent, readAt, reading }) => ({ agent, readAt: Date.parse(readAt), reading }));
+    } catch (error) {
+      if (error instanceof Refused && error.status === 404) return [];
+      throw error;
+    }
+  }
+
   /** Chooses where the person's cloud threads run. The server refuses a service it does not run threads on, in words. */
   async setSandbox(service: string | null): Promise<void> {
     const email = this.#signedInAs();

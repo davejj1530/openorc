@@ -311,7 +311,7 @@ export class OpenOrc {
     this.comments = new TaskCommentService(db, this.runs, this.threads, invalidate, options.dataDir);
     this.taskCheckout = new TaskCheckoutService(db, this.workspaceWriters, options.dataDir);
     this.review = new ReviewService(db, this.workspaceWriters, { dataDir: options.dataDir, conversations: this.threads });
-    this.providerUsage = new ProviderUsageService(db, this.system, { apiKey: () => this.memory.credentialStatus() }, (id) =>
+    this.providerUsage = new ProviderUsageService(db, this.system, { apiKey: () => this.memory.credentialStatus(), cloud: async () => (await this.account?.account.agentUsage()) ?? [] }, (id) =>
       id ? this.claudeAccounts.environment(this.environment.current(), id) : this.environment.current(),
     );
     this.claudeAccountSwitch = new ClaudeAccountSwitch({ db, settings: this.settings, usage: this.providerUsage, runs: this.runs, threads: this.threads, log: this.log });

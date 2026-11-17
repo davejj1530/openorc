@@ -11,7 +11,7 @@ type Dependencies = {
   defaultAccountInfo: () => ReturnType<SystemService["info"]>;
   enabledHarnesses?: () => readonly HarnessId[];
   agentUpdates: Pick<AgentUpdateService, "get" | "check" | "install" | "cancel" | "configure">;
-  providerUsage: Pick<ProviderUsageService, "read" | "recent" | "redeemCodex">;
+  providerUsage: Pick<ProviderUsageService, "read" | "recent" | "redeemCodex" | "cloud">;
   planLimits: () => Promise<PlanLimits[]>;
   invalidate: (keys: string[]) => void;
 };
@@ -48,8 +48,10 @@ export function createSystemHandlers({
     "agents.updates.install": ({ ids }) => agentUpdates.install(ids),
     "agents.updates.cancel": () => agentUpdates.cancel(),
     "agents.updates.configure": (patch) => agentUpdates.configure(patch),
-    "providers.usage": ({ provider, claudeAccountId, maxAgeMs, fxModel }) =>
-      maxAgeMs ? providerUsage.recent(provider, claudeAccountId, maxAgeMs, fxModel) : providerUsage.read(provider, claudeAccountId, fxModel),
+    "providers.usage": ({ provider, claudeAccountId, maxAgeMs, fxModel, cloud }) => {
+      if (cloud) return providerUsage.cloud(provider);
+      return maxAgeMs ? providerUsage.recent(provider, claudeAccountId, maxAgeMs, fxModel) : providerUsage.read(provider, claudeAccountId, fxModel);
+    },
     "providers.limits": async () => (await planLimits()).filter((row) => !enabledHarnesses || enabledHarnesses().includes(row.provider)),
     "providers.codex.reset": async (input) => {
       const result = await providerUsage.redeemCodex(input);

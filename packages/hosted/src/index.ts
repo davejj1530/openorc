@@ -40,6 +40,8 @@ import { Skills, type OwnSkills } from "./skills.js";
 import { ProjectEnvironment } from "./environment.js";
 import type { MacWorkUpload } from "./mac-start.js";
 export type { MacWorkUpload } from "./mac-start.js";
+export type { WireFileWrite, WireFileWriteOutcome } from "./wire.js";
+import type { WireFileWrite, WireFileWriteOutcome } from "./wire.js";
 import { CloudConnectors } from "./connectors.js";
 import { CloudMachines } from "./machines.js";
 import { CloudCheckRuns } from "./cloud-check.js";
@@ -281,6 +283,8 @@ export interface HostedThreads {
   project(id: string): Project | null;
   /** Whether a cloud thread of this Mac project may start from its folder (mac-start.ts). */
   macStartOffered?(macProjectId: string, spaceId?: string): Promise<boolean>;
+  /** Writes one file of a thread's checkout on its machine, and answers how it ended there. Rejects in words when it can't be asked. */
+  writeFile?(threadId: string, write: WireFileWrite): Promise<WireFileWriteOutcome>;
   /** The palette's search of a space's cloud threads, or with none named every space's, in the app's shape: only threads the account lists. */
   search?(spaceId: string | undefined, params: Omit<RpcParams<"threads.search">, "spaceId">): Promise<ThreadSearchHit[]>;
   /** This place's rows of a merged list, from what it last heard, at once. Null with none to add. */

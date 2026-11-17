@@ -80,6 +80,20 @@ it("searches the space's cloud threads in the app's shape, with the turn each me
   ]);
 });
 
+it("writes a cloud thread's file on its machine while it is as read, and says the server's words when it can't", async () => {
+  const write = (text: string, expected: { kind: "version"; version: string } | { kind: "absent" }) => hosted.threads.writeFile!(id, { id: crypto.randomUUID(), path: "NOTE.md", text, expected });
+  await expect(write("one", { kind: "absent" })).rejects.toThrow("Editing this cloud workspace's files isn't available yet.");
+  stand.threadFiles.capabilities = { fileWrite: { available: true } };
+  const saved = await write("one", { kind: "absent" });
+  expect(saved).toMatchObject({ kind: "saved", version: expect.stringMatching(/^[0-9a-f]{64}$/) });
+  expect(stand.fileWrites.files.get(id)?.get("NOTE.md")).toBe("one");
+  // Someone changed it on the machine since: the write answers the file as it is there.
+  stand.fileWrites.files.get(id)!.set("NOTE.md", "theirs");
+  expect(await write("two", { kind: "version", version: saved.kind === "saved" ? saved.version! : "" })).toEqual({ kind: "conflict", current: { version: expect.any(String), text: "theirs" } });
+  stand.fileWrites.refusal = "Ben's turn is running. Save again once it ends.";
+  expect(await write("three", { kind: "absent" })).toEqual({ kind: "refused", message: "Ben's turn is running. Save again once it ends." });
+});
+
 it("reads a tool call's whole output from a server that serves it", async () => {
   stand.threadFiles.capabilities = { toolOutput: { available: true } };
   const whole = "line of output\n".repeat(5_000);

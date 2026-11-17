@@ -51,6 +51,8 @@ export const HostedCapabilities = z.object({
     agentUsage: availability,
     /** A thread's newest work save, for this Mac to browse a copy of its files. */
     fileBrowser: availability,
+    /** A thread's files written from this Mac, on its machine, by someone in the thread. */
+    fileWrite: availability,
     files: availability,
     nativeSubthreads: availability,
     personSubthreads: availability,

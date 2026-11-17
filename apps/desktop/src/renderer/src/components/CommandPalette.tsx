@@ -19,7 +19,6 @@ import { ProjectLogo } from "./ProjectIconPicker";
 import { StatusIcon } from "./status";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import { HostedPaletteUnavailable, usePaletteSearch } from "./HostedPaletteSearch";
-import { HOSTED_REASONS } from "@openorc/protocol";
 
 /** Threads listed before a word is typed. */
 const RECENT = 5;
@@ -87,8 +86,8 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                 {paletteActions
                   .filter((action) => (action.available?.() ?? true) && !(organization?.organization && action.label === "Add project"))
                   .map(({ label, icon: Icon, run }) =>
-                    search.cloudThread && label === "New file" ? (
-                      <HostedPaletteUnavailable key={label} label={label} reason={HOSTED_REASONS.fileWrite} />
+                    search.newFileReason && label === "New file" ? (
+                      <HostedPaletteUnavailable key={label} label={label} reason={search.newFileReason} />
                     ) : (
                       <Item key={label} onSelect={() => go(run)} icon={<Icon size={15} />} label={label} />
                     ),

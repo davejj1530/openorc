@@ -3,7 +3,6 @@ import { newThreadWorkspaceMode, offeredAccount, projectAccountChoice, targetMod
 import { WORKSPACE_ID, executionMode, type ClaudeAccounts, type Project } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Composer } from "../components/Composer";
-import { ComposerCommitChip } from "../components/ComposerCommitChip";
 import { FolderPlus } from "../components/icons";
 import { type PickerAccounts } from "../components/ModelPickerAccounts";
 import { ComposerModelPicker, ModelPicker, type ModelChoice, type OrclingPickerChoices } from "../components/ModelPicker";
@@ -12,6 +11,7 @@ import { useMacStart } from "../components/MacStartLine";
 import { loadProjectActivity, ProjectActivity } from "../components/ProjectActivity";
 import { Panel } from "../components/Panel";
 import { NewThreadQuestion } from "../components/ProjectPicker";
+import { NewThreadMark } from "../components/NewThreadMark";
 import { DitherBackdrop } from "../components/DitherBackdrop";
 import { ThreadTabs } from "../components/ThreadTabs";
 import { TopBar } from "../components/TopBar";
@@ -24,7 +24,6 @@ import { cloudRunChoice, useCloudModels } from "../lib/cloud-run-choice";
 import { useCloudStartReady } from "../lib/use-cloud-start-ready";
 import { useMounted } from "../lib/use-mounted";
 import { usePublishComposerAccount } from "../lib/composer-account";
-import { useComposerChanges } from "../lib/composer-changes";
 import { useDefaultHarness } from "../lib/default-harness";
 import { focusedProject, useLayout } from "../lib/layout";
 import { swapInPlace } from "../lib/motion";
@@ -189,18 +188,8 @@ function NewThreadProject({
   // On OpenOrc Cloud the thread runs on the person's cloud sign-in, so this Mac's own agents and accounts never hold it.
   const onCloud = workspaceMode === "hosted";
   const files = useNewThreadFiles(projectId, onCloud);
-  const cloudModels = useCloudModels(onCloud);
-  // The model the start runs; on OpenOrc Cloud, one the cloud runs.
-  const choice = cloudRunChoice(picked, onCloud ? cloudModels : undefined);
-  const runDraft: NewThreadDraft = choice && target.kind === "model" ? { ...draft, target: { kind: "model", choice } } : draft;
-
-  useEffect(() => {
-    // A start on OpenOrc Cloud begins on a model the cloud runs, whatever agents this Mac has.
-    const offered = (onCloud && cloudModels) || models.data;
-    if (target.kind !== "model" || target.choice || !offered || defaultHarness === undefined) return;
-    const initial = initialThreadChoice(offered, defaultHarness, info.data, onCloud);
-    if (initial) changeDraft({ target: { kind: "model", choice: initial } });
-  }, [target, models.data, cloudModels, info.data, defaultHarness, onCloud]);
+  const chooseModel = (model: ModelChoice) => changeDraft({ target: { kind: "model", choice: model } });
+  const { choice, runDraft } = useStartChoice({ draft, onCloud, models: models.data, info: info.data, defaultHarness, choose: chooseModel });
   usePublishComposerAccount(choice?.agent, claudeAccountId, choice?.model);
 
   const {
@@ -228,7 +217,6 @@ function NewThreadProject({
   const disabledReason = onCloud ? (hosted.blocked?.words ?? macStart.refusal ?? (!hosted.shown ? "Checking OpenOrc Cloud…" : targetDisabledReason)) : localReason;
   const cloudStartReady = useCloudStartReady({ draft: runDraft, onCloud, held: Boolean(disabledReason), permissionMode: permission, spaceId });
   const location = useNewThreadLocation(projectId, selected, workspaceMode, draft.workingDirectory);
-  const chooseModel = (model: ModelChoice) => changeDraft({ target: { kind: "model", choice: model } });
   const retry = () => {
     void accounts.refetch();
     void models.refetch();
@@ -255,7 +243,6 @@ function NewThreadProject({
     if (mounted.current && spaceNavigation.getState().generation === generation && useRouter.getState().route.view === "newthread") openThread(threadId);
   };
 
-  const composerChanges = useComposerChanges(git.tracks && selected && workspaceMode === "current" ? { kind: "project", id: selected.id, projectName: selected.name } : null);
   const panelContext =
     selected && !cloudOnly
       ? { kind: "newthread" as const, project: selected, workingDirectory: draft.workingDirectory ?? selected.rootPath, changes: git.tracks && workspaceMode === "current" }
@@ -281,11 +268,9 @@ function NewThreadProject({
               </div>
             ) : (
               <>
+                <NewThreadMark />
                 <NewThreadQuestion projectId={projectId} projects={projects} disabled={start.isPending} onProject={onProject} />
                 <div className="relative">
-                  <div className="new-thread-changes empty:hidden">
-                    <ComposerCommitChip changes={composerChanges} />
-                  </div>
                   {macStart.line ? <div className="mb-2">{macStart.line}</div> : null}
                   <Composer
                     draftKey={files.draftKey}
@@ -345,6 +330,38 @@ function NewThreadProject({
       {panelContext ? <Panel context={panelContext} /> : null}
     </ClaudeAccountScope>
   );
+}
+
+/**
+ * The model a start runs (`choice`) and the draft it starts from: the one chosen, and on OpenOrc Cloud one the cloud
+ * runs, whatever agents this Mac has. With none chosen yet, the first one offered is chosen.
+ */
+function useStartChoice({
+  draft,
+  onCloud,
+  models,
+  info,
+  defaultHarness,
+  choose,
+}: {
+  draft: NewThreadDraft;
+  onCloud: boolean;
+  models: ModelOption[] | undefined;
+  info: SystemInfo | undefined;
+  defaultHarness: ReturnType<typeof useDefaultHarness>;
+  choose: (choice: ModelChoice) => void;
+}) {
+  const { target } = draft;
+  const cloudModels = useCloudModels(onCloud);
+  const choice = cloudRunChoice(targetModel(target), onCloud ? cloudModels : undefined);
+  useEffect(() => {
+    const offered = (onCloud && cloudModels) || models;
+    if (target.kind !== "model" || target.choice || !offered || defaultHarness === undefined) return;
+    const initial = initialThreadChoice(offered, defaultHarness, info, onCloud);
+    if (initial) choose(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `choose` is made anew each render; the offers decide
+  }, [target, models, cloudModels, info, defaultHarness, onCloud]);
+  return { choice, runDraft: choice && target.kind === "model" ? { ...draft, target: { kind: "model" as const, choice } } : draft };
 }
 
 /** The model the thread starts with. On OpenOrc Cloud it offers what a cloud thread's composer does: the agents the cloud runs. */

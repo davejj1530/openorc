@@ -43,7 +43,8 @@ import type { Skills } from "./skills.js";
 import { TerminalWatch } from "./thread-terminals.js";
 import { Refused, type Requests, type Session, type SessionChange } from "./session.js";
 import { CLOUD_PROJECT, githubRepoOf, listRows, projectPairs, resolvedCount, runsNow, starterOf, toAppEvent, toRuns, toSummary } from "./translate.js";
-import { ROUTES, SOCKET, wireThread, wireTopics, type WireEvent, type WireThread } from "./wire.js";
+import { ROUTES, SOCKET, wireThread, wireTopics, type WireEvent, type WireFileWrite, type WireFileWriteOutcome, type WireThread } from "./wire.js";
+import { writeThreadFile } from "./thread-file-writes.js";
 import type { QueuedStart } from "./shared-sends.js";
 
 import { firstMessage } from "./first-message.js";
@@ -374,6 +375,11 @@ export class Threads implements HostedThreads {
     const row = this.#rows().get(threadId);
     if (!row) throw new Error(GONE);
     return row;
+  }
+
+  /** `HostedThreads.writeFile` (thread-file-writes.ts). */
+  writeFile(threadId: string, write: WireFileWrite): Promise<WireFileWriteOutcome> {
+    return writeThreadFile(this, threadId, write);
   }
 
   /**

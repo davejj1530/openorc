@@ -776,7 +776,7 @@ export class OpenOrc {
       createReviewThreadHandlers({ review: this.review, db: this.db, invalidate }),
       createReviewCommentsHandlers({ review: this.review, invalidate }),
       createReviewWorkspaceHandlers({ review: this.review, db: this.db, taskCheckout: this.taskCheckout, invalidate }),
-      createFilesHandlers({ db: this.db, files: this.files, folder: (scope) => this.cloudFolders.of(scope) }),
+      createFilesHandlers({ db: this.db, files: this.files, folders: () => this.cloudFolders }),
       createSkillsHandlers({
         db: this.db,
         files: this.files,

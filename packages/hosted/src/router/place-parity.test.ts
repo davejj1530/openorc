@@ -1,5 +1,4 @@
 import type { HostedThreads } from "../index.js";
-import { HOSTED_REASONS } from "@openorc/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { PlaceRouter } from "./place-router.js";
 
@@ -78,8 +77,6 @@ describe("hosted calls normally served here", () => {
     expect(next).not.toHaveBeenCalled();
   });
   it.each([
-    { method: "files.write", params: { scope: { kind: "thread", id: "cloud-thread" }, path: "example.ts", text: "", expected: { kind: "absent" } } },
-    { method: "files.format", params: { scope: { kind: "thread", id: "cloud-thread" }, path: "example.ts", text: "" } },
     { method: "instructions.list", params: { threadId: "cloud-thread" } },
     { method: "instructions.save", params: { threadId: "cloud-thread", path: "AGENTS.md", content: "Example", version: null } },
     { method: "preview.state", params: { threadId: "cloud-thread" } },
@@ -91,7 +88,7 @@ describe("hosted calls normally served here", () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it("reads a cloud thread's files on this Mac, from its copy, and holds its writes", async () => {
+  it("answers a cloud thread's files on this Mac, which reads its copy and writes on its machine", async () => {
     const next = vi.fn(async () => ({ type: "rpc.result" as const, id: 5, result: null }));
     const router = new PlaceRouter({ place: () => place, next });
     const scope = { kind: "thread", id: "cloud-thread" };
@@ -100,15 +97,13 @@ describe("hosted calls normally served here", () => {
       ["files.read", { scope, path: "README.md" }],
       ["files.search", { scope, query: "readme" }],
       ["files.find", { scope, query: { text: "lantern", regex: false, caseSensitive: false } }],
+      ["files.format", { scope, path: "README.md", text: "# changed\n" }],
+      ["files.write", { scope, path: "README.md", text: "# changed\n", expected: { kind: "absent" } }],
     ] as const) {
       const request = { type: "rpc" as const, id: 5, method, params };
       await router.handle(request);
       expect(next).toHaveBeenLastCalledWith(request);
     }
-    next.mockClear();
-    const write = { type: "rpc" as const, id: 6, method: "files.write", params: { scope, path: "README.md", text: "# changed\n", expected: { kind: "absent" } } };
-    expect(await router.handle(write)).toEqual({ type: "rpc.error", id: 6, message: HOSTED_REASONS.fileWrite });
-    expect(next).not.toHaveBeenCalled();
   });
 
   it("keeps local instructions and Preview on their existing path", async () => {

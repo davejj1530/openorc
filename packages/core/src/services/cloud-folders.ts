@@ -5,10 +5,11 @@
  * there (a terminal, a background command, delegated work). Otherwise, and while a turn runs, the copy stays the last
  * save; how old it is is the copy's own `asOf`, never passed off as live. Refresh asks the person before it ends anything.
  */
+import { randomUUID } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import path from "node:path";
 import { projects } from "@openorc/db";
-import { HOSTED_REASONS, type CloudCopy, type FileScope } from "@openorc/protocol";
+import { FileVersion, HOSTED_REASONS, type CloudCopy, type FileExpectation, type FileScope, type FileWriteResult, type FolderPath } from "@openorc/protocol";
 import { CloudCopies, type CloudCopiesDeps } from "./cloud-copies.js";
 import { conversationFolder, type ConversationFolder } from "./conversation-folder.js";
 
@@ -21,6 +22,8 @@ export class CloudFolders {
   readonly copies: CloudCopies;
   /** When each thread's copy was last brought up to its machine. */
   private readonly checked = new Map<string, number>();
+  /** Whether each thread's files may be written from here, as last asked of its server. */
+  private readonly writable = new Map<string, { at: number; writes: boolean }>();
   private readonly deps: CloudCopiesDeps;
 
   constructor(deps: CloudCopiesDeps) {
@@ -45,7 +48,44 @@ export class CloudFolders {
     const summary = this.deps.hosted()?.threads.summary?.(threadId);
     const project = summary ? projects.get(this.deps.db, summary.projectId) : null;
     if (!project) throw new Error("This thread's project isn't on this computer.");
-    return { root: await realpath(folder), kind: "cloud", project, readOnly: HOSTED_REASONS.fileWrite, name: path.basename(project.rootPath) };
+    const readOnly = (await this.writes(threadId)) ? null : HOSTED_REASONS.fileWrite;
+    return { root: await realpath(folder), kind: "cloud", project, readOnly, name: path.basename(project.rootPath) };
+  }
+
+  /**
+   * Writes one file on the thread's machine, as its host makes it there while the file is still as `expected`, and lays
+   * what the machine then has into the copy at once: the new text, or on a conflict the file as it is there. Rejects
+   * with the server's words for a write refused.
+   */
+  async write(
+    threadId: string,
+    folder: { root: string },
+    input: { path: FolderPath; text: string; expected: FileExpectation },
+  ): Promise<Exclude<FileWriteResult, { kind: "conflict" }> | { kind: "conflict" }> {
+    const write = this.deps.hosted()?.threads.writeFile;
+    if (!write) throw new Error(HOSTED_REASONS.fileWrite);
+    const outcome = await write(threadId, { id: randomUUID(), ...input });
+    if (outcome.kind === "refused") throw new Error(outcome.message);
+    if (outcome.kind === "conflict") {
+      if (!outcome.current) await this.copies.applyWrite(threadId, input.path, null);
+      else if (outcome.current.text !== null) await this.copies.applyWrite(threadId, input.path, Buffer.from(outcome.current.text, "utf8"));
+      return { kind: "conflict" };
+    }
+    await this.copies.applyWrite(threadId, input.path, Buffer.from(input.text, "utf8"));
+    const version = FileVersion.parse(outcome.version);
+    return { kind: "saved", root: folder.root, path: input.path, absolutePath: path.join(folder.root, input.path), version, text: null, formatError: null };
+  }
+
+  /** Whether the reader may write the thread's files from here: its server writes them and they may write the thread. */
+  private async writes(threadId: string): Promise<boolean> {
+    const known = this.writable.get(threadId);
+    if (known && this.now() - known.at < CHECK_MS) return known.writes;
+    const threads = this.deps.hosted()?.threads;
+    const capabilities = await threads?.call("hosted.capabilities", { threadId }).catch(() => null);
+    const collaboration = threads?.summary?.(threadId).owner?.collaboration;
+    const writes = capabilities?.features.fileWrite?.available === true && collaboration?.canWrite !== false;
+    this.writable.set(threadId, { at: this.now(), writes });
+    return writes;
   }
 
   /** The file browser's Refresh: the copy brought up to its machine, or what that would end, named unless `endsOk`. */

@@ -10,8 +10,11 @@ function threadOf(method: RpcMethod, params: Record<string, unknown>): string | 
   return typeof id === "string" ? id : null;
 }
 
-/** A cloud thread's files read on this Mac, from the copy of its newest save (core's CloudCopies). */
-const READ_HERE: ReadonlySet<RpcMethod> = new Set(["files.list", "files.search", "files.read", "files.find", "editor.query"]);
+/**
+ * A cloud thread's files on this Mac: read from the copy of its newest save (core's CloudFolders), formatted there, and
+ * written on its machine through it, which says why when they can't be.
+ */
+const FILES_HERE: ReadonlySet<RpcMethod> = new Set(["files.list", "files.search", "files.read", "files.find", "files.format", "files.write", "editor.query"]);
 
 /**
  * Ownership outlives access. A withdrawn cloud id must never become a request against this Mac, unless the thread came
@@ -24,8 +27,7 @@ export class HostedCallGuard {
   refusal(place: HostedThreads | null, method: RpcMethod, params: Record<string, unknown>): string | null {
     const held = this.check(place, method, params);
     if (held === "unavailable") return "That conversation isn't available on OpenOrc Cloud.";
-    if (held !== "held" || ownerRoute(method) || READ_HERE.has(method)) return null;
-    return method.startsWith("files.") ? HOSTED_REASONS.fileWrite : HOSTED_REASONS.fileBrowser;
+    return held === "held" && !ownerRoute(method) && !FILES_HERE.has(method) ? HOSTED_REASONS.fileBrowser : null;
   }
 
   private check(place: HostedThreads | null, method: RpcMethod, params: Record<string, unknown>): "held" | "unavailable" | null {

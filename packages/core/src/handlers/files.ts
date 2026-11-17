@@ -1,14 +1,14 @@
 import { audit, Db } from "@openorc/db";
 import type { FileScope } from "@openorc/protocol";
-import type { ConversationFolder } from "../services/conversation-folder.js";
+import type { CloudFolders } from "../services/cloud-folders.js";
 import { FileService } from "../services/files.js";
 import { listDirectory } from "../services/file-directory.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
   db: Db;
   files: Pick<FileService, "search" | "read" | "write" | "find" | "format" | "intelligence">;
-  /** Where a scope's files are: its conversation's folder, or a cloud thread's reading copy. */
-  folder: (scope: FileScope) => Promise<ConversationFolder>;
+  /** Where a scope's files are: its conversation's folder, or a cloud thread's copy, written on its machine. */
+  folders: () => Pick<CloudFolders, "of" | "write">;
 };
 
 /** One conversation, or one new conversation's folder, whose finds supersede each other. */
@@ -17,8 +17,9 @@ const conversationKey = (scope: FileScope) => (scope.kind === "project" ? `proje
 export function createFilesHandlers({
   db,
   files,
-  folder: folderOf,
+  folders,
 }: Dependencies): Pick<Handlers, "files.list" | "files.search" | "files.read" | "files.write" | "files.find" | "files.format" | "editor.query"> {
+  const folderOf = (scope: FileScope) => folders().of(scope);
   return {
     "editor.query": async ({ scope, expectedRoot, ...input }) => {
       const folder = await folderOf(scope);
@@ -32,7 +33,11 @@ export function createFilesHandlers({
     "files.search": async ({ scope, query, limit }) => files.search(await folderOf(scope), query, limit),
     "files.read": async ({ scope, path }) => files.read(await folderOf(scope), path, { outside: true }),
     "files.write": async ({ scope, path, text, expected }) => {
-      const result = await files.write(await folderOf(scope), { path, text, expected, format: true });
+      const folder = await folderOf(scope);
+      // A cloud thread's file is written on its machine, and its copy here follows.
+      const written = folder.kind === "cloud" && !folder.readOnly ? await folders().write(scope.id, folder, { path, text, expected }) : null;
+      if (written?.kind === "conflict") return { kind: "conflict", current: await files.read(folder, path) };
+      const result = written ?? (await files.write(folder, { path, text, expected, format: true }));
       if (result.kind === "saved") audit.record(db, { actor: "user", action: "files.write", resourceType: scope.kind, resourceId: scope.id, metadata: { path } });
       return result;
     },

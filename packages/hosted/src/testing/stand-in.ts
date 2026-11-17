@@ -33,6 +33,7 @@ import { StandInCheck } from "./stand-in-check.js";
 import { StandInMacWork } from "./stand-in-mac-work.js";
 import { StandInSearch } from "./stand-in-search.js";
 import { StandInAgentUsage } from "./stand-in-agent-usage.js";
+import { StandInFileWrites } from "./stand-in-file-writes.js";
 import { StandInTerminals } from "./stand-in-terminals.js";
 import type { StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInOrganizations } from "./stand-in-organizations.js";
@@ -63,6 +64,8 @@ export interface StandIn {
   terminals: StandInTerminals;
   /** The server's readings of each person's agent sign-ins on OpenOrc Cloud, by email. */
   agentUsage: StandInAgentUsage;
+  /** Writes of a cloud thread's files on its machine, behind the `fileWrite` capability of `threadFiles`. */
+  fileWrites: StandInFileWrites;
   tasks: StandInTasks;
   chat: StandInChat;
   /** Its origin, for `HostedDeps.server` or `OpenOrcOptions.accountServer`. */
@@ -471,6 +474,7 @@ function parityStandIns({
     terminals: new StandInTerminals({ available: on("terminal"), readers: (threadId) => hosted.readersOf(threadId), peers, person }),
     search: new StandInSearch(hosted),
     agentUsage: new StandInAgentUsage(),
+    fileWrites: new StandInFileWrites({ available: on("fileWrite") }),
   };
 }
 
@@ -483,7 +487,8 @@ function parityRoute(parity: ReturnType<typeof parityStandIns>, request: { metho
     parity.check.route(request, who) ??
     parity.terminals.route(request, who, body) ??
     parity.search.route(request, who) ??
-    parity.agentUsage.route(request, who)
+    parity.agentUsage.route(request, who) ??
+    parity.fileWrites.route(request, who, body)
   );
 }
 

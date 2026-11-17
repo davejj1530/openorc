@@ -228,6 +228,16 @@ export type WirePushDevice = z.infer<typeof wirePushDevice>;
 
 const route = <T = null>(method: Route<T>["method"], path: string, reply: z.ZodType<T> | null): Route<T> => ({ method, path, reply });
 
+/** How a write of a cloud thread's file ended on its machine (the server's file-writes.ts). */
+const fileWriteOutcome = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("saved"), version: z.string().nullable() }),
+  z.object({ kind: z.literal("conflict"), current: z.object({ version: z.string(), text: z.string().nullable() }).nullable() }),
+  z.object({ kind: z.literal("refused"), message: z.string() }),
+]);
+export type WireFileWriteOutcome = z.infer<typeof fileWriteOutcome>;
+/** One file of a cloud thread's checkout to write: its new text (null removes it) while it is still as `expected`. */
+export type WireFileWrite = { id: string; path: string; text: string | null; expected: { kind: "version"; version: string } | { kind: "absent" } };
+
 /** Every route the app calls, in one list. The stand-in server in testing/ serves exactly these. */
 export const ROUTES = {
   ...SPACE_ROUTES,
@@ -331,6 +341,8 @@ export const ROUTES = {
         ),
       }),
     ),
+  /** One file of a thread's checkout written on its machine, as its host made it. The same id again is the same write. */
+  writeFile: (id: string) => route("PUT", `/hosted/threads/${encodeURIComponent(id)}/files`, fileWriteOutcome),
   /** One tool call's whole output, as the server kept it; null output for a call that never ended. */
   toolOutput: (id: string, toolCallId: string) => route("GET", `/hosted/threads/${encodeURIComponent(id)}/tool-calls/${encodeURIComponent(toolCallId)}/output`, z.object({ output: z.unknown() })),
   /** The agent folds the conversation between turns. Asking again with the same id is the same compaction. */

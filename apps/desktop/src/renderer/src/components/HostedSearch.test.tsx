@@ -10,6 +10,9 @@ import { useUi } from "../lib/ui";
 import { CommandPalette } from "./CommandPalette";
 import { cloudReviewThread, localReviewThread } from "./test-fixtures/hosted-review";
 
+/** A cloud server that answers its capabilities and serves none of these. */
+const SERVED_NOTHING = { version: 1, features: {} };
+
 beforeEach(() => {
   queryClient.clear();
   vi.stubGlobal(
@@ -48,7 +51,8 @@ it.each([true, false])("searches messages from a thread in either place, the clo
     taskTitle: null,
     member: null,
   };
-  vi.spyOn(core, "call").mockImplementation((async (method: string) => (method === "threads.get" ? thread : method === "threads.search" ? [hit] : [])) as typeof core.call);
+  vi.spyOn(core, "call").mockImplementation((async (method: string) =>
+    method === "threads.get" ? thread : method === "threads.search" ? [hit] : method === "hosted.capabilities" ? SERVED_NOTHING : []) as typeof core.call);
   render(
     <QueryClientProvider client={queryClient}>
       <CommandPalette open onOpenChange={() => {}} />
@@ -69,6 +73,7 @@ it("says a cloud server's own refusal where the hits would be, and shows none", 
   vi.spyOn(core, "call").mockImplementation((async (method: string) => {
     if (method === "threads.get") return cloudReviewThread;
     if (method === "threads.search") throw new Error(HOSTED_REASONS.search);
+    if (method === "hosted.capabilities") return SERVED_NOTHING;
     return [];
   }) as typeof core.call);
   render(

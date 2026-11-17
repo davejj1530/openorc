@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -59,12 +60,27 @@ function cloudSave(text: string, savedAt: string) {
  * The thread's machine as the server tells of it: its saves, whether the newest is current, and how it answers an ask
  * to leave with a save (`refuse` as a running turn or a reader who may not refuses it).
  */
-function machine(options: { current: boolean; refuse?: boolean; ends?: string[] }) {
+function machine(options: { current: boolean; refuse?: boolean; ends?: string[]; writes?: boolean }) {
   const saves = [cloudSave("first", "2026-11-18T10:00:00.000Z")];
   let current = options.current;
   const asked = { reads: 0, asks: 0 };
+  const written: { path: string; text: string | null }[] = [];
   const hosted = {
-    threads: { holds: ({ thread }: { thread: string }) => thread === ID, row: () => ({ id: ID, space: "personal" }), summary: () => ({ id: ID, projectId }) },
+    threads: {
+      holds: ({ thread }: { thread: string }) => thread === ID,
+      row: () => ({ id: ID, space: "personal" }),
+      summary: () => ({ id: ID, projectId }),
+      call: async () => ({ version: 1, features: options.writes ? { fileWrite: { available: true } } : {} }),
+      writeFile: async (_: string, write: { path: string; text: string | null }) => {
+        written.push(write);
+        return {
+          kind: "saved",
+          version: createHash("sha256")
+            .update(write.text ?? "")
+            .digest("hex"),
+        };
+      },
+    },
     macProjects: {
       workSave: async () => {
         asked.reads += 1;
@@ -82,7 +98,7 @@ function machine(options: { current: boolean; refuse?: boolean; ends?: string[] 
   } as unknown as Hosted;
   let now = Date.parse("2026-11-18T11:00:00.000Z");
   const folders = new CloudFolders({ db, hosted: () => hosted, dataDir: root, invalidate: () => {}, here: computerNames(process.platform), now: () => now });
-  return { folders, asked, later: (ms: number) => void (now += ms) };
+  return { folders, asked, written, later: (ms: number) => void (now += ms) };
 }
 
 const fix = async (root: string) => readFile(path.join(root, "FIX.md"), "utf8");
@@ -126,4 +142,14 @@ it("never ends what runs on the machine for a read, and Refresh names it and ask
   const refreshed = await folders.refresh(ID, true);
   expect(asked.asks).toBe(1);
   expect("copy" in refreshed && (await fix(refreshed.copy.folder))).toBe("second");
+});
+
+it("writes a cloud thread's file on its machine once its server writes them, and the copy holds the write at once", async () => {
+  const { folders, written } = machine({ current: true, writes: true });
+  const folder = await folders.of({ kind: "thread", id: ID });
+  expect(folder.readOnly).toBeNull();
+  const saved = await folders.write(ID, folder, { path: "FIX.md" as never, text: "mine", expected: { kind: "absent" } });
+  expect(saved).toMatchObject({ kind: "saved", path: "FIX.md", absolutePath: path.join(folder.root, "FIX.md") });
+  expect(written).toEqual([expect.objectContaining({ path: "FIX.md", text: "mine" })]);
+  expect(await fix(folder.root)).toBe("mine");
 });

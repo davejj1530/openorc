@@ -1,0 +1,70 @@
+/* What's new after an update: a 560px sheet, its step's picture set 8px into it at the sheet's radius less that, then
+   the step's title with the close beside it and its line, then the step dots, the way to try it and Next. Every step
+   keeps the sheet's height. */
+.whats-new {
+  width: 560px;
+}
+.whats-new-picture {
+  margin: 8px 8px 0;
+  height: 320px;
+  overflow: hidden;
+  border-radius: calc(var(--radius-3xl) - 8px);
+}
+.whats-new-picture img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.whats-new-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 0 20px;
+}
+.whats-new-title {
+  color: var(--ink);
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
+}
+.whats-new-line {
+  min-height: 40px;
+  padding: 4px 20px 0;
+  color: var(--ink-3);
+  font-size: var(--text-base);
+  line-height: 20px;
+}
+.whats-new-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px 20px;
+}
+.whats-new-dots {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 16px;
+}
+/* The current step's dot widens into a pill, and the pill moves as the step does. Each dot is pressed by a 16px
+   target around it. */
+.whats-new-dot {
+  box-sizing: content-box;
+  width: 6px;
+  height: 6px;
+  padding: 5px;
+  margin: -5px;
+  border-radius: 999px;
+  background-clip: content-box;
+  background-color: var(--ink-4);
+  opacity: 0.5;
+  transition:
+    width var(--duration-arrive) var(--ease-out),
+    opacity var(--duration-arrive) var(--ease-out);
+}
+.whats-new-dot-current {
+  width: 18px;
+  background-color: var(--ink);
+  opacity: 1;
+}

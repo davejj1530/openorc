@@ -17,6 +17,7 @@ const native = vi.hoisted(() => ({
   notices: [] as { options: { title: string; body: string }; click?: () => void }[],
 }));
 vi.mock("electron", () => ({
+  app: { getVersion: () => "0.1.0-beta.35" },
   BrowserWindow: { getAllWindows: native.windows },
   ipcMain: { handle: (key: string, handler: (...args: unknown[]) => unknown) => native.handlers.set(key, handler), removeHandler: (key: string) => native.handlers.delete(key) },
   Notification: class {
@@ -106,6 +107,10 @@ it("uses the in-app notice without a desktop notification when any app window is
   await f.updates.check();
   expect(native.show).not.toHaveBeenCalled();
   expect(f.call("getState")).toMatchObject({ state: { phase: "available" }, dismissed: false });
+});
+
+it("tells the app window which version is running", () => {
+  expect(fixture().call("version")).toBe("0.1.0-beta.35");
 });
 
 it("checks for an update when the window asks, with automatic checks off", async () => {

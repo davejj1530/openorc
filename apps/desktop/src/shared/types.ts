@@ -184,6 +184,8 @@ export interface OpenOrcApi {
     settings(): Promise<UpdateSettings>;
     setAutomaticChecks(on: boolean): Promise<UpdateSettings>;
     getState(): Promise<import("./app-updates").UpdateSnapshot>;
+    /** The version of OpenOrc that is running. */
+    version(): Promise<string>;
     onState(callback: (snapshot: import("./app-updates").UpdateSnapshot) => void): () => void;
     dismiss(request: import("./app-updates").UpdateDismissal): Promise<import("./app-updates").UpdateSnapshot>;
     check(): Promise<void>;

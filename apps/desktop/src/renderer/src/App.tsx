@@ -17,6 +17,7 @@ import { TooltipProvider } from "./components/ui";
 import { ImportProjectDialog } from "./dialogs/ImportProjectDialog";
 import { ImportSessionsDialog } from "./dialogs/ImportSessionsDialog";
 import { NewFileDialog } from "./dialogs/NewFileDialog";
+import { useSettleWhatsNew, WhatsNew } from "./components/WhatsNew";
 import { useAppShortcuts } from "./lib/app-shortcuts";
 import { focusedProject, useLayout } from "./lib/layout";
 import { useLookHandover } from "./lib/mac-look";
@@ -56,6 +57,7 @@ export function App() {
   const route = useRouter((state) => state.route);
   const projectId = useLayout(focusedProject);
   useLookHandover();
+  useSettleWhatsNew();
   useAppShortcuts(projectForRoute(route, projectId));
   return (
     <TooltipProvider>
@@ -115,6 +117,7 @@ function DesktopApp() {
       <CloudMoveDialog />
       <RemoveWorktreeDialog />
       <NewFileDialog />
+      <WhatsNew />
     </div>
   );
 }

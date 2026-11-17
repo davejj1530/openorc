@@ -2,6 +2,8 @@ import { z } from "zod";
 import { SpaceId } from "./spaces.js";
 import { teamChatChannelRpcParams, type TeamChatChannelRpcResults } from "./team-chat-channels.js";
 import { teamChatReadRpcParams, type TeamChatReadRpcResults } from "./team-chat-read.js";
+export * from "./team-chat-orcling.js";
+import { TeamChatActor, TeamChatOrclingPick, TeamOrclingCall, teamChatOrclingRpcParams, type TeamChatOrclingRpcResults } from "./team-chat-orcling.js";
 
 const id = z.string().min(1).max(200);
 const seq = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -55,7 +57,15 @@ export const TeamChatFile = z.object({
 export type TeamChatFile = z.infer<typeof TeamChatFile>;
 
 /** The message a reply answers, as the reply shows it: who wrote it and its first words, empty when it is only files. */
-export const TeamChatAnswered = z.object({ id, seq, person: TeamChatPerson.nullable(), excerpt: z.string(), files: seq });
+export const TeamChatAnswered = z.object({
+  id,
+  seq,
+  person: TeamChatPerson.nullable(),
+  /** The Orcling that said it, for an answer to a call; a server without Orclings sends none. */
+  orcling: z.object({ name: z.string() }).nullable().default(null),
+  excerpt: z.string(),
+  files: seq,
+});
 export type TeamChatAnswered = z.infer<typeof TeamChatAnswered>;
 
 /** Human messages have their own projection, independent of work runs and agent events. */
@@ -63,7 +73,7 @@ export const TeamMessage = z.object({
   id,
   channelId: id,
   seq: seq.refine((value) => value > 0),
-  actor: z.object({ kind: z.literal("person"), person: TeamChatPerson.nullable() }),
+  actor: TeamChatActor,
   body: z.string(),
   files: z.array(TeamChatFile),
   reactions: z.array(z.object({ emoji: z.string(), userIds: z.array(id) })),
@@ -71,7 +81,8 @@ export const TeamMessage = z.object({
   replyTo: TeamChatAnswered.nullable().default(null),
   /** Who pinned it for everyone in the conversation, and when; a server without pins sends none. */
   pinned: z.object({ by: TeamChatPerson.nullable(), at: z.iso.datetime() }).nullable().default(null),
-  call: z.null(),
+  /** The sender's own Orcling this message called, and how its answer is going. */
+  call: TeamOrclingCall.nullable().default(null),
   createdAt: z.iso.datetime(),
 });
 export type TeamMessage = z.infer<typeof TeamMessage>;
@@ -99,13 +110,20 @@ export const PendingTeamMessage = z.object({
   body: z.string(),
   files: z.array(TeamChatFile).max(10).default([]),
   replyTo: TeamChatAnswered.nullable().default(null),
+  /** The sender's own Orcling it calls, with the call's id kept across retries. */
+  orcling: TeamChatOrclingPick.extend({ callId: z.uuid() }).nullable().default(null),
   createdAt: z.string(),
   state: z.enum(["sending", "failed"]),
   error: z.string().nullable(),
 });
 export type PendingTeamMessage = z.infer<typeof PendingTeamMessage>;
 /** Local words and stable send identities, without an authorized history cache. */
-export const TeamChatDraft = z.object({ text: z.string(), replyTo: TeamChatAnswered.nullable().default(null), pending: z.array(PendingTeamMessage) });
+export const TeamChatDraft = z.object({
+  text: z.string(),
+  replyTo: TeamChatAnswered.nullable().default(null),
+  orcling: TeamChatOrclingPick.nullable().default(null),
+  pending: z.array(PendingTeamMessage),
+});
 export type TeamChatDraft = z.infer<typeof TeamChatDraft>;
 export type TeamChatStatus = { state: "unavailable" } | { state: "ready"; accountId: string; spaceId: string; reach: "live" | "offline"; chat: TeamChatState };
 
@@ -114,6 +132,7 @@ const conversation = { ...scope, conversationId: id };
 export const teamChatRpcParams = {
   ...teamChatChannelRpcParams,
   ...teamChatReadRpcParams,
+  ...teamChatOrclingRpcParams,
   "teamChat.state": z.object(scope).strict(),
   "teamChat.openDm": z.object({ ...scope, userIds: z.array(id).min(1).max(8) }).strict(),
   "teamChat.timeline": z
@@ -121,7 +140,15 @@ export const teamChatRpcParams = {
     .strict()
     .refine((value) => value.beforeSeq === undefined || value.afterSeq === undefined),
   "teamChat.send": z
-    .object({ ...conversation, id: z.uuid(), body: z.string().max(10_000), fileIds: z.array(id).max(10).optional(), replyToId: id.optional() })
+    .object({
+      ...conversation,
+      id: z.uuid(),
+      body: z.string().max(10_000),
+      fileIds: z.array(id).max(10).optional(),
+      replyToId: id.optional(),
+      /** The sender's own Orcling to call once; the Mac runs it. */
+      orcling: z.object({ callId: z.uuid(), localOrclingId: id }).strict().optional(),
+    })
     .strict()
     .refine((value) => value.body.trim().length > 0 || (value.fileIds?.length ?? 0) > 0, "Write something or attach a file."),
   "teamChat.react": z.object({ ...conversation, messageId: id, emoji: TeamChatReaction }).strict(),
@@ -131,7 +158,7 @@ export const teamChatRpcParams = {
   "teamChat.watch": z.object({ ...conversation, requestId: z.uuid() }).strict(),
   "teamChat.unwatch": z.object({ ...conversation, requestId: z.uuid() }).strict(),
 };
-export interface TeamChatRpcResults extends TeamChatChannelRpcResults, TeamChatReadRpcResults {
+export interface TeamChatRpcResults extends TeamChatChannelRpcResults, TeamChatReadRpcResults, TeamChatOrclingRpcResults {
   "teamChat.state": TeamChatStatus;
   "teamChat.openDm": TeamConversation;
   "teamChat.timeline": TeamChatTimeline;

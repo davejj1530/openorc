@@ -11,13 +11,14 @@ import { createHostedAccountHandlers } from "./organization-billing.js";
 import { createOnlineTaskHandlers } from "./online-tasks.js";
 import { createSpacesHandlers } from "./spaces.js";
 import { createTeamChatHandlers } from "./team-chat.js";
+import type { TeamChatOrclingCalls } from "../services/team-chat-orclings.js";
 
 /** These account services belong to the Mac's windows; paired-phone methods retain their own allowlist. */
-export function createHostedHandlers(account: Hosted | null, files: HostedFiles, db: Db) {
+export function createHostedHandlers(account: Hosted | null, files: HostedFiles, db: Db, orclingCalls: TeamChatOrclingCalls) {
   return {
     ...createHostedAccountHandlers(account),
     ...createSpacesHandlers(account?.spaces ?? null),
-    ...createTeamChatHandlers(account?.chat ?? null),
+    ...createTeamChatHandlers(account?.chat ?? null, orclingCalls),
     ...createOnlineTaskHandlers(account?.tasks ?? null),
     ...createHostedFilesHandlers(files),
     ...createHostedEnvironmentHandlers(account, db),

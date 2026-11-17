@@ -79,7 +79,7 @@ function serve(features: string[], pages: (params: RpcParams<"teamChat.timeline"
     if (method === "teamChat.timeline") return pages(params as RpcParams<"teamChat.timeline">);
     if (method === "teamChat.send") {
       const sent = params as RpcParams<"teamChat.send">;
-      return { ...message(3, sent.body, self, sent.replyToId ? { id: sent.replyToId, seq: 2, person: mara, excerpt: "Is the build green?", files: 0 } : null), id: sent.id };
+      return { ...message(3, sent.body, self, sent.replyToId ? { id: sent.replyToId, seq: 2, person: mara, orcling: null, excerpt: "Is the build green?", files: 0 } : null), id: sent.id };
     }
     return { ok: true };
   });
@@ -118,7 +118,7 @@ it("offers no Reply where the server has no replies", async () => {
 it("opens an answered message that is not on the page by loading back to it, then marks it", async () => {
   const early = message(1, "The very first question");
   const later = Array.from({ length: 3 }, (_, index) => message(index + 70, `Later ${index}`));
-  const reply = message(73, "Answering the first", self, { id: early.id, seq: 1, person: mara, excerpt: early.body, files: 0 });
+  const reply = message(73, "Answering the first", self, { id: early.id, seq: 1, person: mara, orcling: null, excerpt: early.body, files: 0 });
   const call = serve(["base", "replies"], (params) => (params.beforeSeq ? page([early]) : page([...later, reply], true)));
   render(tree());
   fireEvent.click(await screen.findByRole("button", { name: "Show the message from Mara Okafor: The very first question" }));

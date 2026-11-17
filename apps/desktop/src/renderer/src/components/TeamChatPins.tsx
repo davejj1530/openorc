@@ -5,7 +5,8 @@ import type { TeamChatContextValue } from "../lib/team-chat-context";
 import { answeredOf, answeredWords } from "../lib/team-chat-replies";
 import { useTeamChatPins } from "../lib/team-chat-pins";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { AccountFace } from "./AccountFace";
+import { TeamChatActorFace } from "./TeamChatActorFace";
+import { actorName } from "../lib/team-chat-actor";
 import { Loader2, Pin, PinOff } from "./icons";
 import { Button, Tooltip } from "./ui";
 import "../styles/team-chat-pins.css";
@@ -67,9 +68,9 @@ function PinsBody({ pins, people, onOpen, onUnpin }: { pins: ReturnType<typeof u
       {pins.data.pins.map(({ message }) => (
         <li key={message.id} className="team-chat-pin">
           <Popover.Close className="team-chat-pin-open" onClick={() => onOpen(message)}>
-            <AccountFace name={message.actor.person?.name ?? "Former member"} image={message.actor.person?.image ?? null} />
+            <TeamChatActorFace actor={message.actor} size={20} />
             <span className="team-chat-pin-text">
-              <span className="team-chat-pin-name">{message.actor.person?.name ?? "Former member"}</span>
+              <span className="team-chat-pin-name">{actorName(message.actor)}</span>
               <span className="team-chat-pin-words">{answeredWords(answeredOf(message), people)}</span>
             </span>
           </Popover.Close>

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { TeamChatReaction, teamChatRpcParams, type TeamChatPerson, type TeamConversation, type TeamMessage } from "@openorc/protocol";
+import { actorPerson, TeamChatReaction, teamChatRpcParams, type TeamChatPerson, type TeamConversation, type TeamMessage } from "@openorc/protocol";
 import { chatWatch } from "../wire-chat.js";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 import type { StandInPeer } from "./stand-in-peer.js";
@@ -8,6 +8,7 @@ import { StandInChatChannels } from "./stand-in-chat-channels.js";
 import { StandInChatReads } from "./stand-in-chat-reads.js";
 import { standInPins } from "./stand-in-chat-pins.js";
 import { standInSearch } from "./stand-in-chat-search.js";
+import { StandInChatCalls } from "./stand-in-chat-calls.js";
 
 type Reply = { status: number; body: unknown };
 type Request = { method: string; path: string; query: URLSearchParams; space: string | null };
@@ -24,6 +25,7 @@ export class StandInChat {
   repliesEnabled = false;
   pinsEnabled = false;
   searchEnabled = false;
+  orclingEnabled = false;
   readonly reads = new StandInChatReads();
   /** Takes a message's uploaded files (StandInUploads.attachChat); null refuses them. */
   attachFiles: ((input: { who: string; space: string; ids: string[]; messageId: string; conversationId: string }) => TeamMessage["files"] | null) | null = null;
@@ -31,6 +33,7 @@ export class StandInChat {
   readonly records = new Map<string, StandInChatRecord>();
   readonly #watches = new WeakMap<StandInPeer, Map<string, { spaceId: string; conversationId: string }>>();
   readonly #channels: StandInChatChannels;
+  readonly calls = new StandInChatCalls({ deliver: (record, message) => this.#deliver(record, message), readable: (record, who) => this.#readable(record, who) });
 
   constructor(private readonly deps: { spaces: StandInSpaces; peers(): StandInPeer[]; person(email: string): { name: string; image: string | null } }) {
     this.#channels = new StandInChatChannels(this, deps.spaces);
@@ -75,6 +78,7 @@ export class StandInChat {
       ["replies", this.repliesEnabled],
       ["pins", this.pinsEnabled],
       ["search", this.searchEnabled],
+      ["orcling", this.orclingEnabled],
     ];
     return ["base", ...flags.flatMap(([name, on]) => (on ? [name] : []))];
   }
@@ -111,6 +115,10 @@ export class StandInChat {
 
   #conversationRoute(request: Request, spaceId: string, who: string, body: unknown): Reply {
     if (request.method === "POST" && request.path === "/chat/dms") return this.#open(spaceId, who, body);
+    if (this.orclingEnabled) {
+      const called = this.calls.route(request.path, request.method, who, body);
+      if (called) return called;
+    }
     if (request.method === "GET" && request.path === "/chat/search" && this.searchEnabled)
       return {
         status: 200,
@@ -226,7 +234,13 @@ export class StandInChat {
 
   #send(record: StandInChatRecord, who: string, body: unknown): Reply {
     const fields = body && typeof body === "object" ? body : {};
-    const { parentId: _parent, replyToId: answering, fileIds: chosen, ...words } = { parentId: null, replyToId: null as unknown, fileIds: [] as unknown, ...fields };
+    const {
+      parentId: _parent,
+      replyToId: answering,
+      fileIds: chosen,
+      orclingCall,
+      ...words
+    } = { parentId: null, replyToId: null as unknown, fileIds: [] as unknown, orclingCall: null as unknown, ...fields };
     const fileIds = Array.isArray(chosen) ? chosen.filter((id): id is string => typeof id === "string") : [];
     const text = { ...words, ...(fileIds.length && { fileIds }), ...(typeof answering === "string" && { replyToId: answering }) };
     const input = teamChatRpcParams["teamChat.send"].safeParse({ ...text, spaceId: record.spaceId, conversationId: record.conversation.id });
@@ -253,6 +267,7 @@ export class StandInChat {
       createdAt: new Date().toISOString(),
     };
     record.messages.push(message);
+    if (orclingCall && this.orclingEnabled) this.calls.record(record, message, who, orclingCall);
     record.conversation.lastMessageAt = message.createdAt;
     this.#deliver(record, message);
     return { status: 201, body: message };
@@ -262,7 +277,16 @@ export class StandInChat {
   #answered(record: StandInChatRecord, id: string | undefined): TeamMessage["replyTo"] | undefined {
     if (id === undefined) return null;
     const answered = this.repliesEnabled ? record.messages.find((message) => message.id === id) : undefined;
-    return answered && { id: answered.id, seq: answered.seq, person: answered.actor.person, excerpt: excerpt(answered.body), files: answered.files.length };
+    return (
+      answered && {
+        id: answered.id,
+        seq: answered.seq,
+        person: actorPerson(answered.actor),
+        orcling: answered.actor.kind === "orcling" ? { name: answered.actor.name } : null,
+        excerpt: excerpt(answered.body),
+        files: answered.files.length,
+      }
+    );
   }
 
   /** The same id again answers the stored message to its sender in this conversation, and refuses anything else. */
@@ -271,7 +295,7 @@ export class StandInChat {
       .flatMap((each) => each.messages)
       .find((message) => message.id === id);
     if (!previous) return null;
-    return previous.actor.person?.id === userOf(who) && previous.channelId === record.conversation.id && previous.body === body
+    return actorPerson(previous.actor)?.id === userOf(who) && previous.channelId === record.conversation.id && previous.body === body
       ? { status: 201, body: previous }
       : { status: 409, body: { code: "message_id_conflict", message: "That message ID is already in use." } };
   }

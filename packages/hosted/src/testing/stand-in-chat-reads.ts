@@ -1,4 +1,4 @@
-import type { TeamChatRead } from "@openorc/protocol";
+import { actorPerson, type TeamChatRead } from "@openorc/protocol";
 import { userOf } from "./stand-in-spaces.js";
 import type { StandInChatRecord } from "./stand-in-chat.js";
 
@@ -18,7 +18,7 @@ export class StandInChatReads {
   read(record: StandInChatRecord, who: string): TeamChatRead | null {
     if (!record.conversation.members.some((person) => person.id === userOf(who))) return null;
     const seenSeq = this.#seen.get(key(record.conversation.id, who)) ?? 0;
-    const later = record.messages.filter((message) => message.seq > seenSeq && message.actor.person?.id !== userOf(who));
+    const later = record.messages.filter((message) => message.seq > seenSeq && actorPerson(message.actor)?.id !== userOf(who));
     return {
       seenSeq,
       seenThroughMessageId: record.messages.find((message) => message.seq === seenSeq)?.id ?? null,

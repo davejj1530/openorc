@@ -1,0 +1,46 @@
+/* An Orcling's answer keeps its tint: its bubbles take a wash of its body color over the usual fill. */
+.team-chat .team-chat-run-orcling {
+  --orcling-fill: color-mix(in srgb, var(--orcling-tint) 16%, var(--surface-2));
+}
+
+/* The call a message made, on one quiet line under it. */
+.team-chat-call {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+}
+.team-chat-call-failed {
+  color: var(--ink-3);
+}
+.team-chat-call-retry {
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.team-chat-call-retry:hover {
+  background: var(--surface-2);
+}
+.team-chat-call-retry:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* In the `@` list, what an Orcling is to the person, after its name. */
+.team-chat-tag-detail {
+  margin-left: auto;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+}
+
+.team-chat-message:has(> .team-chat-call) {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.team-chat-message-mine:has(> .team-chat-call) {
+  align-items: flex-end;
+}

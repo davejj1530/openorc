@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { TeamChatFile, TeamChatPerson } from "@openorc/protocol";
+import type { TeamChatFile, TeamChatOrclingPick, TeamChatPerson } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { useTagging } from "../lib/team-chat-tagging";
 import { ComposerEditor, type ComposerEditorHandle } from "./composer-editor/ComposerEditor";
@@ -25,13 +25,16 @@ export interface TeamChatComposerProps {
   files?: TeamChatComposerFiles | null;
   /** The message the next send answers, while the person is replying. */
   replying?: TeamChatReplying | null;
+  /** The person's own Orclings the `@` list offers after people, and what a pick of one does. */
+  orclings?: readonly TeamChatOrclingPick[];
+  onOrcling?: (orcling: TeamChatOrclingPick) => void;
 }
 
-export function TeamChatComposer({ text, placeholder, reason, onChange, onSend, taggable = [], named = [], files: place = null, replying = null }: TeamChatComposerProps) {
+export function TeamChatComposer({ text, placeholder, reason, onChange, onSend, taggable = [], named = [], files: place = null, replying = null, orclings, onOrcling }: TeamChatComposerProps) {
   const editor = useRef<ComposerEditorHandle>(null);
   const shell = useRef<HTMLDivElement>(null);
   const [caret, setCaret] = useState<number | null>(null);
-  const tags = useTagging({ text, caret, taggable, named, editor });
+  const tags = useTagging({ text, caret, taggable, named, orclings, onOrcling, editor });
   const draft = useTeamChatDraftFiles(place);
   const answering = replying?.answered.id;
   useEffect(() => {
@@ -51,7 +54,7 @@ export function TeamChatComposer({ text, placeholder, reason, onChange, onSend, 
     <div className="composer-padding team-chat-compose">
       <div className="mx-auto max-w-chat w-full composer">
         <div className="composer-shell" ref={shell}>
-          {tags.matches.length ? <TeamChatTagPicker anchor={shell} people={tags.matches} cursor={tags.cursor} onCursor={tags.setCursor} onPick={tags.pick} onDismiss={tags.dismiss} /> : null}
+          {tags.matches.length ? <TeamChatTagPicker anchor={shell} candidates={tags.matches} cursor={tags.cursor} onCursor={tags.setCursor} onPick={tags.pick} onDismiss={tags.dismiss} /> : null}
           {replying ? <TeamChatReplyingLine {...replying} /> : null}
           {place ? <TeamChatAttachments place={place} draft={draft} /> : null}
           <div className="composer-prompt">

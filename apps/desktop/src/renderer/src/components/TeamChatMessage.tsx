@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ContextMenu } from "@base-ui/react/context-menu";
-import type { TeamChatPerson, TeamChatReaction, TeamMessage } from "@openorc/protocol";
+import { actorPerson, type TeamChatPerson, type TeamChatReaction, type TeamMessage, type TeamOrclingCall } from "@openorc/protocol";
+import { TeamChatCallLine } from "./TeamChatCallLine";
+import { actorName } from "../lib/team-chat-actor";
 import { cn } from "../lib/cn";
 import { useTeamChatVisible } from "../lib/team-chat-visibility";
 import { CoversPreview } from "../lib/browser-preview";
@@ -25,6 +27,7 @@ export function TeamChatMessage({
   onReply,
   onOpenAnswered,
   onPin,
+  onRetryCall,
   found,
 }: {
   message: TeamMessage;
@@ -37,6 +40,8 @@ export function TeamChatMessage({
   onOpenAnswered?: () => void;
   /** Pinning or unpinning for everyone in the conversation; absent where pins aren't available or for a reader who hasn't joined. */
   onPin?: (pinned: boolean) => void;
+  /** The owner tries again a call of their Orcling this message made. */
+  onRetryCall?: (call: TeamOrclingCall) => void;
   /** Shown in place just now, from a reply, a pin or a search. */
   found?: true;
 }) {
@@ -59,7 +64,7 @@ export function TeamChatMessage({
     document.addEventListener("pointerdown", outside);
     return () => document.removeEventListener("pointerdown", outside);
   }, [open]);
-  const mine = message.actor.person?.id === self;
+  const mine = actorPerson(message.actor)?.id === self;
   const words = personTagText(message.body, (id) => people.find((person) => person.id === id)?.name);
   // Words keep their bubble and the files go under it; files alone sit in the bubble, which carries reactions.
   const withFiles = message.files.length > 0 && Boolean(message.body.trim());
@@ -80,7 +85,7 @@ export function TeamChatMessage({
       {message.replyTo ? <TeamChatReplyQuote answered={message.replyTo} self={self} people={people} onOpen={onOpenAnswered} /> : null}
       <div className="team-chat-bubble-line">
         <ContextMenu.Root open={menuOpen && visible} onOpenChange={setMenuOpen}>
-          <ContextMenu.Trigger className={cn("orcling-bubble", mine && "message-bubble")} tabIndex={0} aria-label={`${message.actor.person?.name ?? "Former member"}: ${words}`}>
+          <ContextMenu.Trigger className={cn("orcling-bubble", mine && "message-bubble")} tabIndex={0} aria-label={`${actorName(message.actor)}: ${words}`}>
             <BubbleContent message={message} people={people} words={words} />
             <TeamChatReactions reactions={message.reactions} people={people} self={self} onReact={onReact} reason={reason} side={mine ? "start" : "end"} />
           </ContextMenu.Trigger>
@@ -98,6 +103,7 @@ export function TeamChatMessage({
         <TeamChatReactionPicker open={open && !reason} reactions={message.reactions} self={self} onReact={onReact} onClose={() => setOpen(false)} />
       </div>
       {withFiles ? <TeamChatFiles files={message.files} conversationId={message.channelId} /> : null}
+      <TeamChatCallLine call={message.call} self={self} onRetry={onRetryCall} />
       {copyError ? (
         <span role="status" className="team-chat-message-error">
           Text could not be copied.

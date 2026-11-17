@@ -1,9 +1,19 @@
-import { TeamChatPins, TeamChatRead, TeamChatSearch, TeamChatState, TeamChatTimeline, TeamConversation, TeamMessage } from "@openorc/protocol";
+import { type OrclingLook, TeamOwnerOrclingCall, TeamChatPins, TeamChatRead, TeamChatSearch, TeamChatState, TeamChatTimeline, TeamConversation, TeamMessage } from "@openorc/protocol";
 import { z } from "zod";
 import type { Route } from "./wire.js";
 
 const route = <T>(method: Route<T>["method"], path: string, reply: z.ZodType<T>): Route<T> => ({ method, path, reply });
 const conversationPath = (id: string) => `/chat/conversations/${encodeURIComponent(id)}`;
+const callPath = (id: string) => `/chat/calls/${encodeURIComponent(id)}`;
+/** The calling message and up to 50 before it, as the server lets the owner's app read them to answer. */
+export const orclingClaim = z.object({
+  call: TeamOwnerOrclingCall.shape.call,
+  context: z.object({
+    callingMessageId: z.string(),
+    messages: z.array(z.object({ id: z.string(), seq: z.number(), speaker: z.string(), body: z.string(), files: z.array(z.object({ name: z.string(), bytes: z.number() })) })),
+  }),
+});
+export type OrclingClaim = z.infer<typeof orclingClaim>;
 export const CHAT_ROUTES = {
   state: route("GET", "/chat/state", TeamChatState),
   openDm: route("POST", "/chat/dms", TeamConversation),
@@ -26,6 +36,17 @@ export const CHAT_ROUTES = {
   },
   send: (id: string) => route("POST", `${conversationPath(id)}/messages`, TeamMessage),
   react: (id: string) => route("POST", `/chat/messages/${encodeURIComponent(id)}/reactions`, TeamMessage),
+  orclingCall: (id: string) => route("GET", callPath(id), TeamOwnerOrclingCall),
+  claimCall: (id: string) => route("POST", `${callPath(id)}/claim`, orclingClaim),
+  renewCall: (id: string) =>
+    route(
+      "POST",
+      `${callPath(id)}/heartbeat`,
+      z.null().transform(() => ({})),
+    ),
+  answerCall: (id: string) => route("POST", `${callPath(id)}/answer`, TeamMessage),
+  failCall: (id: string) => route("POST", `${callPath(id)}/fail`, TeamOwnerOrclingCall),
+  retryCall: (id: string) => route("POST", `${callPath(id)}/retry`, TeamOwnerOrclingCall),
   search: (q: string) => route("GET", `/chat/search?${new URLSearchParams({ q })}`, TeamChatSearch),
   pins: (id: string) => route("GET", `${conversationPath(id)}/pins`, TeamChatPins),
   pin: (id: string, pinned: boolean) => route(pinned ? "POST" : "DELETE", `/chat/messages/${encodeURIComponent(id)}/pin`, TeamMessage),
@@ -37,3 +58,6 @@ export type ChatWatch = z.infer<typeof chatWatch>;
 export const chatWatched = chatWatch.extend({ ok: z.boolean() });
 export const chatMessage = z.object({ spaceId: z.string(), conversationId: z.string(), message: TeamMessage });
 export const chatRead = z.object({ spaceId: z.string(), conversationId: z.string(), read: TeamChatRead });
+
+/** What the owner's app sends with a message that calls its Orcling; the secret never leaves the app's core otherwise. */
+export type WireOrclingCall = { id: string; localOrclingId: string; name: string; look: OrclingLook; runnerSecret: string };

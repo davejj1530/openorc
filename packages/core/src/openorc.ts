@@ -11,6 +11,7 @@ import { BenchGenerator } from "./bench.js";
 import { DeviceService } from "./devices/service.js";
 import { FrameCoalescer } from "./frames.js";
 import { createHostedHandlers } from "./handlers/hosted.js";
+import { TeamChatOrclingCalls } from "./services/team-chat-orclings.js";
 import { hostedFilesFor, type HostedFiles } from "./services/hosted-files.js";
 import { hostedParityHandlers } from "./handlers/hosted-parity.js";
 import { threadCollaborationHandlers } from "./handlers/thread-collaboration.js";
@@ -709,7 +710,7 @@ export class OpenOrc {
       createSlackHandlers({ slack: this.slack, invalidate }),
       createCloudHandlers(),
       createClaudeAccountHandlers(this.claudeAccounts),
-      createHostedHandlers(this.account, this.hostedFiles, this.db),
+      createHostedHandlers(this.account, this.hostedFiles, this.db, new TeamChatOrclingCalls({ db: this.db, orclings: this.orclings, textGeneration: this.textGeneration, log: this.log })),
       createHostedSkillsCloudHandlers(() => this.hostedSkills, this.settings),
       createCloudMovesHandlers(() => this.cloudMoves),
       createMacProjectsHandlers(new MacProjects({ db: this.db, hosted: () => this.account, changed: () => this.options.transport.push({ type: "invalidate", keys: ["macProjects"] }) })),

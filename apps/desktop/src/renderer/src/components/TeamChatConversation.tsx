@@ -26,7 +26,12 @@ export function TeamChatConversation({
   /** What the server offers; a control appears only for a feature it lists. */
   features: ReadonlySet<TeamChatFeature>;
 }) {
-  const content = useTeamChatConversation(scope, target, conversation, { unread: features.has("unread"), replies: features.has("replies"), pins: features.has("pins") });
+  const content = useTeamChatConversation(scope, target, conversation, {
+    unread: features.has("unread"),
+    replies: features.has("replies"),
+    pins: features.has("pins"),
+    orcling: features.has("orcling"),
+  });
   const place = useTeamChatFilePlace(scope, conversation.id, features.has("files") && conversation.joined);
   const [details, setDetails] = useState(false);
   const visible = useTeamChatVisible();

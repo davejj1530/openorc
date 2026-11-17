@@ -38,7 +38,7 @@ it("retains a stable send ID through an unconfirmed delivery and relaunch", () =
 it("keeps the message a draft answers through relaunch, sends it with the words once, then answers none", () => {
   const disk = storage();
   const drafts = new TeamChatDrafts(disk);
-  const answered = { id: "question", seq: 4, person: { id: "mara", name: "Mara Okafor", image: null }, excerpt: "Is the build green?", files: 0 };
+  const answered = { id: "question", seq: 4, person: { id: "mara", name: "Mara Okafor", image: null }, orcling: null, excerpt: "Is the build green?", files: 0 };
   drafts.reply(scope, answered);
   drafts.write(scope, "Yes");
   const again = new TeamChatDrafts(disk);
@@ -69,8 +69,8 @@ it("cannot restore removed words when browser storage refuses deletion", () => {
   });
   drafts.write(scope, "Private words");
   drafts.forget(scope);
-  expect(drafts.read(scope)).toEqual({ text: "", replyTo: null, pending: [] });
+  expect(drafts.read(scope)).toEqual({ text: "", replyTo: null, orcling: null, pending: [] });
   drafts.write(scope, "New words");
   drafts.forgetSpace(scope.accountId, scope.spaceId);
-  expect(drafts.read(scope)).toEqual({ text: "", replyTo: null, pending: [] });
+  expect(drafts.read(scope)).toEqual({ text: "", replyTo: null, orcling: null, pending: [] });
 });

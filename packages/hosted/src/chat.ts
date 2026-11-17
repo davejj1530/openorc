@@ -1,7 +1,7 @@
 import type { RpcParams, TeamChatRead, TeamChatStatus, TeamConversation } from "@openorc/protocol";
 import type { HostedDeps, HostedSpaces } from "./index.js";
 import { Refused, type Session } from "./session.js";
-import { CHAT_ROUTES, chatMessage, chatRead, chatWatched, type ChatWatch } from "./wire-chat.js";
+import { CHAT_ROUTES, chatMessage, chatRead, chatWatched, type ChatWatch, type OrclingClaim, type WireOrclingCall } from "./wire-chat.js";
 import { SOCKET, wireTopics, type Route } from "./wire.js";
 
 interface ChatDeps extends Pick<HostedDeps, "push"> {
@@ -125,10 +125,48 @@ export class TeamChat {
     return this.#change(spaceId, CHAT_ROUTES.removeMember(conversationId, userId));
   }
 
-  async send({ spaceId, conversationId, id, body, fileIds, replyToId }: RpcParams<"teamChat.send">) {
-    const message = await this.#request(spaceId, CHAT_ROUTES.send(conversationId), { id, body, parentId: null, replyToId: replyToId ?? null, fileIds: fileIds ?? [] });
+  /** A message; one that calls the sender's own Orcling carries the call its app made, secret and all. */
+  async send({ spaceId, conversationId, id, body, fileIds, replyToId }: Omit<RpcParams<"teamChat.send">, "orcling">, orclingCall: WireOrclingCall | null = null) {
+    const message = await this.#request(spaceId, CHAT_ROUTES.send(conversationId), { id, body, parentId: null, replyToId: replyToId ?? null, fileIds: fileIds ?? [], orclingCall });
     this.#invalidate(spaceId, conversationId);
     return message;
+  }
+
+  orclingCall({ spaceId, callId }: RpcParams<"teamChat.orclingCall">) {
+    return this.#request(spaceId, CHAT_ROUTES.orclingCall(callId));
+  }
+
+  /** The owner's app takes its call to run, and reads what the Orcling answers from. */
+  claimCall(spaceId: string, callId: string, attempt: { attemptId: string; runnerSecret: string }): Promise<OrclingClaim> {
+    return this.#request(spaceId, CHAT_ROUTES.claimCall(callId), attempt);
+  }
+
+  renewCall(spaceId: string, callId: string, attempt: { attemptId: string; runnerSecret: string }) {
+    return this.#request(spaceId, CHAT_ROUTES.renewCall(callId), attempt);
+  }
+
+  async answerCall(spaceId: string, conversationId: string, callId: string, answer: { attemptId: string; runnerSecret: string; body: string }) {
+    try {
+      return await this.#request(spaceId, CHAT_ROUTES.answerCall(callId), answer);
+    } finally {
+      this.#invalidate(spaceId, conversationId);
+    }
+  }
+
+  async failCall(spaceId: string, conversationId: string, callId: string, failure: { attemptId: string; runnerSecret: string; reason: string }) {
+    try {
+      return await this.#request(spaceId, CHAT_ROUTES.failCall(callId), failure);
+    } finally {
+      this.#invalidate(spaceId, conversationId);
+    }
+  }
+
+  async retryCall(spaceId: string, conversationId: string, callId: string, runnerSecret: string) {
+    try {
+      return await this.#request(spaceId, CHAT_ROUTES.retryCall(callId), { runnerSecret });
+    } finally {
+      this.#invalidate(spaceId, conversationId);
+    }
   }
 
   search({ spaceId, q }: RpcParams<"teamChat.search">) {

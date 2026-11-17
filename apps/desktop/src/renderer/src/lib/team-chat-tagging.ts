@@ -1,23 +1,31 @@
 import { useMemo, useState, type RefObject } from "react";
 import { teamChatShortNames } from "@openorc/client";
-import type { TeamChatPerson } from "@openorc/protocol";
+import type { TeamChatOrclingPick, TeamChatPerson } from "@openorc/protocol";
 import { mentionQueryAt } from "./composer-mentions";
 import { personTag } from "./message-marks";
-import { matchingPeople } from "../components/TeamChatTagPicker";
+import { matchingPeople, type TeamChatTagCandidate } from "../components/TeamChatTagPicker";
 import type { ComposerEditorHandle } from "../components/composer-editor/ComposerEditor";
 
-/** The `@` list at the caret: who it offers, the row the keys move, and the structured tag a pick writes. */
+/**
+ * The `@` list at the caret: who it offers, the row the keys move, and what a pick writes: a teammate's structured tag,
+ * or the plain name of the person's own Orcling, which the draft then calls.
+ */
 export function useTagging({
   text,
   caret,
   taggable,
   named,
+  orclings = [],
+  onOrcling,
   editor,
 }: {
   text: string;
   caret: number | null;
   taggable: readonly TeamChatPerson[];
   named: readonly TeamChatPerson[];
+  /** The person's own Orclings this conversation can call; listed after people. */
+  orclings?: readonly TeamChatOrclingPick[];
+  onOrcling?: (orcling: TeamChatOrclingPick) => void;
   editor: RefObject<ComposerEditorHandle | null>;
 }) {
   const [cursor, setCursor] = useState(0);
@@ -27,11 +35,18 @@ export function useTagging({
     return { people: named.map((person, index) => ({ id: person.id, name: short[index] ?? person.name })) };
   }, [named]);
   const query = caret === null ? null : mentionQueryAt(text, caret);
-  const matches = query && query.start !== dismissed ? matchingPeople(taggable, query.query) : [];
+  const matches: TeamChatTagCandidate[] =
+    query && query.start !== dismissed
+      ? [
+          ...matchingPeople(taggable, query.query).map((person) => ({ kind: "person" as const, person })),
+          ...matchingPeople(orclings, query.query).map((orcling) => ({ kind: "orcling" as const, orcling })),
+        ]
+      : [];
   const at = Math.min(cursor, Math.max(0, matches.length - 1));
-  const pick = (person: TeamChatPerson) => {
+  const pick = (candidate: TeamChatTagCandidate) => {
     if (!query || caret === null) return;
-    const tag = `${personTag(person.id)} `;
+    if (candidate.kind === "orcling") onOrcling?.(candidate.orcling);
+    const tag = candidate.kind === "person" ? `${personTag(candidate.person.id)} ` : `@${candidate.orcling.name} `;
     editor.current?.pick(`${text.slice(0, query.start)}${tag}${text.slice(caret)}`, query.start + tag.length);
     setCursor(0);
   };

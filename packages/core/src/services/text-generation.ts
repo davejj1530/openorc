@@ -123,6 +123,24 @@ export class TextGenerationService {
     }
   }
 
+  /**
+   * A one-shot answer from a chosen agent and model rather than the text-generation choice, with every tool off, such as
+   * an Orcling's answer on its own model in a team chat.
+   */
+  async speak(request: { agent: HarnessId; model: string; claudeAccountId?: string; system: string; prompt: string; schema: object }): Promise<Completion> {
+    this.pending++;
+    try {
+      const { resolved, reason } = await this.resolve(request.agent, request.model, request.claudeAccountId);
+      const launch = resolved && this.providers.launch(resolved.provider, request.claudeAccountId);
+      if (!resolved || !launch) return { kind: "unavailable", reason: reason ?? `${harnessCatalog[request.agent].name} is unavailable. Check its connection in Settings.` };
+      const generator = new TextGenerator({ provider: resolved.provider, model: resolved.model, binary: launch.binary, env: launch.env, system: request.system, timeoutMs: 180_000 });
+      const text = await generator.complete(request.prompt, request.schema);
+      return text ? { kind: "answered", text, model: { provider: resolved.provider, label: resolved.label } } : { kind: "failed" };
+    } finally {
+      this.pending--;
+    }
+  }
+
   private async generator(agent: AgentKind, claudeAccountId: string | undefined, options: { effort?: "low"; system?: string; timeoutMs: number }): Promise<Generator> {
     const prefs = this.preferences();
     if (prefs.provider === "off") return { reason: "Text generation is off. Turn it on in Settings." };

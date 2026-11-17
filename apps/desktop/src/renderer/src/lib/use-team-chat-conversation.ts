@@ -9,12 +9,13 @@ import { useNewFrom, useTeamChatSeen } from "./team-chat-seen";
 import { jumpToTeamMessage, useTeamMessageReveal } from "./team-chat-jump";
 import { answeredOf } from "./team-chat-replies";
 import { pinTeamMessage } from "./team-chat-pins";
+import { useTeamChatOrclings } from "./team-chat-orclings";
 
 export function useTeamChatConversation(
   scope: TeamChatContextValue,
   target: TeamChatRoute,
   conversation: TeamConversation,
-  features: { unread: boolean; replies: boolean; pins: boolean },
+  features: { unread: boolean; replies: boolean; pins: boolean; orcling: boolean },
 ): Omit<TeamChatProps, "conversation" | "people" | "names"> {
   const timeline = useTeamChatTimeline(scope, target.conversationId, true);
   const newFrom = useNewFrom(conversation, features.unread);
@@ -39,6 +40,7 @@ export function useTeamChatConversation(
         timeline.data.messages.map((message) => message.id),
       );
   }, [timeline.data, target]);
+  const orclings = useTeamChatOrclings(scope, target, features.orcling && conversation.joined, setActionError);
   const revealing = useTeamMessageReveal({ target, page: timeline.data, paging: loadingOlder, failed: actionError !== null, loadOlder: () => void older() });
   const older = async () => {
     setLoadingOlder(true);
@@ -80,6 +82,7 @@ export function useTeamChatConversation(
       void older();
     },
     ...revealing,
+    ...orclings,
     ...replying(target, draft.replyTo, features.replies, conversation.joined),
     ...pinning(scope, target, features.pins, conversation.joined, setActionError),
     onReact: (message, emoji) => {

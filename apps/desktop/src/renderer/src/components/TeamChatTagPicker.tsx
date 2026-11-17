@@ -1,32 +1,37 @@
 import { useId, type RefObject } from "react";
-import type { TeamChatPerson } from "@openorc/protocol";
+import type { TeamChatOrclingPick, TeamChatPerson } from "@openorc/protocol";
 import { AccountFace } from "./AccountFace";
+import { OrclingAvatar } from "./OrclingAvatar";
 import { ComposerSuggestions } from "./ComposerSuggestions";
 import "../styles/team-chat-unread.css";
 
-/** Teammates the `@` word at the caret may tag, by face and full name; picking writes their structured tag. */
+/** Who the `@` word can name: a teammate, tagged, or one of the person's own Orclings, called once. */
+export type TeamChatTagCandidate = { kind: "person"; person: TeamChatPerson } | { kind: "orcling"; orcling: TeamChatOrclingPick };
+const candidateKey = (candidate: TeamChatTagCandidate) => (candidate.kind === "person" ? `person:${candidate.person.id}` : `orcling:${candidate.orcling.localOrclingId}`);
+
+/** Teammates the `@` word at the caret may tag, by face and full name, then the person's own Orclings; picking writes the tag or the call. */
 export function TeamChatTagPicker({
   anchor,
-  people,
+  candidates,
   cursor,
   onCursor,
   onPick,
   onDismiss,
 }: {
   anchor: RefObject<HTMLDivElement | null>;
-  people: readonly TeamChatPerson[];
+  candidates: readonly TeamChatTagCandidate[];
   cursor: number;
   onCursor(index: number): void;
-  onPick(person: TeamChatPerson): void;
+  onPick(candidate: TeamChatTagCandidate): void;
   onDismiss(): void;
 }) {
   const id = useId();
   return (
-    <ComposerSuggestions anchor={anchor} side="top" members cursor={cursor} count={people.length} onDismiss={onDismiss}>
-      <div id={id} role="listbox" aria-label="Tag a person">
-        {people.map((person, index) => (
+    <ComposerSuggestions anchor={anchor} side="top" members cursor={cursor} count={candidates.length} onDismiss={onDismiss}>
+      <div id={id} role="listbox" aria-label="Tag a person or call your Orcling">
+        {candidates.map((candidate, index) => (
           <button
-            key={person.id}
+            key={candidateKey(candidate)}
             id={`${id}-${index}`}
             type="button"
             tabIndex={-1}
@@ -35,12 +40,22 @@ export function TeamChatTagPicker({
             className="composer-suggestion team-chat-tag-option"
             onMouseDown={(event) => {
               event.preventDefault();
-              onPick(person);
+              onPick(candidate);
             }}
             onMouseMove={() => onCursor(index)}
           >
-            <AccountFace name={person.name} image={person.image} />
-            <span className="composer-suggestion-label">{person.name}</span>
+            {candidate.kind === "person" ? (
+              <>
+                <AccountFace name={candidate.person.name} image={candidate.person.image} />
+                <span className="composer-suggestion-label">{candidate.person.name}</span>
+              </>
+            ) : (
+              <>
+                <OrclingAvatar orcling={candidate.orcling} size={20} />
+                <span className="composer-suggestion-label">{candidate.orcling.name}</span>
+                <span className="team-chat-tag-detail">Your Orcling</span>
+              </>
+            )}
           </button>
         ))}
       </div>

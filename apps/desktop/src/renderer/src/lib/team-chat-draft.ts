@@ -1,4 +1,4 @@
-import { TeamChatDraft, type PendingTeamMessage, type TeamChatAnswered } from "@openorc/protocol";
+import { TeamChatDraft, type PendingTeamMessage, type TeamChatAnswered, type TeamChatOrclingPick } from "@openorc/protocol";
 export type { TeamChatDraft, PendingTeamMessage } from "@openorc/protocol";
 export interface TeamChatTarget {
   accountId: string;
@@ -24,7 +24,7 @@ export class TeamChatDrafts {
     const key = keyOf(at);
     const cached = this.#memory.get(key);
     if (cached) return cached;
-    let saved: TeamChatDraft = { text: "", replyTo: null, pending: [] };
+    let saved: TeamChatDraft = { text: "", replyTo: null, orcling: null, pending: [] };
     try {
       const parsed = TeamChatDraft.safeParse(JSON.parse(this.storage.getItem(key) ?? "null"));
       if (parsed.success) saved = { ...parsed.data, pending: parsed.data.pending.map((message) => ({ ...message, state: "failed", error: "Delivery couldn't be confirmed." })) };
@@ -41,11 +41,26 @@ export class TeamChatDrafts {
   reply(at: TeamChatTarget, replyTo: TeamChatAnswered | null): void {
     this.#save(at, { ...this.read(at), replyTo });
   }
+  /** The person's own Orcling the next send calls, picked from the `@` list. */
+  callOrcling(at: TeamChatTarget, orcling: TeamChatOrclingPick): void {
+    this.#save(at, { ...this.read(at), orcling });
+  }
   begin(at: TeamChatTarget, files: PendingTeamMessage["files"] = []): PendingTeamMessage | null {
     const current = this.read(at);
     if (!current.text.trim() && !files.length) return null;
-    const message: PendingTeamMessage = { id: crypto.randomUUID(), body: current.text, files, replyTo: current.replyTo, createdAt: new Date().toISOString(), state: "sending", error: null };
-    this.#save(at, { text: "", replyTo: null, pending: [...current.pending, message] });
+    // An Orcling is called only while its name is still in the words; deleting "@Rini" takes the call back.
+    const called = current.orcling && current.text.includes(`@${current.orcling.name}`) ? { ...current.orcling, callId: crypto.randomUUID() } : null;
+    const message: PendingTeamMessage = {
+      id: crypto.randomUUID(),
+      body: current.text,
+      files,
+      replyTo: current.replyTo,
+      orcling: called,
+      createdAt: new Date().toISOString(),
+      state: "sending",
+      error: null,
+    };
+    this.#save(at, { text: "", replyTo: null, orcling: null, pending: [...current.pending, message] });
     return message;
   }
   attempt(at: TeamChatTarget, id: string): void {
@@ -78,7 +93,7 @@ export class TeamChatDrafts {
     this.#emit();
   }
   #forgetKey(key: string): void {
-    const empty = { text: "", replyTo: null, pending: [] };
+    const empty = { text: "", replyTo: null, orcling: null, pending: [] };
     this.#memory.set(key, empty);
     try {
       this.storage.removeItem(key);

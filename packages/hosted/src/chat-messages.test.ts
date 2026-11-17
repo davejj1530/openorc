@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { actorPerson } from "@openorc/protocol";
 import { createHosted, type Hosted } from "./index.js";
 import { hostDeps, newDevice, signInAs } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
@@ -41,7 +42,7 @@ it("sends a reply through the app's client and reads the message it answers, ref
   expect(await first.chat.state({ spaceId })).toMatchObject({ state: "ready", chat: { features: expect.arrayContaining(["replies"]) } });
   const question = await first.chat.send({ ...target, id: randomUUID(), body: "Ready for review?" });
   const answer = await second.chat.send({ ...target, id: randomUUID(), body: "Yes", replyToId: question.id });
-  expect(answer.replyTo).toEqual({ id: question.id, seq: question.seq, person: question.actor.person, excerpt: "Ready for review?", files: 0 });
+  expect(answer.replyTo).toEqual({ id: question.id, seq: question.seq, person: actorPerson(question.actor), orcling: null, excerpt: "Ready for review?", files: 0 });
   expect((await first.chat.timeline(target)).messages.map((message) => message.replyTo?.id ?? null)).toEqual([null, question.id]);
   const other = await first.chat.createChannel({ spaceId, name: "elsewhere" });
   const elsewhere = await first.chat.send({ spaceId, conversationId: other.id, id: randomUUID(), body: "Elsewhere" });

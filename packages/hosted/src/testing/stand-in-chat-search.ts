@@ -1,4 +1,4 @@
-import type { TeamChatSearch } from "@openorc/protocol";
+import { actorPerson, type TeamChatSearch } from "@openorc/protocol";
 import type { StandInChatRecord } from "./stand-in-chat.js";
 
 const wordsOf = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? [];
@@ -28,7 +28,7 @@ export function standInSearch(readable: StandInChatRecord[], q: string, nameOf: 
         id: message.id,
         channelId: message.channelId,
         seq: message.seq,
-        person: message.actor.person,
+        person: actorPerson(message.actor),
         snippet: { text, marks },
         files: message.files.map(({ name, kind }) => ({ name, kind })),
         createdAt: message.createdAt,

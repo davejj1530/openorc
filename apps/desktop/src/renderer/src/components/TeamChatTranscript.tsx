@@ -1,11 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { stretchTime } from "@openorc/client";
-import type { PendingTeamMessage, TeamChatAnswered, TeamChatPerson, TeamChatReaction, TeamMessage } from "@openorc/protocol";
+import { actorPerson, type PendingTeamMessage, type TeamChatAnswered, type TeamChatPerson, type TeamChatReaction, type TeamMessage, type TeamOrclingCall } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { teamChatGroups } from "../lib/team-chat-groups";
 import { useTeamChatVisible } from "../lib/team-chat-visibility";
 import { lastDisplayed, useWindowAttention } from "../lib/team-chat-seen";
-import { AccountFace } from "./AccountFace";
+import { TeamChatActorFace } from "./TeamChatActorFace";
+import { actorName } from "../lib/team-chat-actor";
 import { TeamChatMessage } from "./TeamChatMessage";
 import { TeamChatReplyQuote } from "./TeamChatReplyQuote";
 import { Tooltip } from "./ui";
@@ -32,6 +33,8 @@ export interface TeamChatTranscriptProps {
   onOpenAnswered?: (answered: TeamChatAnswered) => void;
   /** Pinning for everyone; absent where pins aren't available or for a reader who hasn't joined. */
   onPin?: (message: TeamMessage, pinned: boolean) => void;
+  /** The owner tries again a call of their own Orcling. */
+  onRetryCall?: (call: TeamOrclingCall) => void;
   /** A message to bring into view and mark, once it is on the page. */
   reveal?: { id: string; nonce: number } | null;
   onRevealed?: (nonce: number) => void;
@@ -43,7 +46,7 @@ export function TeamChatTranscript(props: TeamChatTranscriptProps) {
   const previous = useRef({ height: 0, first: "" });
   const attending = useWindowAttention();
   const placed = useRef(false);
-  const firstNew = props.newFrom == null ? undefined : props.messages.find((message) => message.seq > props.newFrom! && message.actor.person?.id !== props.self);
+  const firstNew = props.newFrom == null ? undefined : props.messages.find((message) => message.seq > props.newFrom! && actorPerson(message.actor)?.id !== props.self);
   useLayoutEffect(() => {
     const element = viewport.current;
     if (!element || !visible) return;
@@ -143,14 +146,20 @@ function SpeakerGroup({
   onReply,
   onOpenAnswered,
   onPin,
+  onRetryCall,
   found,
-}: Pick<TeamChatTranscriptProps, "messages" | "self" | "people" | "reason" | "names" | "onReact" | "onReply" | "onOpenAnswered" | "onPin"> & { found: string | null }) {
-  const person = messages[0]?.actor.person;
-  const mine = person?.id === self;
+}: Pick<TeamChatTranscriptProps, "messages" | "self" | "people" | "reason" | "names" | "onReact" | "onReply" | "onOpenAnswered" | "onPin" | "onRetryCall"> & { found: string | null }) {
+  const actor = messages[0]!.actor;
+  const mine = actorPerson(actor)?.id === self;
+  const orcling = actor.kind === "orcling" ? actor : null;
   return (
-    <div className={cn("orcling-run team-chat-run", mine && "team-chat-run-mine")}>
-      {!mine ? <AccountFace name={person?.name ?? "Former member"} image={person?.image ?? null} className="orcling-run-face" /> : null}
-      {!mine && names ? <div className="orcling-run-name">{person?.name ?? "Former member"}</div> : null}
+    <div
+      className={cn("orcling-run team-chat-run", mine && "team-chat-run-mine", orcling && "team-chat-run-orcling")}
+      {...(orcling && { style: { "--orcling-tint": orcling.look.bodyColor } as CSSProperties })}
+    >
+      {!mine ? <TeamChatActorFace actor={actor} size={28} className="orcling-run-face" /> : null}
+      {orcling ? <div className="orcling-run-name">{`${orcling.name} · ${orcling.owner.id === self ? "Your" : `${orcling.owner.name}'s`} Orcling`}</div> : null}
+      {!mine && !orcling && names ? <div className="orcling-run-name">{actorName(actor)}</div> : null}
       <div className="orcling-run-bubbles">
         {messages.map((message) => (
           <TeamChatMessage
@@ -163,6 +172,7 @@ function SpeakerGroup({
             {...(onReply && { onReply: () => onReply(message) })}
             {...(onOpenAnswered && message.replyTo && { onOpenAnswered: () => onOpenAnswered(message.replyTo!) })}
             {...(onPin && { onPin: (pinned: boolean) => onPin(message, pinned) })}
+            onRetryCall={onRetryCall}
             found={found === message.id || undefined}
           />
         ))}

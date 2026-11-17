@@ -88,7 +88,7 @@ function serve(
     }
     if (method === "teamChat.send") {
       const sent = params as RpcParams<"teamChat.send">;
-      return { ...message(3, sent.body, self, sent.replyToId ? { id: sent.replyToId, seq: 2, person: mara, excerpt: "Is the build green?", files: 0 } : null), id: sent.id };
+      return { ...message(3, sent.body, self, sent.replyToId ? { id: sent.replyToId, seq: 2, person: mara, orcling: null, excerpt: "Is the build green?", files: 0 } : null), id: sent.id };
     }
     return { ok: true };
   });

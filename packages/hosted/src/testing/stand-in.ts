@@ -18,6 +18,7 @@ import type { AddressInfo, Socket } from "node:net";
 import type { LiveSocket } from "../index.js";
 import { engineSession } from "./stand-in-socket.js";
 import { StandInSignIns } from "./stand-in-sign-ins.js";
+import { accountDeletionRoutes } from "./stand-in-account-deletion.js";
 import { StandInAppSignIns } from "./stand-in-app-sign-ins.js";
 import { StandInGithub } from "./stand-in-github.js";
 import { StandInSpaces } from "./stand-in-spaces.js";
@@ -284,35 +285,6 @@ function accounts(options: StandInOptions) {
       const who = holder(token);
       return who ? { status: 200, body: signInRows(signIns.get(who) ?? []) } : unauthorized();
     },
-    // Deleting an account, as the server answers it once nothing holds it: its own organizations and teams are the
-    // server's to work out, so the stand-in has none to name, and the person's sessions all end with the request.
-    "GET /account/deletion": (_body, token) => {
-      const who = holder(token);
-      return who ? { status: 200, body: { email: who, deleted: [], left: [], held: [], pro: billing.get(who)?.pro ? "paid" : null } } : unauthorized();
-    },
-    "POST /account/deletion/code": (_body, token) => {
-      const who = holder(token);
-      if (!who) return unauthorized();
-      routes["POST /api/auth/email-otp/send-verification-otp"]!({ email: who, type: "sign-in" }, null);
-      return { status: 204, body: null };
-    },
-    "DELETE /account": (body, token) => {
-      const who = holder(token);
-      if (!who) return unauthorized();
-      if (
-        String(body["email"] ?? "")
-          .trim()
-          .toLowerCase() !== who
-      )
-        return { status: 400, body: { statusCode: 400, message: `Type ${who} exactly to delete your account.` } };
-      const refused = checkCode(who, String(body["otp"] ?? ""));
-      if (refused) return refused;
-      for (const [id, email] of sessions) if (email === who) sessions.delete(id);
-      billing.delete(who);
-      people.delete(who);
-      signIns.delete(who);
-      return { status: 202, body: null };
-    },
     "GET /settings/hosted": (_body, token) => {
       const who = holder(token);
       return who ? { status: 200, body: hostedSettings(who) } : unauthorized();
@@ -326,6 +298,7 @@ function accounts(options: StandInOptions) {
       return { status: 200, body: hostedSettings(who) };
     },
   };
+  Object.assign(routes, accountDeletionRoutes({ holder, checkCode, routes, sessions, billing, people, signIns }));
   // The sign-in page mails the code as the apps ask for it, and the person reads it.
   const mail = (who: string): Reply & { code?: string } => ({ ...routes["POST /api/auth/email-otp/send-verification-otp"]!({ email: who, type: "sign-in" }, null), code: codes.get(who)?.code });
   return { codes, sessions, billing, people, sandboxes, signIns, admit, holder, caller, routes, checkCode, session, mail };

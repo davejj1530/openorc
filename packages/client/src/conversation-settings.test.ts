@@ -153,3 +153,21 @@ it("gives a thread its own agent's default once it loads, when the models answer
   rerender({ loaded: { ...cloud } });
   expect(result.current.choice).toEqual({ agent: "codex", model: "gpt-6-sol", effort: "medium" });
 });
+
+it("keeps a cloud thread on its agent CLI's own default, and takes a cloud thread's default from the models the cloud runs", async () => {
+  const cloudModels = [
+    { id: "", label: "Codex default", agent: "codex", isDefault: true, efforts: [], defaultEffort: null },
+    { id: "gpt-6-sol", label: "GPT-6 Sol", agent: "codex", isDefault: false, efforts: ["medium"], defaultEffort: "medium" },
+  ];
+  // This Mac has no Codex models at all.
+  const macModels = [{ id: "claude-opus-5-5", label: "Opus 5.5", agent: "claude", isDefault: true, efforts: ["high"], defaultEffort: "high" }];
+  const answers: Record<string, unknown> = { "agents.models": macModels, "cloudModels.catalog": { models: cloudModels, providers: [] } };
+  call.mockImplementation((method) => Promise.resolve(answers[method] ?? {}));
+  const owner = { brain: "hosted" as const, reach: "live" as const, heardAt: 0 };
+  const saved: SavedThreadSettings = { ...thread, agent: "codex", model: "", effort: null, owner };
+  const running = renderHook(() => client.useConversationSettings({ thread: saved, activeRun: undefined }), { wrapper });
+  expect(running.result.current.choice).toEqual({ agent: "codex", model: "", effort: null });
+  const fresh: SavedThreadSettings = { ...thread, agent: "codex", model: null, effort: null, owner };
+  const { result } = renderHook(() => client.useConversationSettings({ thread: fresh, activeRun: undefined }), { wrapper });
+  await waitFor(() => expect(result.current.choice).toMatchObject({ agent: "codex", model: "" }));
+});

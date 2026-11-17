@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { normalizeModelSettings, placeOf, type AgentKind, type PermissionPreset, type Run, type RunMode, type ThreadSummary } from "@openorc/protocol";
+import { CLOUD_DEFAULT_MODEL, normalizeModelSettings, placeOf, type AgentKind, type PermissionPreset, type Run, type RunMode, type ThreadSummary } from "@openorc/protocol";
 import { agentDefaultChoice, defaultChoice, type ModelChoice } from "./model-picker-selection.js";
 import type { PermissionDefault } from "./permission-default.js";
 import type { ClientQueries } from "./query.js";
@@ -13,15 +13,26 @@ type Setting = "model" | "mode" | "permission";
 const settingFields: Record<Setting, (keyof SettingsPatch)[]> = { model: ["agent", "model", "effort", "fastMode"], mode: ["mode"], permission: ["permissionMode"] };
 const settingsIn = (patch: SettingsPatch) => (Object.keys(settingFields) as Setting[]).filter((setting) => settingFields[setting].some((field) => field in patch));
 
+/**
+ * The choice a thread or its run saved. A cloud thread may run its agent CLI's own default, saved as the empty model,
+ * which is a choice like any other there.
+ */
 function savedModelChoice(thread: SavedThreadSettings | null, activeRun: Run | undefined): ModelChoice | null {
+  if (thread && placeOf(thread).elsewhere && thread.model === CLOUD_DEFAULT_MODEL) return { agent: thread.agent, model: CLOUD_DEFAULT_MODEL, effort: thread.effort };
   if (thread?.model) return normalizeModelSettings({ agent: thread.agent, model: thread.model, effort: thread.effort, fastMode: thread.fastMode });
   if (activeRun?.model) return normalizeModelSettings({ agent: activeRun.agent, model: activeRun.model, effort: activeRun.effort, fastMode: activeRun.fastMode });
   return null;
 }
 
-/** A thread's default with nothing saved: a cloud thread keeps its own agent, as what this Mac runs by default has no say in it. */
-function threadDefault(models: Parameters<typeof defaultChoice>[0], agent: AgentKind | null, elsewhere: boolean): ModelChoice | null {
-  return elsewhere && agent ? agentDefaultChoice(models, agent) : defaultChoice(models, agent);
+type Models = Parameters<typeof defaultChoice>[0];
+
+/**
+ * A thread's default with nothing saved. A cloud thread keeps its own agent, its default read from the models the cloud
+ * runs, where its server lists them, else from this Mac's: what this Mac runs by default has no say in it.
+ */
+function threadDefault(models: Models, cloud: Models | null, agent: AgentKind | null, elsewhere: boolean): ModelChoice | null {
+  if (!elsewhere || !agent) return defaultChoice(models, agent);
+  return (cloud && agentDefaultChoice(cloud, agent)) ?? agentDefaultChoice(models, agent);
 }
 
 /** Model/policy choices persist in selection order, before any message is sent. */
@@ -42,10 +53,11 @@ export function useConversationSettingsWith(queries: ClientQueries, permissions:
   }, [storedKey]);
   const agent = thread?.agent ?? activeRun?.agent ?? null;
   const elsewhere = Boolean(thread && placeOf(thread).elsewhere);
+  const cloud = queries.useRpc("cloudModels.catalog", {}, { enabled: elsewhere, staleTime: 5 * 60_000 }).data?.models ?? null;
   // Saved execution settings stay visible even while the catalog is stale or unavailable. With nothing saved or picked,
   // the default for the thread's own agent, worked out again as the thread and the models arrive in either order, so a
   // screen that opens before its thread has loaded never keeps another agent's default.
-  const fallback = useMemo(() => (picked || stored || !models.data ? null : threadDefault(models.data, agent, elsewhere)), [picked, stored, models.data, agent, elsewhere]);
+  const fallback = useMemo(() => (picked || stored || !models.data ? null : threadDefault(models.data, cloud, agent, elsewhere)), [picked, stored, models.data, cloud, agent, elsewhere]);
   const choice = picked ?? stored ?? fallback;
   const [mode, setMode] = useState<RunMode>(thread ? thread.mode : (activeRun?.mode ?? "act"));
   const savedMode = thread?.mode ?? activeRun?.mode;

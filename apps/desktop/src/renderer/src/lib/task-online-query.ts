@@ -41,7 +41,7 @@ export function usePersonalSpace(spaceId: string): boolean {
  */
 export function useTaskOnlineScope(): {
   scope: (TaskOnlineScope & { personal: boolean }) | null;
-  availability: OnlineTaskAvailability | null;
+  availability: Extract<OnlineTaskAvailability, { state: "ready" }> | null;
   status: ReturnType<typeof useTaskOnlineQuery<"tasks.online.state">>;
 } {
   const space = useSpaceNavigation((state) => state.inventory.find((space) => space.id === state.current));

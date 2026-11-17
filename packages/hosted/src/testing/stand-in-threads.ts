@@ -173,6 +173,8 @@ export class StandInThreads {
   readonly readersOf: (threadId: string) => string[];
   /** The notes of each thread, for the people they tag. */
   readonly notes: StandInNotes;
+  /** How the log is read (StandIn `threadLog`). */
+  readonly log = { newestTurns: true };
 
   constructor(
     private readonly peers: () => Iterable<StandInPeer>,
@@ -264,7 +266,7 @@ export class StandInThreads {
     if (!match) return null;
     const thread = this.#readable(as, decodeURIComponent(match[1]!));
     if (!thread) return missing();
-    if (method === "GET" && match[2] === "/events") return { status: 200, body: pageOf(thread, query) };
+    if (method === "GET" && match[2] === "/events") return { status: 200, body: pageOf(thread, query, this.log.newestTurns) };
     if (match[4]) return { status: 200, body: toolOutputOf(thread, decodeURIComponent(match[4])) };
     if (!match[2]) return this.#one(method, thread, as.who, body);
     return method === "POST" ? this.#act(thread, as.who, match[3] ? decodeURIComponent(match[3]) : null, body) : null;

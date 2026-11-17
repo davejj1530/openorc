@@ -274,7 +274,7 @@ export const ROUTES = {
   threads: route("GET", "/hosted/threads", wireThreadList),
   thread: (id: string) => route("GET", `/hosted/threads/${encodeURIComponent(id)}`, wireThreadDetail),
   /** After a seq, before one, or from a turn, at most `limit` events. */
-  events: (id: string, from: { after: number } | { before: number } | { fromTurn: number }, limit: number) =>
+  events: (id: string, from: { after: number } | { before: number } | { fromTurn: number } | { lastTurns: number }, limit: number) =>
     route("GET", `/hosted/threads/${encodeURIComponent(id)}/events?${new URLSearchParams({ ...stringsOf(from), limit: String(limit) })}`, wireEvents),
   /** One message to the thread. Sending the same id again is the same message. */
   send: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/messages`, wireSent),

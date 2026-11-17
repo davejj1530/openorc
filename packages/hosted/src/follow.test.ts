@@ -54,6 +54,21 @@ describe("a hosted thread's log", () => {
     expect(texts(all.events)).toEqual(["question 1", "answer 1", "question 2", "answer 2", "question 3", "answer 3"]);
   });
 
+  it("opens on the newest turns in one read of the log, and on a server from before that reads the turn ends first", async () => {
+    const { hosted } = await signedIn();
+    const runId = `hosted:${thread}`;
+    const reads = () => stand.requests.filter((request) => request.method === "GET" && request.path.startsWith(`/hosted/threads/${thread}`)).map((request) => request.path);
+    const before = reads().length;
+    const newest = await hosted.threads.call("events.page", { runId, turns: 1 });
+    expect(newest).toMatchObject({ fromTurn: 2 });
+    expect(texts(newest.events)).toEqual(["question 3", "answer 3"]);
+    expect(reads().slice(before), "one read: the log, and not the thread's detail").toEqual([`/hosted/threads/${thread}/events`]);
+
+    stand.threadLog.newestTurns = false;
+    const older = await hosted.threads.call("events.page", { runId, turns: 1 });
+    expect(older).toEqual(newest);
+  });
+
   it("streams what the agent writes next as frames of the thread's run", async () => {
     const { hosted, seen } = await signedIn();
     await hosted.threads.call("events.page", { runId: `hosted:${thread}`, turns: 2 });

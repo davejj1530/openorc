@@ -153,7 +153,7 @@ it("names a watched first turn that finishes while the opening page is still arr
   const { hosted } = await app(newDevice(), {
     fetch: async (input, init) => {
       const url = new URL(String(input));
-      if (url.pathname.endsWith("/events") && url.searchParams.has("fromTurn")) {
+      if (url.pathname.endsWith("/events") && url.searchParams.has("lastTurns")) {
         reading = true;
         await gate;
       }

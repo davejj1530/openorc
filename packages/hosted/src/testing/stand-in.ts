@@ -130,6 +130,8 @@ export interface StandIn {
   threadFiles: StandInThreadFiles;
   /** Working together in a thread: whether the server serves it, and whether shared writing is open. */
   threadCollaboration: StandInCollaboration;
+  /** How a thread's log is read: `newestTurns` false is a server from before `lastTurns`, which leaves it unread. */
+  threadLog: { newestTurns: boolean };
   /** GitHub as the server reaches it: what an install grants, and where its pages send the browser back. */
   github: Pick<StandInGithub, "grant" | "returnFor" | "configured">;
   organizations: StandInOrganizations;
@@ -581,7 +583,10 @@ function paymentsFace(billing: Map<string, StandInBilling>, payments: StandInPay
 /** What a test does to the stand-in's threads, as an agent's host or another person would. */
 function threadsFace(
   hosted: StandInThreads,
-): Pick<StandIn, "addThread" | "append" | "set" | "stoppedCommands" | "ask" | "endTurn" | "readies" | "compactions" | "sent" | "answered" | "started" | "threadFiles" | "threadCollaboration"> {
+): Pick<
+  StandIn,
+  "addThread" | "append" | "set" | "stoppedCommands" | "ask" | "endTurn" | "readies" | "compactions" | "sent" | "answered" | "started" | "threadFiles" | "threadCollaboration" | "threadLog"
+> {
   return {
     addThread: (email, seed) => hosted.addThread(email.toLowerCase(), seed),
     append: (threadId, events, options) => hosted.append(threadId, events, options),
@@ -596,6 +601,7 @@ function threadsFace(
     started: hosted.started,
     threadFiles: hosted.files,
     threadCollaboration: hosted.collaboration,
+    threadLog: hosted.log,
   };
 }
 

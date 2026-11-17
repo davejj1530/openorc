@@ -26,13 +26,18 @@ export const toolOutputOf = (thread: Thread, toolCallId: string) => ({
   output: thread.events.findLast((stored) => stored.event["type"] === "tool.completed" && stored.event["toolCallId"] === toolCallId)?.event["output"] ?? null,
 });
 
-/** A stretch of the log: from a turn, or after a seq, at most `limit` events, with the head. */
-export function pageOf(thread: Thread, query: URLSearchParams) {
+/**
+ * A stretch of the log: from a turn, from the newest turns, or after a seq, at most `limit` events, with the head. A
+ * server that doesn't read the newest turns (`newestTurns` false) answers an ask for them as one with no bound: the
+ * newest events, with no `fromTurn`.
+ */
+export function pageOf(thread: Thread, query: URLSearchParams, newestTurns: boolean) {
   const limit = Number(query.get("limit") ?? 500);
   const ends = turnEnds(thread);
-  const fromTurn = query.has("fromTurn") ? Math.min(Number(query.get("fromTurn")), ends.length) : undefined;
-  if (query.has("before")) {
-    const before = Number(query.get("before"));
+  const lastTurns = newestTurns && query.has("lastTurns") ? Number(query.get("lastTurns")) : null;
+  const fromTurn = query.has("fromTurn") ? Math.min(Number(query.get("fromTurn")), ends.length) : lastTurns !== null ? Math.max(0, ends.length - lastTurns) : undefined;
+  if (query.has("before") || (!newestTurns && query.has("lastTurns"))) {
+    const before = query.has("before") ? Number(query.get("before")) : headOf(thread) + 1;
     const events = thread.events.filter((stored) => stored.seq < before).slice(-limit);
     return { events: events.map((stored) => wire(thread, stored)), head: headOf(thread) };
   }

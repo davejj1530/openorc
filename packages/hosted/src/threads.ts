@@ -444,16 +444,24 @@ export class Threads implements HostedThreads {
     const row = this.row(threadId);
     const space = this.on(threadId);
     await this.deps.follower.follow(threadId);
-    let fromTurn = params.fromTurn ?? 0;
-    if (params.fromTurn === undefined && params.turns !== undefined) {
-      const detail = await space.request(ROUTES.thread(threadId));
-      fromTurn = Math.max(0, detail.turnEnds.length - params.turns);
-    }
-    const first = await space.request(ROUTES.events(threadId, { fromTurn }, READ_LIMIT));
+    const first = await this.#firstPage(space, threadId, params);
+    const fromTurn = first.fromTurn ?? 0;
     const events = await this.#readOn(space, threadId, first.events, first.head);
     this.observed(threadId, events);
-    if (!row.parentId) this.#names.observed(threadId, events, first.fromTurn ?? fromTurn);
-    return { events: events.map((event) => toAppEvent(threadId, event)), fromTurn: first.fromTurn ?? fromTurn, live: runsNow(row, this.reach) };
+    if (!row.parentId) this.#names.observed(threadId, events, fromTurn);
+    return { events: events.map((event) => toAppEvent(threadId, event)), fromTurn, live: runsNow(row, this.reach) };
+  }
+
+  /**
+   * The page a run opens on: from the turn asked, or the newest `turns` in one read. A server from before it read the
+   * newest turns itself answers that read with no `fromTurn`; then the thread's turn ends are read first, as before.
+   */
+  async #firstPage(space: Requests, threadId: string, params: RpcParams<"events.page">) {
+    if (params.fromTurn !== undefined || params.turns === undefined) return space.request(ROUTES.events(threadId, { fromTurn: params.fromTurn ?? 0 }, READ_LIMIT));
+    const newest = await space.request(ROUTES.events(threadId, { lastTurns: params.turns }, READ_LIMIT));
+    if (newest.fromTurn !== undefined) return newest;
+    const detail = await space.request(ROUTES.thread(threadId));
+    return space.request(ROUTES.events(threadId, { fromTurn: Math.max(0, detail.turnEnds.length - params.turns) }, READ_LIMIT));
   }
 
   /** Every event of the run after a seq of its log. */

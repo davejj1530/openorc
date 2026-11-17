@@ -1,0 +1,15 @@
+/* Connected to OpenOrc: a small filled dot at the face's lower right, ringed in the ground behind it. Nothing else is shown. */
+.team-chat-presence {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--ok);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+/* Several faces overlap one another, so a dot would hide under the next face: only a face standing alone carries one. */
+.team-chat-faces:has(> .team-chat-face + .team-chat-face) .team-chat-presence {
+  display: none;
+}

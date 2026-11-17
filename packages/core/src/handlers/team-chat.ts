@@ -23,6 +23,7 @@ export function createTeamChatHandlers(chat: ChatCalls | null, orclings: TeamCha
     "teamChat.timeline": (input) => requireChat().timeline(input),
     "teamChat.send": (input) => orclings.send(input, requireChat()),
     "teamChat.orclingCall": (input) => requireChat().orclingCall(input),
+    "teamChat.presence": (input) => requireChat().presence(input),
     "teamChat.retryOrclingCall": (input) => orclings.retry(input, requireChat()),
     "teamChat.react": (input) => requireChat().react(input),
     "teamChat.pins": (input) => requireChat().pins(input),

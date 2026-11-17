@@ -31,12 +31,18 @@ export type TeamChatActor = z.infer<typeof TeamChatActor>;
 export const TeamChatOrclingPick = z.object({ localOrclingId: id, name: z.string(), look: OrclingLook });
 export type TeamChatOrclingPick = z.infer<typeof TeamChatOrclingPick>;
 
+/** Whether each person of the organization has an OpenOrc app connected now; unknown when the server couldn't say. */
+export const TeamChatPresence = z.object({ people: z.array(z.object({ id, state: z.enum(["connected", "not-connected", "unknown"]) })) });
+export type TeamChatPresence = z.infer<typeof TeamChatPresence>;
+
 const scope = { spaceId: SpaceId };
 export const teamChatOrclingRpcParams = {
+  "teamChat.presence": z.object(scope).strict(),
   "teamChat.orclingCall": z.object({ ...scope, callId: id }).strict(),
   "teamChat.retryOrclingCall": z.object({ ...scope, conversationId: id, callId: id }).strict(),
 };
 export interface TeamChatOrclingRpcResults {
+  "teamChat.presence": TeamChatPresence;
   "teamChat.orclingCall": TeamOwnerOrclingCall;
   "teamChat.retryOrclingCall": TeamOwnerOrclingCall;
 }

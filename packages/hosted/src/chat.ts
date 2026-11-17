@@ -1,7 +1,7 @@
 import type { RpcParams, TeamChatRead, TeamChatStatus, TeamConversation } from "@openorc/protocol";
 import type { HostedDeps, HostedSpaces } from "./index.js";
 import { Refused, type Session } from "./session.js";
-import { CHAT_ROUTES, chatMessage, chatRead, chatWatched, type ChatWatch, type OrclingClaim, type WireOrclingCall } from "./wire-chat.js";
+import { CHAT_ROUTES, chatMessage, chatPresenceNudge, chatRead, chatWatched, type ChatWatch, type OrclingClaim, type WireOrclingCall } from "./wire-chat.js";
 import { SOCKET, wireTopics, type Route } from "./wire.js";
 
 interface ChatDeps extends Pick<HostedDeps, "push"> {
@@ -43,6 +43,11 @@ export class TeamChat {
       if (!event.success || this.#closed) return;
       const { spaceId, conversationId } = event.data;
       if ([...this.#watches.values()].some((watch) => watch.spaceId === spaceId && watch.conversationId === conversationId)) this.#invalidate(spaceId, conversationId);
+    });
+    // Someone's apps came or went: who is connected is read again, and nothing else.
+    deps.session.onSocket("chat:presence", (body) => {
+      const event = chatPresenceNudge.safeParse(body);
+      if (event.success && !this.#closed) this.deps.push({ type: "invalidate", keys: [`team-chat-presence:${event.data.spaceId}`] });
     });
     // Another of this person's apps moved their place: counts here follow without a watch.
     deps.session.onSocket("chat:read", (body) => {
@@ -130,6 +135,10 @@ export class TeamChat {
     const message = await this.#request(spaceId, CHAT_ROUTES.send(conversationId), { id, body, replyToId: replyToId ?? null, fileIds: fileIds ?? [], orclingCall });
     this.#invalidate(spaceId, conversationId);
     return message;
+  }
+
+  presence({ spaceId }: RpcParams<"teamChat.presence">) {
+    return this.#request(spaceId, CHAT_ROUTES.presence);
   }
 
   orclingCall({ spaceId, callId }: RpcParams<"teamChat.orclingCall">) {

@@ -1,4 +1,15 @@
-import { type OrclingLook, TeamOwnerOrclingCall, TeamChatPins, TeamChatRead, TeamChatSearch, TeamChatState, TeamChatTimeline, TeamConversation, TeamMessage } from "@openorc/protocol";
+import {
+  type OrclingLook,
+  TeamChatPresence,
+  TeamOwnerOrclingCall,
+  TeamChatPins,
+  TeamChatRead,
+  TeamChatSearch,
+  TeamChatState,
+  TeamChatTimeline,
+  TeamConversation,
+  TeamMessage,
+} from "@openorc/protocol";
 import { z } from "zod";
 import type { Route } from "./wire.js";
 
@@ -36,6 +47,7 @@ export const CHAT_ROUTES = {
   },
   send: (id: string) => route("POST", `${conversationPath(id)}/messages`, TeamMessage),
   react: (id: string) => route("POST", `/chat/messages/${encodeURIComponent(id)}/reactions`, TeamMessage),
+  presence: route("GET", "/chat/presence", TeamChatPresence),
   orclingCall: (id: string) => route("GET", callPath(id), TeamOwnerOrclingCall),
   claimCall: (id: string) => route("POST", `${callPath(id)}/claim`, orclingClaim),
   renewCall: (id: string) =>
@@ -61,3 +73,5 @@ export const chatRead = z.object({ spaceId: z.string(), conversationId: z.string
 
 /** What the owner's app sends with a message that calls its Orcling; the secret never leaves the app's core otherwise. */
 export type WireOrclingCall = { id: string; localOrclingId: string; name: string; look: OrclingLook; runnerSecret: string };
+/** Someone's apps came or went in an organization; it names nobody. */
+export const chatPresenceNudge = z.object({ spaceId: z.string() });

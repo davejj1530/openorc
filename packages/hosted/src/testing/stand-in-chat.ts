@@ -26,6 +26,9 @@ export class StandInChat {
   pinsEnabled = false;
   searchEnabled = false;
   orclingEnabled = false;
+  presenceEnabled = false;
+  /** Answers every person unknown, as a server that couldn't hear from another in time. */
+  presenceUnknown = false;
   readonly reads = new StandInChatReads();
   /** Takes a message's uploaded files (StandInUploads.attachChat); null refuses them. */
   attachFiles: ((input: { who: string; space: string; ids: string[]; messageId: string; conversationId: string }) => TeamMessage["files"] | null) | null = null;
@@ -65,6 +68,17 @@ export class StandInChat {
     return conversation;
   }
 
+  /** Someone's apps came or went: the organization's apps read who is connected again. */
+  presenceChanged(spaceId: string): void {
+    for (const peer of this.deps.peers()) if (peer.who() && this.deps.spaces.readers(spaceId).includes(peer.who() ?? "")) peer.send("chat:presence", { spaceId });
+  }
+
+  #presence(spaceId: string) {
+    const connected = new Set(this.deps.peers().flatMap((peer) => (peer.who() ? [userOf(peer.who()!)] : [])));
+    const state = (id: string) => (connected.has(id) ? "connected" : "not-connected");
+    return { people: this.people(spaceId).map((person) => ({ id: person.id, state: this.presenceUnknown ? "unknown" : state(person.id) })) };
+  }
+
   changeAccess(spaceId: string, topics = ["members", "chat"]): void {
     for (const peer of this.deps.peers()) if (peer.who() && this.deps.spaces.readers(spaceId).includes(peer.who() ?? "")) peer.send("changed", { organizationId: spaceId, topics });
   }
@@ -79,6 +93,7 @@ export class StandInChat {
       ["pins", this.pinsEnabled],
       ["search", this.searchEnabled],
       ["orcling", this.orclingEnabled],
+      ["presence", this.presenceEnabled],
     ];
     return ["base", ...flags.flatMap(([name, on]) => (on ? [name] : []))];
   }
@@ -119,6 +134,7 @@ export class StandInChat {
       const called = this.calls.route(request.path, request.method, who, body);
       if (called) return called;
     }
+    if (request.method === "GET" && request.path === "/chat/presence" && this.presenceEnabled) return { status: 200, body: this.#presence(spaceId) };
     if (request.method === "GET" && request.path === "/chat/search" && this.searchEnabled)
       return {
         status: 200,

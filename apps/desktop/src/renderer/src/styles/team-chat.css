@@ -66,14 +66,22 @@ body:has(.sidebar-shell[data-open="true"]) .work-row[data-chat="true"] > .team-c
   flex-shrink: 0;
   align-items: center;
 }
+/* Each face is held in its own box, which carries the connected dot. */
+.team-chat-face {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
 /* Initials sit inside the face at about 0.45 of its width, as the account face's do. */
 .team-chat-faces .account-face {
   width: 20px;
   height: 20px;
   font-size: 9px;
 }
-.team-chat-faces .account-face + .account-face {
+.team-chat-face + .team-chat-face {
   margin-left: -8px;
+}
+.team-chat-face + .team-chat-face .account-face {
   box-shadow: 0 0 0 2px var(--bg);
 }
 /* A group takes one face's room: two smaller faces, one above and behind the other. */
@@ -82,19 +90,23 @@ body:has(.sidebar-shell[data-open="true"]) .work-row[data-chat="true"] > .team-c
   width: 20px;
   height: 20px;
 }
-.team-chat-faces.team-chat-pair .account-face {
+.team-chat-faces.team-chat-pair .team-chat-face {
   position: absolute;
   width: 75%;
   height: 75%;
   margin: 0;
+}
+.team-chat-faces.team-chat-pair .account-face {
+  width: 100%;
+  height: 100%;
   font-size: 7px;
   box-shadow: 0 0 0 1.5px var(--bg);
 }
-.team-chat-faces.team-chat-pair .account-face:first-child {
+.team-chat-faces.team-chat-pair .team-chat-face:first-child {
   top: -10%;
   left: -10%;
 }
-.team-chat-faces.team-chat-pair .account-face + .account-face {
+.team-chat-faces.team-chat-pair .team-chat-face + .team-chat-face {
   right: -10%;
   bottom: -10%;
 }

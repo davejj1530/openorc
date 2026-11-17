@@ -2,12 +2,19 @@ import type { TeamChatPerson, TeamConversation } from "@openorc/protocol";
 import { AccountFace } from "./AccountFace";
 import { Hash, Lock } from "./icons";
 import { cn } from "../lib/cn";
+import { useTeamChatPresence } from "../lib/team-chat-presence";
+import "../styles/team-chat-presence.css";
 
+/** Faces of people, each with a filled dot while one of their OpenOrc apps is connected; nothing when it isn't or isn't known. */
 export function TeamChatFace({ people, max = 2, className }: { people: readonly TeamChatPerson[]; max?: number; className?: string }) {
+  const presence = useTeamChatPresence();
   return (
     <span className={cn("team-chat-faces", className)}>
       {people.slice(0, max).map((person) => (
-        <AccountFace key={person.id} name={person.name} image={person.image} />
+        <span key={person.id} className="team-chat-face">
+          <AccountFace name={person.name} image={person.image} />
+          {presence.get(person.id) === "connected" ? <span className="team-chat-presence" role="img" aria-label="Connected to OpenOrc" data-tip="Connected to OpenOrc" /> : null}
+        </span>
       ))}
     </span>
   );

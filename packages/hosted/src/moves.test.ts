@@ -34,3 +34,17 @@ it("says in a cloud thread's summary where it is moving, and why its last move s
   journal.set(thread, { to: "mac", failed: "A folder for this thread is already here with other work in it." });
   expect(await moving()).toEqual({ to: "mac", failed: "A folder for this thread is already here with other work in it." });
 });
+
+it("lets a thread the server let go of leave the list at once, before its word of it comes", async () => {
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+  const thread = stand.addThread(ADA, { projectId: project, title: "Moved to this Mac" });
+  const { deps, browser } = hostDeps(stand, newDevice());
+  const hosted = createHosted(deps);
+  hosts.push(hosted);
+  await hosted.start();
+  await signInAs(hosted, browser, ADA);
+  await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(true));
+  hosted.threads.letGo!(thread);
+  expect(hosted.threads.holds({ thread })).toBe(false);
+  expect(hosted.threads.holds({ run: `hosted:${thread}` })).toBe(false);
+});

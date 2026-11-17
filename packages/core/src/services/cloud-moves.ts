@@ -331,6 +331,8 @@ export class CloudMoves {
         await this.deps.sessions.take({ id: threadId, agent: placed.agent, claudeAccountId: placed.claudeAccountId, children: [] }, session, placed.worktreePath, `cloud-${move.id}`);
       this.step(move, { phase: "received", step: null });
       await hosted.moves.movedAway(row.space, threadId);
+      // Gone from the server: this Mac's list lets it go at once, so the thread's reads come here from now on.
+      hosted.threads.letGo?.(threadId);
     } catch (error) {
       if (written) await this.deps.deleteThread(threadId).catch(() => undefined);
       this.step(move, { phase: "abandoned", step: null, error: words(error), folder: error instanceof FolderInTheWay ? error.folder : null });

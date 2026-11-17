@@ -83,6 +83,8 @@ function account() {
     bundle: "",
     session: null as Buffer | null,
     events: [] as AgentEvent[],
+    /** The server's list doesn't say yet that a thread left it, as when its word of it is still on the way. */
+    slowToHear: false,
     /** Each subagent's own events, by its thread's id. */
     children: {} as Record<string, AgentEvent[]>,
     summaryProject: "",
@@ -101,8 +103,9 @@ function account() {
       // The Mac hears a thread made on the server once it reads the server again.
       refresh: async () => {
         made.forEach((row, id) => rows.set(id, row));
-        leaving.forEach((id) => rows.delete(id));
+        if (!cloud.slowToHear) leaving.forEach((id) => rows.delete(id));
       },
+      letGo: (id: string) => void rows.delete(id),
     },
     moves: {
       arrive: async (space: string, input: { id: string; projectId: string }) => (sent.arrived.push({ space, id: input.id, projectId: input.projectId }), { id: input.id }),
@@ -441,6 +444,17 @@ describe("a cloud thread moving to this Mac", () => {
     });
     const [run] = runs.listForThread(db, child);
     expect(listEvents(db, run!.id).map((event) => (event.type === "message.completed" ? event.text : event.type))).toEqual(["After 30 days"]);
+  });
+
+  it("reads the thread here the moment the server lets it go, without waiting to hear of it", async () => {
+    const project = projects.insert(db, { name: "App", rootPath: folder, gitRemote: "https://github.com/acme/app.git", defaultBranch: "main", settings: {} });
+    const made = account();
+    const id = await cloudThread(made, project);
+    made.cloud.slowToHear = true;
+    await moves(made.hosted).move(id, false);
+    await settled(id);
+    expect(cloudMoves.latest(db, id)).toMatchObject({ phase: "done" });
+    expect(made.hosted.threads.holds({ thread: id })).toBe(false);
   });
 
   it("comes into a worktree at its base, its conversation with it, when the cloud kept nothing beyond the base", async () => {

@@ -269,6 +269,8 @@ export interface HostedThreads {
   summary?(threadId: string): ThreadSummary;
   /** Reads the server's list again. */
   refresh?(): Promise<void>;
+  /** The thread is gone from the server (deleted, or moved to this Mac): it and its subthreads leave the list at once. */
+  letGo?(threadId: string): void;
   /** The threads the account has of one cloud project, as last heard. */
   rowsOfProject?(projectId: string): { id: string; space: string; projectId: string | null }[];
   /** The person began writing a new cloud thread's first message: the machine it will run on is made ready. Never rejects. */

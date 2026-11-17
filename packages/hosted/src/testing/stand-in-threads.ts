@@ -36,13 +36,7 @@ import { StandInNotes } from "./stand-in-notes.js";
 import { headOf, lastAgentSeq, messageOf, pageOf, turnEnd, turnEnds, wire } from "./stand-in-thread-log.js";
 import { placeOwn, placeShared } from "./stand-in-thread-placement.js";
 import type { UploadedFile } from "../wire-files.js";
-
-export interface StandInPeer {
-  /** The address the socket's token is for, or null once its session ended. */
-  who(): string | null;
-  watched: Set<string>;
-  send(event: string, body: unknown): void;
-}
+import type { StandInPeer } from "./stand-in-peer.js";
 
 export interface StandInThreadSeed {
   projectId: string | null;

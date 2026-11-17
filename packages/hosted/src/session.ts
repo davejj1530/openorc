@@ -18,6 +18,7 @@
 import { ACCOUNT_PROTOCOL_HEADER, ACCOUNT_PROTOCOL_VERSION, type AccountReach } from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedDeps, LiveSocket } from "./index.js";
+import { answerPresence } from "./presence.js";
 import { outgoing } from "./raw-body.js";
 import { ROUTES, wireRefusal, type Route } from "./wire.js";
 
@@ -88,9 +89,11 @@ export class Session {
   #blip: ReturnType<typeof setTimeout> | null = null;
   #lastConnect = Number.NEGATIVE_INFINITY;
   readonly #listeners = new Set<(change: SessionChange) => void>();
-  readonly #socketListeners = new Map<string, ((body: unknown) => void)[]>();
+  readonly #socketListeners = new Map<string, Parameters<LiveSocket["on"]>[1][]>();
 
-  constructor(private readonly deps: Pick<HostedDeps, "server" | "session" | "fetch" | "connect" | "now" | "log">) {}
+  constructor(private readonly deps: Pick<HostedDeps, "server" | "session" | "fetch" | "connect" | "now" | "log" | "inUse">) {
+    answerPresence(this, deps.inUse);
+  }
 
   get state(): SessionState {
     const held = this.#held;
@@ -217,7 +220,7 @@ export class Session {
   }
 
   /** A message the server sends on the socket, heard on every socket this session opens. */
-  onSocket(event: string, listener: (body: unknown) => void): void {
+  onSocket(event: string, listener: Parameters<LiveSocket["on"]>[1]): void {
     this.#socketListeners.set(event, [...(this.#socketListeners.get(event) ?? []), listener]);
     this.#held?.socket?.on(event, listener);
   }

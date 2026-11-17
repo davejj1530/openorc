@@ -195,7 +195,7 @@ export const wireChange = z.object({ threadId: z.string(), head: seq });
 export const wireWatched = z.object({ ok: z.boolean(), head: seq });
 
 /** The socket's event names. */
-export const SOCKET = { changed: "changed", watch: "hosted:watch", unwatch: "hosted:unwatch", events: "hosted:events", threadChanged: "hosted:changed" } as const;
+export const SOCKET = { changed: "changed", watch: "hosted:watch", unwatch: "hosted:unwatch", events: "hosted:events", threadChanged: "hosted:changed", presence: "hosted:presence" } as const;
 
 /** Runtime refusals use one sentence; decorated body validators use an ordered list of sentences. */
 export const wireRefusal = z.object({

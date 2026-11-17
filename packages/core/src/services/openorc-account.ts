@@ -46,6 +46,8 @@ export interface AccountDeps {
   claude: ClaudeSignInLaunch & { defaultId(): string };
   terminal: SpawnTerminal | undefined;
   openBrowser: ((url: string) => void) | undefined;
+  /** Whether someone is using this Mac, the reading the Mac's own phone alerts hold back by, which OpenOrc Cloud asks before its alerts. */
+  presence: (() => Promise<boolean>) | undefined;
   /** The person's own skills on this Mac, which their cloud turns get where the server serves skills. */
   skills: OwnSkills;
   log: Logger;
@@ -54,12 +56,20 @@ export interface AccountDeps {
 
 /** The account for this core: none with no account server. */
 export function accountFor(
-  options: Pick<OpenOrcOptions, "accountServer" | "accountSecrets" | "terminal" | "openBrowser">,
-  parts: Omit<AccountDeps, "server" | "secrets" | "terminal" | "openBrowser" | "textGeneration">,
+  options: Pick<OpenOrcOptions, "accountServer" | "accountSecrets" | "terminal" | "openBrowser" | "presence">,
+  parts: Omit<AccountDeps, "server" | "secrets" | "terminal" | "openBrowser" | "presence" | "textGeneration">,
   textGeneration?: AccountDeps["textGeneration"],
 ): Hosted | null {
   if (!options.accountServer) return null;
-  return createAccount({ ...parts, textGeneration, server: options.accountServer, secrets: options.accountSecrets, terminal: options.terminal, openBrowser: options.openBrowser });
+  return createAccount({
+    ...parts,
+    textGeneration,
+    server: options.accountServer,
+    secrets: options.accountSecrets,
+    terminal: options.terminal,
+    openBrowser: options.openBrowser,
+    presence: options.presence,
+  });
 }
 
 /** The account for this Mac. Made only for a core given an account server. */
@@ -89,6 +99,7 @@ function createAccount(deps: AccountDeps): Hosted {
     mintClaudeToken: (id) => mintClaudeToken(deps.claude, deps.terminal ?? spawnWithPipes, id ?? deps.claude.defaultId()),
     ...(deps.openBrowser && { browser: { awaitReturn: awaitBrowserReturn, open: deps.openBrowser } }),
     deviceName: process.platform === "darwin" ? "OpenOrc on this Mac" : "OpenOrc on this computer",
+    ...(deps.presence && { inUse: deps.presence }),
     skills: deps.skills,
     now: Date.now,
     log: deps.log,

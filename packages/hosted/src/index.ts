@@ -57,8 +57,8 @@ export type { OwnSkill, OwnSkills } from "./skills.js";
 export interface LiveSocket {
   /** `up` on every new session, `down` when it drops, `refused` when the server will not take the token. */
   onState(listener: (state: "up" | "down" | "refused") => void): void;
-  /** A message the server sends. */
-  on(event: string, listener: (body: unknown) => void): void;
+  /** A message the server sends; `answer` is there when the server asks for a reply to it. */
+  on(event: string, listener: (body: unknown, answer?: (reply: unknown) => void) => void): void;
   /** Sends one message and resolves with the server's reply to it. Rejects when the socket is down or drops first. */
   ask(event: string, body: unknown): Promise<unknown>;
   close(): void;
@@ -113,6 +113,11 @@ export interface HostedDeps {
   };
   /** What the sign-in page calls this device, such as "OpenOrc on this Mac". */
   deviceName: string;
+  /**
+   * Whether someone used this computer's keyboard or mouse in the last two minutes, which OpenOrc Cloud asks when it
+   * would alert the person's phone, as the Mac's own alerts hold back. Without it the device answers that nobody is.
+   */
+  inUse?(): Promise<boolean>;
   /**
    * The person's own skills for an agent on this device, which their cloud turns get where the server serves skills.
    * Absent where the device has none to give. It rejects in words when they cannot be read.

@@ -6,7 +6,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { userOf } from "./stand-in-spaces.js";
-import type { StandInPeer } from "./stand-in-threads.js";
+import type { StandInPeer } from "./stand-in-peer.js";
 
 type Reply = { status: number; body: unknown };
 type Request = { method: string; path: string; query: URLSearchParams; space: string | null };

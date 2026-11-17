@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { TeamChatReaction, teamChatRpcParams, type TeamChatPerson, type TeamConversation, type TeamMessage } from "@openorc/protocol";
 import { chatWatch } from "../wire-chat.js";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
-import type { StandInPeer, StandInThreads } from "./stand-in-threads.js";
+import type { StandInPeer } from "./stand-in-peer.js";
+import type { StandInThreads } from "./stand-in-threads.js";
 import { StandInChatChannels } from "./stand-in-chat-channels.js";
 import { StandInChatReads } from "./stand-in-chat-reads.js";
 

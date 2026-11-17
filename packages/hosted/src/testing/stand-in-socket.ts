@@ -1,12 +1,12 @@
 /**
  * The stand-in's socket: Socket.IO's own framing over a real WebSocket, enough of it for the app's client. Engine.IO's
  * open packet, the client's CONNECT with `{ token }` answered CONNECT or CONNECT_ERROR `UNAUTHORIZED`, events both
- * ways, acknowledgements of the client's events, and pings until the socket closes.
+ * ways, acknowledgements both ways, and pings until the socket closes.
  */
 import { createHash, randomUUID } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Socket } from "node:net";
-import type { StandInPeer } from "./stand-in-threads.js";
+import type { StandInPeer } from "./stand-in-peer.js";
 
 export interface SocketRules {
   holder(token: string | null | undefined): string | null;
@@ -21,12 +21,31 @@ export function engineSession(request: IncomingMessage, socket: Socket, rules: S
   const key = request.headers["sec-websocket-key"];
   if (typeof key !== "string") return void socket.destroy();
   let peer: StandInPeer | null = null;
+  const asks = new Map<number, (reply: unknown) => void>();
+  let asked = 0;
   const send = webSocket(key, socket, (text) => {
     if (text === "3") return;
+    const acknowledged = /^43(\d+)(\[.*)$/s.exec(text);
+    if (acknowledged) {
+      const id = Number(acknowledged[1]);
+      asks.get(id)?.((JSON.parse(acknowledged[2]!) as unknown[])[0]);
+      asks.delete(id);
+      return;
+    }
     if (text.startsWith("40")) {
       const auth = text.length > 2 ? (JSON.parse(text.slice(2)) as { token?: string }) : {};
       if (!rules.holder(auth.token)) return send(`44${JSON.stringify({ message: "UNAUTHORIZED" })}`);
-      peer = { who: () => rules.holder(auth.token), watched: new Set(), send: (event, body) => send(`42${JSON.stringify([event, body])}`) };
+      peer = {
+        who: () => rules.holder(auth.token),
+        watched: new Set(),
+        send: (event, body) => send(`42${JSON.stringify([event, body])}`),
+        ask: (event, body) =>
+          new Promise((resolve) => {
+            const id = ++asked;
+            asks.set(id, resolve);
+            send(`42${id}${JSON.stringify([event, body])}`);
+          }),
+      };
       rules.joined(peer);
       return send(`40${JSON.stringify({ sid: randomUUID() })}`);
     }

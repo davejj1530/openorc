@@ -35,7 +35,9 @@ import type { StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInOrganizations } from "./stand-in-organizations.js";
 import { StandInChat, socketAnswers } from "./stand-in-chat.js";
 import { billingState, leftSeconds, StandInPayments, type StandInBilling, type StandInOffers } from "./stand-in-billing.js";
-import { StandInThreads, type Admit, type StandInPeer, type StandInThreadSeed } from "./stand-in-threads.js";
+import { StandInThreads, type Admit, type StandInThreadSeed } from "./stand-in-threads.js";
+import type { StandInPeer } from "./stand-in-peer.js";
+import { presenceOf } from "./stand-in-presence.js";
 import type { StandInCollaboration } from "./stand-in-collaboration.js";
 
 export interface StandIn {
@@ -125,6 +127,8 @@ export interface StandIn {
   github: Pick<StandInGithub, "grant" | "returnFor" | "configured">;
   organizations: StandInOrganizations;
   spaces: StandInSpaces;
+  /** Whether someone is at one of the person's computers, as the server asks before an alert: their own live sockets, a second at most. */
+  presence(email: string, ms?: number): Promise<boolean>;
   close(): Promise<void>;
 }
 
@@ -372,6 +376,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     requests,
     ...lifetime,
     connect: (_url, token) => inProcessSocket(token, { holder, peers, admit, serving: isServing, answer: answerSocket }),
+    presence: presenceOf(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets]),
   };
 }
 
@@ -458,7 +463,7 @@ function inProcessSocket(
   server: { holder(token: string): string | null; peers: Set<Peer>; admit(peer: Peer): void; serving(): boolean; answer(peer: StandInPeer, event: string, body: unknown): unknown },
 ): LiveSocket {
   const listeners: ((state: "up" | "down" | "refused") => void)[] = [];
-  const heard = new Map<string, ((body: unknown) => void)[]>();
+  const heard = new Map<string, Parameters<LiveSocket["on"]>[1][]>();
   const peer: Peer = {
     token,
     waiting: true,
@@ -466,6 +471,8 @@ function inProcessSocket(
     who: () => server.holder(token),
     emit: (state) => listeners.forEach((listener) => listener(state)),
     send: (event, body) => queueMicrotask(() => heard.get(event)?.forEach((listener) => listener(structuredClone(body)))),
+    // The first answer is the client's; a client with no listener never answers.
+    ask: (event, body) => new Promise((resolve) => queueMicrotask(() => heard.get(event)?.forEach((listener) => listener(structuredClone(body), (reply) => resolve(structuredClone(reply)))))),
   };
   server.peers.add(peer);
   if (server.serving()) server.admit(peer);

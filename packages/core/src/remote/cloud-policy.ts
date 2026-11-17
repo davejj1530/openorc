@@ -85,7 +85,8 @@ const cloudReplies: { [M in CloudRemoteMethod]: Reply<M> } = {
   // Who can be tagged, as the server gives them to everyone in the thread: an address only beside a name two people share.
   "threads.people": same,
   "threads.postNote": same,
-  // A cloud thread's work as its windows read it: paths, diffs, commits and the branch's state on GitHub.
+  // A cloud thread's work as its windows read it: what its server serves, paths, diffs, commits and the branch's state.
+  "hosted.capabilities": same,
   "hosted.review.changes": same,
   "hosted.review.file": same,
   "hosted.review.commits": same,

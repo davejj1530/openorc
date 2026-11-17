@@ -6,11 +6,18 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { FakeMac } from "../test-fixtures/fake-mac";
 import { CloudChangesScreen } from "./CloudChangesScreen";
 
-const mac = vi.hoisted(() => ({ phone: null as FakeMac | null, state: null as unknown, actions: [] as unknown[], answer: null as unknown }));
+const mac = vi.hoisted(() => ({
+  phone: null as FakeMac | null,
+  state: null as unknown,
+  actions: [] as unknown[],
+  answer: null as unknown,
+  changes: { available: true } as { available: boolean; reason?: string },
+}));
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
   mac.phone = fakeMac((method: RpcMethod, params) => {
     if (method === "threads.get") return Promise.resolve({ id: "t1", title: "Fix the export crash", prUrl: null, prState: null, owner: { brain: "hosted", reach: "live", heardAt: 0 } });
+    if (method === "hosted.capabilities") return Promise.resolve({ features: { changes: mac.changes } });
     if (method === "hosted.review.changes")
       return Promise.resolve({
         state: "recorded",
@@ -47,6 +54,7 @@ afterEach(() => {
   cleanup();
   mac.phone!.module.client.queryClient.clear();
   mac.actions = [];
+  mac.changes = { available: true };
   mac.phone!.saved.clear();
 });
 
@@ -82,4 +90,13 @@ it("offers Commit while there is work to commit, and nothing to push once the br
   render(<CloudChangesScreen />, { wrapper: mac.phone!.wrapper });
   expect(await screen.findByRole("button", { name: "Commit" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: /Push|Publish/ })).toBeNull();
+});
+
+it("says only the server's reason where it does not serve a thread's changes, with nothing to retry", async () => {
+  mac.changes = { available: false, reason: "Saved changes aren't available in this cloud thread yet." };
+  mac.state = state({ uncommitted: null, unpushed: null, published: true });
+  render(<CloudChangesScreen />, { wrapper: mac.phone!.wrapper });
+  expect(await screen.findByText("Saved changes aren't available in this cloud thread yet.")).toBeTruthy();
+  expect(screen.queryByText("Retry")).toBeNull();
+  expect(screen.queryByText("src/export.ts")).toBeNull();
 });

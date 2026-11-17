@@ -72,8 +72,9 @@ export const CLOUD_REMOTE_METHODS = [
   "threads.readNotes",
   "threads.people",
   "threads.postNote",
-  // A cloud thread's work: its changes, a file's diff, its commits, where it stands on GitHub, and commit, push or a
-  // pull request.
+  // A cloud thread's work: what its server serves of it, its changes, a file's diff, its commits, where it stands on
+  // GitHub, and commit, push or a pull request.
+  "hosted.capabilities",
   "hosted.review.changes",
   "hosted.review.file",
   "hosted.review.commits",
@@ -121,6 +122,7 @@ export const CLOUD_THREAD_READS = [
   "threads.authors",
   "threads.notes",
   "threads.people",
+  "hosted.capabilities",
   "hosted.review.changes",
   "hosted.review.file",
   "hosted.review.commits",

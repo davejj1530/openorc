@@ -1,5 +1,5 @@
 import { hostedActionLine, hostedPublishReason, panelToolLabels } from "@openorc/client";
-import type { HostedReviewState, HostedThreadChanges, HostedThreadCommits, ThreadSummary } from "@openorc/protocol";
+import { HOSTED_REASONS, type HostedReviewState, type HostedThreadChanges, type HostedThreadCommits, type ThreadSummary } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
@@ -115,6 +115,18 @@ function Commits({ commits }: { commits: HostedThreadCommits }) {
   );
 }
 
+/**
+ * Whether the thread's server serves its changes: undefined while it is asked, its reason once it says they are off,
+ * and null otherwise. A capability read that fails leaves the change reads to say what is wrong, as on the desktop.
+ */
+function useChangesOff(threadId: string): string | null | undefined {
+  const read = useRpc("hosted.capabilities", { threadId }, { staleTime: 60_000 });
+  if (read.error) return null;
+  if (!read.data) return undefined;
+  const feature = read.data.features.changes;
+  return feature?.available ? null : (feature?.reason ?? HOSTED_REASONS.changes);
+}
+
 /** What the branch holds: its files since the thread started, or why none are listed. */
 function Files({ threadId, changes, error, retry }: { threadId: string; changes: HostedThreadChanges | undefined; error: Error | null; retry: () => void }) {
   if (error) return <FailedBlock message={error.message} onRetry={retry} />;
@@ -138,16 +150,18 @@ function Files({ threadId, changes, error, retry }: { threadId: string; changes:
 export function CloudChangesScreen() {
   const { threadId } = useLocalSearchParams<{ threadId: string }>();
   const thread = useRpc("threads.get", { id: threadId });
-  const changes = useRpc("hosted.review.changes", { threadId });
+  const off = useChangesOff(threadId);
+  const changes = useRpc("hosted.review.changes", { threadId }, { enabled: off === null });
   const state = useRpc("hosted.review.state", { threadId });
-  const commits = useRpc("hosted.review.commits", { threadId });
+  const commits = useRpc("hosted.review.commits", { threadId }, { enabled: off === null });
   const [footer, setFooter] = useState(0);
   const recorded = changes.data?.state === "recorded" ? changes.data : null;
   return (
     <View className="flex-1 bg-bg">
       <Stack.Screen options={{ headerTitle: () => <PanelTitle title={panelToolLabels.changes} line={recorded ? changesLine(recorded.totals) : null} /> }} />
       <ScrollView contentContainerStyle={{ paddingBottom: footer + 12 }}>
-        <Files threadId={threadId} changes={changes.data} error={changes.error} retry={() => void changes.refetch()} />
+        {/* A server that says it does not serve changes is answered by its reason alone: nothing failed to retry. */}
+        {off ? <Text className="px-5 py-10 text-center text-ink-4">{off}</Text> : <Files threadId={threadId} changes={changes.data} error={changes.error} retry={() => void changes.refetch()} />}
         {commits.data ? <Commits commits={commits.data} /> : null}
       </ScrollView>
       {thread.data ? (

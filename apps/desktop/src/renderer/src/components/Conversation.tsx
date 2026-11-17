@@ -128,21 +128,22 @@ function useMessageTarget(scope: ConversationScope): MessageTarget | undefined {
   });
 }
 
+/**
+ * Compact, where the thread's place runs it: always on this Mac, and in a cloud thread once its server serves it; until
+ * then the composer shows /compact and Compact context held with the reason.
+ */
+function useCompact(thread: ThreadSummary | null) {
+  const mutation = useRpcMutation("threads.compact");
+  const held = useHostedCapabilities(thread).reason("compact") !== null;
+  const id = thread?.id;
+  return { pending: mutation.isPending, error: mutation.error, run: held || !id ? undefined : () => mutation.mutate({ id }) };
+}
+
 /** A thread's own `/` commands; compacting waits for the turn to finish. */
-function threadCommands({
-  thread,
-  working,
-  compact,
-  fork,
-}: {
-  thread: ThreadSummary | null;
-  working: boolean;
-  compact: ((input: { id: string }) => void) | undefined;
-  fork: (() => void) | undefined;
-}): SlashCommand[] {
+function threadCommands({ thread, working, compact, fork }: { thread: ThreadSummary | null; working: boolean; compact: (() => void) | undefined; fork: (() => void) | undefined }): SlashCommand[] {
   if (!thread) return [];
   return [
-    ...(!working && compact ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: () => compact({ id: thread.id }) }] : []),
+    ...(!working && compact ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: compact }] : []),
     ...(fork ? [{ name: "fork", hint: "Continue in a new thread from here", run: fork }] : []),
   ];
 }
@@ -231,7 +232,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const taskDraft = useTaskComposerDraft({ scope: hostedFiles ?? null, threadId: thread?.id ?? null, draftKey, prompt, setPrompt });
   const submitter = useSubmit();
   const [sends, setSends] = useState(0);
-  const compact = useRpcMutation("threads.compact");
+  const compact = useCompact(thread);
   const fork = useRpcMutation("threads.fork");
   const forkThread = fork.mutate;
   const threadId = thread?.id;
@@ -239,9 +240,9 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
     if (threadId) forkThread({ id: threadId }, { onSuccess: (t) => void (!("rejected" in t) && openThread(t.id)) });
   }, [threadId, forkThread]);
 
-  const { live, working, generatingImage } = conversationActivity({ thread, activeRun, liveTranscript, compacting: compact.isPending });
-  const { sameAgent, settingsPending, canSteer } = processFit({ live, activeRun, choice, mode, permission, compacting: compact.isPending });
-  const steerReason = conversationSteerReason({ canSteer, compacting: compact.isPending, settingsPending, sameAgent, agent: activeRun?.agent });
+  const { live, working, generatingImage } = conversationActivity({ thread, activeRun, liveTranscript, compacting: compact.pending });
+  const { sameAgent, settingsPending, canSteer } = processFit({ live, activeRun, choice, mode, permission, compacting: compact.pending });
+  const steerReason = conversationSteerReason({ canSteer, compacting: compact.pending, settingsPending, sameAgent, agent: activeRun?.agent });
   const composer = useRef<ComposerHandle>(null);
   const cloud = useHostedComposer(thread, { choice, mode, permission }, composer, prompt);
   const controls = useThreadControls(thread, { canSteer, reason: steerReason, blocked: cloud.blocked, onSent: () => setSends((count) => count + 1) }, composer);
@@ -259,7 +260,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
     mode,
     permission,
     permissionReady,
-    compacting: compact.isPending,
+    compacting: compact.pending,
     waitForSave: settings.waitForSave,
     task: taskDraft.task,
   };
@@ -284,9 +285,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const skills = useSkillCommands(...skillsAsked);
   const connectorMentions = useConnectorMentions(suggestScope, choice?.agent, executionMode(mode, permission));
   const onFork = thread && !forkUnavailable(thread.agent) && !placeOf(thread).elsewhere ? forkConversation : undefined;
-  // A cloud thread compacts where its server serves it; until then the composer shows /compact held with its reason.
-  const compactHeld = useHostedCapabilities(thread).reason("compact") !== null;
-  const commands: SlashCommand[] = [...threadCommands({ thread, working, compact: compactHeld ? undefined : compact.mutate, fork: onFork }), ...skills.commands];
+  const commands: SlashCommand[] = [...threadCommands({ thread, working, compact: compact.run, fork: onFork }), ...skills.commands];
   const marks = useMessageMarks(skills.commands, connectorMentions);
 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
@@ -380,9 +379,9 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
               steerable={canSteer}
               steerReason={steerReason}
               context={cloud.hosted ? (liveTranscript?.context ?? null) : (thread?.context ?? null)}
-              compacting={compact.isPending}
+              compacting={compact.pending}
               generatingImage={generatingImage}
-              onCompact={thread && !working && !compactHeld ? () => compact.mutate({ id: thread.id }) : undefined}
+              onCompact={working ? undefined : compact.run}
               compactDisabledReason={working ? "Available after this turn finishes." : undefined}
               fileSearch={conversation}
               commands={commands}

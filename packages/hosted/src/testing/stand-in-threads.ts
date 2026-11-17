@@ -34,7 +34,8 @@ import { attachedPath, StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInCollaboration } from "./stand-in-collaboration.js";
 import { StandInNotes } from "./stand-in-notes.js";
 import { headOf, lastAgentSeq, messageOf, pageOf, turnEnd, turnEnds, wire } from "./stand-in-thread-log.js";
-import { parentOf, placeOwn, placeShared } from "./stand-in-thread-placement.js";
+import { parentOf, placeOwn, placeShared, startTurn } from "./stand-in-thread-placement.js";
+import { StandInCompactions } from "./stand-in-compactions.js";
 import type { UploadedFile } from "../wire-files.js";
 import type { StandInPeer } from "./stand-in-peer.js";
 
@@ -161,8 +162,7 @@ export class StandInThreads {
   readonly #starts = new Map<string, Reply>();
   /** Every ready ask the stand-in stored, in order. */
   readonly readies: { threadId: string; settings: unknown }[] = [];
-  /** Every compaction asked, in order: the agent folds the conversation as the asker's own turn, which tests end with `endTurn`. */
-  readonly compactions: { threadId: string; who: string; body: Record<string, unknown> }[] = [];
+  readonly compactions = new StandInCompactions();
   /** Every POST /hosted/threads body, in order, with the space it named. */
   readonly started: { space: string; body: Record<string, unknown> }[] = [];
   /** Capabilities, files on messages and the files unit's rules. */
@@ -266,26 +266,16 @@ export class StandInThreads {
     if (!thread) return missing();
     if (method === "GET" && match[2] === "/events") return { status: 200, body: pageOf(thread, query) };
     if (!match[2]) return this.#one(method, thread, as.who, body);
-    if (method === "POST" && match[2] === "/compact") return this.#compact(thread, as.who, body);
-    if (method !== "POST" || !match[3]) return null;
-    if (thread.owner !== as.who && !this.collaboration.sharedWrites) return READ_ONLY;
-    const commandId = decodeURIComponent(match[3]);
+    return method === "POST" ? this.#act(thread, as.who, match[3] ? decodeURIComponent(match[3]) : null, body) : null;
+  }
+
+  /** A person's stop of a command left running, or with none named their Compact (stand-in-compactions.ts). */
+  #act(thread: Thread, who: string, commandId: string | null, body: Record<string, unknown>): Reply {
+    if (thread.owner !== who && !this.collaboration.sharedWrites) return READ_ONLY;
+    if (!commandId) return this.compactions.take(thread, who, body);
     thread.stopped.push(commandId);
     this.#released(thread, commandId);
     return { status: 204, body: null };
-  }
-
-  /** As the server takes Compact: refused while a turn runs, otherwise the asker's own turn, which starts at once. */
-  #compact(thread: Thread, who: string, body: Record<string, unknown>): Reply {
-    if (thread.owner !== who && !this.collaboration.sharedWrites) return READ_ONLY;
-    const again = this.compactions.some((asked) => asked.threadId === thread.id && asked.who === who && asked.body["id"] === body["id"]);
-    this.compactions.push({ threadId: thread.id, who, body });
-    if (again) return { status: 200, body: { compacting: true } };
-    if (thread.turn) return { status: 409, body: { message: "Wait for the current turn to finish before compacting.", statusCode: 409 } };
-    this.#startTurn(thread, who);
-    thread.status = "working";
-    this.#changed(thread);
-    return { status: 200, body: { compacting: true } };
   }
 
   /** A stopped command no longer holds the thread's handoff; once none does, the next sender may start. */
@@ -528,7 +518,7 @@ export class StandInThreads {
     message.state = "delivered";
     message.refusal = null;
     const starts = !thread.turn;
-    if (starts) this.#startTurn(thread, message.author);
+    if (starts) startTurn(thread, message.author);
     // As the server does: a turn a message starts with other settings saves them as the thread's; a join saves nothing.
     if (starts && message.settings) {
       const { agent, ...rest } = message.settings;
@@ -615,7 +605,7 @@ export class StandInThreads {
     const refusal = startsTurn ? this.admit(who, this.#settings(thread)) : null;
     if (refusal) return { status: 200, body: { answered: false, refusal } };
     ask.answered = true;
-    if (startsTurn) this.#startTurn(thread, who);
+    if (startsTurn) startTurn(thread, who);
     this.append(thread.id, [{ type: "approval.resolved", ts: Date.now(), approvalId: ask.id, decision: body["decision"], ...(body["answers"] ? { answers: body["answers"] } : {}) }], {
       by: userOf(who),
     });
@@ -706,7 +696,7 @@ export class StandInThreads {
       createdAt: at,
       lastActivityAt: at,
     };
-    if (seed.status === "working") this.#startTurn(thread, email);
+    if (seed.status === "working") startTurn(thread, email);
     this.#threads.set(id, thread);
     this.#tellReaders(thread);
     return id;
@@ -770,14 +760,6 @@ export class StandInThreads {
       createdAt: thread.createdAt,
       lastActivityAt: thread.lastActivityAt,
     };
-  }
-
-  /** A new turn, sent by `who`: its own id, which the log's events of it carry. */
-  #startTurn(thread: Thread, who: string): void {
-    thread.turn = who;
-    thread.turnId = `turn-${thread.id.slice(0, 8)}-${thread.turns.size + 1}`;
-    thread.turns.set(thread.turnId, who);
-    thread.turnStartedAt = new Date().toISOString();
   }
 
   #title(thread: Thread): string {

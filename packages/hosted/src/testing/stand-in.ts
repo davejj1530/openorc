@@ -576,7 +576,7 @@ function threadsFace(
     ask: (threadId, request) => hosted.ask(threadId, request),
     endTurn: (threadId, status) => hosted.endTurn(threadId, status),
     readies: hosted.readies,
-    compactions: hosted.compactions,
+    compactions: hosted.compactions.asked,
     sent: hosted.sent,
     answered: hosted.answered,
     started: hosted.started,

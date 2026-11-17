@@ -62,3 +62,11 @@ export function parentOf(threads: ReadonlyMap<string, Thread>, parentThreadId: u
   if (parent?.space !== space || parent.projectId !== projectId) return { refusal: { status: 403, body: { message: "You can't start a thread under that one.", statusCode: 403 } } };
   return { parent };
 }
+
+/** A new turn, sent by `who`: its own id, which the log's events of it carry. */
+export function startTurn(thread: Thread, who: string): void {
+  thread.turn = who;
+  thread.turnId = `turn-${thread.id.slice(0, 8)}-${thread.turns.size + 1}`;
+  thread.turns.set(thread.turnId, who);
+  thread.turnStartedAt = new Date().toISOString();
+}

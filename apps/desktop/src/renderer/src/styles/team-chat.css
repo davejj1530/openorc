@@ -1,7 +1,8 @@
 .work-row:not([data-chat="true"]) > .team-chat {
   display: none;
 }
-.work-row[data-chat="true"] > :not(.team-chat) {
+/* A chat tab hides the work it keeps behind it; a frozen organization's screen, which stands in for both, stays. */
+.work-row[data-chat="true"] > :not(.team-chat, :has(> .organization-frozen)) {
   display: none;
 }
 .work-row[data-chat="true"] > .team-chat {

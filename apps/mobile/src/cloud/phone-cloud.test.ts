@@ -140,3 +140,18 @@ it("keeps its session through a Mac that cannot say whose it is, and one at a ti
   await expect(cloud.follow(broken)).rejects.toThrow("not connected");
   expect(signedInAs(cloud)).toBe(RILEY);
 });
+
+it("forgets its token and what it kept when the server ends its session, as a deleted account does, and holds none", async () => {
+  const studio = await mac(RILEY);
+  const device = phone();
+  const cloud = device.make();
+  await cloud.follow(studio.source);
+  await vi.waitFor(() => expect(signedInAs(cloud)).toBe(RILEY));
+  device.kept.set("threads", "[]");
+  stand.revoke();
+  // Its next request is answered 401, which ends the session where the phone keeps it.
+  await cloud.hosted!.spaces.refresh().catch(() => undefined);
+  await vi.waitFor(() => expect(cloud.holds).toBe(false));
+  expect(device.vault.record).toBeNull();
+  expect(device.kept.size).toBe(0);
+});

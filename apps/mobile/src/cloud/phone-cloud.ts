@@ -123,6 +123,8 @@ export class PhoneCloud {
         save: async (value) => {
           this.#record = value === null ? null : { server: record.server, value };
           await this.deps.vault.save(this.#record);
+          // A session that ended, as the server ends a deleted account's on its next request, takes what it kept with it.
+          if (value === null) this.deps.kept.forget();
         },
       },
       kept: this.deps.kept,

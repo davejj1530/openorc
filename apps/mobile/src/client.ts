@@ -24,6 +24,11 @@ import { oncePerNotice, presentationFor } from "./notifications/foreground";
 import { handleAlerts, pushPlatform } from "./notifications/native";
 import { threadOnScreen } from "./notifications/on-screen";
 import { ScratchStore } from "./scratch-store";
+import { liveSocketOf } from "@openorc/hosted/socket";
+import { io } from "socket.io-client";
+import { followMac } from "./cloud/follow-mac";
+import { keptIn, keychainVault } from "./cloud/native";
+import { PhoneCloud } from "./cloud/phone-cloud";
 import { timeFrame } from "./thread/perf-probe";
 
 /** The app's own key-value store on disk. Only saved Macs use it directly; the demo never touches them. */
@@ -151,3 +156,18 @@ export const useRpcs = <M extends PhoneMethod>(method: M, paramsList: readonly R
   client.useRpcs(method, paramsList, options);
 export const useRpcMutation = <M extends PhoneMethod>(method: M): UseMutationResult<RpcResults[M], Error, RpcParams<M>> => client.useRpcMutation(method);
 export const { queryClient, useRun } = client;
+
+/**
+ * The phone's own OpenOrc Cloud: a session of its own, which the Mac it shows gets it for the person signed in there,
+ * kept in the Keychain and followed as that Mac's account changes. Its lists and threads join Home in the next unit.
+ */
+export const cloud = new PhoneCloud({
+  vault: keychainVault,
+  kept: keptIn(kept),
+  fetch,
+  connect: liveSocketOf(io),
+  push: () => undefined,
+  now: Date.now,
+  log: { info: () => undefined, warn: (message) => console.warn(`[OpenOrc] ${message}`) },
+});
+void cloud.start().then(() => followMac(link, cloud, (message) => console.warn(`[OpenOrc] ${message}`)));

@@ -13,6 +13,10 @@ vi.mock("react-native-mmkv", () => ({
     return { getString: (key: string) => saved.get(key), set: (key: string, value: string) => void saved.set(key, value), remove: (key: string) => saved.delete(key) };
   },
 }));
+vi.mock("./cloud/native", () => ({
+  keychainVault: { load: async () => null, save: async () => undefined },
+  keptIn: () => ({ load: () => null, save: () => undefined, forget: () => undefined }),
+}));
 vi.mock("react-native-quick-crypto", () => ({ randomUUID: () => "id" }));
 vi.mock("./notifications/on-screen", () => ({ threadOnScreen: () => null }));
 vi.mock("./connection/asset-cache", () => ({ createAssetCache: () => ({ forget: () => undefined, uri: async () => "" }) }));

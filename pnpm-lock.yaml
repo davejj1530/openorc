@@ -332,6 +332,9 @@ importers:
       '@openorc/client':
         specifier: workspace:*
         version: link:../../packages/client
+      '@openorc/hosted':
+        specifier: workspace:*
+        version: link:../../packages/hosted
       '@openorc/link':
         specifier: workspace:*
         version: link:../../packages/link
@@ -455,6 +458,9 @@ importers:
       remend:
         specifier: ^1.4.0
         version: 1.4.0
+      socket.io-client:
+        specifier: ^4.8.4
+        version: 4.8.4(supports-color@8.1.1)
       tailwind-merge:
         specifier: ^3.3.0
         version: 3.6.0

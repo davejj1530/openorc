@@ -47,7 +47,7 @@ const stops = (threadId: string) => at.stand.requests.filter((request) => reques
 
 /** Mara starts a turn in her thread from her own Mac. */
 async function marasTurn(threadId: string, prompt: string) {
-  await at.asMara((mara) => mara("runs.start", { threadId, ...settings, prompt }));
+  await at.asMara((mara) => mara("runs.start", { threadId, ...settings, prompt }), threadId);
   return (await together(threadId, (state) => state.live?.sender?.name === "Mara Okafor")).live!;
 }
 
@@ -172,7 +172,7 @@ it("reads a teammate's note that tags the person through the Mac, and marks it r
   const threadId = at.cloud.threads.teammate;
   const id = crypto.randomUUID();
   const me = (await together(threadId, () => true)).viewer!;
-  await at.asMara((mara) => mara("threads.postNote", { threadId, id, text: "@Riley can you check the footer?", mentions: [{ userId: me.id, start: 0, end: 6 }] }));
+  await at.asMara((mara) => mara("threads.postNote", { threadId, id, text: "@Riley can you check the footer?", mentions: [{ userId: me.id, start: 0, end: 6 }] }), threadId);
   expect((await together(threadId, (state) => state.mentions.unread)).mentions.firstUnreadNoteId).toBe(id);
   const page = await phone.call("threads.notes", { threadId, limit: 200 });
   expect(page.notes.find((note) => note.id === id)).toMatchObject({ mentionedYou: true, read: false, author: { name: "Mara Okafor" } });

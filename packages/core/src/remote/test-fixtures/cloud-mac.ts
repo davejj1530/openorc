@@ -96,8 +96,12 @@ export async function cloudMac() {
     return paired;
   }
 
-  /** A second Mac signed in as Mara, for what only Birch Studio's admin can change. */
-  async function asMara<T>(work: (mara: ReturnType<typeof rpcClient>) => Promise<T>): Promise<T> {
+  /**
+   * A second Mac signed in as Mara, for what only Birch Studio's admin can change, or what she does in a cloud thread.
+   * `inThread`: the cloud thread the work acts in, which her Mac must have heard first, as her app lists a thread
+   * before she can act in it; her spaces are ready before her threads are heard.
+   */
+  async function asMara<T>(work: (mara: ReturnType<typeof rpcClient>) => Promise<T>, inThread?: string): Promise<T> {
     let maraToken: string | null = null;
     const admin = await OpenOrc.create({
       dataDir: path.join(folder, `mara-${Date.now()}`),
@@ -111,6 +115,7 @@ export async function cloudMac() {
       const mara = rpcClient(() => admin);
       await mara("account.signIn", {});
       await vi.waitFor(async () => expect(await mara("spaces.status", {})).toMatchObject({ state: "ready" }), { timeout: 5_000 });
+      if (inThread) await vi.waitFor(async () => expect(await mara("threads.get", { id: inThread })).toMatchObject({ owner: { brain: "hosted" } }), { timeout: 5_000 });
       return await work(mara);
     } finally {
       await admin.close();

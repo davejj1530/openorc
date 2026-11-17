@@ -23,7 +23,7 @@ import { useRpc, useRpcs } from "../client";
 import { projectChoices } from "../projects";
 import { macScope, spaceScope } from "../spaces/list-scope";
 import { useSpaces } from "../spaces/use-spaces";
-import { homeItems, homeLayout, type HomeList, type HomeOptions } from "./home-items";
+import { homeCalls, homeItems, homeLayout, type HomeList, type HomeOptions } from "./home-items";
 import { hiddenIn, MAC_SCOPE, ownershipIn, pruneHidden, useHomeFilter } from "./filter";
 import { pruneMissingFolds, toggleFold, toggleThreadChildren, useFolds } from "./folds";
 
@@ -174,6 +174,8 @@ export function useHomeItems(connected: boolean, selected: Pick<HomeOptions, "se
   const items = homeItems(list, options);
   return {
     items,
+    /** What calls the person in the groups, for the lines at the list's edges. */
+    calls: homeCalls(items, list),
     showMore,
     /** The next ten of a project's threads, the most recently active of those without a row. */
     showMoreInGroup: (projectId: string) => {

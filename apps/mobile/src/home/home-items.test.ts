@@ -1,7 +1,7 @@
 import { sidebarDayList, sidebarThreadPage, THREAD_PAGE, type ListLayout, type SidebarFilter } from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { homeItems, homeLayout, type HomeItem, type HomeList, type HomeOptions, type HomeProject } from "./home-items";
+import { homeCalls, homeItems, homeLayout, type HomeItem, type HomeList, type HomeOptions, type HomeProject } from "./home-items";
 import { fixtureProjects, fixtureThreads } from "./test-fixtures/threads";
 
 const outline = (items: HomeItem[]) =>
@@ -70,6 +70,16 @@ const quiet = (id: string, projectId: string, minutesAgo: number): ThreadSummary
   unread: false,
   activity: "idle",
   lastActivityAt: now - minutesAgo * 60_000,
+});
+
+describe("homeCalls", () => {
+  it("names what calls the person in the groups by its row, or by its folded project's label, in the list's order", () => {
+    const listed = list();
+    const calls = (collapsed: string[]) => homeCalls(items(listed, { collapsed }), listed).map((call) => `${call.id} ${call.status.kind} @ ${call.anchor}`);
+    expect(calls(allOpen)).toEqual(["t-pairing waiting @ t-pairing", "t-ledger failed @ t-ledger", "t-docs waiting @ t-docs", "t-phone failed @ t-phone", "t-slack unread @ t-slack"]);
+    // Pinned's own unread row is not one of them; folded, a project's calls stand on its label.
+    expect(calls([...allOpen, "project:website"]).slice(2, 4)).toEqual(["t-docs waiting @ project:website", "t-phone failed @ project:website"]);
+  });
 });
 
 describe("homeItems", () => {

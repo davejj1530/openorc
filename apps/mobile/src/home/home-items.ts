@@ -1,4 +1,5 @@
 import {
+  callsThePerson,
   listLayout,
   projectRows,
   rootStatuses,
@@ -9,6 +10,7 @@ import {
   waitingRoots,
   type ListLayout,
   type SidebarDayList,
+  type ThreadStatus,
   type ThreadTreeRow,
 } from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
@@ -197,4 +199,36 @@ export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {
       options,
     ),
   ];
+}
+
+/** Something in Home's groups that calls the person, and the item that stands for it: its row, or its folded project's label. */
+export type HomeCall = { id: string; title: string; status: ThreadStatus; anchor: string };
+
+/**
+ * What calls the person in the projects' groups (a question, a failure or a result not yet read), in the list's order:
+ * each by its row, or by its project's label while the project is folded, as the desktop's edge lines read them.
+ */
+export function homeCalls(items: readonly HomeItem[], list: HomeList): HomeCall[] {
+  const byProject = new Map(groupsOf(list).map((group) => [group.project.id, group.roots]));
+  const statuses = rootStatuses(list.days.rest, list.days.all);
+  const rows = new Set(items.flatMap((item) => (item.kind === "thread" ? [item.thread.id] : [])));
+  const calls: HomeCall[] = [];
+  let inGroup = false;
+  for (const item of items) {
+    if (item.kind === "section") inGroup = false;
+    if (item.kind === "project") {
+      inGroup = true;
+      if (!item.open)
+        for (const root of byProject.get(item.project.id) ?? []) {
+          const status = statuses.get(root.id);
+          // The open thread a folded group still shows stands for itself.
+          if (!rows.has(root.id) && callsThePerson(status)) calls.push({ id: root.id, title: root.title, status: status!, anchor: item.key });
+        }
+    }
+    if (item.kind === "thread" && inGroup && !item.tree.depth) {
+      const status = statuses.get(item.thread.id);
+      if (callsThePerson(status)) calls.push({ id: item.thread.id, title: item.thread.title, status: status!, anchor: item.key });
+    }
+  }
+  return calls;
 }

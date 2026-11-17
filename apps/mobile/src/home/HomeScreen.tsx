@@ -1,6 +1,7 @@
 import { AnimatedLegendList } from "@legendapp/list/reanimated";
 import { router, useGlobalSearchParams, usePathname } from "expo-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { LegendListRef } from "@legendapp/list/react-native";
 import { Pressable, RefreshControl, View } from "react-native";
 import { LinearTransition, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,6 +26,7 @@ import { ProjectLabel, RetryRow, SectionToggle, ShowMore, ShowMoreChildren, Show
 import type { HomeItem } from "./home-items";
 import { refreshHome } from "./refresh";
 import { ThreadRow } from "./ThreadRow";
+import { EdgeLines, useHomeEdges } from "./EdgeLines";
 import { Unpaired } from "./Unpaired";
 import { CloudOutOfReach } from "../spaces/cloud-reach";
 import { spaceStanding } from "../spaces/cloud-words";
@@ -134,6 +136,11 @@ function ClosedSpace({ words }: { words: string }) {
 function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; header: ReactNode }) {
   const insets = useSafeAreaInsets();
   const home = useHomeItems(state.kind === "connected", { selectedId: useSelectedThreadId() });
+  const list = useRef<LegendListRef>(null);
+  // The bars hide the list's ends: a row under either reads as past that edge.
+  const covered = useMemo(() => ({ top: insets.top + HOME_BAR_HEIGHT, bottom: insets.bottom + BOTTOM_BAR_ROOM + 4 }), [insets.top, insets.bottom]);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const edges = useHomeEdges(list, home.calls, scrollY, covered, insets.top + HOME_BAR_HEIGHT + headerHeight);
   const folds = useHomeFolds(home);
   const still = useReducedMotion();
   const refresh = useRefresh();
@@ -142,6 +149,7 @@ function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; heade
   return (
     <>
       <AnimatedLegendList<HomeItem>
+        ref={list}
         data={home.items}
         keyExtractor={(item) => item.key}
         getItemType={(item) => item.kind}
@@ -150,10 +158,10 @@ function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; heade
         extraData={folds.motions}
         renderItem={({ item, index }) => <HomeRow item={item} home={home} index={index} motion={rowMotion(folds.motions, item.key)} fold={folds.toggle} />}
         ListHeaderComponent={
-          <>
+          <View onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
             {header}
             <OutOfReachLine state={state} />
-          </>
+          </View>
         }
         ListFooterComponent={<View className="h-24" />}
         sharedValues={sharedValues}
@@ -161,6 +169,7 @@ function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; heade
         // The list lowers the spinner by its top padding, below the bar. Without a tint, iOS draws none.
         refreshControl={<RefreshControl refreshing={refresh.refreshing} onRefresh={refresh.onRefresh} tintColorClassName="accent-ink-3" />}
       />
+      <EdgeLines edges={edges.edges} calls={home.calls} covered={covered} onBring={edges.bring} />
     </>
   );
 }

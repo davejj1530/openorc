@@ -72,6 +72,20 @@
   margin-left: auto;
   color: var(--ink-4);
 }
+/* A row that opens its commit: the lines stay where they were, the fill reaches past them to the lane. */
+.commit-open {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  margin: -4px -8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  text-align: left;
+}
+.commit-open:hover,
+.commit-open:focus-visible {
+  background: var(--surface-2);
+}
 /* How many older commits a cloud thread's list leaves out: the lane runs on to it, with no dot. */
 .commit-more {
   font-size: var(--text-sm);

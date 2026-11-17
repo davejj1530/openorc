@@ -1,11 +1,13 @@
-import { WORKSPACE_ID } from "@openorc/protocol";
 import { router } from "expo-router";
 import { Keyboard, Pressable, View } from "react-native";
-import { ChevronDown, FolderOpen, Globe } from "../generated/icons";
+import type { ComponentType } from "react";
+import { ChevronDown } from "../generated/icons";
 import type { ProjectChoice } from "../projects";
+import type { IconProps } from "../ui/icon";
 import { Text } from "../ui/Text";
+import { projectIcon } from "./project-icon";
 
-function Picker({ label, name, Icon, disabled, onPress }: { label: string; name: string; Icon: typeof FolderOpen; disabled: boolean; onPress: () => void }) {
+function Picker({ label, name, Icon, disabled, onPress }: { label: string; name: string; Icon: ComponentType<IconProps>; disabled: boolean; onPress: () => void }) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -29,14 +31,13 @@ function Picker({ label, name, Icon, disabled, onPress }: { label: string; name:
 }
 
 /** The new thread's project, above the composer. */
-export function NewThreadPickers({ composerId, project, starting, uploading }: { composerId: string; project: ProjectChoice | undefined; starting: boolean; uploading: boolean }) {
-  const projectName = project?.name ?? "Project";
+export function NewThreadPickers({ composerId, project, starting, uploading }: { composerId: string; project: ProjectChoice; starting: boolean; uploading: boolean }) {
   return (
     <View className="min-h-touch flex-row items-center gap-2 px-3">
       <Picker
-        label={`Project, ${projectName}`}
-        name={projectName}
-        Icon={project?.id === WORKSPACE_ID ? Globe : FolderOpen}
+        label={`Project, ${project.name}`}
+        name={project.name}
+        Icon={projectIcon(project, true)}
         disabled={starting || uploading}
         onPress={() => router.push({ pathname: "/project", params: { composerId } })}
       />

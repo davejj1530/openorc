@@ -216,14 +216,17 @@ function heldChanged(): void {
 }
 cloud.subscribe(heldChanged);
 
-// The Mac's agents' models on every session with it, kept with the lists, so a cloud thread's composer has a model to
-// send with while the Mac is asleep, even when no composer was opened while it was awake.
+// The Mac's agents' models, which of them are signed in and its settings, on every session with it, kept with the
+// lists, so a cloud thread's composer has a model to send with, and a new cloud thread its first model, while the Mac
+// is asleep, even when neither was opened while it was awake.
 let modelsRead: number | null = null;
 link.subscribe(() => {
   const state = link.getState();
   if (state.kind !== "connected" || showsDemo(state) || state.serial === modelsRead) return;
   modelsRead = state.serial;
   void client.queryClient.prefetchQuery({ queryKey: ["agents.models", {}], queryFn: () => link.connection.call("agents.models", {}), staleTime: 5 * 60_000 });
+  void client.queryClient.prefetchQuery({ queryKey: ["agents.availability", {}], queryFn: () => link.connection.call("agents.availability", {}) });
+  void client.queryClient.prefetchQuery({ queryKey: ["app.settings.get", {}], queryFn: () => link.connection.call("app.settings.get", {}) });
 });
 alerts.subscribe(() => void cloudAlerts.sync());
 void cloud.start().then(() => followMac(link, cloud, (message) => console.warn(`[OpenOrc] ${message}`)));

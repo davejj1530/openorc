@@ -1,5 +1,5 @@
 import { newThreadChoice, newThreadStartInput, newThreadWorkspaceMode, projectGitView, targetModel } from "@openorc/client";
-import { WORKSPACE_ID } from "@openorc/protocol";
+import { WORKSPACE_ID, type RpcParams, type WorkspaceMode } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { link, useRpc, useRpcMutation } from "../client";
 import { composerControls } from "../composer/composer-state";
@@ -11,15 +11,18 @@ import { useImageAttach } from "../composer/use-image-attach";
 import { failureMessage } from "../failure";
 import { haptic } from "../ui/haptics";
 import { useSheetDraft, useSheetPermission } from "./drafts";
+import type { ProjectChoice } from "../projects";
 import { startBlocker, unstarted, type SheetDraft } from "./new-thread-state";
 
 /**
  * A new thread in one project, with the desktop's defaults: the model for the Mac's default harness or its first
  * signed-in one, mode act, the Mac's default permission and Claude account until one is chosen here, and the Mac's
  * default workspace where the project can branch. The phone never names a folder: Workspace runs where the Mac's
- * Workspace does. A start the Mac refuses keeps the draft and says why.
+ * Workspace does. A project only OpenOrc Cloud has starts there, from its space, with no word from the Mac. A start
+ * refused keeps the draft and says why.
  */
-export function useNewThread(projectId: string) {
+export function useNewThread(project: ProjectChoice) {
+  const projectId = project.id;
   const [draft, setDraft] = useSheetDraft(projectId);
   const permission = useSheetPermission();
   const appSettings = useDefaultChoice(draft, setDraft);
@@ -76,8 +79,7 @@ export function useNewThread(projectId: string) {
     field.emptied();
     setError(null);
     try {
-      const workspaceMode = newThreadWorkspaceMode({ canBranch: await canBranch(projectId), chosen: null, preferred: appSettings?.defaultWorkspaceMode });
-      const { thread } = await start.mutateAsync(newThreadStartInput({ ...draft, claudeAccountId }, { workspaceMode, permissionMode: permission.permission, ...sent }));
+      const { thread } = await start.mutateAsync(await startInput(project, { ...draft, claudeAccountId }, { permissionMode: permission.permission, ...sent }, appSettings?.defaultWorkspaceMode));
       haptic.confirm();
       return thread.id;
     } catch (error) {
@@ -122,6 +124,22 @@ export function useDefaultChoice(draft: SheetDraft, setDraft: ReturnType<typeof 
     if (choice) setDraft((current) => ({ ...current, target: { kind: "model", choice } }));
   }, [draft.target, models.data, harnesses.data, appSettings.data, setDraft]);
   return appSettings.data;
+}
+
+/**
+ * What a start sends: in a cloud project, OpenOrc Cloud in its space, with no Claude account of the Mac's; else the
+ * Mac's place for it, as the desktop's New thread chooses one.
+ */
+async function startInput(
+  project: ProjectChoice,
+  draft: SheetDraft,
+  sent: Pick<RpcParams<"threads.start">, "permissionMode" | "prompt" | "attachments">,
+  preferred: WorkspaceMode | undefined,
+): Promise<RpcParams<"threads.start">> {
+  const { claudeAccountId, ...rest } = draft;
+  if (project.cloud) return { ...newThreadStartInput(rest, { ...sent, workspaceMode: "hosted" }), spaceId: project.cloud.spaceId };
+  const workspaceMode = newThreadWorkspaceMode({ canBranch: await canBranch(project.id), chosen: null, preferred });
+  return newThreadStartInput({ ...rest, ...(claudeAccountId ? { claudeAccountId } : {}) }, { ...sent, workspaceMode });
 }
 
 /**

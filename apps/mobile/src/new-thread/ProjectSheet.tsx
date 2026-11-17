@@ -4,18 +4,19 @@ import { useRef, useState } from "react";
 import { Keyboard, Pressable, ScrollView, TextInput, View, type ScrollViewInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSharedSettings } from "../composer/settings-bridge";
-import { Check, Folder, FolderOpen, Globe, Search, X } from "../generated/icons";
+import { Check, Search, X } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { ListPressable } from "../ui/ListPressable";
 import { Text } from "../ui/Text";
+import { projectIcon } from "./project-icon";
 
 function closeSheet() {
   Keyboard.dismiss();
   router.back();
 }
 
-/** A searchable list of the new thread's projects, including Workspace. */
+/** A searchable list of the new thread's projects, including Workspace and, in a space, its cloud projects. */
 export function ProjectSheet() {
   const { composerId } = useLocalSearchParams<{ composerId: string }>();
   const project = useSharedSettings(composerId)?.project;
@@ -79,8 +80,7 @@ export function ProjectSheet() {
       </View>
       {choices.map((choice) => {
         const on = choice.id === project?.chosen;
-        const FolderIcon = on ? FolderOpen : Folder;
-        const Icon = choice.id === WORKSPACE_ID ? Globe : FolderIcon;
+        const Icon = projectIcon(choice, on);
         return (
           <ListPressable
             key={choice.id}

@@ -191,11 +191,13 @@ export function ModelSheet() {
   const catalog = pickerCatalog(models.data ?? []);
   const choice = settings?.choice ?? null;
   const current = catalogModel(models.data, choice);
+  // A read that failed while the Mac's last list is kept, as every read does while it is asleep, leaves that list to choose from.
+  const failure = models.data ? null : models.error;
   const state = pickerSettings({
     model: models.isPlaceholderData ? undefined : current,
     value: choice,
     loading: models.isLoading || models.isPlaceholderData,
-    failed: Boolean(models.error),
+    failed: Boolean(failure),
   });
   const agents = [...new Set(catalog.filter((model) => !model.legacy).map((model) => model.agent))];
   const [tab, setTab] = useState<AgentKind | null>(null);
@@ -258,7 +260,7 @@ export function ModelSheet() {
         </View>
       </View>
       <View className="gap-5 px-5">
-        <ModelStatus loading={models.isLoading} error={models.error} empty={!shown && !current} />
+        <ModelStatus loading={models.isLoading} error={failure} empty={!shown && !current} />
         {list ? <ModelList list={list} choice={choice} onPick={pick} onProvider={setProvider} /> : null}
         <ModelControls shown={shown} settings={settings} state={state} />
       </View>

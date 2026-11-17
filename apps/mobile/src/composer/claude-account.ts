@@ -1,5 +1,5 @@
 import { offeredAccount, projectAccountChoice } from "@openorc/client";
-import { DEFAULT_CLAUDE_ACCOUNT, type ClaudeAccountConnection, type ThreadSummary } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, placeOf, type ClaudeAccountConnection, type ThreadSummary } from "@openorc/protocol";
 import { useRpc, useRpcMutation } from "../client";
 import type { ComposerSettings, ModelSettings } from "./settings-bridge";
 
@@ -40,11 +40,12 @@ export function useNewThreadClaudeAccount(projectId: string, chosen: string | un
 
 /**
  * An open Claude thread's account, which it leaves for another between turns: its next message resumes the
- * conversation there. An Orcling's conversation keeps its own, as on the Mac.
+ * conversation there. An Orcling's conversation keeps its own, as on the Mac, and an OpenOrc Cloud thread runs on the
+ * person's sign-in there, not on an account of the Mac's.
  */
 export function useThreadClaudeAccount(thread: ThreadSummary | null): ComposerSettings["claudeAccount"] {
   const switching = useRpcMutation("threads.switchClaudeAccount");
-  if (!thread || thread.agent !== "claude" || thread.orclingId || thread.teamInstanceId) return undefined;
+  if (!thread || thread.agent !== "claude" || thread.orclingId || thread.teamInstanceId || placeOf(thread).elsewhere) return undefined;
   return {
     chosen: thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT,
     select: (claudeAccountId) => switching.mutate({ id: thread.id, claudeAccountId }),

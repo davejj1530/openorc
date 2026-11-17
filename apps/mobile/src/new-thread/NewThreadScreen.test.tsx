@@ -212,3 +212,42 @@ it("offers the project's skills as a / word is typed, and puts the one tapped in
   expect(nativeProps.get(marked)?.style).toEqual({ fontFamily: "ImmaculateGothic-Bold" });
   expect(screen.queryByRole("button", { name: "$code-review" })).toBeNull();
 });
+
+it("in a space, lists its projects only OpenOrc Cloud has beside the Mac's, and starts one there in its space without asking the Mac's git", async () => {
+  const personal = { id: "personal-me", kind: "personal" as const };
+  mac.reads["spaces.status"] = {
+    state: "ready",
+    userId: "me",
+    apiOrigin: "",
+    personalSpaceId: personal.id,
+    spaces: [personal],
+    create: { allowed: false, reason: null },
+    invitations: [],
+    reach: "live",
+    heardAt: 1,
+    error: null,
+  };
+  mac.reads["spaces.projects"] = [
+    { key: "openorc", name: "openorc", repo: null, localProjectId: "openorc", hostedProjectId: null, connected: true },
+    { key: "cloud-project:h-notes", name: "notes-app", repo: "riley/notes-app", localProjectId: null, hostedProjectId: "h-notes", connected: true },
+  ];
+  onTestFinished(() => {
+    delete mac.reads["spaces.status"];
+    delete mac.reads["spaces.projects"];
+    act(() => mac.phone!.cloud.hold(false));
+  });
+  act(() => mac.phone!.cloud.hold(true));
+  const asked = vi.spyOn(mac.git, "openorc", "get");
+  await openAndWrite("Fix the build");
+  const sheet = openProjects();
+  expect(screen.getAllByRole("radio").map((row) => row.getAttribute("aria-label"))).toEqual(["Workspace", "openorc", "notes-app"]);
+  await act(async () => fireEvent.click(project("notes-app")));
+  sheet.unmount();
+  act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)("Search the attachments"));
+  mac.start.mockResolvedValue({ thread: { id: "cloud-thread" } });
+  await waitFor(() => expect(button("Start").disabled).toBe(false));
+  await act(async () => fireEvent.click(button("Start")));
+  expect(mac.start.mock.calls[0]![0]).toMatchObject({ projectId: "cloud-project:h-notes", spaceId: "personal-me", hosted: true, prompt: "Search the attachments" });
+  expect(mac.start.mock.calls[0]![0]).not.toHaveProperty("workspaceMode");
+  expect(asked).not.toHaveBeenCalled();
+});

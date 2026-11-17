@@ -63,9 +63,9 @@ afterEach(cleanup);
 const image = { path: "/Users/me/Library/Application Support/OpenOrc/attachments/0b1c.jpg", preview: "file:///cache/0b1c.jpg" };
 const sent = () => mac.start.mock.calls.at(-1)![0];
 
-/** The sheet in a project. */
-function open(projectId: string) {
-  return renderHook(() => useNewThread(projectId), { wrapper: mac.phone!.wrapper });
+/** The sheet in a project: one of the Mac's, or with `cloud`, one only OpenOrc Cloud has, in that space. */
+function open(projectId: string, cloud?: { spaceId: string }) {
+  return renderHook(() => useNewThread({ id: projectId, name: projectId, ...(cloud ? { cloud } : {}) }), { wrapper: mac.phone!.wrapper });
 }
 type Sheet = ReturnType<typeof open>;
 
@@ -327,11 +327,23 @@ it("keeps the images that land after the sheet has closed", async () => {
 });
 
 it("switches drafts in place when the project changes, keeping each project's own prompt", () => {
-  const sheet = renderHook((props: { projectId: string }) => useNewThread(props.projectId), { initialProps: { projectId: "openorc" }, wrapper: mac.phone!.wrapper });
+  const sheet = renderHook((props: { projectId: string }) => useNewThread({ id: props.projectId, name: props.projectId }), { initialProps: { projectId: "openorc" }, wrapper: mac.phone!.wrapper });
   act(() => sheet.result.current.setText("Fix the build"));
   sheet.rerender({ projectId: "notes" });
   expect(sheet.result.current.draft.prompt).toBe("");
   act(() => sheet.result.current.setText("Tidy the notes"));
   sheet.rerender({ projectId: "openorc" });
   expect(sheet.result.current.draft.prompt).toBe("Fix the build");
+});
+
+it("starts a thread in a project only OpenOrc Cloud has there, in its space, without asking the Mac's git or sending its Claude account", async () => {
+  mac.start.mockResolvedValue({ thread: { id: "cloud-thread" } });
+  mac.phone!.saved.set("newthread.mac-1.cloud-project:p1", JSON.stringify({ target: { kind: "model", choice: null }, mode: "act", prompt: "", claudeAccountId: "work" }));
+  const sheet = open("cloud-project:p1", { spaceId: "space-birch" });
+  await write(sheet, "Lay out the plans");
+  expect(await submit(sheet)).toBe("cloud-thread");
+  expect(sent()).toMatchObject({ projectId: "cloud-project:p1", spaceId: "space-birch", hosted: true, prompt: "Lay out the plans" });
+  expect(sent()).not.toHaveProperty("workspaceMode");
+  expect(sent()).not.toHaveProperty("claudeAccountId");
+  expect(mac.asked).not.toContain("projects.git");
 });

@@ -4,10 +4,10 @@ import type { KeyValue } from "./scratch-store";
 
 /**
  * The reads the phone paints from on a cold start, before the Mac answers: Home's lists and task list, the Mac's look in
- * its settings, the last usage it reported, and its agents' models, which a cloud thread's composer chooses from while
- * the Mac is asleep.
+ * its settings, the last usage it reported, and its agents' models and which of them are signed in, which a cloud
+ * thread's composer and a new cloud thread choose from while the Mac is asleep.
  */
-const KEPT: ReadonlySet<string> = new Set<RpcMethod | DeviceMethod>(["projects.list", "threads.list", "app.settings.get", "tasks.board", "providers.limits", "agents.models"]);
+const KEPT: ReadonlySet<string> = new Set<RpcMethod | DeviceMethod>(["projects.list", "threads.list", "app.settings.get", "tasks.board", "providers.limits", "agents.models", "agents.availability"]);
 const SAVE_AFTER_MS = 1_000;
 
 type Storage = KeyValue;
@@ -20,7 +20,8 @@ interface Kept {
 
 // Version 2: lists an earlier build saved could hold another host's threads.
 const storageKey = (macId: string) => `lists.v2.${macId}`;
-const kept = (query: Query) => KEPT.has(String(query.queryKey[0])) && query.state.status === "success";
+// A list whose latest read failed, as every read does while the Mac is asleep, still holds the last answer it had.
+const kept = (query: Query) => KEPT.has(String(query.queryKey[0])) && query.state.data !== undefined;
 
 /** Puts a Mac's saved lists back in the cache, as old as they are, so they refetch once the Mac answers. */
 export function restoreLists(client: QueryClient, storage: Storage, macId: string): boolean {

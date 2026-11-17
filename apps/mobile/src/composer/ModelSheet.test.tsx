@@ -411,3 +411,58 @@ it("shows one agent's models at a time, and an agent with many by provider, with
   expect(screen.getByRole("radio", { name: "Old Zen" })).toBeTruthy();
   expect(screen.queryByRole("radio", { name: "Big Pickle" })).toBeNull();
 });
+
+/** An OpenOrc Cloud thread on Claude, its settings built as ThreadScreen builds them. */
+function OpenCloudThread() {
+  const thread = {
+    id: "cloud",
+    projectId: "cloud-project:p1",
+    agent: "claude",
+    model: "opus",
+    effort: "high",
+    fastMode: false,
+    mode: "act",
+    permissionMode: "trusted",
+    claudeAccountId: null,
+    activity: "idle",
+    owner: { brain: "hosted", reach: "live", heardAt: 1 },
+  } as ThreadSummary;
+  const settings = { ...client.useConversationSettings({ thread, activeRun: undefined }), claudeAccount: useThreadClaudeAccount(thread) };
+  useShareSettings("new-thread", settings);
+  return <ComposerChips composerId="new-thread" settings={settings} />;
+}
+
+it("offers no account of the Mac's on an OpenOrc Cloud thread, and names its model from the Mac's own list", async () => {
+  macState({ accounts: accounts() });
+  render(
+    <>
+      <OpenCloudThread />
+      <ModelSheet />
+    </>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  expect(await screen.findByRole("button", { name: "Model, Opus" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /^Claude account/ })).toBeNull();
+  expect(mac.calls.filter((call) => call.method === "agents.models").map((call) => call.params)).toEqual([{}]);
+});
+
+it("lets the Mac's last list be chosen from without an error while the Mac does not answer", async () => {
+  macState({ accounts: accounts() });
+  // The list kept from the Mac's last answer, and the read since, failed, as every read does while it is asleep.
+  const { queryClient } = mac.phone!.module;
+  queryClient.setQueryData(["agents.models", {}], [mac.claude, mac.codex]);
+  queryClient
+    .getQueryCache()
+    .find({ queryKey: ["agents.models", {}] })!
+    .setState({ status: "error", error: new Error("Your Mac did not answer in time.") });
+  render(
+    <>
+      <OpenCloudThread />
+      <ModelSheet />
+    </>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  expect(await screen.findByRole("button", { name: "Model, Opus" })).toBeTruthy();
+  expect(screen.queryByText(/Couldn’t load models/)).toBeNull();
+  expect(screen.getAllByText("Opus").length).toBeGreaterThan(1);
+});

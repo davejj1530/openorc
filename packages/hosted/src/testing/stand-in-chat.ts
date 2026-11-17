@@ -7,6 +7,7 @@ import type { StandInThreads } from "./stand-in-threads.js";
 import { StandInChatChannels } from "./stand-in-chat-channels.js";
 import { StandInChatReads } from "./stand-in-chat-reads.js";
 import { standInPins } from "./stand-in-chat-pins.js";
+import { standInSearch } from "./stand-in-chat-search.js";
 
 type Reply = { status: number; body: unknown };
 type Request = { method: string; path: string; query: URLSearchParams; space: string | null };
@@ -22,6 +23,7 @@ export class StandInChat {
   filesEnabled = false;
   repliesEnabled = false;
   pinsEnabled = false;
+  searchEnabled = false;
   readonly reads = new StandInChatReads();
   /** Takes a message's uploaded files (StandInUploads.attachChat); null refuses them. */
   attachFiles: ((input: { who: string; space: string; ids: string[]; messageId: string; conversationId: string }) => TeamMessage["files"] | null) | null = null;
@@ -72,6 +74,7 @@ export class StandInChat {
       ["files", this.filesEnabled],
       ["replies", this.repliesEnabled],
       ["pins", this.pinsEnabled],
+      ["search", this.searchEnabled],
     ];
     return ["base", ...flags.flatMap(([name, on]) => (on ? [name] : []))];
   }
@@ -108,6 +111,14 @@ export class StandInChat {
 
   #conversationRoute(request: Request, spaceId: string, who: string, body: unknown): Reply {
     if (request.method === "POST" && request.path === "/chat/dms") return this.#open(spaceId, who, body);
+    if (request.method === "GET" && request.path === "/chat/search" && this.searchEnabled)
+      return {
+        status: 200,
+        body: standInSearch(
+          this.#in(spaceId).filter((record) => this.#readable(record, who)),
+          request.query.get("q") ?? "",
+        ),
+      };
     return this.#channels.route(request, spaceId, who, body) ?? this.#recordRoute(request, spaceId, who, body) ?? this.#reactionRoute(request, spaceId, who, body);
   }
 

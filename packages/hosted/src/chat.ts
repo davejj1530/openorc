@@ -131,6 +131,10 @@ export class TeamChat {
     return message;
   }
 
+  search({ spaceId, q }: RpcParams<"teamChat.search">) {
+    return this.#request(spaceId, CHAT_ROUTES.search(q));
+  }
+
   pins({ spaceId, conversationId }: RpcParams<"teamChat.pins">) {
     return this.#request(spaceId, CHAT_ROUTES.pins(conversationId));
   }

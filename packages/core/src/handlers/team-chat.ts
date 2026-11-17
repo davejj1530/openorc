@@ -25,6 +25,7 @@ export function createTeamChatHandlers(chat: ChatCalls | null): Pick<Handlers, k
     "teamChat.react": (input) => requireChat().react(input),
     "teamChat.pins": (input) => requireChat().pins(input),
     "teamChat.pin": (input) => requireChat().pin(input),
+    "teamChat.search": (input) => requireChat().search(input),
     "teamChat.watch": (input) => requireChat().watch(input),
     "teamChat.unwatch": (input) => chat?.unwatch(input) ?? {},
     "teamChat.seen": (input) => requireChat().seen(input),

@@ -16,6 +16,7 @@ beforeEach(async () => {
   stand.chat.channelsEnabled = true;
   stand.chat.repliesEnabled = true;
   stand.chat.pinsEnabled = true;
+  stand.chat.searchEnabled = true;
   spaceId = stand.addTeam("Birch Studio", [FIRST, SECOND]);
 });
 afterEach(async () => {
@@ -68,4 +69,17 @@ it("pins for everyone in the conversation through the app's client, and keeps an
   expect((await first.chat.pins({ spaceId, conversationId: hidden.id })).pins).toHaveLength(1);
   await second.chat.pin({ ...target, messageId: said.id, pinned: false });
   expect((await first.chat.pins(target)).pins).toEqual([]);
+});
+
+it("searches the conversations the person may read through the app's client, and nothing else", async () => {
+  const first = await host(FIRST),
+    second = await host(SECOND);
+  const pair = await first.chat.openDm({ spaceId, userIds: [userOf(SECOND)] });
+  const said = await first.chat.send({ spaceId, conversationId: pair.id, id: randomUUID(), body: "The zephyr build is green" });
+  const hidden = await first.chat.createChannel({ spaceId, name: "hidden", private: true });
+  await first.chat.send({ spaceId, conversationId: hidden.id, id: randomUUID(), body: "Zephyr plans stay private" });
+  const found = await second.chat.search({ spaceId, q: "zeph" });
+  expect(found.hits.map((hit) => [hit.id, hit.channelId, hit.seq])).toEqual([[said.id, pair.id, said.seq]]);
+  expect(found.hits[0]?.snippet.marks).toEqual([[4, 10]]);
+  expect((await first.chat.search({ spaceId, q: "zephyr" })).hits).toHaveLength(2);
 });

@@ -1,6 +1,6 @@
 import { useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import type { LegendListRef } from "@legendapp/list/react-native";
-import { conversationActivity, conversationSendDisabledReason, processFit, threadWriteBlock, type SubmitRequest } from "@openorc/client";
+import { conversationActivity, processFit, threadWriteBlock, type SubmitRequest } from "@openorc/client";
 import { isSubagentThread, placeOf, type OrclingChatSummary, type Run, type ThreadCollaboration, type ThreadSummary } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from "react";
@@ -10,9 +10,7 @@ import { client, useLinkState, useRpc } from "../client";
 import { useThreadClaudeAccount } from "../composer/claude-account";
 import { Composer } from "../composer/Composer";
 import { useShareSettings } from "../composer/settings-bridge";
-import { threadLinkReason } from "../connection/link-reason";
 import { useOwnCloud } from "../cloud/use-own-cloud";
-import type { LinkState } from "../connection/manager";
 import { useCoverHome } from "../home/home-cover";
 import { useThreadOnScreen } from "../notifications/on-screen";
 import { chatFor, useOrclingChats } from "../orclings/orcling-chats";
@@ -31,6 +29,7 @@ import { useSnoozeClock } from "./snooze-clock";
 import { SubagentStatusBar } from "./SubagentStatusBar";
 import { ThreadTitle } from "./ThreadHeader";
 import { useThreadHeaderMenu } from "./ThreadMenu";
+import { sendBlocked } from "./send-blocked";
 import { NoteReplyContext, useMentionOpening, useNoteReading, useNoteReply, useThreadNotes } from "./thread-notes";
 import { Transcript } from "./Transcript";
 import { useThreadActions } from "./use-thread-actions";
@@ -64,26 +63,6 @@ interface PaneProps {
   composerInset: SharedValue<number>;
   listRef: RefObject<LegendListRef | null>;
   followKey: number;
-}
-
-/** Why the composer cannot send now: the link to the Mac first, for a thread that needs it, then the conversation's own state. */
-function sendBlocked(
-  link: LinkState,
-  settings: { permissionReady: boolean; choice: unknown },
-  runs: { isLoading: boolean; error: unknown },
-  thread: ThreadSummary | null,
-  ownCloud: boolean,
-): string | null {
-  return (
-    threadLinkReason(link, thread, ownCloud) ??
-    conversationSendDisabledReason({
-      permissionReady: settings.permissionReady,
-      historyLoading: runs.isLoading,
-      historyFailed: Boolean(runs.error),
-      hasModel: Boolean(settings.choice),
-      thread,
-    })
-  );
 }
 
 /** History that would not load: one quiet line and a way to ask again. */

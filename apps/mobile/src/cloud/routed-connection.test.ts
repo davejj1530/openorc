@@ -146,3 +146,15 @@ it("sends every call to the Mac while the phone holds no session of its own, and
     { type: "gap", runIds: ["r"] },
   ]);
 });
+
+it("answers team chat from its own session with the Mac asleep, and asks the Mac nothing of it", async () => {
+  Object.assign(stand.chat, { enabled: true, channelsEnabled: true });
+  const { connection, mac } = await routed();
+  mac.at.down = true;
+  await vi.waitFor(() => expect(hosted.spaces.status().state).toBe("ready"));
+  expect(await connection.call("teamChat.state", { spaceId: birch })).toMatchObject({ state: "ready", spaceId: birch });
+  const channel = await connection.call("teamChat.createChannel", { spaceId: birch, name: "launch" });
+  await connection.call("teamChat.send", { spaceId: birch, conversationId: channel.id, id: crypto.randomUUID(), body: "Checklist is done" });
+  expect((await connection.call("teamChat.timeline", { spaceId: birch, conversationId: channel.id })).messages.map((message) => message.body)).toEqual(["Checklist is done"]);
+  expect(mac.at.asked.filter((each) => each.method.startsWith("teamChat."))).toEqual([]);
+});

@@ -37,6 +37,7 @@ export class RoutedConnection implements CoreConnection {
     this.router = new PlaceRouter({
       place: () => this.signedIn()?.threads ?? null,
       spaces: () => this.signedIn()?.spaces ?? null,
+      chat: () => this.signedIn()?.chat ?? null,
       next: (request) => this.toMac(request),
     });
     mac.onPush((push) => this.emit(push));

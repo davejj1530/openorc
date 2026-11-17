@@ -73,6 +73,15 @@ export class OrganizationAccessStore {
     };
   }
 
+  /**
+   * The person is leaving or deleting an organization: its content closes now, so nothing mounted under it reads it again
+   * on the way out. A refresh opens it again while they are still in it.
+   */
+  close(spaceId: string): void {
+    if (this.#disposed) return;
+    this.#publish({ ...this.#snapshot, spaces: this.#snapshot.spaces.filter((space) => space.id !== spaceId) });
+  }
+
   async refresh(): Promise<void> {
     if (this.#disposed) return;
     this.#expire();

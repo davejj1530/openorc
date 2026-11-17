@@ -174,6 +174,29 @@ describe("shared organization content authority", () => {
     expect(f.store.status("team-a").identity).toBe(JSON.stringify(["https://example.com", "person-b"]));
   });
 
+  it("closes an organization the person leaves at once, ending its leases and clearing its caches, until a read opens it again", async () => {
+    const f = fixture();
+    await f.store.refresh();
+    const lease = f.store.capture("team-a");
+    const cleared: OrganizationProtectionChange[] = [];
+    f.store.subscribeProtected((change) => cleared.push(change));
+    // A read already on its way, answered from before the leave, doesn't bring the organization back.
+    const old = deferred<SpacesStatus>();
+    f.read.mockReturnValueOnce(old.promise);
+    const reading = f.store.refresh();
+    f.store.close("team-a");
+    expect(lease.current()).toBe(false);
+    expect(f.store.status("team-a").blocked).toBe("membership");
+    expect(f.store.status("team-b").allowed).toBe(true);
+    expect(cleared).toMatchObject([{ reason: "membership", removed: ["team-a"] }]);
+    old.resolve(spaces());
+    await reading;
+    expect(f.store.status("team-a").allowed).toBe(false);
+    // Refused, the person is still in it: the next read opens it again.
+    await f.store.refresh();
+    expect(f.store.status("team-a").allowed).toBe(true);
+  });
+
   it("checks the deadline synchronously when suspended timers have not run yet", async () => {
     const f = fixture(grace);
     await f.store.refresh();

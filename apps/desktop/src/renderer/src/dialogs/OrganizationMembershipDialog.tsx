@@ -4,6 +4,7 @@ import { AccountFace } from "../components/AccountFace";
 import { OrganizationDeleteBillingRefusal, deleteRefusalWords, type DeleteRefusal } from "../components/OrganizationDeleteBillingRefusal";
 import { Button, Dialog, Input } from "../components/ui";
 import { useRpcMutation } from "../lib/client";
+import { organizationContentGate } from "../lib/organization-content-gate";
 import "../components/Organization.css";
 
 export type MembershipAction = { kind: "remove"; organization: OrganizationIdentity; person: OrganizationPerson } | { kind: "leave" | "delete"; organization: OrganizationIdentity };
@@ -123,10 +124,20 @@ interface Calls {
 /** Carries the action out. A deletion the organization's billing refuses is answered, not thrown: nothing was deleted. */
 async function carryOut(action: MembershipAction, calls: Calls, confirmation: string): Promise<DeleteRefusal | null> {
   const spaceId = action.organization.id;
-  if (action.kind === "remove") await calls.remove({ spaceId, memberId: action.person.memberId });
-  else if (action.kind === "leave") await calls.leave({ spaceId });
-  else return (await calls.destroy({ spaceId, name: confirmation })).refusal ?? null;
-  return null;
+  if (action.kind === "remove") {
+    await calls.remove({ spaceId, memberId: action.person.memberId });
+    return null;
+  }
+  // Its content closes as the person leaves, before the reads a leave sets off; refused, the gate reads it again.
+  organizationContentGate.close(spaceId);
+  try {
+    const refusal = action.kind === "leave" ? (await calls.leave({ spaceId }), null) : ((await calls.destroy({ spaceId, name: confirmation })).refusal ?? null);
+    if (refusal) void organizationContentGate.refresh();
+    return refusal;
+  } catch (error) {
+    void organizationContentGate.refresh();
+    throw error;
+  }
 }
 
 /** Where a deletion the organization's billing refuses leads; null for any other outcome. */

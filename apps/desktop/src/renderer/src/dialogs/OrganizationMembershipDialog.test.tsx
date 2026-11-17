@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { accountDay } from "@openorc/client";
 import { queryClient } from "../lib/client";
+import { organizationContentGate } from "../lib/organization-content-gate";
 import { OrganizationMembershipDialog, type MembershipAction } from "./OrganizationMembershipDialog";
 
 const mock = vi.hoisted(() => ({ call: vi.fn() }));
@@ -55,6 +56,25 @@ it.each(cases)("keeps $label completed while its following read is retried", asy
   retry.resolve();
   await waitFor(() => expect(close).toHaveBeenCalledTimes(1));
   expect(mock.call.mock.calls.filter(([name]) => name === method)).toHaveLength(1);
+});
+
+it("closes the organization's content as the person leaves, before the leave's reads, and reads the gate again when refused", async () => {
+  const closed = vi.spyOn(organizationContentGate, "close");
+  const refreshed = vi.spyOn(organizationContentGate, "refresh").mockResolvedValue();
+  const leave = Promise.withResolvers<unknown>();
+  mock.call.mockImplementation((method: string) => (method === "organization.leave" ? leave.promise : Promise.resolve({})));
+  render(
+    <QueryClientProvider client={queryClient}>
+      <OrganizationMembershipDialog action={{ kind: "leave", organization }} onClose={vi.fn()} onDone={vi.fn()} />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Leave organization" }));
+  await waitFor(() => expect(closed).toHaveBeenCalledWith("birch"));
+  expect(refreshed).not.toHaveBeenCalled();
+  leave.reject(new Error("You're the only admin of Birch Studio."));
+  await waitFor(() => expect(refreshed).toHaveBeenCalledTimes(1));
+  closed.mockRestore();
+  refreshed.mockRestore();
 });
 
 const ENDS = Date.parse("2026-12-01T06:05:00.000Z");

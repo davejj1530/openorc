@@ -293,6 +293,10 @@ export {
 } from "./hosted-send.js";
 export { hostedActionLine, hostedFilePatch, hostedPublishReason, hostedReviewPending, hostedTurnCards } from "./hosted-review.js";
 export { mergeTeamMessages, teamChatRoster, teamChatShortNames, teamConversationTitle, teamChatScopeKey, TeamChatGeneration, type TeamChatRow, type TeamChatScope } from "./team-chat.js";
+export { TeamChatDrafts, type TeamChatDraftStorage, type TeamChatTarget } from "./team-chat-drafts.js";
+export { refreshTeamHistory } from "./team-chat-history.js";
+export { answeredName, answeredOf, teamChatCallLine } from "./team-chat-replies.js";
+export { createTeamChat, teamChatList, type TeamChatDeps, type TeamChatLease, type TeamChatListRow, type TeamChatStore } from "./team-chat-store.js";
 export * from "./seat-words.js";
 export * from "./hosted-capabilities.js";
 export { onlineTaskKey, onlineTaskTags, readOnlineTaskPages, type OnlineTaskScope } from "./online-tasks.js";

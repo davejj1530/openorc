@@ -1,5 +1,5 @@
 import { TeamChatDraft, type PendingTeamMessage, type TeamChatAnswered, type TeamChatOrclingPick } from "@openorc/protocol";
-export type { TeamChatDraft, PendingTeamMessage } from "@openorc/protocol";
+/** One conversation of one account's organization, where a draft is written. */
 export interface TeamChatTarget {
   accountId: string;
   spaceId: string;
@@ -8,11 +8,24 @@ export interface TeamChatTarget {
 const PREFIX = "openorc.teamChat.draft:";
 const keyOf = (at: TeamChatTarget) => PREFIX + JSON.stringify([at.accountId, at.spaceId, at.conversationId]);
 
+/** Where drafts outlive a launch: the window's local storage, or the phone's own. */
+export interface TeamChatDraftStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+  key(index: number): string | null;
+  readonly length: number;
+}
+
 /** Only local words and unsent identities persist; authorized server history never enters draft storage. */
 export class TeamChatDrafts {
   readonly #memory = new Map<string, TeamChatDraft>();
   readonly #listeners = new Set<() => void>();
-  constructor(private readonly storage: Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length">) {}
+  constructor(
+    private readonly storage: TeamChatDraftStorage,
+    /** A fresh unique id for each message, kept across its retries. */
+    private readonly randomId: () => string,
+  ) {}
 
   subscribe = (listener: () => void): (() => void) => {
     this.#listeners.add(listener);
@@ -49,9 +62,9 @@ export class TeamChatDrafts {
     const current = this.read(at);
     if (!current.text.trim() && !files.length) return null;
     // An Orcling is called only while its name is still in the words; deleting "@Rini" takes the call back.
-    const called = current.orcling && current.text.includes(`@${current.orcling.name}`) ? { ...current.orcling, callId: crypto.randomUUID() } : null;
+    const called = current.orcling && current.text.includes(`@${current.orcling.name}`) ? { ...current.orcling, callId: this.randomId() } : null;
     const message: PendingTeamMessage = {
-      id: crypto.randomUUID(),
+      id: this.randomId(),
       body: current.text,
       files,
       replyTo: current.replyTo,

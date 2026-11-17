@@ -1,5 +1,6 @@
 import type { TeamChatAnswered, TeamChatPerson } from "@openorc/protocol";
-import { answeredName, answeredWords } from "../lib/team-chat-replies";
+import { answeredName } from "@openorc/client";
+import { answeredWords } from "../lib/team-chat-replies";
 import { CornerUpLeft, X } from "./icons";
 import { Tooltip } from "./ui";
 

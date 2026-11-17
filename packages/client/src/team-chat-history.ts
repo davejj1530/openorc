@@ -1,4 +1,4 @@
-import { mergeTeamMessages } from "@openorc/client";
+import { mergeTeamMessages } from "./team-chat.js";
 import type { TeamChatTimeline } from "@openorc/protocol";
 
 /** Refresh the visible page and fill missed sequences before publishing one reconciled history. */

@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./router": "./src/router/place-router.ts",
     "./socket": "./src/live-socket.ts",
-    "./testing": "./src/testing/stand-in.ts"
+    "./testing": "./src/testing/stand-in.ts",
+    "./test-fixtures": "./src/test-fixtures/host.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

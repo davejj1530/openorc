@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 import type { SpacesStatus } from "@openorc/protocol";
 import { OrganizationAccessStore } from "./organization-access-store";
-import { TeamChatDrafts } from "./team-chat-draft";
+import { TeamChatDrafts } from "@openorc/client";
 import { TeamChatClosedGroups } from "./team-chat-closed-groups";
 import { TeamChatProtection } from "./team-chat-protection";
 import { spaceNavigation } from "./space-navigation";
@@ -48,7 +48,7 @@ async function fixture() {
   let answer = status();
   const gate = new OrganizationAccessStore({ now: Date.now, read: async () => answer });
   const queries = new QueryClient();
-  const drafts = new TeamChatDrafts(localStorage);
+  const drafts = new TeamChatDrafts(localStorage, () => crypto.randomUUID());
   const closedGroups = new TeamChatClosedGroups(localStorage);
   const protection = new TeamChatProtection({ gate, queries, drafts, closedGroups, navigation: spaceNavigation, fileDrafts: teamChatFileDrafts });
   stops.push(

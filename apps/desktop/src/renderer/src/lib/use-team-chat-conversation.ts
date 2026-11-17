@@ -7,7 +7,7 @@ import { earlierTeamMessages, teamChatDrafts, useTeamChatTimeline } from "./team
 import { reactToTeamMessage, sendTeamMessage } from "./team-chat-actions";
 import { useNewFrom, useTeamChatSeen } from "./team-chat-seen";
 import { jumpToTeamMessage, useTeamMessageReveal } from "./team-chat-jump";
-import { answeredOf } from "./team-chat-replies";
+import { answeredOf } from "@openorc/client";
 import { pinTeamMessage } from "./team-chat-pins";
 import { useTeamChatOrclings } from "./team-chat-orclings";
 

@@ -1,10 +1,8 @@
 import { Command } from "cmdk";
-import { useQuery } from "@tanstack/react-query";
 import { rowAge, teamConversationTitle, useSidebarNow } from "@openorc/client";
 import type { TeamChatSearchHit, TeamConversation } from "@openorc/protocol";
-import { core } from "../lib/rpc";
-import { useTeamChatContext, type TeamChatContextValue } from "../lib/team-chat-context";
-import { useTeamChatState } from "../lib/team-chat-queries";
+import { useTeamChatContext } from "../lib/team-chat-context";
+import { teamChat, useTeamChatState } from "../lib/team-chat-queries";
 import { openTeamConversation } from "../lib/team-chat-open";
 import { jumpToTeamMessage } from "../lib/team-chat-jump";
 import { TeamChatFace } from "./TeamChatFace";
@@ -19,7 +17,7 @@ export function TeamChatSearchHits({ query, onOpened }: { query: string; onOpene
   const state = useTeamChatState();
   const chat = state.data?.state === "ready" ? state.data.chat : null;
   const q = query.trim();
-  const hits = useTeamChatSearch(scope, q, Boolean(chat?.features.includes("search")) && q.length >= SHORTEST);
+  const hits = teamChat.useSearch(scope, q, Boolean(chat?.features.includes("search")) && q.length >= SHORTEST);
   const now = useSidebarNow();
   if (!scope || !chat) return null;
   if (hits.error)
@@ -57,18 +55,4 @@ export function TeamChatSearchHits({ query, onOpened }: { query: string; onOpene
       })}
     </Command.Group>
   );
-}
-
-function useTeamChatSearch(scope: TeamChatContextValue | null, q: string, enabled: boolean) {
-  return useQuery({
-    queryKey: ["team-chat", scope?.accountId, scope?.spaceId, scope?.generation, "search", q],
-    enabled: Boolean(scope) && enabled,
-    retry: false,
-    staleTime: 5_000,
-    meta: { tags: scope ? ["team-chat", `team-chat:${scope.spaceId}`] : [] },
-    queryFn: async ({ signal }) => {
-      if (!scope?.current() || signal.aborted) throw new Error("The chat changed. Search again.");
-      return core.call("teamChat.search", { spaceId: scope.spaceId, q });
-    },
-  });
 }

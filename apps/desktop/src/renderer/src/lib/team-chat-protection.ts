@@ -2,7 +2,7 @@ import { TeamChatGeneration } from "@openorc/client";
 import type { SpacesStatus } from "@openorc/protocol";
 import type { QueryClient } from "@tanstack/react-query";
 import type { OrganizationAccessStore } from "./organization-access-store";
-import type { TeamChatDrafts } from "./team-chat-draft";
+import type { TeamChatDrafts } from "@openorc/client";
 import type { TeamChatClosedGroups } from "./team-chat-closed-groups";
 import type { TeamChatContextValue } from "./team-chat-context";
 import type { spaceNavigation } from "./space-navigation";

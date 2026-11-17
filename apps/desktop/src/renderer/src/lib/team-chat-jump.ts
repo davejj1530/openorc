@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { create } from "zustand";
-import type { TeamChatTarget } from "./team-chat-draft";
+import type { TeamChatTarget } from "@openorc/client";
 
 /** A message to show in its conversation: a reply's answered message, a pin or a search result. */
 export interface TeamChatJump {

@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TeamChatRead, TeamChatStatus, TeamConversation, TeamMessage } from "@openorc/protocol";
-import { core } from "./rpc";
-import { queryClient } from "./client";
-import { chatStateKey } from "./team-chat-queries";
+import type { TeamConversation, TeamMessage } from "@openorc/protocol";
+import { teamChat } from "./team-chat-queries";
 import type { TeamChatContextValue } from "./team-chat-context";
-import type { TeamChatTarget } from "./team-chat-draft";
+import type { TeamChatTarget } from "@openorc/client";
 
 /** Whether the person can be looking at this window: it is focused and its page is visible. */
 export function useWindowAttention(): boolean {
@@ -61,12 +59,9 @@ export function useTeamChatSeen(scope: TeamChatContextValue, target: TeamChatTar
     if (!next || !scope.current() || next.seq <= sent.current) return;
     const before = sent.current;
     sent.current = next.seq;
-    void core
-      .call("teamChat.seen", { spaceId: target.spaceId, conversationId: target.conversationId, messageId: next.id })
-      .then((read) => store(scope, target.conversationId, read))
-      .catch(() => {
-        if (sent.current === next.seq) sent.current = before;
-      });
+    void teamChat.seen(scope, target, next).catch(() => {
+      if (sent.current === next.seq) sent.current = before;
+    });
   };
   useEffect(
     () => () => {
@@ -86,19 +81,4 @@ export function useTeamChatSeen(scope: TeamChatContextValue, target: TeamChatTar
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => flush.current(), 250);
   }, []);
-}
-
-function store(scope: TeamChatContextValue, conversationId: string, read: TeamChatRead): void {
-  if (!scope.current()) return;
-  queryClient.setQueryData<TeamChatStatus>(chatStateKey(scope), (state) =>
-    state?.state === "ready"
-      ? {
-          ...state,
-          chat: {
-            ...state.chat,
-            conversations: state.chat.conversations.map((item) => (item.id === conversationId && (item.read?.seenSeq ?? 0) <= read.seenSeq ? { ...item, read } : item)),
-          },
-        }
-      : state,
-  );
 }

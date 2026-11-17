@@ -27,6 +27,9 @@ beforeEach(() => {
   reads.set("hosted.review.state", reviewState);
   reads.set("hosted.review.file", reviewFile);
   reads.set("hosted.review.turn", recordedTurn);
+  reads.set("hosted.review.commits", { commits: [], total: 0, pushed: null });
+  // This Mac's own read of whether the thread's work can come to a folder here, in place of Push.
+  reads.set("macProjects.bringState", { mac: false });
   writes = [];
   response = { accepted: true, action: pendingAction };
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => {
@@ -58,7 +61,8 @@ it("draws saved changes and publishing controls without a local Git or review-co
   expect(screen.queryByRole("button", { name: "Push" })).toBeNull();
   expect(screen.queryByRole("button", { name: "PR" })).toBeNull();
   expect(screen.queryByText("Clean workspace")).toBeNull();
-  expect(vi.mocked(core.call).mock.calls.every(([method]) => method.startsWith("hosted.review.") || method === "account.status" || method === "hosted.capabilities")).toBe(true);
+  const own = new Set(["account.status", "hosted.capabilities", "macProjects.bringState"]);
+  expect(vi.mocked(core.call).mock.calls.every(([method]) => method.startsWith("hosted.review.") || own.has(method))).toBe(true);
 });
 
 it.each([
@@ -124,7 +128,8 @@ it.each([
   mount(commits());
   expect(await screen.findByRole("button", { name: label })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Commit" })).toBeNull();
-  expect(screen.getByText("Commit history isn't available in this cloud thread yet.")).toBeTruthy();
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+  expect(screen.queryByRole("list", { name: "Commits" }), "a thread with no commits lists none").toBeNull();
   expect(vi.mocked(core.call).mock.calls.some(([method]) => method.startsWith("git."))).toBe(false);
 });
 

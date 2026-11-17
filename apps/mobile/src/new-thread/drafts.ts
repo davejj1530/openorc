@@ -2,6 +2,7 @@ import { PermissionPreset, type ThreadSummary } from "@openorc/protocol";
 import { useCallback, useState } from "react";
 import { shownMacId, storage, client } from "../client";
 import { decodeSheetDraft, type SheetDraft } from "./new-thread-state";
+import { threadModelChoice } from "@openorc/client";
 
 const draftKey = (projectId: string) => `newthread.${shownMacId() ?? "none"}.${projectId}`;
 const projectKey = () => `newthread.${shownMacId() ?? "none"}.project`;
@@ -61,11 +62,11 @@ export function rememberProject(projectId: string): void {
   storage.set(projectKey(), projectId);
 }
 
-type Parent = Pick<ThreadSummary, "id" | "projectId" | "agent" | "model" | "effort" | "fastMode" | "mode" | "claudeAccountId">;
+type Parent = Pick<ThreadSummary, "id" | "projectId" | "agent" | "model" | "effort" | "fastMode" | "mode" | "claudeAccountId" | "owner">;
 
 /** A subthread's draft before anything is chosen: its parent's model, mode and account, as the desktop starts one. */
 function parentDraft(parent: Parent): SheetDraft {
-  const choice = parent.model ? { agent: parent.agent, model: parent.model, effort: parent.effort, fastMode: parent.fastMode } : null;
+  const choice = threadModelChoice(parent);
   return { ...decodeSheetDraft(parent.projectId, null), target: { kind: "model", choice }, mode: parent.mode, ...(parent.claudeAccountId ? { claudeAccountId: parent.claudeAccountId } : {}) };
 }
 

@@ -14,12 +14,18 @@ const settingFields: Record<Setting, (keyof SettingsPatch)[]> = { model: ["agent
 const settingsIn = (patch: SettingsPatch) => (Object.keys(settingFields) as Setting[]).filter((setting) => settingFields[setting].some((field) => field in patch));
 
 /**
- * The choice a thread or its run saved. A cloud thread may run its agent CLI's own default, saved as the empty model,
- * which is a choice like any other there.
+ * The model choice a thread saved, which a subthread starts on too. A cloud thread may run its agent CLI's own default,
+ * saved as the empty model, which is a choice like any other there.
  */
+export function threadModelChoice(thread: Pick<ThreadSummary, "agent" | "model" | "effort" | "fastMode" | "owner">): ModelChoice | null {
+  if (placeOf(thread).elsewhere && thread.model === CLOUD_DEFAULT_MODEL) return { agent: thread.agent, model: CLOUD_DEFAULT_MODEL, effort: thread.effort };
+  return thread.model ? normalizeModelSettings({ agent: thread.agent, model: thread.model, effort: thread.effort, fastMode: thread.fastMode }) : null;
+}
+
+/** The choice a thread or its run saved. */
 function savedModelChoice(thread: SavedThreadSettings | null, activeRun: Run | undefined): ModelChoice | null {
-  if (thread && placeOf(thread).elsewhere && thread.model === CLOUD_DEFAULT_MODEL) return { agent: thread.agent, model: CLOUD_DEFAULT_MODEL, effort: thread.effort };
-  if (thread?.model) return normalizeModelSettings({ agent: thread.agent, model: thread.model, effort: thread.effort, fastMode: thread.fastMode });
+  const saved = thread && threadModelChoice(thread);
+  if (saved) return saved;
   if (activeRun?.model) return normalizeModelSettings({ agent: activeRun.agent, model: activeRun.model, effort: activeRun.effort, fastMode: activeRun.fastMode });
   return null;
 }
@@ -27,10 +33,11 @@ function savedModelChoice(thread: SavedThreadSettings | null, activeRun: Run | u
 type Models = Parameters<typeof defaultChoice>[0];
 
 /**
- * A thread's default with nothing saved. A cloud thread keeps its own agent, its default read from the models the cloud
- * runs, where its server lists them, else from this Mac's: what this Mac runs by default has no say in it.
+ * A thread's default with nothing saved, which a subthread of it starts on too. A cloud thread keeps its own agent, its
+ * default read from the models the cloud runs, where its server lists them, else from this Mac's: what this Mac runs by
+ * default has no say in it.
  */
-function threadDefault(models: Models, cloud: Models | null, agent: AgentKind | null, elsewhere: boolean): ModelChoice | null {
+export function threadDefault(models: Models, cloud: Models | null, agent: AgentKind | null, elsewhere: boolean): ModelChoice | null {
   if (!elsewhere || !agent) return defaultChoice(models, agent);
   return (cloud && agentDefaultChoice(cloud, agent)) ?? agentDefaultChoice(models, agent);
 }

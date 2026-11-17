@@ -1,7 +1,7 @@
-import { targetModel } from "@openorc/client";
+import { targetModel, threadDefault } from "@openorc/client";
 import { placeOf, type PermissionPreset, type RpcParams, type ThreadSummary } from "@openorc/protocol";
-import { useRef, useState } from "react";
-import { useRpcMutation } from "../client";
+import { useEffect, useRef, useState } from "react";
+import { useRpc, useRpcMutation } from "../client";
 import { useCloudFiles } from "../cloud/cloud-files";
 import { OLDER_MAC_SUBTHREADS } from "../connection/link-connection";
 import { useShares } from "../connection/use-shares";
@@ -15,7 +15,6 @@ import { failureMessage } from "../failure";
 import { haptic } from "../ui/haptics";
 import { useSubthreadDraft } from "./drafts";
 import { startBlocker, unstarted, type SheetDraft } from "./new-thread-state";
-import { useDefaultChoice } from "./use-new-thread";
 
 /** The phone's capability a Mac shares once it starts a thread under another for a phone. */
 const SUBTHREAD_STARTS = "subthread-starts";
@@ -44,13 +43,29 @@ export function subthreadStartInput(
 }
 
 /**
+ * With nothing chosen and nothing saved on the parent, the parent's own default, as its header shows it: its agent's,
+ * from the models the cloud runs for a cloud thread.
+ */
+function useParentDefault(parent: ThreadSummary, cloud: boolean, draft: SheetDraft, setDraft: ReturnType<typeof useSubthreadDraft>[1]) {
+  const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
+  const catalog = useRpc("cloudModels.catalog", {}, { enabled: cloud, staleTime: 5 * 60_000 });
+  const waiting = cloud && catalog.isPending;
+  useEffect(() => {
+    if (draft.target.kind !== "model" || draft.target.choice || !models.data || waiting) return;
+    const choice = threadDefault(models.data, catalog.data?.models ?? null, parent.agent, cloud);
+    if (choice) setDraft((current) => ({ ...current, target: { kind: "model", choice } }));
+  }, [draft.target, models.data, catalog.data, waiting, parent.agent, cloud, setDraft]);
+}
+
+/**
  * A thread started under `parent`, as the desktop's New subthread starts one: in the parent's folder, on its model,
  * mode, permission and account until they are changed here. The draft is kept per parent, and a start the Mac refuses
  * keeps it and says why.
  */
 export function useNewSubthread(parent: ThreadSummary) {
   const [draft, setDraft] = useSubthreadDraft(parent);
-  useDefaultChoice(draft, setDraft);
+  const cloud = placeOf(parent).elsewhere;
+  useParentDefault(parent, cloud, draft, setDraft);
   const [permission, setPermission] = useState<PermissionPreset>(parent.permissionMode);
   const start = useRpcMutation("threads.start");
   const [starting, setStarting] = useState(false);
@@ -63,7 +78,6 @@ export function useNewSubthread(parent: ThreadSummary) {
     setError(null);
   };
   // Under a cloud thread, the subthread is OpenOrc Cloud's too: its images go there through the phone's own session.
-  const cloud = placeOf(parent).elsewhere;
   const files = useCloudFiles(cloud ? { threadId: parent.id } : null);
   const attach = useImageAttach({ onImage: (image) => setDraft((current) => ({ ...current, images: [...current.images, image] })), onError: setError, cloud: files.scope });
   const { uploading } = attach;

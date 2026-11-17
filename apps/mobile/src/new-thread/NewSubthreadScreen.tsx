@@ -1,5 +1,5 @@
 import { composerActivity, workspaceLabel } from "@openorc/client";
-import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
+import { placeOf, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { View } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
@@ -8,17 +8,22 @@ import { useRpc } from "../client";
 import { ComposerPlane } from "../composer/ComposerPlane";
 import { SendButton } from "../composer/SendButton";
 import { useShareSettings } from "../composer/settings-bridge";
-import { FolderOpen, Globe } from "../generated/icons";
+import { Cloud, FolderOpen, Globe } from "../generated/icons";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { useNewSubthread } from "./use-new-subthread";
 
-/** Where the subthread will work: its parent's project and folder, which it shares. */
+/**
+ * Where the subthread will work: its parent's project and folder, which it shares; under a cloud thread, its project on
+ * OpenOrc Cloud, as the parent's header says it.
+ */
 function ParentPlace({ parent }: { parent: ThreadSummary }) {
   const projects = useRpc("projects.list", {});
   const project = projects.data?.find((each) => each.id === parent.projectId)?.name;
-  const Icon = parent.projectId === WORKSPACE_ID ? Globe : FolderOpen;
-  const place = [project, workspaceLabel(parent)].filter(Boolean).join(" · ");
+  const cloud = placeOf(parent).elsewhere;
+  const folder = parent.projectId === WORKSPACE_ID ? Globe : FolderOpen;
+  const Icon = cloud ? Cloud : folder;
+  const place = (cloud ? [project ?? parent.owner?.project?.name, placeOf(parent).mark] : [project, workspaceLabel(parent)]).filter(Boolean).join(" · ");
   if (!place) return null;
   return (
     <View accessible accessibilityLabel={`Works in ${place}`} className="flex-row items-center gap-1.5 px-5">

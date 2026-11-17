@@ -28,7 +28,8 @@ const parent = {
 const mac = vi.hoisted(() => ({
   phone: null as FakeMac | null,
   shares: true,
-  parentOwner: null as unknown,
+  parentMore: null as Partial<ThreadSummary> | null,
+  catalog: null as unknown,
   start: null as unknown as ReturnType<typeof vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>>,
 }));
 
@@ -36,9 +37,11 @@ vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
   const reads: Record<string, unknown> = {
     get "threads.get"() {
-      return mac.parentOwner ? { ...parent, owner: mac.parentOwner } : parent;
+      return { ...parent, ...mac.parentMore };
     },
-    "cloudModels.catalog": null,
+    get "cloudModels.catalog"() {
+      return mac.catalog;
+    },
     "projects.list": [{ id: "openorc", name: "openorc", defaultBranch: "main" }],
     "agents.models": [{ id: "opus", label: "Opus", agent: "claude", isDefault: true, efforts: ["high"], defaultEffort: "high" }],
     "agents.availability": [{ id: "claude", state: "ready" }],
@@ -63,7 +66,8 @@ beforeEach(() => {
   mac.phone!.saved.clear();
   mac.phone!.module.queryClient.clear();
   mac.shares = true;
-  mac.parentOwner = null;
+  mac.parentMore = null;
+  mac.catalog = null;
   mac.start = vi.fn();
   vi.mocked(router.replace).mockClear();
 });
@@ -118,15 +122,28 @@ it("says at once that an older Mac cannot start subthreads from a phone, and hol
   expect(mac.start).not.toHaveBeenCalled();
 });
 
-it("starts one under a cloud thread, which its own server starts, whatever the Mac's age", async () => {
+it("starts one under a cloud thread on OpenOrc Cloud, on the parent's CLI default, whatever the Mac's age", async () => {
   mac.shares = false;
-  mac.parentOwner = { brain: "hosted", reach: "live", heardAt: 0 };
+  // The parent runs its agent CLI's own default, saved as the empty model.
+  mac.parentMore = { owner: { brain: "hosted", reach: "live", heardAt: 0 }, model: "" } as Partial<ThreadSummary>;
   render(<NewSubthreadScreen />, { wrapper: mac.phone!.wrapper });
-  await screen.findByLabelText("Message");
+  expect(await screen.findByLabelText("Works in openorc · OpenOrc Cloud")).toBeTruthy();
   expect(screen.queryByText("Update OpenOrc on your Mac to start subthreads from your phone.")).toBeNull();
   write("Check the footer copy");
   await waitFor(() => expect(start().getAttribute("aria-disabled")).toBe("false"));
   mac.start.mockResolvedValue({ thread: { id: "child-2" } });
   await act(async () => fireEvent.click(start()));
-  await waitFor(() => expect(mac.start).toHaveBeenCalledWith(expect.objectContaining({ parentThreadId: "parent-1", prompt: "Check the footer copy" })));
+  await waitFor(() => expect(mac.start).toHaveBeenCalledWith(expect.objectContaining({ parentThreadId: "parent-1", agent: "claude", model: "", prompt: "Check the footer copy" })));
+});
+
+it("starts under a cloud thread with nothing saved on the default its header shows, from the models the cloud runs", async () => {
+  mac.parentMore = { owner: { brain: "hosted", reach: "live", heardAt: 0 }, model: null } as unknown as Partial<ThreadSummary>;
+  mac.catalog = { models: [{ id: "sonnet-5.5", label: "Sonnet 5.5", agent: "claude", isDefault: true, efforts: ["medium"], defaultEffort: "medium" }] };
+  render(<NewSubthreadScreen />, { wrapper: mac.phone!.wrapper });
+  await screen.findByLabelText("Message");
+  write("Check the footer copy");
+  await waitFor(() => expect(start().getAttribute("aria-disabled")).toBe("false"));
+  mac.start.mockResolvedValue({ thread: { id: "child-3" } });
+  await act(async () => fireEvent.click(start()));
+  await waitFor(() => expect(mac.start).toHaveBeenCalledWith(expect.objectContaining({ agent: "claude", model: "sonnet-5.5" })));
 });

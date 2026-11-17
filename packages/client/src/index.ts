@@ -11,6 +11,7 @@ export { conversationCost, formatCost } from "./conversation-cost.js";
 export { failureParts } from "./failure-parts.js";
 export { conversationActivity, conversationCanSteer, conversationPlaceholder, heardTranscript, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
 export type { SavedThreadSettings } from "./conversation-settings.js";
+export { threadDefault, threadModelChoice } from "./conversation-settings.js";
 export {
   composerActions,
   messageBody,

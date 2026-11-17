@@ -33,15 +33,16 @@ export function hostedCommandSuggestions(held: HeldCommands, token: { start: num
   }));
 }
 
+/** The app's own commands where the Mac lists them, first and in their order, whether held or not; the rest after. */
+const order = (row: SuggestionRow) => {
+  const name = NAMES.findIndex((each) => row.key === `action:/${each}`);
+  return name === -1 ? NAMES.length : name;
+};
+
 export function cloudCommandRows(held: HeldCommands, commands: Parameters<typeof commandRows>[0], draft: Parameters<typeof commandRows>[1], token: { start: number; token: string } | null) {
   if (!anyHeld(held)) return commandRows(commands, draft);
-  return [
-    ...hostedCommandSuggestions(held, token),
-    ...commandRows(
-      commands.filter((command) => !NAMES.some((name) => command.name === name && held[name] !== null)),
-      draft,
-    ),
-  ];
+  const runnable = commands.filter((command) => !NAMES.some((name) => command.name === name && held[name] !== null));
+  return [...hostedCommandSuggestions(held, token), ...commandRows(runnable, draft)].sort((a, b) => order(a) - order(b));
 }
 
 export function hostedFileSuggestion(reason: string | null): SuggestionRow[] {

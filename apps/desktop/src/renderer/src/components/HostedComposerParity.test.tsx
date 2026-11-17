@@ -71,6 +71,8 @@ it("runs /compact as the app's command once the server serves it, while /fork ke
   type(field, "/", 1);
   expect(await screen.findByRole("option", { name: "/compact Summarize" })).toBeTruthy();
   expect(screen.getByRole("option", { name: "/fork" }).getAttribute("aria-disabled")).toBe("true");
+  // In the Mac's order: compact, then fork.
+  expect(screen.getAllByRole("option").map((option) => option.textContent?.split(" ")[0]?.slice(0, 8))).toEqual(["/compact", "/fork"]);
   type(field, "/compact", 8);
   press(field, { key: "Enter" });
   await vi.waitFor(() => expect(compact).toHaveBeenCalledOnce());

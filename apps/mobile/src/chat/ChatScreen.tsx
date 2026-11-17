@@ -1,13 +1,12 @@
-import { answeredName, answeredOf, personFirst, stretchTime, teamConversationTitle, type TeamChatLease, type TeamChatTarget } from "@openorc/client";
+import { answeredName, answeredOf, stretchTime, teamConversationTitle, type TeamChatLease, type TeamChatTarget } from "@openorc/client";
 import { TeamChatReaction, type TeamChatAnswered, type TeamConversation, type TeamMessage, type TeamOrclingCall } from "@openorc/protocol";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActionSheetIOS, Pressable, View, type ScrollViewInstance } from "react-native";
 import { KeyboardChatScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { teamChat } from "../client";
-import { OrclingFace } from "../orclings/OrclingFace";
-import { PersonFace } from "../ui/PersonFace";
+import { Pin } from "../generated/icons";
 import { Spinner } from "../ui/Spinner";
 import { cn } from "../ui/cn";
 import { Text } from "../ui/Text";
@@ -16,8 +15,9 @@ import { chatItems, type ChatItem } from "./chat-items";
 import { CallLine } from "./CallLine";
 import { ChatFiles, ChatFileScopeContext, chatFileScope } from "./ChatFiles";
 import { ChatComposer } from "./ChatComposer";
+import { ActorFace, authorOf } from "./Author";
 import { useChatLease } from "./lease";
-import { useMessageReveal, type ChatJump } from "./reveal";
+import { useAskedJump, useMessageReveal, useRevealScroll, type ChatJump } from "./reveal";
 import { Reactions } from "./Reactions";
 
 /** A message the draft began, on its way or kept after it did not go. */
@@ -32,13 +32,6 @@ const runCorners = (item: { first: boolean; last: boolean }) => ({
   borderTopLeftRadius: item.first ? BUBBLE_RADIUS : 6,
   borderBottomLeftRadius: item.last ? BUBBLE_RADIUS : 6,
 });
-
-/** Who wrote a message: the person, a former member, or an Orcling as "<name> · <owner>'s Orcling". */
-function authorOf(message: TeamMessage, self: string): string {
-  const { actor } = message;
-  if (actor.kind === "orcling") return `${actor.name} · ${actor.owner.id === self ? "Your" : `${personFirst(actor.owner)}'s`} Orcling`;
-  return actor.person?.name ?? "Former member";
-}
 
 /** A message of emoji alone, a few, which stands large without a bubble, as Messages draws it. */
 const emojiOnly = (body: string) => /^(\p{Extended_Pictographic}|\p{Emoji_Component}|‍|️|\s){1,24}$/u.test(body.trim()) && /\p{Extended_Pictographic}/u.test(body);
@@ -131,13 +124,6 @@ function Mine({ message, moves }: { message: TeamMessage; moves: MessageMoves })
       <Under message={message} moves={moves} mine />
     </View>
   );
-}
-
-/** Who wrote a message, by face: a person's picture or initials, an Orcling's own look. */
-function ActorFace({ message }: { message: TeamMessage }) {
-  const { actor } = message;
-  if (actor.kind === "orcling") return <OrclingFace look={actor.look} size={FACE} />;
-  return <PersonFace name={actor.person?.name ?? "?"} image={actor.person?.image ?? null} size="lg" />;
 }
 
 /** Another's message on the left: the name over the first of a run, the face beside its last. */
@@ -237,8 +223,10 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
   // a search hit at its message.
   const atEnd = useRef(jump === null);
   const opened = useRef(jump !== null);
-  const revealId = useMessageReveal(lease, conversationId, timeline.data, jump);
-  const revealed = useRef(false);
+  // A pin asks the conversation already open to show its message, as a search hit opens one at it.
+  const asked = useAskedJump(conversationId);
+  const reveal = useMessageReveal(lease, conversationId, timeline.data, asked ?? jump);
+  const onRowLayout = useRevealScroll(list, reveal, () => (atEnd.current = false));
   const files = useMemo(() => chatFileScope(lease.spaceId, conversationId), [lease, conversationId]);
   const messages = useMemo(() => timeline.data?.messages ?? [], [timeline.data]);
   const sent = new Set(messages.map((message) => message.id));
@@ -254,11 +242,6 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
     if (!message) return;
     atEnd.current = true;
     send(message);
-  };
-  const revealAt = (y: number) => {
-    if (revealed.current) return;
-    revealed.current = true;
-    list.current?.scrollTo({ y: Math.max(0, y - 96), animated: false });
   };
   const openAtNew = (y: number) => {
     if (opened.current) return;
@@ -290,7 +273,7 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
           {timeline.error ? <Text className="px-5 py-10 text-center text-ink-4">{timeline.error.message}</Text> : null}
           {timeline.data && !messages.length && !draft.pending.length ? <Text className="py-10 text-center text-ink-4">No messages yet</Text> : null}
           {items.map((item) => (
-            <View key={item.key} style={{ paddingTop: item.gap }} onLayout={"message" in item && item.message.id === revealId ? ({ nativeEvent }) => revealAt(nativeEvent.layout.y) : undefined}>
+            <View key={item.key} style={{ paddingTop: item.gap }} onLayout={"message" in item ? ({ nativeEvent }) => onRowLayout(item.message.id, nativeEvent.layout.y) : undefined}>
               <Row item={item} moves={moves} onNew={openAtNew} />
             </View>
           ))}
@@ -319,6 +302,15 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
   );
 }
 
+/** The header's way to the conversation's pinned messages, where the organization's chat keeps pins. */
+function PinsButton({ conversationId }: { conversationId: string }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Pinned" hitSlop={8} onPress={() => router.push({ pathname: "/chat-pins", params: { id: conversationId } })} className="active:opacity-60">
+      <Pin size={20} className="text-ink" />
+    </Pressable>
+  );
+}
+
 /** A conversation's name as the list names it: a channel by # and its name, a group by its people. */
 const conversationTitle = (conversation: TeamConversation, self: string): string =>
   conversation.kind === "channel" ? `#${conversation.name ?? "channel"}` : teamConversationTitle(conversation, self);
@@ -326,7 +318,7 @@ const conversationTitle = (conversation: TeamConversation, self: string): string
 /** A conversation of the shown organization's team chat, pushed over Home from its Chat tab, named as the list names it. */
 export function ChatScreen() {
   const { id, message, seq } = useLocalSearchParams<{ id: string; message?: string; seq?: string }>();
-  const jump = useMemo(() => (message && seq ? { id: message, seq: Number(seq) } : null), [message, seq]);
+  const jump = useMemo(() => (message && seq ? { id: message, seq: Number(seq), key: "opened" } : null), [message, seq]);
   const lease = useChatLease();
   const state = teamChat.useChatState(lease).data;
   const conversation = state?.state === "ready" ? state.chat.conversations.find((each) => each.id === id) : undefined;
@@ -335,10 +327,11 @@ export function ChatScreen() {
   const [newFrom, setNewFrom] = useState<number | null | undefined>(undefined);
   // A conversation just opened, as a first message to a person, is not listed yet: it opens with no line.
   const read = conversation?.read;
+  const pins = state?.state === "ready" && state.chat.features.includes("pins");
   if (newFrom === undefined && state?.state === "ready") setNewFrom(read && read.unread > 0 ? read.seenSeq : null);
   return (
     <>
-      <Stack.Screen options={{ headerTitle: title }} />
+      <Stack.Screen options={{ headerTitle: title, headerRight: pins ? () => <PinsButton conversationId={id} /> : undefined }} />
       {lease && newFrom !== undefined ? (
         <Conversation key={`${lease.generation}:${id}`} lease={lease} conversationId={id} title={title} newFrom={newFrom} jump={jump} />
       ) : (

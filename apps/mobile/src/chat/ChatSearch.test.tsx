@@ -37,11 +37,11 @@ const page = (seqs: number[], older: boolean) => ({ messages: seqs.map((seq) => 
 
 it("pages back until the message asked for is on the page, then names it; one no longer there ends quietly", async () => {
   chat.earlier.mockResolvedValue(undefined);
-  const { result, rerender } = renderHook(({ timeline }) => useMessageReveal(lease, "c-launch", timeline, { id: "m4", seq: 4 }), { initialProps: { timeline: page([20, 21], true) } });
+  const { result, rerender } = renderHook(({ timeline }) => useMessageReveal(lease, "c-launch", timeline, { id: "m4", seq: 4, key: "hit" }), { initialProps: { timeline: page([20, 21], true) } });
   expect(result.current).toBeNull();
   await waitFor(() => expect(chat.earlier).toHaveBeenCalledOnce());
   rerender({ timeline: page([4, 5, 20, 21], true) });
-  expect(result.current).toBe("m4");
+  expect(result.current?.id).toBe("m4");
   expect(chat.earlier).toHaveBeenCalledOnce();
   chat.earlier.mockClear();
   // Deleted: paged past it, so nothing more is asked.

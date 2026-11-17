@@ -32,6 +32,7 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "hosted.review.file": review.file,
   "hosted.review.state": review.state,
   "hosted.review.commits": review.commits,
+  "hosted.review.commit": review.commitChanges,
   "hosted.review.action": review.action,
   "hosted.terminal.list": terminals.list,
   "hosted.terminal.open": terminals.open,

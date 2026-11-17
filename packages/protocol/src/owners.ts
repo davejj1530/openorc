@@ -68,6 +68,7 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "hosted.review.file": byThreadId,
   "hosted.review.state": byThreadId,
   "hosted.review.commits": byThreadId,
+  "hosted.review.commit": byThreadId,
   "hosted.review.action": byThreadId,
   "hosted.terminal.list": byThreadId,
   "hosted.terminal.open": byThreadId,

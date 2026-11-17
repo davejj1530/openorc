@@ -166,7 +166,7 @@ const idReadTags: MethodRules = {
   "threads.people": (p) => ["spaces", `thread:${String(p["threadId"])}`],
   // Notes arrive by invalidation of their thread, never as events: a thread's change reads its notes again.
   "threads.notes": (p) => ["threads", `thread:${String(p["threadId"])}`, `notes:${String(p["threadId"])}`],
-  ...each(["hosted.review.changes", "hosted.review.turn", "hosted.review.file", "hosted.review.state", "hosted.review.commits"], (p) => [
+  ...each(["hosted.review.changes", "hosted.review.turn", "hosted.review.file", "hosted.review.state", "hosted.review.commits", "hosted.review.commit"], (p) => [
     "threads",
     `thread:${String(p["threadId"])}`,
     `threaddiff:${String(p["threadId"])}`,

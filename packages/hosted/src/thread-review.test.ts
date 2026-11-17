@@ -176,3 +176,19 @@ it("asks for a turn's saved changes and files by the server's turn, though the a
   await hosted.threads.call("hosted.review.file", { threadId, path: file.path, turnId: ended.turnId });
   expect(requests.map((request) => request.path.split("?")[0])).toEqual([`/hosted/threads/${threadId}/turns/${server}/changes`, `/hosted/threads/${threadId}/turns/${server}/changes/file`]);
 });
+
+it("reads one of the thread's commits as its changes and its files by the commit, and says so when the server can't", async () => {
+  const sha = "0123456789abcdef0123456789abcdef01234567";
+  const changes = { sha, parent: "89abcdef0123456789abcdef0123456789abcdef", totals: { files: 1, insertions: 3, deletions: 1 }, files: [file], unlisted: 0 };
+  answer = changes;
+  expect(await hosted.threads.call("hosted.review.commit", { threadId, sha })).toEqual(changes);
+  answer = { path: file.path, oldPath: null, status: "modified", body: file.body, patch: "@@ -1 +1 @@\n-a\n+b", cut: null, note: null };
+  await hosted.threads.call("hosted.review.file", { threadId, path: file.path, commit: sha });
+  expect(requests.map((request) => request.path)).toEqual([`/hosted/threads/${threadId}/commits/${sha}/changes`, `/hosted/threads/${threadId}/commits/${sha}/changes/file?path=src%2Fexample.ts`]);
+  // A commit whose changes the server doesn't keep is refused in its words; a server from before the route, in the app's.
+  answer = { statusCode: 404, code: "commit_not_kept", message: "This commit was made before its changes were kept." };
+  status = 404;
+  await expect(hosted.threads.call("hosted.review.commit", { threadId, sha })).rejects.toThrow("This commit was made before its changes were kept.");
+  answer = { statusCode: 404, message: `Cannot GET /hosted/threads/${threadId}/commits/${sha}/changes` };
+  await expect(hosted.threads.call("hosted.review.commit", { threadId, sha })).rejects.toThrow("This commit's changes can't be read from here.");
+});

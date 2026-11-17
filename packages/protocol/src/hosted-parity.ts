@@ -98,6 +98,16 @@ export const HostedThreadCommits = z.object({
   pushed: z.string().nullable(),
 });
 export type HostedThreadCommits = z.output<typeof HostedThreadCommits>;
+/** One of the thread's commits as its changes against its first parent, the files and counts made as a turn's are. `parent` is null for a first commit. */
+export const HostedCommitChanges = z.object({
+  sha: z.string(),
+  parent: z.string().nullable(),
+  totals: z.object({ files: count, insertions: count, deletions: count }),
+  files: z.array(HostedChangedFile),
+  unlisted: count,
+});
+export type HostedCommitChanges = z.infer<typeof HostedCommitChanges>;
+const commitSha = z.string().regex(/^[0-9a-f]{40}$/);
 export const HostedFileDiff = z.object({
   path: z.string(),
   oldPath: z.string().nullable(),
@@ -159,9 +169,14 @@ export const hostedParityRpcParams = {
   "hosted.capabilities": z.object({ threadId: z.string() }).strict(),
   "hosted.review.changes": z.object({ threadId: z.string() }).strict(),
   "hosted.review.turn": z.object({ threadId: z.string(), turnId: z.string() }).strict(),
-  "hosted.review.file": z.object({ threadId: z.string(), turnId: z.string().optional(), path: z.string().min(1).max(4096) }).strict(),
+  /** One file's patch: in the thread's changes, a turn's (`turnId`) or a commit's (`commit`), never both. */
+  "hosted.review.file": z
+    .object({ threadId: z.string(), turnId: z.string().optional(), commit: commitSha.optional(), path: z.string().min(1).max(4096) })
+    .strict()
+    .refine((params) => params.turnId === undefined || params.commit === undefined, "A file is a turn's or a commit's, not both."),
   "hosted.review.state": z.object({ threadId: z.string() }).strict(),
   "hosted.review.commits": z.object({ threadId: z.string() }).strict(),
+  "hosted.review.commit": z.object({ threadId: z.string(), sha: commitSha }).strict(),
   "hosted.review.action": z.object({ threadId: z.string(), action: HostedActionRequest }).strict(),
 };
 export interface HostedParityRpcResults {
@@ -171,5 +186,6 @@ export interface HostedParityRpcResults {
   "hosted.review.file": HostedFileDiff;
   "hosted.review.state": HostedReviewState;
   "hosted.review.commits": HostedThreadCommits;
+  "hosted.review.commit": HostedCommitChanges;
   "hosted.review.action": HostedReviewReply;
 }

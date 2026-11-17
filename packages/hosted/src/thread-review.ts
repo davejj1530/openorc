@@ -1,4 +1,6 @@
-import type { HostedActionRequest, HostedReviewReply, HostedThreadCommits, RpcParams, RpcResults } from "@openorc/protocol";
+import type { HostedActionRequest, HostedCommitChanges, HostedReviewReply, HostedThreadCommits, RpcParams, RpcResults } from "@openorc/protocol";
+
+const COMMIT_UNREADABLE = "This commit's changes can't be read from here.";
 import type { Threads } from "./threads.js";
 import { Refused } from "./session.js";
 import { refuse } from "./sends.js";
@@ -10,8 +12,10 @@ export const changes = (threads: Threads, { threadId }: RpcParams<"hosted.review
 // A turn's card names it by the agent's own id; the server's change routes know it by its own.
 export const turn = (threads: Threads, { threadId, turnId }: RpcParams<"hosted.review.turn">) =>
   readReview(threads.on(threadId), threadId, REVIEW_ROUTES.turn(threadId, threads.voices.serverTurn(threadId, turnId)));
-export const file = (threads: Threads, { threadId, path, turnId }: RpcParams<"hosted.review.file">) =>
-  threads.on(threadId).request(REVIEW_ROUTES.file(threadId, path, turnId === undefined ? undefined : threads.voices.serverTurn(threadId, turnId)));
+export const file = (threads: Threads, { threadId, path, turnId, commit }: RpcParams<"hosted.review.file">) =>
+  threads
+    .on(threadId)
+    .request(commit ? REVIEW_ROUTES.commitFile(threadId, commit, path) : REVIEW_ROUTES.file(threadId, path, turnId === undefined ? undefined : threads.voices.serverTurn(threadId, turnId)));
 export const state = (threads: Threads, { threadId }: RpcParams<"hosted.review.state">) => readPublishing(threads.on(threadId), threadId);
 
 /** The thread's commits, read off its machine; none from a server that keeps none. */
@@ -20,6 +24,19 @@ export async function commits(threads: Threads, { threadId }: RpcParams<"hosted.
     return await threads.on(threadId).request(REVIEW_ROUTES.commits(threadId));
   } catch (error) {
     if (error instanceof Refused && error.status === 404 && threads.holds({ thread: threadId })) return { commits: [], total: 0, pushed: null };
+    throw error;
+  }
+}
+
+/**
+ * One of the thread's commits as its changes. A commit whose changes the server doesn't keep (not one of the thread's
+ * listed commits, or made before it kept them) is refused in its words; a server from before the route, in the app's.
+ */
+export async function commitChanges(threads: Threads, { threadId, sha }: RpcParams<"hosted.review.commit">): Promise<HostedCommitChanges> {
+  try {
+    return await threads.on(threadId).request(REVIEW_ROUTES.commit(threadId, sha));
+  } catch (error) {
+    if (error instanceof Refused && error.status === 404 && error.code !== "commit_not_kept") throw new Refused(COMMIT_UNREADABLE, 404);
     throw error;
   }
 }

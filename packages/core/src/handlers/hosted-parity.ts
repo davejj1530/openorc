@@ -13,6 +13,7 @@ export const hostedParityHandlers: Pick<Handlers, keyof typeof hostedParityRpcPa
   "hosted.review.file": unavailable,
   "hosted.review.state": unavailable,
   "hosted.review.commits": unavailable,
+  "hosted.review.commit": unavailable,
   "hosted.review.action": unavailable,
   "hosted.terminal.list": unavailable,
   "hosted.terminal.open": unavailable,

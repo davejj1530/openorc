@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ThreadAction } from "../thread/thread-actions";
+import { flatStyle, nativeProps } from "../test-fixtures/react-native";
 import { fixtureThreads } from "./test-fixtures/threads";
 import { cloudPlace, ThreadRow } from "./ThreadRow";
 
@@ -54,19 +55,23 @@ it("marks missing subagent updates with a neutral dashed circle", () => {
   expect(view.getByLabelText("No updates").contains(view.getByLabelText("Neutral status mark"))).toBe(true);
 });
 
-it("puts what a root row needs from you where its spinner goes: the end of the line under its title", () => {
+const label = (view: ReturnType<typeof render>) => view.getByRole("button").getAttribute("aria-label") ?? "";
+
+it("puts what a root row needs from you on its title's line, at its end, and says it only in the row's label", () => {
   const plan = fixtureThreads.find((thread) => thread.id === "t-plan")!;
   const view = render(<ThreadRow thread={{ ...plan, activity: "waiting" }} project="openorc" arriving={false} />);
   const question = view.getByLabelText("Needs you");
-  expect(view.getByText(plan.title).parentElement?.contains(question)).toBe(false);
-  expect(view.getByText("Needs you").parentElement?.contains(question)).toBe(true);
+  expect(view.getByText(plan.title).parentElement?.parentElement?.contains(question)).toBe(true);
+  expect(view.queryByText("Needs you")).toBeNull();
+  expect(label(view)).toContain("Needs you");
 });
 
-it("lights up a working thread's title and still says it works, while an idle title stays plain", () => {
+it("lights up a working thread's title and says it works in its label, while an idle title stays plain", () => {
   const paging = fixtureThreads.find((thread) => thread.id === "t-paging")!;
   const working = render(<ThreadRow thread={paging} project="openorc" arriving={false} />);
   expect(working.container.querySelector("[data-masked]")?.textContent).toBe(paging.title);
-  expect(working.getByRole("button").getAttribute("aria-label")).toContain("Working");
+  expect(working.queryByText("Working")).toBeNull();
+  expect(label(working)).toContain("Working");
   cleanup();
   const plan = fixtureThreads.find((thread) => thread.id === "t-plan")!;
   const idle = render(<ThreadRow thread={plan} project="Workspace" arriving={false} />);
@@ -74,39 +79,32 @@ it("lights up a working thread's title and still says it works, while an idle ti
   expect(idle.getByText(plan.title)).toBeTruthy();
 });
 
-it("names a root row's project under its title, with its pull request's state and number at the end", () => {
+it("keeps a root row to its title's line: its project, branch and pull request in its label, the pull request's mark in its slot", () => {
   const canvas = fixtureThreads.find((thread) => thread.id === "t-canvas")!;
   const view = render(<ThreadRow thread={canvas} project="immaculate" arriving={false} />);
-  expect(view.getByText("immaculate")).toBeTruthy();
-  expect(view.getByLabelText("Pull request #93, closed").textContent).toBe("#93");
-  expect(view.getByRole("button").getAttribute("aria-label")).toContain("Pull request #93, closed");
-});
-
-it("says after a root row's project the branch its thread works on", () => {
+  expect(view.queryByText("immaculate")).toBeNull();
+  expect(view.queryByText("#93")).toBeNull();
+  expect(label(view)).toContain("Pull request #93, closed");
+  expect(label(view)).toContain("immaculate");
+  cleanup();
   const notes = fixtureThreads.find((thread) => thread.id === "t-notes")!;
-  const tokens = fixtureThreads.find((thread) => thread.id === "t-tokens")!;
-  expect(render(<ThreadRow thread={{ ...notes, branch: "main" }} project="openorc" arriving={false} />).getByText("openorc · main")).toBeTruthy();
-  cleanup();
-  expect(render(<ThreadRow thread={tokens} project="immaculate" arriving={false} />).getByText("immaculate · feat/figma-tokens")).toBeTruthy();
+  const quiet = { ...notes, branch: "fix/menu", prUrl: null, lastActivityAt: Date.now() - 12 * 60_000 };
+  const row = render(<ThreadRow thread={quiet} project="openorc" arriving={false} />);
+  expect(row.getByTestId("opens-thread").textContent).toBe(`${quiet.title}12m`);
+  expect(label(row)).toContain("openorc");
+  expect(label(row)).toContain("fix/menu");
 });
 
-it("keeps a quiet row in its project's group to one line, its age at the end, and a second line only for something to say", () => {
-  const quiet = { ...fixtureThreads.find((thread) => thread.id === "t-plan")!, branch: null, prUrl: null, lastActivityAt: Date.now() - 12 * 60_000 };
-  const row = render(<ThreadRow thread={quiet} project={null} arriving={false} />);
-  expect(row.getByText("12m")).toBeTruthy();
-  expect(row.getByTestId("opens-thread").textContent).toBe(`${quiet.title}12m`);
-  cleanup();
-  const branched = render(<ThreadRow thread={{ ...quiet, branch: "fix/menu" }} project={null} arriving={false} />);
-  expect(branched.getByText("fix/menu")).toBeTruthy();
-  cleanup();
-  // A cloud thread in a group whose label wears the cloud says nothing more; under a folder's label it wears its own.
-  // Nor does the branch OpenOrc Cloud made for it.
-  const cloud = { ...quiet, id: "cloud", branch: "openorc/plan-the-week", owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 1 } };
-  expect(render(<ThreadRow thread={cloud} project={null} cloudLabel arriving={false} />).queryByLabelText("Cloud glyph")).toBeNull();
-  cleanup();
-  const mixed = render(<ThreadRow thread={cloud} project={null} arriving={false} />);
-  expect(mixed.getByLabelText("Cloud glyph")).toBeTruthy();
-  expect(mixed.getByText("OpenOrc Cloud")).toBeTruthy();
+it("keeps the age and the mark in columns of their own on every row, so they line up down the list", () => {
+  const plan = { ...fixtureThreads.find((thread) => thread.id === "t-plan")!, branch: null, prUrl: null };
+  const ages = ["now", "12m", "11mo"];
+  for (const [index, at] of [Date.now(), Date.now() - 12 * 60_000, Date.now() - 340 * 86_400_000].entries()) {
+    const view = render(<ThreadRow thread={{ ...plan, lastActivityAt: at, activity: index ? "idle" : "waiting" }} project={null} arriving={false} />);
+    expect(flatStyle(nativeProps.get(view.getByText(ages[index]!))!.style).width).toBe(32);
+    // The mark's box is there with a mark and without one, so the age ends at one place.
+    expect(Array.from(view.container.querySelectorAll("div")).filter((element) => /\bw-7\b/.test(String(nativeProps.get(element)?.className)))).toHaveLength(1);
+    cleanup();
+  }
 });
 
 it("keeps a parent's disclosure on its own row, beside the link that opens the thread, and asks for the opposite fold", () => {
@@ -127,13 +125,15 @@ it("keeps a parent's disclosure on its own row, beside the link that opens the t
   expect(onFold).toHaveBeenLastCalledWith(parent.id, true);
 });
 
-it("marks an OpenOrc Cloud thread with the cloud, its project and the teammate who started it, and leaves its menu to the Mac", () => {
+it("marks an OpenOrc Cloud thread with the cloud and the face of the teammate who started it, says where in its label, and leaves its menu to the Mac", () => {
   const mine = { ...fixtureThreads.find((thread) => thread.id === "t-plan")!, branch: null, prUrl: null };
   const cloud = { ...mine, id: "cloud", owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 1, startedBy: { name: "Mara Okafor", image: null } } };
   const row = render(<ThreadRow thread={cloud} project="Canvas" arriving={false} />);
-  expect(row.getByText("Canvas · Mara")).toBeTruthy();
   expect(row.getByLabelText("Cloud glyph")).toBeTruthy();
-  expect(row.getByRole("button").getAttribute("aria-label")).toContain("Canvas, OpenOrc Cloud, started by Mara Okafor");
+  expect(row.getByText("MO")).toBeTruthy();
+  expect(row.queryByText("Canvas · Mara")).toBeNull();
+  expect(row.queryByText("OpenOrc Cloud")).toBeNull();
+  expect(label(row)).toContain("Canvas, OpenOrc Cloud, started by Mara Okafor");
   expect(menus.built).toEqual([]);
   row.unmount();
 
@@ -142,7 +142,7 @@ it("marks an OpenOrc Cloud thread with the cloud, its project and the teammate w
   expect(menus.built.length).toBeGreaterThan(0);
 });
 
-it("says whose turn it is on a cloud thread someone else is in, and dims its cloud while the Mac cannot reach OpenOrc Cloud", () => {
+it("says whose turn it is on a cloud thread someone else is in, in its label, and dims its cloud while the Mac cannot reach OpenOrc Cloud", () => {
   const mara = { id: "u-mara", name: "Mara Okafor", image: null };
   const working = { ...fixtureThreads.find((thread) => thread.id === "t-plan")!, branch: null, prUrl: null, activity: "running" as const };
   const owner = {
@@ -165,14 +165,11 @@ it("says whose turn it is on a cloud thread someone else is in, and dims its clo
     },
   };
   const row = render(<ThreadRow thread={{ ...working, id: "cloud", owner }} project="Canvas" arriving={false} />);
-  expect(row.getByText("Mara's turn")).toBeTruthy();
-  expect(row.queryByText("Working")).toBeNull();
-  // The headline speaks of who, so the facts line names her no more.
-  expect(row.getByText("Canvas")).toBeTruthy();
-  expect(row.queryByText(/Mara$/)).toBeNull();
+  expect(row.queryByText("Mara's turn")).toBeNull();
+  expect(label(row)).toContain("Mara's turn");
   row.unmount();
   const cloud = { ...working, id: "cloud", owner };
-  expect(cloudPlace(cloud, "Canvas")).toMatchObject({ line: "Canvas · Mara", offline: false });
+  expect(cloudPlace(cloud, "Canvas")).toMatchObject({ offline: false });
   expect(cloudPlace(cloud, "Canvas", true)).toMatchObject({ offline: true });
   expect(cloudPlace({ ...cloud, owner: { ...owner, reach: "offline" } }, "Canvas")).toMatchObject({ offline: true });
   expect(cloudPlace(working, "Canvas")).toBeNull();

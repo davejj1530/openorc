@@ -46,10 +46,10 @@ export type HomeItem =
   /** A project's label over its threads, with how many of them wait on the person. */
   | { kind: "project"; key: string; project: HomeProject; open: boolean; waiting: number }
   /**
-   * `project` is the name a root row shows, outside its project's group; rows in their group, and sub threads, show
-   * none. `cloudLabel` when its group's label wears the cloud already. `arriving` rises it in.
+   * `project` is the name a root row's label says, outside its project's group; rows in their group, and sub threads,
+   * say none. `arriving` rises it in.
    */
-  | { kind: "thread"; key: string; thread: ThreadSummary; tree: ThreadTreeRow; project: string | null; arriving: boolean; cloudLabel?: true }
+  | { kind: "thread"; key: string; thread: ThreadSummary; tree: ThreadTreeRow; project: string | null; arriving: boolean }
   /** The foot of Resolved (or of Pinned, under the pinned filter) while the host has more threads to give. */
   | { kind: "more"; key: string }
   /** The foot of a project's group while it holds more threads than it shows. */
@@ -101,12 +101,7 @@ export function homeLayout(list: HomeList, { now, reached }: { now: number; reac
 }
 
 /** Rows for some roots and their trees, each parent's next page of sub threads at the foot of its tree. */
-function treeRows(
-  roots: readonly ThreadSummary[],
-  list: HomeList,
-  options: HomeOptions,
-  { named, arriving, cloudLabel = false }: { named: boolean; arriving: boolean; cloudLabel?: boolean },
-): HomeItem[] {
+function treeRows(roots: readonly ThreadSummary[], list: HomeList, options: HomeOptions, { named, arriving }: { named: boolean; arriving: boolean }): HomeItem[] {
   const trees = threadTreeRows(roots, list.days.all, options.collapsed, options.selectedId ? [options.selectedId] : [], options.childLimits);
   const items: HomeItem[] = [];
   const pages: ThreadTreeRow[] = [];
@@ -117,7 +112,7 @@ function treeRows(
   for (const tree of trees) {
     while (pages.length && pages.at(-1)!.depth >= tree.depth) end();
     const project = named && !tree.depth ? (list.names.get(tree.thread.projectId) ?? null) : null;
-    items.push({ kind: "thread", key: tree.thread.id, thread: tree.thread, tree, project, arriving, ...(cloudLabel ? { cloudLabel: true as const } : {}) });
+    items.push({ kind: "thread", key: tree.thread.id, thread: tree.thread, tree, project, arriving });
     if (tree.expanded && tree.hiddenChildren) pages.push(tree);
   }
   while (pages.length) end();
@@ -165,7 +160,7 @@ function groupItems(list: HomeList, options: HomeOptions): HomeItem[] {
       const shown = projectRows(roots, { rows: options.layout.rows.get(project.id) ?? [], open, holdsActive: (root) => active.has(root.id) });
       return [
         { kind: "project", key, project, open, waiting: waitingRoots(roots, list.days.all) } as const,
-        ...treeRows(shown.rows, list, options, { named: false, arriving: options.opened === key, cloudLabel: Boolean(project.cloud) }),
+        ...treeRows(shown.rows, list, options, { named: false, arriving: options.opened === key }),
         ...(shown.hidden ? [{ kind: "group-more", key: `group-more:${project.id}`, projectId: project.id, count: shown.hidden } as const] : []),
         ...(roots.length || list.days.pinned.length || list.failed || !list.listed ? [] : [{ kind: "empty", key: "empty" } as const]),
       ];

@@ -25,15 +25,16 @@ export const ROW_INSET = 12;
  */
 export const ACTION_RESERVE = ACTION_RIGHT + 44 - ROW_INSET;
 /** How far interface text grows with the reader's text size (ui/Text.tsx). */
-const CHROME_SCALE = 1.4;
+export const CHROME_SCALE = 1.4;
 
 /**
- * Where a row's title line is centered, from the row's top, at the reader's text size: a root row's 8 pt padding and
- * half its title's 24 pt line; a compact row is centered on its 44 pt height until its 22 pt line outgrows it.
+ * Where a row's title line is centered, from the row's top, at the reader's text size. Every thread row is one line,
+ * centered on its 44 pt height until the line outgrows it: a root row's 24 pt title inside 10 pt of padding, a compact
+ * row's 22 pt one inside 11.
  */
 export function titleMid(compact: boolean, fontScale: number): number {
   const scale = Math.min(fontScale, CHROME_SCALE);
-  return compact ? Math.max(22, 11 + 11 * scale) : 8 + 12 * scale;
+  return compact ? Math.max(22, 11 + 11 * scale) : Math.max(22, 10 + 12 * scale);
 }
 /** How many levels a sub thread steps in; deeper ones stay at the last. */
 export const MAX_DEPTH = 3;

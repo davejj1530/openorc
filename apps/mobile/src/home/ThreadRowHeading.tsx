@@ -1,9 +1,7 @@
 import { subagentStatusLabel, useTicking, workDuration, type ThreadMark } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
-import type { ReactNode } from "react";
 import { View } from "react-native";
 import { CircleCheck, CircleDashed, X } from "../generated/icons";
-import { SweepText } from "../ui/SweepText";
 import { Text } from "../ui/Text";
 import { markReach, REACH, ThreadStatusMark } from "./ThreadStatusMark";
 
@@ -41,42 +39,15 @@ export function RowStatus({ thread, mark }: { thread: ThreadSummary; mark: Threa
 }
 
 /**
- * A row's title line: the title in ink, a root's at the list's largest size, shimmering while its agent works, and its
- * age at the end. A root row's status sits on the line under it when it has one (ThreadRow's RowMark), else at this
- * line's end; a parent always has the line under, so the title line's end stays clear for its chevron.
- * A sub thread keeps its status in the lead column, where the tree's line reaches it, and says one fact at the end,
- * whole: for how long it has worked while it runs, then what kind of agent it was.
+ * A sub thread's line: its status in the lead column, where the tree's line reaches it, its title, and one fact at the
+ * end, whole: for how long it has worked while it runs, then what kind of agent it was.
  */
-export function ThreadRowHeading({
-  thread,
-  compact,
-  mark,
-  working = false,
-  age,
-  trailing,
-}: {
-  thread: ThreadSummary;
-  compact: boolean;
-  mark: ThreadMark | null;
-  working?: boolean;
-  /** A root row's age at the line's end, as "3m" or "2h". */
-  age?: string;
-  /** What ends a one-line root row, out in the action column: its mark. */
-  trailing?: ReactNode;
-}) {
+export function ThreadRowHeading({ thread, mark }: { thread: ThreadSummary; mark: ThreadMark | null }) {
   const child = thread.subagent;
   const running = child?.status === "running";
   const tick = useTicking(running);
   let fact: string | null = null;
-  if (compact && child) fact = running ? workDuration(tick - child.startedAt) : child.agentType;
-  if (!compact)
-    return (
-      <View className="flex-row items-center gap-3">
-        <SweepText text={thread.title} className="flex-1 text-xl text-ink" sweeping={working} />
-        {age ? <Text className="shrink-0 text-detail tabular-nums text-ink-4">{age}</Text> : null}
-        {trailing}
-      </View>
-    );
+  if (child) fact = running ? workDuration(tick - child.startedAt) : child.agentType;
   return (
     <View className="flex-row items-center gap-3">
       <RowStatus thread={thread} mark={mark} />

@@ -115,9 +115,14 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("offers no Fork on an OpenOrc Cloud thread, which would be refused there", async () => {
+it("offers Fork in a cloud thread only once its server serves it", async () => {
+  queries.set("hosted.capabilities", { version: 1, features: {} });
   await open();
   expect(composer.props!.commands?.map((command) => command.name)).not.toContain("fork");
+  cleanup();
+  queries.set("hosted.capabilities", { version: 1, features: { fork: { available: true } } });
+  await open();
+  await waitFor(() => expect(composer.props!.commands?.map((command) => command.name)).toContain("fork"));
 });
 
 it("still offers Fork on a thread of this Mac", async () => {

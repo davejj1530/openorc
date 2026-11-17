@@ -114,6 +114,30 @@ it("starts a subthread under a cloud thread once its server says it may, as unde
   expect(screen.getByRole("menuitem", { name: /^Fork$/ }).getAttribute("aria-disabled")).toBe("true");
 });
 
+it("forks a cloud thread once its server serves forks, and opens the fork", async () => {
+  vi.mocked(core.call).mockImplementation((async (method: RpcMethod) => {
+    if (method === "hosted.capabilities") return { version: 1, features: { fork: { available: true } } };
+    if (method === "threads.fork") return { ...cloudReviewThread, id: "fork-thread", title: `${cloudReviewThread.title} (fork)` };
+    throw new Error(`Unexpected local read: ${method}`);
+  }) as never);
+  mount(
+    <Menu.Root open>
+      <Menu.Portal>
+        <CoversPreview />
+        <Menu.Positioner>
+          <Menu.Popup>
+            <ThreadMenuItems thread={cloudReviewThread} parts={Menu} />
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>,
+  );
+  await vi.waitFor(() => expect(screen.getByRole("menuitem", { name: /^Fork$/ }).getAttribute("aria-disabled")).toBeNull());
+  fireEvent.click(screen.getByRole("menuitem", { name: /^Fork$/ }));
+  await vi.waitFor(() => expect(vi.mocked(core.call)).toHaveBeenCalledWith("threads.fork", { id: cloudReviewThread.id }));
+  await vi.waitFor(() => expect(useRouter.getState().route).toMatchObject({ view: "thread", threadId: "fork-thread" }));
+});
+
 it("reads an omitted cloud tool output when its row opens, as a Mac one's", async () => {
   vi.mocked(core.call).mockImplementation((async (method: string) => (method === "events.toolOutput" ? { output: "the whole cloud output" } : undefined)) as never);
   mount(<ToolRow block={{ id: "tool-1", kind: "tool", name: "Read", input: { path: "example.ts" }, outputOmitted: true, done: true, runId: "hosted:example-thread" }} />);

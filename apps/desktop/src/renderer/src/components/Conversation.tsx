@@ -139,6 +139,13 @@ function useCompact(thread: ThreadSummary | null) {
   return { pending: mutation.isPending, error: mutation.error, run: held || !id ? undefined : () => mutation.mutate({ id }) };
 }
 
+/** Fork, where the thread's place runs it: on this Mac, and in a cloud thread once its server serves forks. */
+function useFork(thread: ThreadSummary | null, fork: () => void): (() => void) | undefined {
+  const held = useHostedCapabilities(thread).reason("fork") !== null;
+  if (!thread || forkUnavailable(thread.agent) || held) return undefined;
+  return thread.owner?.brain === "hosted" || !placeOf(thread).elsewhere ? fork : undefined;
+}
+
 /** A thread's own `/` commands; compacting waits for the turn to finish. */
 function threadCommands({ thread, working, compact, fork }: { thread: ThreadSummary | null; working: boolean; compact: (() => void) | undefined; fork: (() => void) | undefined }): SlashCommand[] {
   if (!thread) return [];
@@ -284,7 +291,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const skillsAsked: Parameters<typeof useSkillCommands> = cloud.hosted ? [ownSkillsScope, choice?.agent, undefined, "user"] : [conversation, choice?.agent];
   const skills = useSkillCommands(...skillsAsked);
   const connectorMentions = useConnectorMentions(suggestScope, choice?.agent, executionMode(mode, permission));
-  const onFork = thread && !forkUnavailable(thread.agent) && !placeOf(thread).elsewhere ? forkConversation : undefined;
+  const onFork = useFork(thread, forkConversation);
   const commands: SlashCommand[] = [...threadCommands({ thread, working, compact: compact.run, fork: onFork }), ...skills.commands];
   const marks = useMessageMarks(skills.commands, connectorMentions);
 

@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { placeUnreachable, snoozePresets, threadResolved } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
-import { HOSTED_REASONS, isSubagentThread, forkUnavailable, placeOf, PLACES } from "@openorc/protocol";
+import { isSubagentThread, forkUnavailable, placeOf, PLACES } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -203,11 +203,13 @@ function NewSubthreadItem({ thread, parts: M }: { thread: ThreadSummary; parts: 
 function ThreadForkActions({ thread, parts: M, header }: { thread: ThreadSummary; parts: MenuParts; header?: boolean }) {
   const fork = useRpcMutation("threads.fork");
   const mutating = useThreadMutationPending(thread.id);
-  if (placeOf(thread) === PLACES.hosted)
+  // A cloud thread forks where its server serves forks; until then Fork is held with the reason.
+  const held = useHostedCapabilities(thread).reason("fork");
+  if (placeOf(thread) === PLACES.hosted && held)
     return (
       <>
         {header ? <NewSubthreadItem thread={thread} parts={M} /> : null}
-        <HostedMenuReason parts={M} reason={HOSTED_REASONS.fork}>
+        <HostedMenuReason parts={M} reason={held}>
           <GitFork size={13} /> Fork
         </HostedMenuReason>
       </>

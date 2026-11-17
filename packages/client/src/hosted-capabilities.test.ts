@@ -24,7 +24,7 @@ it("offers a person's subthread in a cloud thread only once its server says so, 
   );
   expect(hostedControlReason(cloud, "personSubthreads", served(undefined))).toBe(HOSTED_REASONS.personSubthreads);
   // A control the server doesn't answer for stays held in the app's words, whatever it answers.
-  expect(hostedControlReason(cloud, "fork", served({ available: true }))).toBe(HOSTED_REASONS.fork);
+  expect(hostedControlReason(cloud, "plans", served({ available: true }))).toBe(HOSTED_REASONS.plans);
 });
 
 it("offers Compact in a cloud thread only once its server says so, and an older server's thread keeps the app's words", () => {

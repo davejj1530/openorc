@@ -7,7 +7,7 @@ const id = z.string().min(1).max(200);
 const seq = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const TeamChatPerson = z.object({ id, name: z.string(), image: z.string().nullable() });
 export type TeamChatPerson = z.infer<typeof TeamChatPerson>;
-export const TeamChatFeature = z.enum(["base", "channels", "groups", "files", "presence", "unread", "replies", "orcling"]);
+export const TeamChatFeature = z.enum(["base", "channels", "groups", "files", "presence", "unread", "replies", "pins", "orcling"]);
 export type TeamChatFeature = z.infer<typeof TeamChatFeature>;
 export const TeamChatReaction = z.enum(["👍", "❤️", "😄", "🎉", "👀", "✅"]);
 export type TeamChatReaction = z.infer<typeof TeamChatReaction>;
@@ -69,12 +69,17 @@ export const TeamMessage = z.object({
   reactions: z.array(z.object({ emoji: z.string(), userIds: z.array(id) })),
   /** A server without replies sends none. */
   replyTo: TeamChatAnswered.nullable().default(null),
+  /** Who pinned it for everyone in the conversation, and when; a server without pins sends none. */
+  pinned: z.object({ by: TeamChatPerson.nullable(), at: z.iso.datetime() }).nullable().default(null),
   call: z.null(),
   createdAt: z.iso.datetime(),
 });
 export type TeamMessage = z.infer<typeof TeamMessage>;
 export const TeamChatTimeline = z.object({ messages: z.array(TeamMessage).max(60), older: z.boolean(), newer: z.boolean(), headSeq: seq, read: TeamChatRead.nullable() });
 export type TeamChatTimeline = z.infer<typeof TeamChatTimeline>;
+/** A conversation's pinned messages, the latest pinned first. */
+export const TeamChatPins = z.object({ pins: z.array(z.object({ message: TeamMessage, pinnedBy: TeamChatPerson.nullable(), pinnedAt: z.iso.datetime() })) });
+export type TeamChatPins = z.infer<typeof TeamChatPins>;
 /** A message not yet confirmed, with the uploaded files it carries, so a retry sends the same message and the same files. */
 export const PendingTeamMessage = z.object({
   id: z.uuid(),
@@ -107,6 +112,8 @@ export const teamChatRpcParams = {
     .strict()
     .refine((value) => value.body.trim().length > 0 || (value.fileIds?.length ?? 0) > 0, "Write something or attach a file."),
   "teamChat.react": z.object({ ...conversation, messageId: id, emoji: TeamChatReaction }).strict(),
+  "teamChat.pins": z.object(conversation).strict(),
+  "teamChat.pin": z.object({ ...conversation, messageId: id, pinned: z.boolean() }).strict(),
   "teamChat.watch": z.object({ ...conversation, requestId: z.uuid() }).strict(),
   "teamChat.unwatch": z.object({ ...conversation, requestId: z.uuid() }).strict(),
 };
@@ -116,6 +123,8 @@ export interface TeamChatRpcResults extends TeamChatChannelRpcResults, TeamChatR
   "teamChat.timeline": TeamChatTimeline;
   "teamChat.send": TeamMessage;
   "teamChat.react": TeamMessage;
+  "teamChat.pins": TeamChatPins;
+  "teamChat.pin": TeamMessage;
   "teamChat.watch": { ok: boolean };
   "teamChat.unwatch": Record<string, never>;
 }

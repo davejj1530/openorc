@@ -1,4 +1,4 @@
-import { TeamChatRead, TeamChatState, TeamChatTimeline, TeamConversation, TeamMessage } from "@openorc/protocol";
+import { TeamChatPins, TeamChatRead, TeamChatState, TeamChatTimeline, TeamConversation, TeamMessage } from "@openorc/protocol";
 import { z } from "zod";
 import type { Route } from "./wire.js";
 
@@ -26,6 +26,8 @@ export const CHAT_ROUTES = {
   },
   send: (id: string) => route("POST", `${conversationPath(id)}/messages`, TeamMessage),
   react: (id: string) => route("POST", `/chat/messages/${encodeURIComponent(id)}/reactions`, TeamMessage),
+  pins: (id: string) => route("GET", `${conversationPath(id)}/pins`, TeamChatPins),
+  pin: (id: string, pinned: boolean) => route(pinned ? "POST" : "DELETE", `/chat/messages/${encodeURIComponent(id)}/pin`, TeamMessage),
   seen: (id: string) => route("PUT", `${conversationPath(id)}/seen`, TeamChatRead),
   unreadSpaces: route("GET", "/chat/unread-spaces", z.object({ spaces: z.array(z.object({ spaceId: z.string() })) })),
 };

@@ -131,6 +131,18 @@ export class TeamChat {
     return message;
   }
 
+  pins({ spaceId, conversationId }: RpcParams<"teamChat.pins">) {
+    return this.#request(spaceId, CHAT_ROUTES.pins(conversationId));
+  }
+
+  async pin({ spaceId, conversationId, messageId, pinned }: RpcParams<"teamChat.pin">) {
+    try {
+      return await this.#request(spaceId, CHAT_ROUTES.pin(messageId, pinned), {});
+    } finally {
+      this.#invalidate(spaceId, conversationId);
+    }
+  }
+
   async react({ spaceId, conversationId, messageId, emoji }: RpcParams<"teamChat.react">) {
     try {
       return await this.#request(spaceId, CHAT_ROUTES.react(messageId), { emoji });

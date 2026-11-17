@@ -147,6 +147,7 @@ it("keeps a frozen draft while a late private page cannot enter the cache", asyn
     files: [],
     reactions: [],
     replyTo: null,
+    pinned: null,
     call: null,
     createdAt: new Date(0).toISOString(),
   };
@@ -202,6 +203,7 @@ it("shows one bubble when an unconfirmed send is found by a live refresh", async
           files: [],
           reactions: [],
           replyTo: null,
+          pinned: null,
           call: null,
           createdAt: new Date(0).toISOString(),
         },
@@ -234,6 +236,7 @@ it("fills every missed page when reconnecting after more than sixty messages", a
     files: [],
     reactions: [],
     replyTo: null,
+    pinned: null,
     call: null,
     createdAt: new Date(0).toISOString(),
   }));

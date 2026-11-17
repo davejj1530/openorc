@@ -30,6 +30,8 @@ export interface TeamChatTranscriptProps {
   /** Answering a message from the composer; absent where replies aren't available. */
   onReply?: (message: TeamMessage) => void;
   onOpenAnswered?: (answered: TeamChatAnswered) => void;
+  /** Pinning for everyone; absent where pins aren't available or for a reader who hasn't joined. */
+  onPin?: (message: TeamMessage, pinned: boolean) => void;
   /** A message to bring into view and mark, once it is on the page. */
   reveal?: { id: string; nonce: number } | null;
   onRevealed?: (nonce: number) => void;
@@ -140,8 +142,9 @@ function SpeakerGroup({
   onReact,
   onReply,
   onOpenAnswered,
+  onPin,
   found,
-}: Pick<TeamChatTranscriptProps, "messages" | "self" | "people" | "reason" | "names" | "onReact" | "onReply" | "onOpenAnswered"> & { found: string | null }) {
+}: Pick<TeamChatTranscriptProps, "messages" | "self" | "people" | "reason" | "names" | "onReact" | "onReply" | "onOpenAnswered" | "onPin"> & { found: string | null }) {
   const person = messages[0]?.actor.person;
   const mine = person?.id === self;
   return (
@@ -159,6 +162,7 @@ function SpeakerGroup({
             onReact={(emoji) => onReact(message, emoji)}
             {...(onReply && { onReply: () => onReply(message) })}
             {...(onOpenAnswered && message.replyTo && { onOpenAnswered: () => onOpenAnswered(message.replyTo!) })}
+            {...(onPin && { onPin: (pinned: boolean) => onPin(message, pinned) })}
             found={found === message.id || undefined}
           />
         ))}

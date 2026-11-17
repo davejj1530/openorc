@@ -6,7 +6,7 @@ import { useTeamChatVisible } from "../lib/team-chat-visibility";
 import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { menuPopup } from "./menu";
-import { TeamChatMessageActions, TeamChatMessageMenuItems } from "./TeamChatMessageControls";
+import { TeamChatMessageActions, TeamChatMessageMenuItems, TeamChatPinnedMark } from "./TeamChatMessageControls";
 import { TeamChatFiles } from "./TeamChatFiles";
 import { TeamChatReactionPicker, TeamChatReactions } from "./TeamChatReactions";
 import { TeamChatReplyQuote } from "./TeamChatReplyQuote";
@@ -24,6 +24,7 @@ export function TeamChatMessage({
   onReact,
   onReply,
   onOpenAnswered,
+  onPin,
   found,
 }: {
   message: TeamMessage;
@@ -34,6 +35,8 @@ export function TeamChatMessage({
   /** Answering this message from the composer; absent where replies aren't available. */
   onReply?: () => void;
   onOpenAnswered?: () => void;
+  /** Pinning or unpinning for everyone in the conversation; absent where pins aren't available or for a reader who hasn't joined. */
+  onPin?: (pinned: boolean) => void;
   /** Shown in place just now, from a reply, a pin or a search. */
   found?: true;
 }) {
@@ -85,11 +88,12 @@ export function TeamChatMessage({
             <CoversPreview />
             <ContextMenu.Positioner collisionPadding={8} className="z-40">
               <ContextMenu.Popup ref={floatingGround} className={menuPopup}>
-                <TeamChatMessageMenuItems reason={reason} onReply={onReply} onCopy={copy} onReact={() => setOpen(true)} />
+                <TeamChatMessageMenuItems reason={reason} onReply={onReply} onCopy={copy} onReact={() => setOpen(true)} pinned={Boolean(message.pinned)} onPin={onPin} />
               </ContextMenu.Popup>
             </ContextMenu.Positioner>
           </ContextMenu.Portal>
         </ContextMenu.Root>
+        <TeamChatPinnedMark pinned={message.pinned} />
         <TeamChatMessageActions reason={reason} onReply={onReply} reacting={open} onReacting={setOpen} />
         <TeamChatReactionPicker open={open && !reason} reactions={message.reactions} self={self} onReact={onReact} onClose={() => setOpen(false)} />
       </div>

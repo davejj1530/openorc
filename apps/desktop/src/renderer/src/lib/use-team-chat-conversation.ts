@@ -8,12 +8,13 @@ import { reactToTeamMessage, sendTeamMessage } from "./team-chat-actions";
 import { useNewFrom, useTeamChatSeen } from "./team-chat-seen";
 import { jumpToTeamMessage, useTeamMessageReveal } from "./team-chat-jump";
 import { answeredOf } from "./team-chat-replies";
+import { pinTeamMessage } from "./team-chat-pins";
 
 export function useTeamChatConversation(
   scope: TeamChatContextValue,
   target: TeamChatRoute,
   conversation: TeamConversation,
-  features: { unread: boolean; replies: boolean },
+  features: { unread: boolean; replies: boolean; pins: boolean },
 ): Omit<TeamChatProps, "conversation" | "people" | "names"> {
   const timeline = useTeamChatTimeline(scope, target.conversationId, true);
   const newFrom = useNewFrom(conversation, features.unread);
@@ -80,6 +81,7 @@ export function useTeamChatConversation(
     },
     ...revealing,
     ...replying(target, draft.replyTo, features.replies, conversation.joined),
+    ...pinning(scope, target, features.pins, conversation.joined, setActionError),
     onReact: (message, emoji) => {
       void reactToTeamMessage(scope, target, message, emoji).catch((error) => {
         if (scope.current()) setActionError(error instanceof Error ? error.message : "The reaction couldn't be saved.");
@@ -98,3 +100,16 @@ const replying = (target: TeamChatRoute, replyTo: TeamChatAnswered | null, repli
         onOpenAnswered: (answered) => jumpToTeamMessage(target, answered),
       }
     : {};
+
+/** Pinning for everyone in the conversation, for someone who has joined it; a refusal shows as the chat's notice. */
+function pinning(scope: TeamChatContextValue, target: TeamChatRoute, pins: boolean, joined: boolean, failed: (message: string | null) => void): Pick<TeamChatProps, "onPin"> {
+  if (!pins || !joined) return {};
+  return {
+    onPin: (message, pinned) => {
+      const fallback = pinned ? "The message couldn't be pinned." : "The message couldn't be unpinned.";
+      void pinTeamMessage(scope, target, message, pinned).catch((error) => {
+        if (scope.current()) failed(error instanceof Error ? error.message : fallback);
+      });
+    },
+  };
+}

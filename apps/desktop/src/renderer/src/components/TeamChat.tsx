@@ -28,6 +28,8 @@ export interface TeamChatProps extends TeamChatTranscriptProps {
   /** The message the next send answers, and the way to answer none. */
   replyTo?: TeamChatAnswered | null;
   onCancelReply?: () => void;
+  /** The heading's pins, where the server keeps them. */
+  pins?: ReactNode;
 }
 export function TeamChat(props: TeamChatProps) {
   const title = teamConversationTitle(props.conversation, props.self);
@@ -51,12 +53,15 @@ export function TeamChat(props: TeamChatProps) {
             <span>{title}</span>
           </div>
         )}
-        {group ? (
-          <div className="team-chat-heading-people">
-            <TeamChatFace people={props.conversation.members} max={3} />
-            <span>{props.conversation.members.length}</span>
-          </div>
-        ) : null}
+        <div className="team-chat-heading-tools">
+          {props.pins}
+          {group ? (
+            <div className="team-chat-heading-people">
+              <TeamChatFace people={props.conversation.members} max={3} />
+              <span>{props.conversation.members.length}</span>
+            </div>
+          ) : null}
+        </div>
       </header>
       <TeamChatBody {...props} />
       {props.notice ? (

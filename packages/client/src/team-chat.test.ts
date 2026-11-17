@@ -11,6 +11,7 @@ const message = (id: string, seq: number): TeamMessage => ({
   files: [],
   reactions: [],
   replyTo: null,
+  pinned: null,
   call: null,
   createdAt: "2026-01-01T00:00:00Z",
 });

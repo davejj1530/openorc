@@ -48,19 +48,7 @@ function AuthorizedChat({ scope, target }: { scope: TeamChatContextValue; target
         }}
       />
     );
-  return (
-    <TeamChatConversation
-      scope={scope}
-      target={target}
-      conversation={conversation}
-      people={chat?.people ?? []}
-      channels={channels}
-      groups={chat?.features.includes("groups") ?? false}
-      unread={chat?.features.includes("unread") ?? false}
-      files={chat?.features.includes("files") ?? false}
-      replies={chat?.features.includes("replies") ?? false}
-    />
-  );
+  return <TeamChatConversation scope={scope} target={target} conversation={conversation} people={chat?.people ?? []} features={new Set(chat?.features)} />;
 }
 
 function ChatUnavailable({ message = "You no longer have access to this chat." }: { message?: string }) {

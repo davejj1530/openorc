@@ -6,6 +6,7 @@ import type { StandInPeer } from "./stand-in-peer.js";
 import type { StandInThreads } from "./stand-in-threads.js";
 import { StandInChatChannels } from "./stand-in-chat-channels.js";
 import { StandInChatReads } from "./stand-in-chat-reads.js";
+import { standInPins } from "./stand-in-chat-pins.js";
 
 type Reply = { status: number; body: unknown };
 type Request = { method: string; path: string; query: URLSearchParams; space: string | null };
@@ -20,6 +21,7 @@ export class StandInChat {
   unreadEnabled = false;
   filesEnabled = false;
   repliesEnabled = false;
+  pinsEnabled = false;
   readonly reads = new StandInChatReads();
   /** Takes a message's uploaded files (StandInUploads.attachChat); null refuses them. */
   attachFiles: ((input: { who: string; space: string; ids: string[]; messageId: string; conversationId: string }) => TeamMessage["files"] | null) | null = null;
@@ -69,6 +71,7 @@ export class StandInChat {
       ["unread", this.unreadEnabled],
       ["files", this.filesEnabled],
       ["replies", this.repliesEnabled],
+      ["pins", this.pinsEnabled],
     ];
     return ["base", ...flags.flatMap(([name, on]) => (on ? [name] : []))];
   }
@@ -109,7 +112,7 @@ export class StandInChat {
   }
 
   #recordRoute(request: Request, spaceId: string, who: string, body: unknown): Reply | null {
-    const route = /^\/chat\/conversations\/([^/]+)(?:\/(timeline|messages|seen))?$/.exec(request.path);
+    const route = /^\/chat\/conversations\/([^/]+)(?:\/(timeline|messages|seen|pins))?$/.exec(request.path);
     if (!route) return null;
     const record = this.records.get(decodeURIComponent(route[1] ?? ""));
     if (!record || record.spaceId !== spaceId || !this.#readable(record, who)) return absent();
@@ -118,12 +121,15 @@ export class StandInChat {
     if (action === "GET timeline") return this.#timeline(record, request.query, who);
     if (action === "POST messages") return this.#send(record, who, body);
     if (action === "PUT seen" && this.unreadEnabled) return this.reads.seen(record, who, body);
+    if (action === "GET pins" && this.pinsEnabled) return standInPins.list(record);
     return absent();
   }
 
   #reactionRoute(request: Request, spaceId: string, who: string, body: unknown): Reply {
     const reaction = /^\/chat\/messages\/([^/]+)\/reactions$/.exec(request.path);
     if (reaction && request.method === "POST") return this.#react(spaceId, who, decodeURIComponent(reaction[1] ?? ""), body);
+    const pin = /^\/chat\/messages\/([^/]+)\/pin$/.exec(request.path);
+    if (pin && this.pinsEnabled && ["POST", "DELETE"].includes(request.method)) return this.#pin(spaceId, who, decodeURIComponent(pin[1] ?? ""), request.method === "POST");
     return absent();
   }
 
@@ -230,6 +236,7 @@ export class StandInChat {
       files,
       reactions: [],
       replyTo,
+      pinned: null,
       call: null,
       createdAt: new Date().toISOString(),
     };
@@ -265,6 +272,14 @@ export class StandInChat {
         peer.send("chat:message", { spaceId: record.spaceId, conversationId: record.conversation.id, message });
       peer.send("changed", { organizationId: record.spaceId, topics: ["chat"] });
     }
+  }
+
+  #pin(spaceId: string, who: string, id: string, pin: boolean): Reply {
+    const record = this.#in(spaceId).find((record) => record.messages.some((message) => message.id === id));
+    if (!record || !this.#readable(record, who)) return absent();
+    const changed = standInPins.change(record, who, { id: userOf(who), ...this.deps.person(who) }, id, pin);
+    if (changed.status === 200) this.changeAccess(spaceId, ["chat"]);
+    return changed;
   }
 
   #react(spaceId: string, who: string, id: string, body: unknown): Reply {

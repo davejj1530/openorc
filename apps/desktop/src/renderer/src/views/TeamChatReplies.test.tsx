@@ -41,6 +41,7 @@ const message = (seq: number, body: string, by = mara, replyTo: TeamMessage["rep
   files: [],
   reactions: [],
   replyTo,
+  pinned: null,
   call: null,
   createdAt: new Date(seq * 60_000).toISOString(),
 });

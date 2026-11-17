@@ -23,6 +23,8 @@ export function createTeamChatHandlers(chat: ChatCalls | null): Pick<Handlers, k
     "teamChat.timeline": (input) => requireChat().timeline(input),
     "teamChat.send": (input) => requireChat().send(input),
     "teamChat.react": (input) => requireChat().react(input),
+    "teamChat.pins": (input) => requireChat().pins(input),
+    "teamChat.pin": (input) => requireChat().pin(input),
     "teamChat.watch": (input) => requireChat().watch(input),
     "teamChat.unwatch": (input) => chat?.unwatch(input) ?? {},
     "teamChat.seen": (input) => requireChat().seen(input),

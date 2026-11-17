@@ -1,0 +1,131 @@
+/* The heading's pin, with how many messages are pinned. */
+.team-chat-pins-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.team-chat-pins-button:hover,
+.team-chat-pins-button[data-popup-open] {
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.team-chat-pins-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.team-chat-pins {
+  width: 360px;
+}
+.team-chat-pins-list {
+  display: grid;
+  gap: 2px;
+}
+.team-chat-pin {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-lg);
+}
+.team-chat-pin:hover {
+  background: var(--surface-2);
+}
+.team-chat-pin-open {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  text-align: left;
+}
+.team-chat-pin-open:focus-visible,
+.team-chat-pin-unpin:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+  border-radius: var(--radius-lg);
+}
+.team-chat-pin .account-face {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+}
+.team-chat-pin-text {
+  display: grid;
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+.team-chat-pin-name {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.team-chat-pin-words {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink-3);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.team-chat-pin-unpin {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin-right: 6px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-4);
+  opacity: 0;
+}
+.team-chat-pin:hover .team-chat-pin-unpin,
+.team-chat-pin:focus-within .team-chat-pin-unpin {
+  opacity: 1;
+}
+.team-chat-pin-unpin:hover {
+  background: var(--surface-3);
+  color: var(--ink-2);
+}
+.team-chat-pins-state {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 16px 10px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+/* A pinned message: a small pin at its bubble's lower outer corner, who pinned it on demand. */
+.team-chat-pinned-mark {
+  position: absolute;
+  bottom: -6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  box-shadow: 0 0 0 2px var(--bg);
+  color: var(--ink-2);
+}
+.team-chat-message:not(.team-chat-message-mine) .team-chat-pinned-mark {
+  right: -6px;
+}
+.team-chat-message-mine .team-chat-pinned-mark {
+  left: -6px;
+}
+
+.team-chat-heading-tools {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}

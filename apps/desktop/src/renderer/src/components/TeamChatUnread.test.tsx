@@ -20,6 +20,7 @@ const message = (seq: number, body: string, from = robin): TeamMessage => ({
   files: [],
   reactions: [],
   replyTo: null,
+  pinned: null,
   call: null,
   createdAt: new Date(Date.UTC(2026, 0, 1, 0, seq)).toISOString(),
 });

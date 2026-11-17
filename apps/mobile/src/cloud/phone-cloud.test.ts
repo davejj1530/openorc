@@ -117,6 +117,19 @@ it("drops its session when the person signs out on the Mac, and takes another pe
   expect(tokenOf(device.vault.record)).not.toBe(riley);
 });
 
+it("tells a listener that took its subscribe on its own, as a store hook takes it, when its session comes and goes", async () => {
+  const studio = await mac(RILEY);
+  const cloud = phone().make();
+  const { subscribe } = cloud;
+  const heard: boolean[] = [];
+  subscribe(() => void heard.push(cloud.holds));
+  await cloud.follow(studio.source);
+  await studio.hosted.account.signOut();
+  await cloud.follow(studio.source);
+  expect(heard).toContain(true);
+  expect(heard.at(-1)).toBe(false);
+});
+
 it("keeps its session through a Mac that cannot say whose it is, and one at a time however often it is asked", async () => {
   const studio = await mac(RILEY);
   const device = phone();

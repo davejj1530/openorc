@@ -64,10 +64,11 @@ export class PhoneCloud {
     return this.#hosted;
   }
 
-  subscribe(listener: () => void): () => void {
+  /** Bound, so a store hook may take it as it is. */
+  readonly subscribe = (listener: () => void): (() => void) => {
     this.#listeners.add(listener);
     return () => void this.#listeners.delete(listener);
-  }
+  };
 
   /** Mounts the session the phone kept, so the cloud is there before any Mac answers. */
   start(): Promise<void> {

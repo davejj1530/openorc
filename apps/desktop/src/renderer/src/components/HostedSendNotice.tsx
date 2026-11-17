@@ -2,7 +2,7 @@ import {
   canStopTurn,
   draftOfNote,
   handoffCard,
-  personFirst,
+  handoffLabel,
   placeUnreachable,
   steerBlock,
   queueBlock,
@@ -17,10 +17,11 @@ import {
   type SendBlockAction,
   type SendPayer,
 } from "@openorc/client";
-import { HOSTED_AGENTS, movingHold, type HarnessId, type PermissionPreset, type RunMode, type ThreadSummary } from "@openorc/protocol";
+import { movingHold, type HarnessId, type PermissionPreset, type RunMode, type ThreadSummary } from "@openorc/protocol";
 import type { ReactNode, RefObject } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
+import { CLOUD_MODEL_LIMITS } from "../lib/cloud-model-limits";
 import { useRouter } from "../lib/router";
 import { machine, thisComputer } from "../lib/this-computer";
 import { useUi } from "../lib/ui";
@@ -38,7 +39,7 @@ export interface CloudComposerLimits {
   modelLimits: { harnesses: readonly HarnessId[]; fast: false };
 }
 
-const CLOUD_LIMITS: CloudComposerLimits = { accounts: undefined, attachmentsDisabledReason: FILES, modelLimits: { harnesses: HOSTED_AGENTS, fast: false } };
+const CLOUD_LIMITS: CloudComposerLimits = { accounts: undefined, attachmentsDisabledReason: FILES, modelLimits: CLOUD_MODEL_LIMITS };
 
 /**
  * What an OpenOrc Cloud thread adds to its conversation, and nothing for any other thread:
@@ -173,15 +174,6 @@ function HandoffCard({ threadId, words, action, composer }: { threadId: string; 
       </Button>
     </section>
   );
-}
-
-function handoffLabel(action: HandoffAction): string {
-  if (action.kind === "note") return `Tag ${personFirst(action.note.to)}`;
-  if (action.kind === "retry-save") return "Retry save";
-  if (action.kind === "stop-work") return "Stop work";
-  // A cloud thread's terminal is held in the same block as a command, and named for what it is.
-  if (action.commandIds.length > 0 && action.commandIds.every((id) => id.startsWith("terminal-"))) return action.commandIds.length > 1 ? "Stop terminals" : "Stop terminal";
-  return action.commandIds.length > 1 ? "Stop commands" : "Stop command";
 }
 
 /**

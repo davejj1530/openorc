@@ -68,9 +68,10 @@ vi.mock("../components/TopBar", () => ({ TopBar: ({ children }: { children: Reac
 // The picker's own rows are its tests'; here, the Claude accounts the screen hands it, and what choosing one does.
 vi.mock("../components/ModelPicker", () => ({
   ModelPicker: () => <button type="button">Choose model</button>,
-  ComposerModelPicker: ({ accounts }: { accounts?: PickerAccounts }) => (
+  ComposerModelPicker: ({ accounts, limits }: { accounts?: PickerAccounts; limits?: { harnesses: readonly string[]; fast: boolean } }) => (
     <>
       <button type="button">Choose model</button>
+      <span data-testid="agents-offered">{limits ? `${limits.harnesses.join(", ")}${limits.fast ? "" : ", no fast mode"}` : "this Mac's"}</span>
       {accounts ? (
         <div role="group" aria-label="Claude account">
           {accounts.accounts.map((account) => (
@@ -375,6 +376,22 @@ describe("NewThread", () => {
     expect(send.getAttribute("data-tip")).not.toMatch(/Sign in to/);
     fireEvent.click(send);
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", hosted: true, prompt: "Add a health check" })));
+  });
+
+  it("offers a cloud start from a project with a folder on this Mac what a cloud thread's composer does, not this Mac's Claude accounts", async () => {
+    const cloud = openOrcCloud("added");
+    if (cloud.state !== "signed-in") throw new Error("Expected a signed-in account");
+    account = { ...cloud, signIns: [...(cloud.signIns ?? []), { agent: "claude", provider: "anthropic", label: "Claude Max", ended: false }] };
+    models = [...models, { id: "claude-model", label: "Claude", agent: "claude", isDefault: true, efforts: [], defaultEffort: null }];
+    system = { ...system, harnesses: system.harnesses.map((row) => (row.id === "claude" ? { ...row, state: "ready" as const } : row)) };
+    writeNewThreadDraft({ ...readNewThreadDraft("p1"), prompt: "Add a health check", target: { kind: "model", choice: { agent: "claude", model: "claude-model", effort: null, fastMode: false } } });
+    render(<NewThread projectId="p1" />);
+    expect(offeredAccounts()).toEqual(["personal", "work", "client"]);
+    expect(screen.getByTestId("agents-offered").textContent).toBe("this Mac's");
+    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "OpenOrc Cloud 1 h" }));
+    await waitFor(() => expect(screen.queryByRole("group", { name: "Claude account" })).toBeNull());
+    expect(screen.getByTestId("agents-offered").textContent).toBe("claude, codex, opencode, no fast mode");
   });
 
   it("starts a thread on OpenOrc Cloud for a project there, with no folder on this Mac", async () => {

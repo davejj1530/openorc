@@ -19,6 +19,7 @@ import { Button, TextButton } from "../components/ui";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { usePermissionSelection, useRpc, useRpcMutation } from "../lib/client";
 import { useNewThreadHosted } from "../lib/cloud-offered";
+import { CLOUD_MODEL_LIMITS } from "../lib/cloud-model-limits";
 import { usePublishComposerAccount } from "../lib/composer-account";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useDefaultHarness } from "../lib/default-harness";
@@ -194,9 +195,9 @@ function NewThreadProject({
 
   useEffect(() => {
     if (target.kind !== "model" || target.choice || !models.data || defaultHarness === undefined) return;
-    const initial = initialThreadChoice(models.data, defaultHarness, info.data, cloudOnly);
+    const initial = initialThreadChoice(models.data, defaultHarness, info.data, onCloud);
     if (initial) changeDraft({ target: { kind: "model", choice: initial } });
-  }, [target, models.data, info.data, defaultHarness, cloudOnly]);
+  }, [target, models.data, info.data, defaultHarness, onCloud]);
   usePublishComposerAccount(choice?.agent, claudeAccountId, choice?.model);
 
   const {
@@ -216,7 +217,8 @@ function NewThreadProject({
     system: { data: info.data, failed: info.isError },
   });
   const usesClaude = choice?.agent === "claude";
-  const pickerAccounts = orcling || cloudOnly ? undefined : newThreadAccounts(accountChoices, claudeAccountId, start.isPending, (id) => changeDraft({ claudeAccountId: id }));
+  // On OpenOrc Cloud, whatever folder it starts from, this Mac's Claude accounts and Orclings never hold the thread.
+  const pickerAccounts = orcling || onCloud ? undefined : newThreadAccounts(accountChoices, claudeAccountId, start.isPending, (id) => changeDraft({ claudeAccountId: id }));
   const localReason = usesClaude && !accounts.data ? (accounts.error?.message ?? "Loading Claude accounts…") : targetDisabledReason;
   // A cloud start from this Mac's folder carries its work, said on the line above Start before anything leaves.
   const macStart = useMacStart(cloudOnly ? null : projectId, spaceId ?? undefined, onCloud);
@@ -229,7 +231,7 @@ function NewThreadProject({
     void info.refetch();
     onRetryProjects();
   };
-  const pickerOrclings = isWorkspace || cloudOnly ? undefined : orclingChoices(orclings, target, (next) => changeDraft({ target: next }));
+  const pickerOrclings = isWorkspace || onCloud ? undefined : orclingChoices(orclings, target, (next) => changeDraft({ target: next }));
 
   const submit = async (text: string, attachments: string[]) => {
     const { generation, key } = spaceNavigation.getState();
@@ -294,11 +296,14 @@ function NewThreadProject({
                     model={choice}
                     onModel={chooseModel}
                     modelControl={
-                      target.kind === "unavailable" ? (
-                        <ModelPicker value={null} onChange={chooseModel} orclings={pickerOrclings} disabled={start.isPending} />
-                      ) : (
-                        <ComposerModelPicker value={choice} onChange={chooseModel} onSelectModel={chooseModel} orclings={pickerOrclings} accounts={pickerAccounts} disabled={start.isPending} />
-                      )
+                      <NewThreadModelControl
+                        choice={target.kind === "unavailable" ? null : choice}
+                        choose={chooseModel}
+                        orclings={pickerOrclings}
+                        accounts={pickerAccounts}
+                        onCloud={onCloud}
+                        disabled={start.isPending}
+                      />
                     }
                     mode={draft.mode}
                     onMode={(mode) => changeDraft({ mode })}
@@ -335,6 +340,27 @@ function NewThreadProject({
       {panelContext ? <Panel context={panelContext} /> : null}
     </ClaudeAccountScope>
   );
+}
+
+/** The model the thread starts with. On OpenOrc Cloud it offers what a cloud thread's composer does: the agents the cloud runs. */
+function NewThreadModelControl({
+  choice,
+  choose,
+  orclings,
+  accounts,
+  onCloud,
+  disabled,
+}: {
+  choice: ModelChoice | null;
+  choose: (choice: ModelChoice) => void;
+  orclings: OrclingPickerChoices | undefined;
+  accounts: PickerAccounts | undefined;
+  onCloud: boolean;
+  disabled: boolean;
+}) {
+  const limits = onCloud ? CLOUD_MODEL_LIMITS : undefined;
+  if (!choice) return <ModelPicker value={null} onChange={choose} orclings={orclings} harnesses={limits?.harnesses} disabled={disabled} />;
+  return <ComposerModelPicker value={choice} onChange={choose} onSelectModel={choose} orclings={orclings} accounts={accounts} limits={limits} disabled={disabled} />;
 }
 
 function NewThreadIssue({ issue, retry }: { issue: string | null; retry(): void }) {

@@ -102,10 +102,6 @@ export interface ConnectionEffects {
   forgetCache(macId: string): void;
   /** Whether anything on the internet answers, for a race lost off Wi-Fi. Aborted once the phone stops waiting. */
   reachesInternet(signal: AbortSignal): Promise<boolean>;
-  /** Deletes the key an earlier build kept to wake a host through its door, which only a cloud brain had. */
-  forgetDoorKey(macId: string): Promise<void>;
-  /** A Mac named the cloud brains it removed, by the ids an earlier build saved them under. */
-  brainsRemoved(macId: string, removed: readonly string[]): void;
 }
 
 /** `spent` when the same code can never pair: the Mac refused it, it expired, or it is not a pairing code. */
@@ -298,7 +294,7 @@ export class ConnectionManager {
       if (this.active()) this.connectNow(null);
       else this.enter({ kind: "unpaired", lost: lost && { why: lost, macName: name } });
     }
-    await Promise.all([this.effects.keys.remove(id), this.effects.forgetDoorKey(id)]);
+    await this.effects.keys.remove(id);
   }
 
   appState(state: "active" | "background"): void {
@@ -470,21 +466,6 @@ export class ConnectionManager {
     session.onClose((code, reason) => this.dropped(session, code, reason));
     this.schedulePing(session);
     if (session.closed) return this.dropped(session, LinkCloseCode.normal, "");
-    void this.learnRemoved(mac.id);
-  }
-
-  /**
-   * Hears which cloud brains the Mac removed, on every session, so a brain an earlier build saved goes with its keys. A
-   * Mac that does not take the question, or a dropped session, says none.
-   */
-  private async learnRemoved(macId: string): Promise<void> {
-    let removed: string[];
-    try {
-      removed = await this.connection.device("brains.removed", {});
-    } catch {
-      return;
-    }
-    if (removed.length) this.effects.brainsRemoved(macId, removed);
   }
 
   private receive(session: PhoneSession, message: MacMessage): void {

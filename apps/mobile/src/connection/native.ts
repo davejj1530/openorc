@@ -106,7 +106,7 @@ const keychain: SecureStore.SecureStoreOptions = { keychainAccessible: SecureSto
 const keyName = (macId: string) => `device-key.${macId}`;
 
 /** Deletes the door key an earlier build kept in the Keychain for a cloud brain, beside the device key. */
-export const forgetDoorKey = (macId: string): Promise<void> => SecureStore.deleteItemAsync(`door-key.${macId}`, keychain);
+export const forgetDoorKey = (hostId: string): Promise<void> => SecureStore.deleteItemAsync(`door-key.${hostId}`, keychain);
 
 /** This phone's private key for each Mac, in the Keychain. */
 export const keychainKeys: DeviceKeys = {

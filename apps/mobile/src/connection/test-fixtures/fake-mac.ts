@@ -46,8 +46,6 @@ export class FakeMac {
   internetChecks = 0;
   /** Answers a call, or holds it when this returns undefined. */
   answer: (method: string, params: unknown) => unknown = () => undefined;
-  /** The brains it says it removed; "unknown" is a Mac that does not take the question. */
-  removedBrains: string[] | "unknown" = [];
 
   constructor(readonly name = "Studio") {}
 
@@ -96,11 +94,6 @@ export class FakeMac {
         this.heard.push(message);
         if (message.t === "ping" && !this.mute) accepted.session.send({ t: "pong", id: message.id });
         if (message.t !== "rpc") return;
-        if (message.method === "brains.removed") {
-          if (this.removedBrains === "unknown") accepted.session.send({ t: "rpc.error", id: message.id, message: "This is not available from a phone." });
-          else accepted.session.send({ t: "rpc.result", id: message.id, result: this.removedBrains });
-          return;
-        }
         const result = this.answer(message.method, message.params);
         if (result !== undefined) accepted.session.send({ t: "rpc.result", id: message.id, result });
       });
@@ -153,14 +146,9 @@ export function effectsFor(
 ): ConnectionEffects & {
   macs: ReturnType<typeof memoryMacs>;
   keys: ReturnType<typeof memoryKeys>;
-  /** The hosts whose door key was deleted. */
-  doorKeysForgotten: string[];
   forgotten: string[];
-  removed: [string, readonly string[]][];
 } {
   const forgotten: string[] = [];
-  const doorKeysForgotten: string[] = [];
-  const removed: [string, readonly string[]][] = [];
   return {
     openSocket: (route) => mac.openSocket(route),
     crypto: nobleCrypto,
@@ -171,11 +159,7 @@ export function effectsFor(
     deviceName: "Test iPhone",
     forgetCache: (id) => void forgotten.push(id),
     reachesInternet: (signal) => mac.reachesInternet(signal),
-    forgetDoorKey: async (id) => void doorKeysForgotten.push(id),
-    brainsRemoved: (macId, ids) => void removed.push([macId, ids]),
-    doorKeysForgotten,
     forgotten,
-    removed,
   };
 }
 

@@ -9,10 +9,6 @@ export interface SavedMac {
   routes: Route[];
   /** The route the last session used. It goes first while it suits the network. */
   lastRoute: Route | null;
-  /** Set by an earlier build, which also paired a Mac's cloud brain: `brain` marks one, which this build never shows. */
-  kind?: "mac" | "brain";
-  /** The cloud brain this Mac named as its own, by the brain's id here; null once it names none. */
-  brain?: string | null;
 }
 
 /** The saved Macs and which one the app shows. Synchronous, so Home can paint before anything connects. */
@@ -39,7 +35,7 @@ export const sameRoute = (a: Route, b: Route) => a.kind === b.kind && a.host ===
 
 /**
  * The kinds of route that can answer on each network, fastest first. LAN addresses answer only on the Mac's own
- * network, so cellular leaves them out. A public route, which only a cloud brain listed, is never tried.
+ * network, so cellular leaves them out. A public route is never tried: no Mac lists one.
  */
 const KINDS: Record<Exclude<NetworkKind, "none">, readonly Route["kind"][]> = {
   wifi: ["lan", "tailnet"],

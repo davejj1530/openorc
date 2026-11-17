@@ -9,7 +9,7 @@ import { createMMKV } from "react-native-mmkv";
 import { randomUUID } from "react-native-quick-crypto";
 import { createAssetCache } from "./connection/asset-cache";
 import { linkHooks } from "./connection/link-hooks";
-import { forgetRemovedBrains, macsOnly, namedBrain } from "./connection/hosts";
+import { dropSavedBrains } from "./connection/hosts";
 import { ConnectionManager, showsDemo, type LinkState } from "./connection/manager";
 import { forgetDoorKey, keychainKeys, openSocket, phoneCrypto, reachesInternet, storedMacs, systemClock } from "./connection/native";
 import type { NetworkKind, SavedMac } from "./connection/saved-macs";
@@ -31,9 +31,9 @@ const kept = createMMKV({ id: "openorc" });
 /** What the app keeps (lists Home paints from on a cold start, folds, drafts, settings), scratched while the demo shows. */
 export const storage = new ScratchStore(kept);
 
-/** Every saved host, a cloud brain an earlier build paired included; the link sees the Macs among them. */
-const hosts = storedMacs(kept);
-const macs = macsOnly(hosts);
+/** The saved Macs, less what an earlier build saved for a cloud brain, with its keys. */
+const macs = storedMacs(kept);
+dropSavedBrains(macs, (id) => void Promise.all([keychainKeys.remove(id), forgetDoorKey(id)]).catch(() => undefined));
 
 /** The phone's connection to the Mac it shows. Created at load, so the route race starts while React mounts. */
 export const link = new ConnectionManager({
@@ -44,8 +44,6 @@ export const link = new ConnectionManager({
   keys: keychainKeys,
   deviceName: Constants.deviceName ?? "iPhone",
   reachesInternet,
-  forgetDoorKey,
-  brainsRemoved: forgetRemovedBrains(hosts, (id) => void link.forget(id)),
   macs,
   forgetCache: (macId) => {
     forgetLists(storage, macId);
@@ -90,22 +88,6 @@ followMacLook(client.queryClient.getQueryCache());
 // paired anew would be asked over the session of the one before it, or the call dropped as that session is let go.
 link.subscribe(() => show(macOf(link.getState())));
 keepLists(client.queryClient, storage, () => shownMac);
-
-/**
- * An earlier build paired a Mac's cloud brain as a second host, on the Mac's word in this answer. The word is still kept
- * on the Mac's record, and cleared once the Mac names none: it is how the phone knows whose brain a saved one is when a
- * Mac says it removed it. A Mac that does not take the question answers with an error, which changes nothing.
- */
-let heardFrom = 0;
-link.subscribe(() => {
-  const state = link.getState();
-  if (state.kind !== "connected" || state.serial === heardFrom) return;
-  heardFrom = state.serial;
-  void link.connection
-    .call("cloud.offer", {})
-    .then((offer) => namedBrain(macs, state.mac.id, offer.brain?.host ?? null))
-    .catch(() => undefined);
-});
 
 const networkKinds: Partial<Record<NetworkStateType, NetworkKind>> = {
   [NetworkStateType.WIFI]: "wifi",

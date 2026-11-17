@@ -1,7 +1,6 @@
 import { LinkCloseCode } from "@openorc/link";
 import type { ClientPush } from "@openorc/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { forgetRemovedBrains } from "./hosts";
 import { ConnectionManager, type LinkState } from "./manager";
 import { effectsFor, FakeMac, lan, lanAddress, pairedWith, publicRoute, tailnet } from "./test-fixtures/fake-mac";
 import type { NetworkKind } from "./saved-macs";
@@ -651,54 +650,12 @@ describe("pairing", () => {
 });
 
 describe("a cloud brain an earlier build paired", () => {
-  it("is named by a Mac that removed it, on each session; a Mac that does not take the question says none", async () => {
-    const mac = new FakeMac();
-    mac.behave(lan, { kind: "answer" });
-    mac.removedBrains = ["brain-key"];
-    const { effects } = start(mac, "wifi", pairedWith(mac));
-    await advance(10);
-    expect(effects.removed).toEqual([[mac.id, ["brain-key"]]]);
-    mac.closeAll("shutdown");
-    await advance(1_000);
-    expect(effects.removed).toEqual([
-      [mac.id, ["brain-key"]],
-      [mac.id, ["brain-key"]],
-    ]);
-    const quiet = new FakeMac();
-    quiet.behave(lan, { kind: "answer" });
-    const none = start(quiet, "wifi", pairedWith(quiet));
-    const old = new FakeMac();
-    old.behave(lan, { kind: "answer" });
-    old.removedBrains = "unknown";
-    const asOld = start(old, "wifi", pairedWith(old));
-    await advance(10);
-    expect(asOld.manager.getState()).toMatchObject({ kind: "connected" });
-    expect([...none.effects.removed, ...asOld.effects.removed]).toEqual([]);
-  });
-
-  it("is forgotten with this phone's key for it and its door key as the session of the Mac that removed it starts", async () => {
-    const mac = new FakeMac();
-    mac.behave(lan, { kind: "answer" });
-    mac.removedBrains = ["brain-key"];
-    const effects = pairedWith(mac);
-    effects.macs.save({ id: "brain-key", name: "Cloud", routes: [publicRoute], lastRoute: null, kind: "brain" });
-    effects.keys.stored.set("brain-key", new Uint8Array(32));
-    const { manager } = start(mac, "wifi", effects);
-    effects.brainsRemoved = forgetRemovedBrains(effects.macs, (id) => void manager.forget(id));
-    await advance(10);
-    expect([...effects.macs.saved.keys()]).toEqual([mac.id]);
-    expect(effects.keys.stored.has("brain-key")).toBe(false);
-    expect(effects.doorKeysForgotten).toEqual(["brain-key"]);
-    expect(effects.forgotten).toEqual(["brain-key"]);
-    expect(manager.getState()).toMatchObject({ kind: "connected", mac: { name: "Studio" } });
-  });
-
-  it("leaves a session opening with one question beside the link's own, and none about a host's kind or door", async () => {
+  it("leaves a session opening with the link's own question alone, none about a brain", async () => {
     const mac = new FakeMac();
     mac.behave(lan, { kind: "answer" });
     start(mac, "wifi", pairedWith(mac));
     await advance(10);
-    expect(mac.heard.flatMap((message) => (message.t === "rpc" ? [message.method] : []))).toEqual(["session.negotiate", "brains.removed"]);
+    expect(mac.heard.flatMap((message) => (message.t === "rpc" ? [message.method] : []))).toEqual(["session.negotiate"]);
   });
 
   it("left a public address on a saved host, which is never dialled, on Wi-Fi or cellular", async () => {

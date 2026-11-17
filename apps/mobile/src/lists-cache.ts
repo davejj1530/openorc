@@ -14,7 +14,7 @@ interface Kept {
   at: number;
 }
 
-// Version 2: lists saved before then could hold the other host's threads after a switch between a Mac and its brain.
+// Version 2: lists an earlier build saved could hold another host's threads.
 const storageKey = (macId: string) => `lists.v2.${macId}`;
 const kept = (query: Query) => KEPT.has(String(query.queryKey[0])) && query.state.status === "success";
 

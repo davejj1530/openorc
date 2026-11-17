@@ -218,7 +218,7 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
                   tree.toggle("");
                 }}
               >
-                <div className="file-tree-row file-tree-root" data-tip={root}>
+                <div className="file-tree-row file-tree-root" data-tip={listing.data?.name ? undefined : root}>
                   <ChevronRight size={12} className={expanded.includes("") ? "rotate-90" : ""} />
                   <Folder size={14} className="file-tree-folder" />
                   <span className="truncate">{rootName}</span>

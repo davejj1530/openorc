@@ -15,6 +15,7 @@ import { fileViews, FileToolbar, isMarkdown, type FileView } from "./FileToolbar
 import { SourceEditor } from "./SourceEditor";
 import { editorCaret, editorNavigationKey, moveInEditor, useEditorNavigation } from "../lib/editor-navigation";
 import { useLayout } from "../lib/layout";
+import { useRpc } from "../lib/client";
 
 const ExplainView = lazy(() => import("./explain/ExplainView").then((m) => ({ default: m.ExplainView })));
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
@@ -36,6 +37,8 @@ export function FilePanel({ selection, directory }: { selection: FileSelection; 
   const onTree = (show: boolean) => (compact ? setOverlayFor(show ? selection.path : null) : useFileExplorer.getState().setVisible(show));
   // A file outside the folder keeps the conversation's explorer and history beside it.
   const root = "file" in buffer.view && !buffer.outside ? buffer.view.file.root : directory;
+  // A cloud thread's copy is named after its project, not its folder here (the explorer's own listing).
+  const name = useRpc("files.list", { scope: selection.scope, path: "" }).data?.name;
   const navigationKey = editorNavigationKey(selection.scope, root);
   const history = useEditorNavigation((state) => state.histories[navigationKey]);
   const move = (direction: "back" | "forward") => moveInEditor(navigationKey, direction, editorCaret(selection, editorActions?.point()));
@@ -68,6 +71,7 @@ export function FilePanel({ selection, directory }: { selection: FileSelection; 
         selection={selection}
         buffer={buffer}
         directory={root}
+        name={name}
         view={view}
         onView={(next) => choose({ selection, view: next })}
         treeVisible={treeVisible}

@@ -53,6 +53,8 @@ interface Props {
   selection: FileSelection;
   buffer: FileBuffer;
   directory: string;
+  /** What the person calls `directory` when its own name is not it, as a cloud thread's copy's. */
+  name?: string | undefined;
   view: FileView;
   onView: (view: FileView) => void;
   treeVisible: boolean;
@@ -62,18 +64,20 @@ interface Props {
 }
 
 /**
- * What the breadcrumb shows: the folder's name, then the file's place in it, and the path Copy path copies. A file
- * outside the folder isn't in the explorer: its own folder and name instead, as text, and its full path to copy.
+ * What the breadcrumb shows: the folder's name (`name` when the folder's own is not it, as a cloud thread's copy's),
+ * then the file's place in it, the path Copy path copies, and the path its tip shows. A file outside the folder isn't in
+ * the explorer: its own folder and name instead, as text, and its full path to copy.
  */
-function fileCrumbs(file: string, directory: string): { root: string; parts: string[]; path: string; outside: boolean } {
+function fileCrumbs(file: string, directory: string, name: string | undefined): { root: string; parts: string[]; path: string; tip: string; outside: boolean } {
   const path = relativeFilePath(file, directory);
-  if (!isAbsoluteFilePath(path)) return { root: directory.split(/[\\/]/).filter(Boolean).at(-1) ?? "Workspace", parts: path.split("/"), path, outside: false };
+  if (!isAbsoluteFilePath(path))
+    return { root: name ?? directory.split(/[\\/]/).filter(Boolean).at(-1) ?? "Workspace", parts: path.split("/"), path, tip: name ? `${name}/${path}` : file, outside: false };
   const segments = path.split(/[\\/]/).filter(Boolean);
-  return { root: segments.at(-2) ?? "/", parts: segments.slice(-1), path: file, outside: true };
+  return { root: segments.at(-2) ?? "/", parts: segments.slice(-1), path: file, tip: file, outside: true };
 }
 
-export function FileToolbar({ selection, buffer, directory, view, onView, treeVisible, onTree, editorActions, navigation }: Props) {
-  const { root, parts, path, outside } = fileCrumbs(selection.path, directory);
+export function FileToolbar({ selection, buffer, directory, name, view, onView, treeVisible, onTree, editorActions, navigation }: Props) {
+  const { root, parts, path, tip, outside } = fileCrumbs(selection.path, directory, name);
   const views = fileViews(selection.path, buffer.text !== null);
   const reveal = (folder: string) => {
     useFileExplorer.getState().reveal(filesKey(selection.scope), folder ? `${folder}/_` : "_");
@@ -81,7 +85,7 @@ export function FileToolbar({ selection, buffer, directory, view, onView, treeVi
   };
   return (
     <header className="file-toolbar">
-      <nav aria-label="File path" className="file-breadcrumbs" data-tip={selection.path}>
+      <nav aria-label="File path" className="file-breadcrumbs" data-tip={tip}>
         <ol>
           <li>{outside ? <span className="file-breadcrumb-folder">{root}</span> : <button onClick={() => reveal("")}>{root}</button>}</li>
           {parts.map((part, index) => (

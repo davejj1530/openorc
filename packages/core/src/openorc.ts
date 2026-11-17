@@ -320,6 +320,7 @@ export class OpenOrc {
       reviewerApp: this.reviewerApp,
       writers: this.workspaceWriters,
       cloudProject: (projectId) => this.account?.threads?.project(projectId) ?? null,
+      cloudReviews: () => this.account?.pullReviews ?? null,
       invalidate,
     });
     this.slack = new SlackService(this, options.slackSecrets, new AttachmentService(options.dataDir));

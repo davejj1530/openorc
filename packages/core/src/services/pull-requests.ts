@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { audit, orclings, projects, pullReviews, runs, threads, type Db, type PullReviewKey } from "@openorc/db";
 import { GitHubPulls, git, remoteRepository, worktree, type PullsAt } from "@openorc/git";
+import type { Hosted } from "@openorc/hosted";
 import type { PullReviewTools } from "@openorc/mcp";
 import {
   PULL_REVIEW_NEEDS_FOLDER,
@@ -45,6 +46,8 @@ export interface PullRequestServiceOptions {
   reviewerApp: Pick<ReviewerAppService, "submitReview">;
   /** A project only OpenOrc Cloud has, with no folder on this Mac: its pull requests are read on GitHub by name. */
   cloudProject?(projectId: string): Project | null;
+  /** OpenOrc Cloud's reviews, which keep the draft of a project only it has; null while signed out. */
+  cloudReviews?(): Hosted["pullReviews"] | null;
   invalidate(keys: string[]): void;
 }
 
@@ -119,6 +122,11 @@ export class PullRequestService {
     return this.github.diff(await this.repository(key.projectId), key.number);
   }
 
+  /** Who keeps the draft of a project only OpenOrc Cloud has: OpenOrc Cloud. Null for a project with a folder here. */
+  drafts(projectId: string): Hosted["pullReviews"] | null {
+    return this.cloud(projectId) ? (this.options.cloudReviews?.() ?? null) : null;
+  }
+
   review(key: PullReviewKey): PullRequestReview | null {
     // A project only OpenOrc Cloud has keeps no draft review on this Mac.
     if (this.cloud(key.projectId)) return null;
@@ -175,6 +183,8 @@ export class PullRequestService {
    * model can check its earlier findings against the new commits.
    */
   async start(key: PullReviewKey, chosen: ModelExecutionSettings, orclingId?: string): Promise<{ threadId: string }> {
+    const cloud = this.drafts(key.projectId);
+    if (cloud) return this.startInCloud(cloud, key, chosen, orclingId);
     const project = this.project(key.projectId);
     const orcling = orclingId ? orclings.get(this.db, orclingId) : null;
     if (orclingId && !orcling) throw new Error("That Orcling no longer exists. Choose another reviewer.");
@@ -191,6 +201,17 @@ export class PullRequestService {
       // An archived conversation, or one whose copy was removed, was put away: the next round starts fresh.
       if (conversation && conversation.archivedAt === null && conversation.worktreePath) return await this.reviewAgain(key, project, detail, conversation, reviewer);
       return await this.reviewAnew(key, project, detail, reviewer);
+    } finally {
+      this.changed();
+    }
+  }
+
+  /** A model reviews a cloud-only project's pull request in a cloud thread of its own, on the head GitHub shows now. */
+  private async startInCloud(cloud: Hosted["pullReviews"], key: PullReviewKey, chosen: ModelExecutionSettings, orclingId?: string): Promise<{ threadId: string }> {
+    if (orclingId) throw new Error("Orclings review pull requests of projects on this Mac.");
+    const detail = await this.github.get(await this.repository(key.projectId), key.number);
+    try {
+      return await cloud.start(key, detail.headSha, { agent: chosen.agent, model: chosen.model, effort: chosen.effort });
     } finally {
       this.changed();
     }
@@ -259,22 +280,24 @@ export class PullRequestService {
    */
   async submit(key: PullReviewKey, input: { event: PullRequestReviewEvent; summary: string; as: PullRequestReviewAuthor }): Promise<{ url: string | null }> {
     const { event, summary } = input;
-    const project = this.project(key.projectId);
-    await this.assertGh();
-    const review = pullReviews.get(this.db, key);
+    const at = await this.repository(key.projectId);
+    const cloud = this.drafts(key.projectId);
+    const review = cloud ? await cloud.get(key) : pullReviews.get(this.db, key);
     if (review?.threadId && this.options.runs.threadActivity(review.threadId) !== "idle") throw new Error("A model is still reviewing. Wait for it to finish, or stop it, before posting.");
     const comments = review?.comments ?? [];
     if (event !== "approve" && !summary.trim() && comments.length === 0) throw new Error("Write a summary or add a comment before posting.");
-    const detail = await this.github.get(project.rootPath, key.number);
+    const detail = await this.github.get(at, key.number);
     // Comments post against the commit they were written on; a review without any is about the head as it is now.
     const commitId = review && comments.length > 0 ? review.commitId : detail.headSha;
     const submission = { commitId, event, body: summary, comments };
     const posted =
       input.as === "app"
         ? await this.options.reviewerApp.submitReview(detail.url, { ...submission, body: await this.signed(review, summary) })
-        : await this.github.submitReview(project.rootPath, detail.url, submission);
+        : await this.github.submitReview(typeof at === "string" ? at : this.options.dataDir, detail.url, submission);
+    // What was posted leaves the draft, wherever it is kept; an edit made while it posted stays.
+    if (cloud && review) await cloud.posted(key, review);
     this.db.transaction(() => {
-      if (review) pullReviews.clearPosted(this.db, key, review);
+      if (review && !cloud) pullReviews.clearPosted(this.db, key, review);
       audit.record(this.db, {
         actor: "user",
         action: "pull_request.review",

@@ -44,6 +44,7 @@ import { CloudMachines } from "./machines.js";
 import { CloudCheckRuns } from "./cloud-check.js";
 import { CloudMacProjects } from "./mac-projects.js";
 import { CloudMoves } from "./moves.js";
+import { CloudPullReviews } from "./pull-reviews.js";
 export { githubRepoOf } from "./translate.js";
 export { signInVerifier } from "./browser-sign-in.js";
 import type { HostedNotice } from "./notices.js";
@@ -290,6 +291,8 @@ export interface Hosted {
   readonly macProjects: CloudMacProjects;
   /** A thread moving between this Mac and the cloud, the server's half (core's CloudMoves). */
   readonly moves: CloudMoves;
+  /** Reviews of pull requests of projects only OpenOrc Cloud has: the person's draft, kept by the server. */
+  readonly pullReviews: CloudPullReviews;
   /** Reads the stored session and the kept answers, and connects when signed in. Never rejects: no session is signed out. */
   start(): Promise<void>;
   /** The device woke or the network came back: connect now instead of at the next retry. */
@@ -297,9 +300,17 @@ export interface Hosted {
   close(): void;
 }
 
-/** What a cloud thread brings from this Mac and what runs for the person there, each over the session alone. */
-function parityServices(session: Session, now: HostedDeps["now"]): Pick<Hosted, "environment" | "connectors" | "machines" | "check" | "macProjects" | "moves"> {
+/**
+ * What a cloud thread brings from this Mac and what runs for the person there, each over the session alone, and the
+ * reviews of pull requests of projects only OpenOrc Cloud has, found by the threads' projects.
+ */
+function parityServices(
+  session: Session,
+  { now, push }: Pick<HostedDeps, "now" | "push">,
+  threads: Pick<Threads, "cloudProjectFor">,
+): Pick<Hosted, "environment" | "connectors" | "machines" | "check" | "macProjects" | "moves" | "pullReviews"> {
   return {
+    pullReviews: new CloudPullReviews({ session, project: (id) => threads.cloudProjectFor(id), push }),
     environment: new ProjectEnvironment({ session, now }),
     connectors: new CloudConnectors({ session }),
     machines: new CloudMachines({ session }),
@@ -386,7 +397,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     chat,
     tasks,
     files,
-    ...parityServices(session, deps.now),
+    ...parityServices(session, deps, threads),
     start: async () => {
       await account.start();
       threads.start();

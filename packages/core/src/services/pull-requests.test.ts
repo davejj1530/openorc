@@ -417,4 +417,54 @@ describe("a project only OpenOrc Cloud has", () => {
     expect(() => service.comment({ ...key, commitId: "h".repeat(40), ...yours })).toThrow(PULL_REVIEW_NEEDS_FOLDER);
     await expect(service.list("unknown", "open")).rejects.toThrow("project unknown not found");
   });
+
+  it("reviews it with OpenOrc Cloud, which keeps the draft: a model starts on GitHub's head, and posting goes through gh and clears what posted", async () => {
+    const draft = {
+      projectId: cloudProject.id,
+      number: 7,
+      commitId: "h".repeat(40),
+      summary: "Two small fixes.",
+      modelSummary: null,
+      threadId: "cloud-review-thread",
+      baseCommit: "b".repeat(40),
+      comments: [
+        { id: "c1", path: "app.ts", startLine: null, startSide: null, line: 3, side: "new" as const, lineText: "  const retries = 3;", body: "Name this constant.", author: null, createdAt: 1 },
+      ],
+      updatedAt: 2,
+    };
+    const reviews = { get: vi.fn(async () => draft), start: vi.fn(async () => ({ threadId: "cloud-review-thread" })), posted: vi.fn(async () => undefined) };
+    const calls: { cwd: string; args: string[] }[] = [];
+    const gh: GhRunner = async (cwd, args) => {
+      calls.push({ cwd, args });
+      if (args[0] === "api") return args.includes("POST") ? JSON.stringify({ html_url: `${url}#pullrequestreview-1` }) : "ada\n";
+      return detail("h".repeat(40), "b".repeat(40));
+    };
+    const service = new PullRequestService(Db.memory(), {
+      dataDir: root,
+      github: new GitHubPulls(gh),
+      system: { info: async () => ({ gh: { installed: true, path: "/usr/bin/gh" } }) as SystemInfo },
+      threads: { start: vi.fn(), update: vi.fn(), queueFollowUp: vi.fn() },
+      runs: { threadActivity: () => "idle", models: async () => [] },
+      reviewerApp: { submitReview: vi.fn() },
+      writers: new WorkspaceWriters(),
+      cloudProject: (id) => (id === cloudProject.id ? cloudProject : null),
+      cloudReviews: () => reviews as never,
+      invalidate: vi.fn(),
+    });
+    const key = { projectId: cloudProject.id, number: 7 };
+    expect(service.drafts(cloudProject.id)).toBe(reviews);
+    expect(service.drafts("unknown")).toBeNull();
+
+    expect(await service.start(key, { agent: "codex", model: "gpt-5.5", effort: "high", fastMode: false })).toEqual({ threadId: "cloud-review-thread" });
+    expect(reviews.start).toHaveBeenCalledWith(key, "h".repeat(40), { agent: "codex", model: "gpt-5.5", effort: "high" });
+    await expect(service.start(key, { agent: "claude", model: "claude-opus-5-5", effort: null, fastMode: false }, "orcling-1")).rejects.toThrow(
+      "Orclings review pull requests of projects on this Mac.",
+    );
+
+    expect(await service.submit(key, { event: "comment", summary: draft.summary, as: "you" })).toEqual({ url: `${url}#pullrequestreview-1` });
+    const post = calls.find((call) => call.args.includes("POST"))!;
+    expect(post.cwd).toBe(root);
+    expect(post.args).toContain("repos/acme/app/pulls/7/reviews");
+    expect(reviews.posted).toHaveBeenCalledWith(key, draft);
+  });
 });

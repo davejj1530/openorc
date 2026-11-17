@@ -95,6 +95,9 @@ it("keeps listing, opening and paging the cloud's threads with the Mac asleep, t
   expect(await connection.call("threads.resolvedCount", { spaceId: birch, projectIds: [MAC_PROJECT], quietBefore: 0 })).toBeGreaterThanOrEqual(0);
   expect(await connection.call("threads.get", { id: cloudThread })).toMatchObject({ id: cloudThread });
   expect(await connection.call("events.page", { runId: hostedRunId(cloudThread), fromTurn: 0 })).toMatchObject({ events: expect.any(Array) });
+  stand.threadFiles.capabilities = { toolOutput: { available: true } };
+  stand.append(cloudThread, [{ type: "tool.completed", ts: Date.now(), toolCallId: "tool-whole", output: "line of output\n".repeat(2_000) }]);
+  expect(await connection.call("events.toolOutput", { runId: hostedRunId(cloudThread), toolCallId: "tool-whole" })).toEqual({ output: "line of output\n".repeat(2_000) });
   // The Mac's own thread waits for the Mac.
   await expect(connection.call("threads.get", { id: "mac-thread" })).rejects.toThrow("not connected");
 });

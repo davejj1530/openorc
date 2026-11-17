@@ -113,6 +113,12 @@ describe("a session that shares cloud threads", () => {
     expect(await capable.call("threads.lastMessage", { id: threadId })).toEqual(await at.window("threads.lastMessage", { id: threadId }));
     expect(await capable.request("threads.collaboration", { threadId })).toEqual(await at.window("threads.collaboration", { threadId }));
     expect(await capable.request("threads.authors", { threadId })).toEqual(await at.window("threads.authors", { threadId }));
+    // A tool call's whole output, as the window opens it.
+    at.stand.threadFiles.capabilities = { toolOutput: { available: true } };
+    at.stand.append(threadId, [{ type: "tool.completed", ts: Date.now(), toolCallId: "tool-whole", output: "line of output\n".repeat(2_000) }]);
+    const whole = await at.window("events.toolOutput", { runId, toolCallId: "tool-whole" });
+    expect(whole).toEqual({ output: "line of output\n".repeat(2_000) });
+    expect(await capable.call("events.toolOutput", { runId, toolCallId: "tool-whole" })).toEqual(whole);
   });
 
   it("keeps its phone's name on a request that goes on to this Mac", async () => {

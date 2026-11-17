@@ -80,6 +80,7 @@ export const CLOUD_THREAD_READS = [
   "threads.lastMessage",
   "runs.listForThread",
   "events.page",
+  "events.toolOutput",
   "threads.collaboration",
   "threads.authors",
 ] as const satisfies readonly RoutedMethod[];

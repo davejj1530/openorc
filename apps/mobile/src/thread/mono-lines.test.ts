@@ -31,6 +31,8 @@ it("cuts a line too wide to draw, and counts the columns of the widest line it k
 
 it("keeps a short output whole", () => {
   expect(monoLines("total 0\ndone", false, standard)).toEqual({ chunks: [["total 0", "done"]], total: 2, columns: 7 });
+  // A file that ends in a newline, as most do, has as many lines as it has newlines.
+  expect(monoLines(`${numbered(2400)}\n`, false, standard).total).toBe(2400);
 });
 
 it("keeps every drawn Text within the size one bitmap can hold, at every text size", () => {

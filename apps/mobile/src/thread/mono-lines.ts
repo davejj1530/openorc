@@ -48,7 +48,8 @@ export function drawnLine(line: string, lineChars: number): string {
  * many characters the widest line shown has.
  */
 export function monoLines(text: string, all: boolean, { chunkLines, lineChars }: MonoMetrics): { chunks: string[][]; total: number; columns: number } {
-  const lines = text.split("\n");
+  // A newline ends the line before it; text that ends in one has no line after it.
+  const lines = text.replace(/\n$/, "").split("\n");
   const shown = (all ? lines : lines.slice(0, SHOWN_LINES)).map((line) => drawnLine(line, lineChars));
   const chunks: string[][] = [];
   for (let start = 0; start < shown.length; start += chunkLines) chunks.push(shown.slice(start, start + chunkLines));

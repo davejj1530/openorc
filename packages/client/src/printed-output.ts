@@ -60,5 +60,6 @@ export function printedOutput(text: string): PrintedOutput {
   const exit = EXIT.exec(text);
   const body = exit ? text.slice(exit[0].length) : text;
   if (NOTHING.test(body.trim()) || !body.trim()) return { exit: exit ? Number(exit[1]) : null, lines: [] };
-  return { exit: exit ? Number(exit[1]) : null, lines: body.split("\n").map(readLine) };
+  // A newline ends the line before it; output that ends in one has no line after it.
+  return { exit: exit ? Number(exit[1]) : null, lines: body.replace(/\n$/, "").split("\n").map(readLine) };
 }

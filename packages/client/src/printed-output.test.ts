@@ -32,6 +32,7 @@ it("reads dividers as headings, failures and warnings by tone, and paths at a li
 it("has no lines when the command printed nothing, and links no words that only look like files", () => {
   expect(printedOutput("(Bash completed with no output)")).toEqual({ exit: null, lines: [] });
   expect(printedOutput("Exit code 2\n")).toEqual({ exit: 2, lines: [] });
+  expect(printedOutput("one\ntwo\n").lines.map((line) => line.text)).toEqual(["one", "two"]);
   const [line] = printedOutput("node.js is installed; 0 failed, 0 errors").lines;
   expect(line).toEqual({ kind: "line", text: "node.js is installed; 0 failed, 0 errors", tone: null, ref: null });
 });

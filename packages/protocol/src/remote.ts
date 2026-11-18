@@ -29,6 +29,12 @@ export const REMOTE_METHODS = [
   "providers.limits",
   // The person's agent sign-in on OpenOrc Cloud as the Mac last heard it; never a read of the Mac's own CLIs.
   "providers.usage",
+  // A thread's files to read, never to write: its folder on this Mac, or a cloud thread's reading copy here.
+  "files.list",
+  "files.read",
+  "files.search",
+  // How old a cloud thread's reading copy is, which its files are read from; never a newer save asked of its machine.
+  "threads.cloudCopy",
   "app.settings.get",
   "threads.start",
   "threads.update",
@@ -118,7 +124,9 @@ export type AssetRef =
   | { kind: "tool-image"; url: string }
   | { kind: "activity"; runId: string; activityId: string }
   | { kind: "preview"; threadId: string; seq: number }
-  | { kind: "reply-image"; runId: string; messageId: string; path: string };
+  | { kind: "reply-image"; runId: string; messageId: string; path: string }
+  /** An image in a thread's files, by its place in the thread's folder, read as files.read reads it. */
+  | { kind: "thread-file"; threadId: string; path: string };
 
 /**
  * The pushes a phone hears. `ready` carries nothing about the Mac's processes or ports. `preview` and `preview.ended`

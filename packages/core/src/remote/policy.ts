@@ -1,5 +1,6 @@
 import { orclings, redact, redactValue, retiredTeams, tasks, threads, type Db } from "@openorc/db";
 import {
+  FolderPath,
   isRemoteMethod,
   phoneEvents,
   REMOTE_ATTACHMENT_BYTES,
@@ -176,6 +177,16 @@ function orclingInstructions({ id, body }: RpcParams<"orclings.instructions.save
 
 export const NOT_FROM_PHONE = "This is not available from a phone.";
 
+/** A thread's own folder, by the thread: never a project's folder or a task's, and never a path the phone chose. */
+const threadFolder = ({ scope }: { scope: RpcParams<"files.list">["scope"] }) => (scope.kind === "thread" ? null : NOT_FROM_PHONE);
+
+/** A read's file shaped for a phone: where it is by its place in the folder alone, never the Mac's own paths or a viewer URL. */
+function phoneFileRead(read: RpcResults["files.read"]): RpcResults["files.read"] {
+  if (read.kind === "file") return { ...read, root: "", absolutePath: "" };
+  if (read.kind === "binary") return { ...read, root: "", absolutePath: "", url: "" as typeof read.url };
+  return { ...read, root: "" };
+}
+
 /** Typed over REMOTE_METHODS: a method listed there without a guard here, or guarded but not listed, fails the build. */
 export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "projects.list": allow,
@@ -202,6 +213,11 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "providers.limits": allow,
   // OpenOrc Cloud's reading alone: a read of the Mac's own sign-ins starts its CLIs, which the Mac's Settings do.
   "providers.usage": ({ cloud }) => (cloud ? null : NOT_FROM_PHONE),
+  "files.list": threadFolder,
+  "files.search": threadFolder,
+  // A place inside the thread's folder: an absolute path would read a file outside it.
+  "files.read": (params) => threadFolder(params) ?? (FolderPath.safeParse(params.path).success ? null : NOT_FROM_PHONE),
+  "threads.cloudCopy": allow,
   "app.settings.get": allow,
   // Whether the Mac offers cloud threads, which builds from before the own cloud went still ask: it does not.
   "cloud.offer": allow,
@@ -309,6 +325,12 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "providers.limits": same,
   // The CLI's own words stay on the Mac.
   "providers.usage": (usage) => ({ ...usage, message: null }),
+  // The folder by the name the person knows it by, never the Mac's path to it.
+  "files.list": ({ root, name, entries }) => ({ root: "", name: name ?? path.basename(root), entries }),
+  "files.search": same,
+  "files.read": phoneFileRead,
+  // When the copy was saved, never where it lies on the Mac.
+  "threads.cloudCopy": (copy) => ({ ...copy, folder: "" }),
   "app.settings.get": same,
   "cloud.offer": same,
   "threads.movePreview": same,

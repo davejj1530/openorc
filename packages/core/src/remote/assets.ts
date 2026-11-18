@@ -1,13 +1,15 @@
 import os from "node:os";
 import path from "node:path";
 import { activityImagePath, messageText, projects, runs, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
-import type { AssetRef } from "@openorc/protocol";
+import { FolderPath, type AssetRef, type FileRead } from "@openorc/protocol";
 import { profileAssetPath, RASTER_IMAGE_TYPES, readImageFile, type ImageFileRead } from "../services/profile-assets.js";
 
 export interface AssetSources {
   dataDir: string;
   db: Db;
   ledger: LedgerWriter;
+  /** A file of a thread's folder as files.read reads it for that thread: its folder on this Mac, or a cloud thread's copy. */
+  fileRead: (threadId: string, path: FolderPath) => Promise<FileRead>;
 }
 
 /** The folder a run worked in, where a relative path in its reply resolves: its thread's or task's worktree, else the project. */
@@ -42,7 +44,7 @@ function replyImagePath(ref: Extract<AssetRef, { kind: "reply-image" }>, { db, l
 }
 
 /** The file an asset reference names. An activity's image and a reply's image live outside the profile, where their run put them. */
-function assetPath(ref: AssetRef, sources: AssetSources): string | null {
+function assetPath(ref: Exclude<AssetRef, { kind: "thread-file" }>, sources: AssetSources): string | null {
   const { dataDir, db, ledger } = sources;
   switch (ref.kind) {
     case "attachment":
@@ -63,6 +65,15 @@ function assetPath(ref: AssetRef, sources: AssetSources): string | null {
 
 /** A phone's image, by a reference its transcript holds. Raster images only, whatever the desktop shows. */
 export async function readRemoteAsset(ref: AssetRef, sources: AssetSources): Promise<ImageFileRead> {
+  if (ref.kind === "thread-file") return threadFileImage(ref, sources);
   const file = assetPath(ref, sources);
   return file ? readImageFile(file, RASTER_IMAGE_TYPES) : { ok: false, reason: "missing" };
+}
+
+/** An image in a thread's folder, by its place there alone, found as files.read finds it: never a path outside the folder. */
+async function threadFileImage(ref: Extract<AssetRef, { kind: "thread-file" }>, sources: AssetSources): Promise<ImageFileRead> {
+  const place = FolderPath.safeParse(ref.path);
+  if (!place.success) return { ok: false, reason: "missing" };
+  const read = await sources.fileRead(ref.threadId, place.data);
+  return read.kind === "binary" && read.media === "image" ? readImageFile(read.absolutePath, RASTER_IMAGE_TYPES) : { ok: false, reason: "missing" };
 }

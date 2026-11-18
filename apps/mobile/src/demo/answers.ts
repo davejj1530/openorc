@@ -5,6 +5,7 @@ import { storyThread } from "./story";
 
 type Answers = { [M in RemoteMethod]: (core: DemoCore, params: RpcParams<M>) => RpcResults[M] };
 
+const NOT_IN_DEMO = "The demo Mac shares no files.";
 const NO_CHANGES: WorkspaceChanges = { comparison: "head", baseSha: null, totals: { files: 0, insertions: 0, deletions: 0 }, files: [], unlisted: 0 };
 
 function listed(core: DemoCore, params: RpcParams<"threads.list">): ThreadSummary[] {
@@ -126,6 +127,19 @@ const answers: Answers = {
   ],
   "claude.accounts.list": (core) => demoAccounts(core.started),
   "providers.limits": (core) => demoLimits(core.clock.now()),
+  // The demo Mac shares no thread files (its negotiate leaves "thread-files" out), so the phone never asks for them.
+  "files.list": () => {
+    throw new Error(NOT_IN_DEMO);
+  },
+  "files.search": () => {
+    throw new Error(NOT_IN_DEMO);
+  },
+  "files.read": () => {
+    throw new Error(NOT_IN_DEMO);
+  },
+  "threads.cloudCopy": () => {
+    throw new Error(NOT_IN_DEMO);
+  },
   // The demo runs no cloud turn, so OpenOrc Cloud has no reading of its sign-ins.
   "providers.usage": (core, { provider }) => ({
     provider,

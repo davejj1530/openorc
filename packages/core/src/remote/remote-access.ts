@@ -10,6 +10,7 @@ import {
   type DeviceMethod,
   type DeviceParams,
   type DeviceRpcResults,
+  type FileRead,
   type PairingOfferView,
   type PreviewHost,
   type PushEnvironment,
@@ -424,7 +425,17 @@ export class RemoteAccess {
       answer,
       guard: guardContext(db, dataDir),
       roots: () => this.macRoots(),
-      readAsset: (ref) => readRemoteAsset(ref, { dataDir, db, ledger }),
+      readAsset: (ref) =>
+        readRemoteAsset(ref, {
+          dataDir,
+          db,
+          ledger,
+          fileRead: async (threadId, path) => {
+            const reply = await answer({ type: "rpc", id: 0, method: "files.read", params: { scope: { kind: "thread", id: threadId }, path } });
+            if (reply.type === "rpc.error") throw new Error(reply.message);
+            return reply.result as FileRead;
+          },
+        }),
       device: (deviceId, method, params) => this.device(deviceId, method, params),
       preview: this.previews,
       watchable: (id) => previewThreadLive(db, id),

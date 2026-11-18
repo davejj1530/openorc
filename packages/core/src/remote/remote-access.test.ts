@@ -285,6 +285,37 @@ describe("phone access", () => {
     await rm(folder, { recursive: true, force: true });
   });
 
+  it("lets a phone read a thread's files by their place in its folder, never the Mac's paths, and never write one", async () => {
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64");
+    const folder = await mkdtemp(path.join(os.tmpdir(), "openorc-phone-files-"));
+    await mkdir(path.join(folder, "src", "plans"), { recursive: true });
+    await writeFile(path.join(folder, "src", "plans", "team.ts"), "export const team = 100;\n");
+    await writeFile(path.join(folder, "board.png"), png);
+    const project = projects.insert(core.db, { name: "Phone files", rootPath: folder, gitRemote: null, defaultBranch: "main", settings: {} });
+    const thread = threads.insert(core.db, { projectId: project.id, title: "Plans", agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+    const scope = { kind: "thread" as const, id: thread.id };
+    const phone = await pairPhone();
+
+    const root = await phone.call("files.list", { scope, path: "" });
+    expect(root.root).toBe("");
+    expect(root.name).toBe(path.basename(folder));
+    expect(root.entries.map((entry) => entry.name)).toEqual(expect.arrayContaining(["src", "board.png"]));
+    const read = await phone.call("files.read", { scope, path: "src/plans/team.ts" });
+    expect(read).toMatchObject({ kind: "file", text: "export const team = 100;\n", root: "", absolutePath: "", path: "src/plans/team.ts" });
+    expect(await phone.call("files.search", { scope, query: "team" })).toContain("src/plans/team.ts");
+    const image = await phone.call("files.read", { scope, path: "board.png" });
+    expect(image).toMatchObject({ kind: "binary", media: "image", url: "", absolutePath: "" });
+    expect(Buffer.from((await phone.asset({ kind: "thread-file", threadId: thread.id, path: "board.png" })).bytes)).toEqual(png);
+    // Only a thread's own folder, by a place inside it: no project folder, no absolute path, no file outside, no write.
+    await expect(phone.call("files.list", { scope: { kind: "project", id: project.id }, path: "" })).rejects.toThrow("not available from a phone");
+    await expect(phone.call("files.read", { scope, path: path.join(folder, "board.png") })).rejects.toThrow("not available from a phone");
+    await expect(phone.asset({ kind: "thread-file", threadId: thread.id, path: "../openorc.sqlite" })).rejects.toThrow("not available");
+    await expect(phone.asset({ kind: "thread-file", threadId: thread.id, path: "src/plans/team.ts" })).rejects.toThrow("not available");
+    await expect(phone.call("files.write" as never, { scope, path: "src/plans/team.ts", text: "", expected: { kind: "absent" } } as never)).rejects.toThrow();
+    expect(JSON.stringify([root, read, image])).not.toContain(folder);
+    await rm(folder, { recursive: true, force: true });
+  });
+
   it("lists a thread's skills to a phone by name, never by the Mac's path", async () => {
     const folder = path.join(dataDir, "skills-from-phone");
     await mkdir(path.join(folder, ".claude", "skills", "deploy"), { recursive: true });

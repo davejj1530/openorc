@@ -26,6 +26,13 @@ describe("phone policy", () => {
     expect(admitRemoteRequest("threads.switchClaudeAccount", { id: "t", claudeAccountId: "work" }, context)).toEqual({ ok: true });
   });
 
+  it("tells a phone how old a cloud thread's reading copy is, never where it lies on the Mac", () => {
+    expect(admitRemoteRequest("threads.cloudCopy", { threadId: "cloud-thread" }, context)).toEqual({ ok: true });
+    const copy = { folder: "/Users/someone/Library/OpenOrc/cloud-copies/cloud-thread", savedAt: "2026-11-18T07:00:00.000Z", head: "abc", asOf: { turnId: null, at: "2026-11-18T07:00:00.000Z" } };
+    const reply = remoteReply("threads.cloudCopy", copy, { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) });
+    expect(reply).toEqual({ ...copy, folder: "" });
+  });
+
   it("reads OpenOrc Cloud's agent sign-in for a phone, never a read of the Mac's own CLIs, and without the CLI's words", () => {
     expect(admitRemoteRequest("providers.usage", { provider: "claude", cloud: true }, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("providers.usage", { provider: "claude" }, context)).toMatchObject({ ok: false });

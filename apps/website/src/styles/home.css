@@ -88,6 +88,12 @@
   border-radius: var(--radius-card);
   background: var(--surface);
 }
+/* A picture of the whole app is a window on the page. Its ground is the page's own colour, so the window keeps an edge
+   all round and a soft shadow under it. */
+.home-page :is(.preview-window, .demo-stage) {
+  border: var(--hairline) solid var(--rule-strong);
+  box-shadow: 0 28px 64px -36px rgb(0 0 0 / 0.28);
+}
 .home-page .app-preview-section .works-with {
   margin-top: 24px;
 }

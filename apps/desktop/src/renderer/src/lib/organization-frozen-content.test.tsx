@@ -68,7 +68,8 @@ afterEach(() => {
 
 async function fixture(access: OrganizationAccess = active) {
   let answer: SpacesStatus = status(access);
-  const gate = new OrganizationAccessStore({ now: Date.now, read: async () => answer });
+  // Heard when it is read, as the app's own read is: the gate takes no answer older than its asking.
+  const gate = new OrganizationAccessStore({ now: Date.now, read: async () => (answer.state === "ready" ? { ...answer, heardAt: Date.now() } : answer) });
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   let view: SpaceView = emptySpaceView();
   const navigation = createSpaceNavigation({

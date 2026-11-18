@@ -46,7 +46,8 @@ afterEach(() => {
 });
 async function fixture() {
   let answer = status();
-  const gate = new OrganizationAccessStore({ now: Date.now, read: async () => answer });
+  // Heard when it is read, as the app's own read is: the gate takes no answer older than its asking.
+  const gate = new OrganizationAccessStore({ now: Date.now, read: async () => ({ ...answer, heardAt: Date.now() }) });
   const queries = new QueryClient();
   const drafts = new TeamChatDrafts(localStorage, () => crypto.randomUUID());
   const closedGroups = new TeamChatClosedGroups(localStorage);

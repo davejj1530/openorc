@@ -36,7 +36,8 @@ async function fixture() {
     spaces: [{ id: "team-a", kind: "organization", name: "Example team", logo: null, role: "admin", memberId: "member-a", memberCount: 2 }],
     organizationAccess: { state: "frozen", reason: "no_pro", until: null, message: "You need Pro to use an organization. Open Account or ask an admin for a seat." },
   };
-  const gate = new OrganizationAccessStore({ now: Date.now, read: async () => status });
+  // Heard when it is read, as the app's own read is: the gate takes no answer older than its asking.
+  const gate = new OrganizationAccessStore({ now: Date.now, read: async () => ({ ...status, heardAt: Date.now() }) });
   gates.push(gate);
   await gate.refresh();
   const transport = {

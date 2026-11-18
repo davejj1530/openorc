@@ -42,4 +42,21 @@ describe("this Mac's journal of a thread moving to and from the cloud", () => {
     expect(listed()).toEqual(["t2"]);
     expect(cloudMoves.cameHere(db, "t2")).toBe(true);
   });
+
+  it("takes the threads started under a thread as come here with it, at any depth, and no other thread under it", () => {
+    const project = projects.insert(db, { name: "App", rootPath: "/app", gitRemote: null, defaultBranch: "main", settings: {} });
+    const make = (id: string, parent: string | null, relation: "started" | "subagent" | null) => {
+      threads.insert(db, { id, projectId: project.id, title: id, agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+      if (parent) threads.update(db, id, { parentThreadId: parent, parentRelation: relation });
+    };
+    make("top", null, null);
+    make("copy", "top", "started");
+    make("links", "copy", "started");
+    make("elsewhere", null, null);
+    make("theirs", "elsewhere", "started");
+    const move = cloudMoves.begin(db, { threadId: "top", direction: "to-mac", projectId: project.id });
+    expect(["top", "copy", "links"].map((id) => cloudMoves.cameHere(db, id))).toEqual([false, false, false]);
+    cloudMoves.set(db, move.id, { phase: "done" });
+    expect(["top", "copy", "links", "theirs"].map((id) => cloudMoves.cameHere(db, id))).toEqual([true, true, true, false]);
+  });
 });

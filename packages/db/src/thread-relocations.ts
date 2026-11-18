@@ -117,9 +117,20 @@ export const cloudMoves = {
     return { to, failed: null };
   },
 
-  /** Whether the thread came from the cloud to this Mac, keeping its id: that id, once a cloud thread's, is this Mac's now. */
+  /**
+   * Whether the thread came from the cloud to this Mac, keeping its id: that id, once a cloud thread's, is this Mac's
+   * now. A thread started under another came with the top of its family, whose move it is.
+   */
   cameHere(db: Db, threadId: string): boolean {
-    const move = cloudMoves.latest(db, threadId);
+    const top = db
+      .stmt(
+        `WITH RECURSIVE up(id, parent, relation) AS (
+          SELECT id, parent_thread_id, parent_relation FROM threads WHERE id = ?
+          UNION ALL SELECT t.id, t.parent_thread_id, t.parent_relation FROM threads t JOIN up ON t.id = up.parent WHERE up.relation = 'started'
+        ) SELECT id FROM up WHERE relation IS NOT 'started' LIMIT 1`,
+      )
+      .get(threadId) as { id: string } | undefined;
+    const move = cloudMoves.latest(db, top?.id ?? threadId);
     return move?.direction === "to-mac" && (move.phase === "received" || move.phase === "done");
   },
 

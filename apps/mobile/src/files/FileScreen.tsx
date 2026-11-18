@@ -14,19 +14,16 @@ import { Text } from "../ui/Text";
 import { FilesNotice, readAt } from "./FilesNotice";
 import { parentPlace, placeName, threadFileAsset, threadScope } from "./thread-files";
 
-/** A file the phone shows rather than reads as text: an image as a tile that opens full screen, anything else by its name and size, as the desktop does. */
+/**
+ * A file the phone shows rather than reads as text: an image as a tile that opens full screen; anything else as the
+ * desktop's Files shows it, its mark and its size, the name being the header's.
+ */
 function Binary({ threadId, file }: { threadId: string; file: Extract<FileRead, { kind: "binary" }> }) {
-  const name = placeName(file.path, "");
-  if (file.media === "image") return <ImageTile asset={threadFileAsset(threadId, file.path)} label={name} />;
+  if (file.media === "image") return <ImageTile asset={threadFileAsset(threadId, file.path)} label={placeName(file.path, "")} />;
   return (
-    <View accessible accessibilityLabel={`${name}, ${formatBytes(file.size)}`} className="flex-row items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3">
-      <FilePlain size={18} className="text-ink-3" />
-      <View className="min-w-0 flex-shrink">
-        <Text numberOfLines={1} className="text-md text-ink">
-          {name}
-        </Text>
-        <Text className="text-sm tabular-nums text-ink-3">{formatBytes(file.size)}</Text>
-      </View>
+    <View accessible accessibilityLabel={formatBytes(file.size)} className="items-center gap-3 py-10">
+      <FilePlain size={28} className="text-ink-3" />
+      <Text className="text-sm tabular-nums text-ink-3">{formatBytes(file.size)}</Text>
     </View>
   );
 }

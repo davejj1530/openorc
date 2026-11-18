@@ -83,7 +83,7 @@ it("lists a thread's folder by its own name, dims what git ignores, and opens a 
 it("says Empty folder for a folder with nothing in it, and the Mac's words for one it cannot list", async () => {
   show(<FilesScreen />, { threadId: "t1", path: "src/plans" });
   expect(await screen.findByText("Empty folder")).toBeTruthy();
-  expect(screen.getByRole("heading", { name: "plans" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "plans · src" })).toBeTruthy();
   cleanup();
   show(<FilesScreen />, { threadId: "t1", path: "elsewhere" });
   expect(await screen.findByText("This project isn't on Studio.", {}, { timeout: 10_000 })).toBeTruthy();
@@ -106,16 +106,20 @@ it("finds files by name at the folder's root, as the desktop's search does", asy
   show(<FilesScreen />, { threadId: "t1" });
   await screen.findByRole("heading", { name: "web" });
   search("team");
-  fireEvent.click(await screen.findByRole("button", { name: "src/plans/team.ts" }));
+  fireEvent.click(await screen.findByRole("button", { name: "team.ts, in src/plans" }));
+  expect(nativeProps.get(screen.getByText("src/plans"))?.className).toContain("text-ink-4");
   expect(router.push).toHaveBeenCalledWith({ pathname: "/file", params: { threadId: "t1", path: "src/plans/team.ts" } });
   search("nothing");
   expect(await screen.findByText("No file names match.")).toBeTruthy();
 });
 
-it("says how old a cloud thread's copy is", async () => {
+it("says how old a cloud thread's copy is at its root, and below it where a folder is", async () => {
   mac.cloud = true;
   show(<FilesScreen />, { threadId: "t1" });
   expect(await screen.findByRole("heading", { name: "web · Saved 3m ago" })).toBeTruthy();
+  cleanup();
+  show(<FilesScreen />, { threadId: "t1", path: "src/plans" });
+  expect(await screen.findByRole("heading", { name: "plans · src" })).toBeTruthy();
 });
 
 it("keeps a folder read before with when it was read while the Mac is out of reach, and waits for the Mac for one never read", async () => {
@@ -142,7 +146,8 @@ it("reads a text file, an empty one, a picture, any other file by name and size,
   expect((await screen.findByAltText("board.png")).getAttribute("data-asset")).toBe(JSON.stringify({ kind: "thread-file", threadId: "t1", path: "board.png" }));
   cleanup();
   show(<FileScreen />, { threadId: "t1", path: "plans.pdf" });
-  expect(await screen.findByLabelText("plans.pdf, 16 KB")).toBeTruthy();
+  expect(await screen.findByLabelText("16 KB")).toBeTruthy();
+  expect(screen.queryByText("plans.pdf", { selector: "span:not(h1 span)" })).toBeNull();
   cleanup();
   show(<FileScreen />, { threadId: "t1", path: "gone.ts" });
   expect(await screen.findByText("File not found. It may have moved or been deleted.")).toBeTruthy();

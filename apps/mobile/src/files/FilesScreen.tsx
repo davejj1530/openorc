@@ -12,7 +12,7 @@ import { ListPressable } from "../ui/ListPressable";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { FilesNotice, readAt } from "./FilesNotice";
-import { placeName, threadScope } from "./thread-files";
+import { parentPlace, placeName, threadScope } from "./thread-files";
 
 /** As many names as the desktop's search shows. */
 const NAME_LIMIT = 50;
@@ -46,14 +46,26 @@ function NameHits({ threadId, query }: { threadId: string; query: string }) {
   if (names.error && !names.data) return <FilesNotice text={names.error.message} />;
   if (!names.data) return <View className="items-center py-10">{<Spinner />}</View>;
   if (!names.data.length) return <FilesNotice text="No file names match." />;
-  return names.data.map((path) => (
-    <ListPressable key={path} accessibilityRole="button" accessibilityLabel={path} onPress={() => openFile(threadId, path)} className="h-touch flex-row items-center gap-3 px-5 active:bg-surface-2">
-      <FilePlain size={16} className="text-ink-4" />
-      <Text numberOfLines={1} ellipsizeMode="head" className="min-w-0 flex-1 font-mono text-xs text-ink-2">
-        {path}
-      </Text>
-    </ListPressable>
-  ));
+  return names.data.map((path) => {
+    const folder = parentPlace(path);
+    return (
+      <ListPressable
+        key={path}
+        accessibilityRole="button"
+        accessibilityLabel={folder ? `${placeName(path, "")}, in ${folder}` : path}
+        onPress={() => openFile(threadId, path)}
+        className="h-touch flex-row items-center gap-3 px-5 active:bg-surface-2"
+      >
+        <FilePlain size={16} className="text-ink-4" />
+        <Text numberOfLines={1} className="shrink-0 text-md text-ink" style={{ maxWidth: "60%" }}>
+          {placeName(path, "")}
+        </Text>
+        <Text numberOfLines={1} ellipsizeMode="head" className="min-w-0 flex-1 text-sm text-ink-4">
+          {folder}
+        </Text>
+      </ListPressable>
+    );
+  });
 }
 
 /** The field atop a thread's files, which finds them by name. */
@@ -89,11 +101,13 @@ export function FilesScreen() {
   const link = useLinkState();
   const live = link.kind === "connected";
   const folder = useRpc("files.list", { scope: threadScope(threadId), path: path as never }, { staleTime: 30_000 });
-  const copy = useRpc("threads.cloudCopy", { threadId }, { enabled: cloud, staleTime: 60_000 });
+  const copy = useRpc("threads.cloudCopy", { threadId }, { enabled: cloud && !path, staleTime: 60_000 });
   const [query, setQuery] = useState("");
   const searching = !path && query.trim().length > 0;
   const title = placeName(path, folder.data?.name ?? panelToolLabels.file);
-  const line = copy.data ? `Saved ${relativeTime(Date.parse(copy.data.asOf.at))}` : null;
+  // Below the root a folder says where it is, as a file says its folder; the root says how old a cloud copy is.
+  const saved = copy.data ? `Saved ${relativeTime(Date.parse(copy.data.asOf.at))}` : null;
+  const line = path ? parentPlace(path) || null : saved;
   const open = (entry: FileEntry) => (entry.kind === "directory" ? openFolder(threadId, entry.path) : openFile(threadId, entry.path));
   return (
     <View className="flex-1 bg-bg">

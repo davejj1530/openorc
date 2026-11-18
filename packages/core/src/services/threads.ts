@@ -439,14 +439,16 @@ export class ThreadService {
     if (patch.permissionMode !== undefined || patch.mode !== undefined) this.runs.assertThreadPermissions(id);
     const { archived, pinned, done, seen, ...rest } = patch;
     const now = Date.now();
-    const updated = threads.update(this.db, id, {
-      ...rest,
-      ...(archived ? { archivedAt: now } : {}),
-      // A pinned thread that is put away loses its pin; the pin meant "keep this in front of me".
-      ...(pinned === undefined ? {} : { pinnedAt: pinned ? now : null }),
-      // Legacy clients may still send done; conversations always remain continuable.
-      doneAt: null,
-      ...(seen === undefined ? {} : { seenAt: seen ? now : null }),
+    const updated = this.db.transaction(() => {
+      if (archived) threads.resolve(this.db, id, now);
+      return threads.update(this.db, id, {
+        ...rest,
+        // A pinned thread that is put away loses its pin; the pin meant "keep this in front of me".
+        ...(pinned === undefined ? {} : { pinnedAt: pinned ? now : null }),
+        // Legacy clients may still send done; conversations always remain continuable.
+        doneAt: null,
+        ...(seen === undefined ? {} : { seenAt: seen ? now : null }),
+      });
     });
     const t = archived === false ? this.reopened(id) : updated;
     if (archived !== undefined || done !== undefined || pinned !== undefined || patch.snoozedUntil !== undefined) {

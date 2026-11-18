@@ -5,6 +5,8 @@ import { git, GitError } from "./exec.js";
 
 const QUIET = { okCodes: [0, 1, 128] };
 const HELD = "refs/saved/";
+/** How long a start's fetch may go without a byte from the repository before it is called out of reach. */
+const STALLED_S = 20;
 
 /** The project's folder here doesn't hold the commit the thread started from, and its remote didn't give it. */
 export const START_NOT_HERE = "This project's folder doesn't hold the commit the thread started from. Pull it, then try again.";
@@ -82,7 +84,9 @@ async function startInStore(store: string, remote: string, base: string): Promis
         await git(store, ["init", "-q", "--bare"]);
       }
       if (await holds(store, base)) return;
-      const answer = await git(store, ["fetch", "-q", "--depth=1", "--no-tags", "--no-write-fetch-head", remote, base], { ...QUIET, timeoutMs: 120_000 }).catch((error: unknown) => {
+      // A repository that answers nothing for STALLED_S is out of reach; one that sends, however large, may take its time.
+      const stalled = ["-c", "http.lowSpeedLimit=1", "-c", `http.lowSpeedTime=${STALLED_S}`];
+      const answer = await git(store, [...stalled, "fetch", "-q", "--depth=1", "--no-tags", "--no-write-fetch-head", remote, base], { ...QUIET, timeoutMs: 10 * 60_000 }).catch((error: unknown) => {
         if (error instanceof GitError) return { code: error.code ?? -1, stderr: error.stderr };
         throw error;
       });

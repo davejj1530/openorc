@@ -50,9 +50,12 @@ it("keeps a frozen person's unsent words in an organization's thread for when ac
 });
 
 it("closes an organization's threads at the grace deadline with nothing heard from the server, keeping their drafts", { timeout: 30_000 }, async () => {
+  stand.setBilling(MEMBER, { ...paid(), standing: "grace", organizationAccess: grace(Date.now() + 86_400_000) });
+  const hosted = await member();
+  // The deadline is heard once the person is in, so a slow sign-in never passes it first.
   const until = Date.now() + 2_500;
   stand.setBilling(MEMBER, { ...paid(until), standing: "grace", organizationAccess: grace(until) });
-  const hosted = await member();
+  await hosted.spaces.refresh();
   await stand.down();
   await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(false), { timeout: 8000 });
   stand.setBilling(MEMBER, { ...paid(), organizationAccess: active });
@@ -60,4 +63,14 @@ it("closes an organization's threads at the grace deadline with nothing heard fr
   await hosted.spaces.refresh();
   await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(true), { timeout: 10000 });
   expect(await hosted.threads.call("threads.get", { id: thread })).toMatchObject({ draft: "Keep the filters as they are." });
+});
+
+it("closes an organization's threads when the grace answer is heard after its deadline, before its timer ran", { timeout: 20_000 }, async () => {
+  let ahead = 0;
+  const until = Date.now() + 60_000;
+  stand.setBilling(MEMBER, { ...paid(until), standing: "grace", organizationAccess: grace(until) });
+  const hosted = await member({ now: () => Date.now() + ahead });
+  ahead = 61_000;
+  await hosted.spaces.refresh();
+  await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(false), { timeout: 5000 });
 });

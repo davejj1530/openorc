@@ -40,6 +40,8 @@ export class Spaces implements HostedSpaces {
   #again: Promise<void> | null = null;
   #closed = false;
   #expiry: ReturnType<typeof setTimeout> | null = null;
+  /** The grace deadline whose passing the account and the threads were told of, so it is told once. */
+  #graceTold: string | null = null;
   readonly #origin: string;
   /** The session whose server answered that it has no mentions. */
   #noMentions: number | null = null;
@@ -280,18 +282,24 @@ export class Spaces implements HostedSpaces {
     if (this.#expiry) clearTimeout(this.#expiry);
     this.#expiry = null;
     const access = this.#snapshot?.index.organizationAccess;
-    const deadlines = [...this.#invitations.map((invite) => invite.expiresAt), ...(access?.state === "grace" ? [Date.parse(access.until) - 1] : [])];
-    const future = deadlines.map((at) => at - this.deps.now()).filter((left) => left > 0);
-    if (future.length)
+    if (access?.state !== "grace") this.#graceTold = null;
+    const now = this.deps.now();
+    // A deadline already passed and not yet told is due at once: a read heard after it cleared the timer that would have told.
+    const grace = access?.state === "grace" && this.#graceTold !== access.until ? [Math.max(Date.parse(access.until) - 1 - now, 0)] : [];
+    const waits = [...this.#invitations.map((invite) => invite.expiresAt - now).filter((left) => left > 0), ...grace];
+    if (waits.length)
       this.#expiry = setTimeout(
         () => {
           // The day of grace ran out on this clock: the account and the threads close now, heard from the server or not.
-          if (access?.state === "grace" && this.#snapshot?.index.organizationAccess === access && this.frozen()) this.deps.accessChanged?.();
+          if (access?.state === "grace" && this.#snapshot?.index.organizationAccess === access && this.frozen()) {
+            this.#graceTold = access.until;
+            this.deps.accessChanged?.();
+          }
           this.#tell();
           this.#setExpiry();
         },
         // The longest timer the clock keeps; a later deadline is set again when it fires.
-        Math.min(Math.min(...future) + 1, 2_147_483_647),
+        Math.min(Math.min(...waits) + 1, 2_147_483_647),
       );
   }
 

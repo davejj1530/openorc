@@ -3,7 +3,7 @@ import { Refused, type Requests } from "./session.js";
 import type { Threads } from "./threads.js";
 import { toRuns } from "./translate.js";
 import { ROUTES, type WireThread } from "./wire.js";
-import { SUBTHREAD_ROUTES, type NativeThread, type WireNativeChild } from "./wire-subthreads.js";
+import { isNativeHelper, SUBTHREAD_ROUTES, type NativeThread, type WireNativeChild } from "./wire-subthreads.js";
 
 export const NATIVE_UNAVAILABLE = HOSTED_REASONS.nativeSubthreads;
 export const NATIVE_STOP_UNAVAILABLE = "This subagent can't be stopped separately.";
@@ -29,7 +29,7 @@ export async function readNativeThread(on: Requests, id: string): Promise<Native
 export async function readNativeRows(on: Requests, listed: WireThread[], previous: NativeThread[]): Promise<NativeThread[]> {
   const rows = new Map<string, NativeThread>(listed.map((row) => [row.id, row]));
   const before = new Map(previous.map((row) => [row.id, row]));
-  const families = new Set(listed.filter((row) => row.parentId).map((row) => rootOf(row, rows)));
+  const families = new Set(listed.filter(isNativeHelper).map((row) => rootOf(row, rows)));
   const keys = new Map([...families].map((id) => [id, nativeFamilyKey(id, rows)]));
   for (const id of families) {
     const key = keys.get(id)!;
@@ -41,7 +41,7 @@ export async function readNativeRows(on: Requests, listed: WireThread[], previou
       const family = [...rows].filter(([, row]) => rootOf(row, rows) === id);
       for (const [key, row] of family) {
         if (error instanceof Refused && (error.status === 403 || error.status === 404)) rows.delete(key);
-        else if (row.parentId) rows.set(key, { ...row, nativeChild: before.get(key)?.nativeChild, nativeReadFailed: true });
+        else if (isNativeHelper(row)) rows.set(key, { ...row, nativeChild: before.get(key)?.nativeChild, nativeReadFailed: true });
       }
     }
   }
@@ -60,9 +60,10 @@ function reuseFamily(key: string, rows: Map<string, NativeThread>, previous: Nat
   return true;
 }
 
+/** The thread a helper's family is read under: up through helpers, to the first thread that is no agent's helper. */
 function rootOf(row: WireThread, rows: ReadonlyMap<string, WireThread>): string {
   const seen = new Set<string>();
-  while (row.parentId && !seen.has(row.id)) {
+  while (isNativeHelper(row) && row.parentId && !seen.has(row.id)) {
     seen.add(row.id);
     const parent = rows.get(row.parentId);
     if (!parent) return row.parentId;
@@ -83,12 +84,12 @@ async function fillFamily(on: Requests, rows: Map<string, NativeThread>, childre
 
 export async function nativeRuns(threads: Threads, { threadId }: RpcParams<"runs.listForThread">): Promise<RpcResults["runs.listForThread"]> {
   const row = threads.row(threadId);
-  return toRuns(row.parentId ? await readNativeThread(threads.on(threadId), threadId) : row, threads.reach);
+  return toRuns(isNativeHelper(row) ? await readNativeThread(threads.on(threadId), threadId) : row, threads.reach);
 }
 
 /** Keep the same request after a lost response, fenced to the exact handle the reader selected. */
 export async function stopNative(threads: Threads, { threadId, expectedRunId }: RpcParams<"subagents.stop">): Promise<null> {
-  if (!expectedRunId || !threads.row(threadId).parentId) throw new Refused(NATIVE_STOP_UNAVAILABLE);
+  if (!expectedRunId || !isNativeHelper(threads.row(threadId))) throw new Refused(NATIVE_STOP_UNAVAILABLE);
   const on = threads.on(threadId);
   const child = (await readNativeThread(on, threadId)).nativeChild!;
   if (child.status === "running" && (!child.stoppable || child.hostRunId !== expectedRunId)) throw new Refused(NATIVE_STOP_UNAVAILABLE);

@@ -42,6 +42,18 @@ it("starts a subthread on OpenOrc Cloud under its cloud parent, which it then re
   expect(listed?.parentThreadId).toBe(parent);
 });
 
+it("reads a person's subthread as a thread of its own: started under its parent, its history its own, no helper list asked", async () => {
+  const started = await hosted.threads.call("threads.start", under(parent));
+  const id = started.thread.id;
+  await vi.waitFor(() => expect(hosted.threads.holds({ thread: id })).toBe(true));
+  await hosted.threads.refresh();
+  expect(await hosted.threads.call("threads.get", { id })).toMatchObject({ parentThreadId: parent, parentRelation: "started" });
+  const asked = stand.requests.length;
+  const runs = await hosted.threads.call("runs.listForThread", { threadId: id });
+  expect(runs.map((run) => run.threadId)).toEqual([id]);
+  expect(stand.requests.slice(asked).some((request) => request.path.endsWith("/subthreads"))).toBe(false);
+});
+
 it("starts none under a thread of another project, and says the server's words under a subthread", async () => {
   const other = stand.addProject(ADA, { name: "site", fullName: "altalogy/site" });
   const elsewhere = stand.addThread(ADA, { projectId: other, title: "Another project's thread" });

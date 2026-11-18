@@ -726,6 +726,13 @@ export class StandInThreads {
     return this.#threads.get(threadId)?.stopped ?? [];
   }
 
+  /** The thread at the top of `thread`'s family. */
+  #rootOf(thread: Thread): Thread {
+    let top = thread;
+    while (top.parentId && this.#threads.get(top.parentId)) top = this.#threads.get(top.parentId)!;
+    return top;
+  }
+
   /** A thread as a reader's list shows it, with every field the real server answers. */
   #rowOf(thread: Thread, who: string) {
     const ask = openAsk(thread);
@@ -733,6 +740,9 @@ export class StandInThreads {
       id: thread.id,
       projectId: thread.projectId,
       parentId: thread.parentId ?? null,
+      // Started under another by a person, at the top of its family's folder, as the server answers (070bde0).
+      relation: thread.parentId ? "started" : null,
+      rootId: thread.parentId ? this.#rootOf(thread).id : null,
       title: this.#title(thread),
       baseBranch: "main",
       branch: thread.branch,

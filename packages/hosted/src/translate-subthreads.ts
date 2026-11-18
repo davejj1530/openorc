@@ -1,9 +1,11 @@
 import { hostedRunId, type ThreadSummary } from "@openorc/protocol";
-import type { NativeThread } from "./wire-subthreads.js";
+import { isNativeHelper, type NativeThread } from "./wire-subthreads.js";
 import type { WireEvent } from "./wire.js";
 
+/** A row's summary as a subthread: a person's own, started under its parent, or an agent's helper with its state. */
 export function withNativeSummary(summary: ThreadSummary, row: NativeThread): ThreadSummary {
   if (!row.parentId) return summary;
+  if (!isNativeHelper(row)) return { ...summary, parentRelation: "started" };
   const child = row.nativeChild;
   const current = !row.nativeReadFailed && summary.owner?.reach === "live";
   const status = nativeStatus(row, current);

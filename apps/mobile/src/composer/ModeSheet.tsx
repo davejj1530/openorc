@@ -1,9 +1,9 @@
 import { ExecutionMode, executionMode, executionModeAvailable, executionModePresentation, executionModeSettings } from "@openorc/protocol";
 import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Check, Lightbulb, Pencil, ShieldCheck, Wand } from "../generated/icons";
 import { haptic } from "../ui/haptics";
+import { FitSheet } from "../ui/FitSheet";
 import { Text } from "../ui/Text";
 import { useSharedSettings } from "./settings-bridge";
 
@@ -12,12 +12,11 @@ const icons = { plan: Lightbulb, review: ShieldCheck, trusted: Pencil, autonomou
 /** How the agent works: plan, or how much it may do before asking. Only the modes the agent offers. */
 export function ModeSheet() {
   const { composerId } = useLocalSearchParams<{ composerId: string }>();
-  const insets = useSafeAreaInsets();
   const settings = useSharedSettings(composerId);
   const agent = settings?.choice?.agent;
   const current = settings ? executionMode(settings.mode, settings.permission) : null;
   return (
-    <View className="gap-1 bg-bg px-5 pt-6" style={{ paddingBottom: insets.bottom + 16 }} onAccessibilityEscape={() => router.back()}>
+    <FitSheet className="gap-1 px-5 pt-6" onAccessibilityEscape={() => router.back()}>
       <Text accessibilityRole="header" className="mb-2 text-xl">
         Mode
       </Text>
@@ -48,6 +47,6 @@ export function ModeSheet() {
             </Pressable>
           );
         })}
-    </View>
+    </FitSheet>
   );
 }

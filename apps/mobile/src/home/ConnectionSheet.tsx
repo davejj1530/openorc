@@ -1,9 +1,9 @@
 import { router } from "expo-router";
 import { View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLinkState } from "../client";
 import { MacSection } from "../settings/MacSection";
 import { CloudSection } from "../spaces/CloudSection";
+import { FitSheet } from "../ui/FitSheet";
 import { Text } from "../ui/Text";
 
 /**
@@ -11,10 +11,9 @@ import { Text } from "../ui/Text";
  * first section, to switch Macs, try again or pair another.
  */
 export function ConnectionSheet() {
-  const insets = useSafeAreaInsets();
   const state = useLinkState();
   return (
-    <View className="gap-6 bg-bg px-5 pt-6" style={{ paddingBottom: insets.bottom + 16 }} onAccessibilityEscape={() => router.back()}>
+    <FitSheet className="gap-6 px-5 pt-6" onAccessibilityEscape={() => router.back()}>
       <View>
         <Text accessibilityRole="header" className="mb-2 text-xl">
           Connection
@@ -22,6 +21,6 @@ export function ConnectionSheet() {
         <MacSection state={state} />
       </View>
       <CloudSection state={state} />
-    </View>
+    </FitSheet>
   );
 }

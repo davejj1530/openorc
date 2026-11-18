@@ -1,9 +1,9 @@
 import type { Space } from "@openorc/protocol";
 import { router } from "expo-router";
 import { Pressable, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpc } from "../client";
 import { Check } from "../generated/icons";
+import { FitSheet } from "../ui/FitSheet";
 import { haptic } from "../ui/haptics";
 import { Text } from "../ui/Text";
 import { chooseSpace } from "./space-choice";
@@ -16,7 +16,6 @@ import { titleName, useSpaces } from "./use-spaces";
  * this phone's own.
  */
 export function SpaceSheet() {
-  const insets = useSafeAreaInsets();
   const account = useSpaces();
   const spaces = account.state === "ready" ? account.spaces : [];
   const current = account.state === "ready" ? account.current.id : null;
@@ -27,7 +26,7 @@ export function SpaceSheet() {
     return space.memberCount === 1 ? "1 person" : `${space.memberCount} people`;
   };
   return (
-    <View className="gap-1 bg-bg px-5 pt-6" style={{ paddingBottom: insets.bottom + 16 }} onAccessibilityEscape={() => router.back()}>
+    <FitSheet className="gap-1 px-5 pt-6" onAccessibilityEscape={() => router.back()}>
       <Text accessibilityRole="header" className="mb-2 text-xl">
         Spaces
       </Text>
@@ -60,6 +59,6 @@ export function SpaceSheet() {
           {space.id === current ? <Check size={16} /> : null}
         </Pressable>
       ))}
-    </View>
+    </FitSheet>
   );
 }

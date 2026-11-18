@@ -3,6 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 vi.mock("expo-router", () => ({ router: { back: () => undefined } }));
+vi.mock("../ui/sheet-bottom", () => ({ useSheetBottom: () => 16 }));
 vi.mock("../client", async () => {
   const { ScratchStore } = await import("../scratch-store");
   return {

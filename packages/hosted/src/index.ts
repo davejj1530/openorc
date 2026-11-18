@@ -50,6 +50,7 @@ import { CloudMacProjects } from "./mac-projects.js";
 import { CloudMoves } from "./moves.js";
 import { CloudPullReviews } from "./pull-reviews.js";
 import { CloudModels } from "./models.js";
+import { CloudThreadFiles } from "./thread-files.js";
 export { githubRepoOf } from "./translate.js";
 export { signInVerifier } from "./browser-sign-in.js";
 import type { HostedNotice } from "./notices.js";
@@ -63,6 +64,7 @@ export { isTeamChatMethod, noOrclingRunner, runsOrcling, teamChatCalls, type Tea
 export type { CloudFileScope, CloudFileReference, FileDestination } from "./files.js";
 export type { FileByteSource } from "./file-transfer.js";
 export type { UploadPlan, UploadedFile } from "./wire-files.js";
+export type { WireFilesSource, WireThreadFileNames, WireThreadFileRead, WireThreadFolder } from "./wire-thread-files.js";
 export type { OwnSkill, OwnSkills } from "./skills.js";
 export type { ArrivalLine, ArrivalSettings } from "./moves.js";
 export type { WireCloudModels } from "./wire-models.js";
@@ -320,6 +322,8 @@ export interface Hosted {
   readonly pullReviews: CloudPullReviews;
   /** The models OpenOrc Cloud runs for the person, as its machines' own agent CLIs list them. */
   readonly models: CloudModels;
+  /** A cloud thread's files read from OpenOrc Cloud itself, for a phone whose Mac is out of reach. */
+  readonly threadFiles: CloudThreadFiles;
   /** Reads the stored session and the kept answers, and connects when signed in. Never rejects: no session is signed out. */
   start(): Promise<void>;
   /** The device woke or the network came back: connect now instead of at the next retry. */
@@ -335,8 +339,9 @@ function parityServices(
   session: Session,
   { now, push }: Pick<HostedDeps, "now" | "push">,
   threads: Pick<Threads, "cloudProjectFor">,
-): Pick<Hosted, "environment" | "connectors" | "machines" | "check" | "macProjects" | "moves" | "pullReviews" | "models"> {
+): Pick<Hosted, "environment" | "connectors" | "machines" | "check" | "macProjects" | "moves" | "pullReviews" | "models" | "threadFiles"> {
   return {
+    threadFiles: new CloudThreadFiles({ session }),
     models: new CloudModels({ session, push }),
     pullReviews: new CloudPullReviews({ session, project: (id) => threads.cloudProjectFor(id), push }),
     environment: new ProjectEnvironment({ session, now }),

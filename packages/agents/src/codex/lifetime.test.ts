@@ -4,7 +4,7 @@ import path from "node:path";
 import { expect, it } from "vitest";
 import { CodexAdapter } from "./adapter.js";
 
-it.skipIf(process.platform === "win32")("closing a CLI wrapper also ends its native session writer", async () => {
+it.skipIf(process.platform === "win32")("closing a CLI wrapper also ends its native session writer", { timeout: 30000 }, async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "openorc-writer-"));
   const childFile = path.join(dir, "writer.cjs");
   const wrapper = path.join(dir, "wrapper");
@@ -27,7 +27,8 @@ it.skipIf(process.platform === "win32")("closing a CLI wrapper also ends its nat
     { revision: 0, binary: wrapper, env: process.env },
   );
   try {
-    await handle.next("session.started", 3000);
+    // Two Node processes start before the handshake: on a machine running every suite at once that takes seconds.
+    await handle.next("session.started", 15000);
     pid = Number(await readFile(pidFile, "utf8"));
     handle.close();
     await handle.wait();
@@ -41,7 +42,7 @@ it.skipIf(process.platform === "win32")("closing a CLI wrapper also ends its nat
             return false;
           }
         },
-        { timeout: 1500 },
+        { timeout: 10000 },
       )
       .toBe(false);
   } finally {

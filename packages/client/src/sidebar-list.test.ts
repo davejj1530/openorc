@@ -69,7 +69,7 @@ function day(threads: ThreadSummary[]) {
   };
 }
 
-/** The morning of the scripted day: openorc with a working thread among quiet ones, immaculate quiet. */
+/** The morning of the scripted day: openorc with a working thread among quiet ones, canvas quiet. */
 function morning() {
   return day([
     thread("o-retry", "openorc", 120, running),
@@ -78,10 +78,10 @@ function morning() {
     thread("o-dock", "openorc", 60),
     thread("o-old-1", "openorc", 900),
     thread("o-old-2", "openorc", 1000),
-    thread("i-chart", "immaculate", 50, running),
-    thread("i-first", "immaculate", 400),
-    thread("i-tokens", "immaculate", 1400),
-    thread("i-old", "immaculate", 2000),
+    thread("i-chart", "canvas", 50, running),
+    thread("i-first", "canvas", 400),
+    thread("i-tokens", "canvas", 1400),
+    thread("i-old", "canvas", 2000),
   ]);
 }
 
@@ -90,7 +90,7 @@ describe("the Workspaces list by last activity, through the scripted day", () =>
     const list = morning();
     expect(list.ids("openorc")).toEqual(["o-dock", "o-retry", "o-audit", "o-electron"]);
     expect(list.shown("openorc").hidden).toBe(2);
-    expect(list.ids("immaculate")).toEqual(["i-chart", "i-first", "i-tokens", "i-old"]);
+    expect(list.ids("canvas")).toEqual(["i-chart", "i-first", "i-tokens", "i-old"]);
   });
 
   it("a quiet thread gets activity: it rises to its project's top, and the quiet one it pushes past four goes behind Show N more", () => {
@@ -119,10 +119,10 @@ describe("the Workspaces list by last activity, through the scripted day", () =>
   it("a thread starts: it joins its project on top, and a quiet one past four leaves for it", () => {
     const list = morning();
     list.at(15);
-    list.start(thread("i-layers", "immaculate", -15, running));
+    list.start(thread("i-layers", "canvas", -15, running));
     list.settle();
-    expect(list.ids("immaculate")).toEqual(["i-layers", "i-chart", "i-first", "i-tokens"]);
-    expect(list.shown("immaculate").hidden).toBe(1);
+    expect(list.ids("canvas")).toEqual(["i-layers", "i-chart", "i-first", "i-tokens"]);
+    expect(list.shown("canvas").hidden).toBe(1);
   });
 
   it("a failure turns its row where it is, and its retry, being activity, takes it to the top", () => {
@@ -204,9 +204,9 @@ describe("the Workspaces list by last activity, through the scripted day", () =>
     const list = morning();
     list.change("i-first", waiting);
     list.settle();
-    const roots = list.roots("immaculate");
-    expect(projectRows(roots, { rows: list.layout().rows.get("immaculate")!, open: false, holdsActive: () => false })).toEqual({ rows: [], hidden: 0 });
-    expect(projectGroups([{ id: "immaculate", name: "immaculate" }], roots, roots)[0]!.waiting).toBe(1);
+    const roots = list.roots("canvas");
+    expect(projectRows(roots, { rows: list.layout().rows.get("canvas")!, open: false, holdsActive: () => false })).toEqual({ rows: [], hidden: 0 });
+    expect(projectGroups([{ id: "canvas", name: "canvas" }], roots, roots)[0]!.waiting).toBe(1);
   });
 
   it("a pin: Pinned keeps the order things were pinned in, whatever works", () => {
@@ -216,11 +216,11 @@ describe("the Workspaces list by last activity, through the scripted day", () =>
   it("two projects need the person: neither row moves for it, and the edge counts what is past it", () => {
     const list = morning();
     const openorc = list.ids("openorc");
-    const immaculate = list.ids("immaculate");
+    const canvas = list.ids("canvas");
     list.change("o-retry", waiting);
     list.change("i-chart", { activity: "idle", ...failed });
     list.settle();
-    expect([list.ids("openorc"), list.ids("immaculate")]).toEqual([openorc, immaculate]);
+    expect([list.ids("openorc"), list.ids("canvas")]).toEqual([openorc, canvas]);
     const edges = pastEdges(
       [
         { id: "o-retry", top: 600, bottom: 644 },
@@ -263,10 +263,10 @@ describe("the Workspaces list by last activity, through the scripted day", () =>
   it("projects keep the order the day found them in when work in one would list it first, and one added since leads", () => {
     const groups = (ids: string[]) => ids.map((id) => ({ project: { id }, roots: [] as ThreadSummary[] }));
     const quiet = () => true;
-    let layout = listLayout(null, { groups: groups(["openorc", "immaculate", "website"]), quiet, now: NINE, held: false, own: [] });
-    layout = listLayout(layout, { groups: groups(["website", "openorc", "immaculate"]), quiet, now: NINE + MIN, held: false, own: [] });
-    expect(inListOrder(groups(["website", "openorc", "immaculate"]), layout).map((g) => g.project.id)).toEqual(["openorc", "immaculate", "website"]);
-    layout = listLayout(layout, { groups: groups(["website", "atlas", "openorc", "immaculate"]), quiet, now: NINE + 2 * MIN, held: false, own: [] });
-    expect(inListOrder(groups(["website", "atlas", "openorc", "immaculate"]), layout).map((g) => g.project.id)).toEqual(["atlas", "openorc", "immaculate", "website"]);
+    let layout = listLayout(null, { groups: groups(["openorc", "canvas", "website"]), quiet, now: NINE, held: false, own: [] });
+    layout = listLayout(layout, { groups: groups(["website", "openorc", "canvas"]), quiet, now: NINE + MIN, held: false, own: [] });
+    expect(inListOrder(groups(["website", "openorc", "canvas"]), layout).map((g) => g.project.id)).toEqual(["openorc", "canvas", "website"]);
+    layout = listLayout(layout, { groups: groups(["website", "atlas", "openorc", "canvas"]), quiet, now: NINE + 2 * MIN, held: false, own: [] });
+    expect(inListOrder(groups(["website", "atlas", "openorc", "canvas"]), layout).map((g) => g.project.id)).toEqual(["atlas", "openorc", "canvas", "website"]);
   });
 });

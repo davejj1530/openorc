@@ -478,7 +478,7 @@ void test("task tools name a space, a project and a revision only for a run the 
     task_update: ["id", "spec", "status"],
   };
   assert.deepEqual(await argumentsOf("mac-run"), mac);
-  host.onlineTaskScopes = async (runId) => (runId === "online-run" ? [{ spaceId: "space-1", projectId: "project-1", name: "Altalogy · openorc" }] : []);
+  host.onlineTaskScopes = async (runId) => (runId === "online-run" ? [{ spaceId: "space-1", projectId: "project-1", name: "Acme · openorc" }] : []);
   assert.deepEqual(await argumentsOf("online-run"), {
     task_context: ["scope", "taskId"],
     task_create: ["execution", "labels", "priority", "scope", "spec", "title", "workspace_mode"],
@@ -490,7 +490,7 @@ void test("task tools name a space, a project and a revision only for a run the 
   assert.deepEqual(await argumentsOf("other-run"), mac);
   // The run's own cloud project is offered by value and by name, so the agent knows what it may name.
   const scope = JSON.stringify((await (await connect("online-run")).listTools()).tools.find((tool) => tool.name === "task_list")?.inputSchema.properties?.scope);
-  assert.ok(scope.includes("space-1") && scope.includes("project-1") && scope.includes("Altalogy · openorc"), scope);
+  assert.ok(scope.includes("space-1") && scope.includes("project-1") && scope.includes("Acme · openorc"), scope);
 });
 
 test("ask_user advertises a validated schema and returns correlated structured results", async (t) => {

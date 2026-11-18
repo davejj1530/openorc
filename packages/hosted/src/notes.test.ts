@@ -16,7 +16,7 @@ const hosts: Hosted[] = [];
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   device = newDevice();
-  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Altalogy/openorc.git" }];
+  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Acme/openorc.git" }];
 });
 
 afterEach(async () => {
@@ -37,9 +37,9 @@ async function hostAs(email: string) {
 
 /** Ada's team thread with notes open; Cy was on the team and has left it. */
 async function shared() {
-  const team = stand.addTeam("Altalogy", [ADA, BOB, CY]);
+  const team = stand.addTeam("Acme", [ADA, BOB, CY]);
   stand.spaces.removeMember(team, CY);
-  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" }, team);
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" }, team);
   stand.setBilling(ADA, pro);
   stand.setSignIns(ADA, [{ agent: "claude" }]);
   stand.threadCollaboration.sharedWrites = true;

@@ -115,10 +115,10 @@ describe("the OpenOrc account in the core", () => {
 
   it("chooses where cloud threads run and answers the whole status", async () => {
     await stand.close();
-    stand = await standIn({ signup: "open", services: ["vercel", "agent37"] });
+    stand = await standIn({ signup: "open", services: ["host-a", "host-b"] });
     await open();
-    expect(await signIn()).toMatchObject({ name: "Ada", sandbox: { chosen: null, fallback: "vercel" } });
-    expect(await call("account.setSandbox", { service: "agent37" })).toMatchObject({ state: "signed-in", sandbox: { chosen: "agent37" } });
+    expect(await signIn()).toMatchObject({ name: "Ada", sandbox: { chosen: null, fallback: "host-a" } });
+    expect(await call("account.setSandbox", { service: "host-b" })).toMatchObject({ state: "signed-in", sandbox: { chosen: "host-b" } });
     await expect(call("account.setSandbox", { service: "local" })).rejects.toThrow("This server doesn't run threads on this machine.");
   });
 

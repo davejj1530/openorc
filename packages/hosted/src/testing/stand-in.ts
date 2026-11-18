@@ -10,7 +10,7 @@
  *   the socket takes the token in its handshake's `auth` and refuses any other with `UNAUTHORIZED`
  *   `revoke()` ends every session, so the next request answers 401, while a socket already open stays open
  *   a request naming a protocol older than the oldest it answers is 426 with words to update OpenOrc
- *   a refused code is said in OpenOrc's words, as the real server's library-refusals.ts says it
+ *   a refused code is said in OpenOrc's words, as the server does
  */
 import { createHmac, randomBytes, randomInt, randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -182,7 +182,7 @@ const CODE_MS = 5 * 60_000;
 const CODE_TRIES = 3;
 const SOCKET_PATH = "/socket.io/";
 /** What the real server calls each sandbox service it can run threads on. */
-const SERVICE_NAMES: Record<string, string> = { local: "this machine", vercel: "Vercel", agent37: "Agent37" };
+const SERVICE_NAMES: Record<string, string> = { local: "this machine", "host-a": "Host A", "host-b": "Host B" };
 
 /** An in-process socket: its state, the server's messages to it, and whether it waits for the server to come back. */
 interface Peer extends StandInPeer {
@@ -586,7 +586,7 @@ function tellOf(peers: Set<Peer>, sockets: Set<StandInPeer>): (who: string, topi
   };
 }
 
-/** What a test does to people's billing, as Polar and the person's payments would. */
+/** What a test does to people's billing, as the payment provider and the person's payments would. */
 function paymentsFace(billing: Map<string, StandInBilling>, payments: StandInPayments): Pick<StandIn, "setBilling" | "checkouts" | "pay" | "setOffers"> {
   return {
     setBilling: (email, state) => void billing.set(email.toLowerCase(), state),

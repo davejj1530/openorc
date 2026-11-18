@@ -1,7 +1,7 @@
 /**
- * Paying, through pages of Polar's that the server makes for the person and this device opens in the browser. The
+ * Paying, through pages of the payment provider's that the server makes for the person and this device opens in the browser. The
  * address goes to the browser and nowhere else. No page comes back to the app: the server sends the `billing` topic
- * when Polar tells it, and while a page is open its part of the account is also read every READ_MS, since one missed
+ * when the payment provider tells it, and while a page is open its part of the account is also read every READ_MS, since one missed
  * topic would otherwise leave the purchase unseen until the next.
  *
  * State, written only here:

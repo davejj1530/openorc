@@ -11,7 +11,7 @@ vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: 
 const now = Date.now();
 const machine = (id: string, more: Partial<CloudMachine> = {}): CloudMachine => ({
   id,
-  serviceName: "Vercel",
+  serviceName: "host-a",
   since: now - 14 * 60_000,
   seconds: 840,
   threads: [{ id: `t-${id}`, title: "Fix the login redirect", holds: ["resting"] }],
@@ -61,7 +61,7 @@ it("names each machine by its thread or its service, says what it used this time
     machines: [
       machine("m1"),
       machine("m2", {
-        serviceName: "Agent37",
+        serviceName: "host-b",
         seconds: 3960,
         threads: [
           { id: "a", title: "Port the parser", holds: ["turn"] },
@@ -73,9 +73,9 @@ it("names each machine by its thread or its service, says what it used this time
   };
   show();
   expect(await screen.findByText("Fix the login redirect")).toBeTruthy();
-  expect(screen.getByText("Awake for 14 min · On Vercel")).toBeTruthy();
+  expect(screen.getByText("Awake for 14 min")).toBeTruthy();
   expect(screen.getByText("0.2 h used")).toBeTruthy();
-  expect(screen.getByText("Your machine on Agent37")).toBeTruthy();
+  expect(screen.getByText("Your machine")).toBeTruthy();
   expect(screen.getByText("Awake for 14 min · 2 threads · Port the parser, Tidy the docs")).toBeTruthy();
   expect(screen.getByText("1.1 h used")).toBeTruthy();
   const [first, held] = screen.getAllByRole("button", { name: "Stop" }) as HTMLButtonElement[];

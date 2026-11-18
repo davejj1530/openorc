@@ -14,7 +14,7 @@ const hosts: Hosted[] = [];
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   device = newDevice();
-  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Altalogy/openorc.git" }];
+  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Acme/openorc.git" }];
 });
 
 afterEach(async () => {
@@ -37,8 +37,8 @@ const pro = { pro: true, standing: "live", at: new Date(Date.now() + 86_400_000)
 
 /** A team thread Ada started, with Bob in her team, both able to start turns. */
 function teamThread(title = "Export the log") {
-  const team = stand.addTeam("Altalogy", [ADA, BOB]);
-  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" }, team);
+  const team = stand.addTeam("Acme", [ADA, BOB]);
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" }, team);
   for (const email of [ADA, BOB]) {
     stand.setBilling(email, pro);
     stand.setSignIns(email, [{ agent: "claude" }]);
@@ -50,8 +50,8 @@ const summary = async (hosted: Hosted, id: string) => (await hosted.threads.call
 
 describe("working together: what the server says", () => {
   it("carries the reader, the creator and the live sender apart, with the server's closed capability", async () => {
-    const team = stand.addTeam("Altalogy", [ADA, BOB]);
-    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" }, team);
+    const team = stand.addTeam("Acme", [ADA, BOB]);
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" }, team);
     const thread = stand.addThread(ADA, { projectId: project, title: "Export the log", status: "working" });
     const { hosted: bob } = await hostAs(BOB);
     const { hosted: ada } = await hostAs(ADA);
@@ -153,8 +153,8 @@ describe("working together: what the server says", () => {
   });
 
   it("lists who can be tagged, telling apart people of one name by address only", async () => {
-    const team = stand.addTeam("Altalogy", [ADA, BOB, "ada@elsewhere.example.com"]);
-    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" }, team);
+    const team = stand.addTeam("Acme", [ADA, BOB, "ada@elsewhere.example.com"]);
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" }, team);
     const thread = stand.addThread(ADA, { projectId: project, title: "Names" });
     const { hosted: bob } = await hostAs(BOB);
     await vi.waitFor(() => expect(bob.threads.holds({ thread })).toBe(true));

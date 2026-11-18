@@ -19,7 +19,7 @@ const hosts: Hosted[] = [];
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   device = newDevice();
-  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Altalogy/openorc.git" }];
+  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Acme/openorc.git" }];
   stand.setBilling(ADA, PRO);
   stand.setSignIns(ADA, [{ agent: "claude" }]);
   stand.threadFiles.capabilities = FILES_ON;
@@ -31,7 +31,7 @@ afterEach(async () => {
 });
 
 async function withThread(seed: { status?: "idle" | "working" } = {}) {
-  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
   const thread = stand.addThread(ADA, { projectId: project, title: "Read the attached notes", ...seed });
   const { deps, browser } = hostDeps(stand, device);
   const hosted = createHosted(deps);
@@ -46,7 +46,7 @@ async function withThread(seed: { status?: "idle" | "working" } = {}) {
 it("starts in a project the window lists before this Mac's thread list has heard it, as just after sign-in", async () => {
   const { hosted } = await withThread();
   // On the server since the thread list was read: the window may list it already, from the spaces' own read.
-  const added = stand.addProject(ADA, { name: "site", fullName: "altalogy/site" });
+  const added = stand.addProject(ADA, { name: "site", fullName: "acme/site" });
   const made = await hosted.threads.call("threads.start", { projectId: `${CLOUD_PROJECT}${added}`, spaceId: SPACE, prompt: "Start the site", ...SETTINGS });
   expect(made.thread.title).toBe("Start the site");
 });

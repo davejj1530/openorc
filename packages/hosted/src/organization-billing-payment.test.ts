@@ -208,10 +208,10 @@ describe("organization payment", () => {
   it("ends a coded provider refusal and permits a new purchase only on the next press", async () => {
     vi.useFakeTimers();
     const f = fixture();
-    f.link.mockRejectedValueOnce(new Refused("Polar answered 500. Try again in a moment.", 502, "organization_payment_refused"));
+    f.link.mockRejectedValueOnce(new Refused("The payment provider answered 500. Try again in a moment.", 502, "organization_payment_refused"));
     await f.payment.open(checkout);
     const failed = f.record();
-    expect(f.payment.work).toMatchObject({ state: "failed", watching: false, error: "Polar answered 500. Try again in a moment." });
+    expect(f.payment.work).toMatchObject({ state: "failed", watching: false, error: "The payment provider answered 500. Try again in a moment." });
     await vi.advanceTimersByTimeAsync(6 * 60_000);
     expect(f.link).toHaveBeenCalledTimes(1);
     expect(f.reread).not.toHaveBeenCalled();
@@ -223,7 +223,7 @@ describe("organization payment", () => {
   });
 
   it.each([
-    new Refused("Polar answered 500. Try again in a moment.", 502),
+    new Refused("The payment provider answered 500. Try again in a moment.", 502),
     new Refused("The payment page could not be opened.", 502, "unknown_code"),
     new Refused("The payment page could not be opened.", 503, "organization_payment_refused"),
   ])("keeps an unclassified gateway failure unresolved without inferring a deadline", async (error) => {

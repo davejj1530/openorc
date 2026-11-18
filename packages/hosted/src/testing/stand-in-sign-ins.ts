@@ -1,5 +1,5 @@
 /**
- * The stand-in's agent sign-in writes, as the real server's agent-sign-ins controller answers them:
+ * The stand-in's agent sign-in writes, answered as the server does:
  *   a Claude token or key, a Codex key and an OpenCode provider's key are kept in place of the agent's (and provider's)
  *   one, with a new `checkedAt`; a secret the vendor refuses (here: one that starts with "bad") is 400 in the vendor's words
  *   a Codex device code is started, then each finish answers pending until the person approves it (`approveDevice`),

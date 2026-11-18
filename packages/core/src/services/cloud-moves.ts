@@ -1,7 +1,6 @@
 /**
  * A thread moving between this Mac and OpenOrc Cloud, keeping its id, so everything that names it (its tabs, pins,
- * unread mark, the phone's open screen) follows it to its new place. The move-thread design in
- * .local-development/multiplayer/run-nov14/move-thread/design.md; the server's half is its `hosted/arrivals.ts`.
+ * unread mark, the phone's open screen) follows it to its new place. The server keeps the other half of a move.
  *
  *   to the cloud   the thread takes no turn (runs.ts). Its agent's conversation (the session slot), its folder's work
  *                  (a Mac start's pack) and its transcript are read here first; then the arrival is made on the server

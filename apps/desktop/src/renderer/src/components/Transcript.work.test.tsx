@@ -491,17 +491,17 @@ it("shows a manual compaction between turns as finished work, not a turn under w
 });
 
 it("ends a turn a teammate stopped before its agent said anything as stopped, after the line that says who stopped it", () => {
-  // Walk 8's cloud thread: Mara stopped Theo's turn three seconds in, before its agent said a word.
+  // A cloud thread where Mara stopped Theo's turn three seconds in, before its agent said a word.
   runs.reset();
-  const runId = "hosted:16a121e7-cd86-437b-9ed5-88ecbb061ce5";
+  const runId = "hosted:00000000-0000-4000-8000-000000000081";
   runs.applyFrame({
     runId,
     seq: 1,
     events: [
       { type: "message.completed", runId, ts: 1794771807800, messageId: "user-theo", role: "user", text: "Work on the export" },
-      { type: "turn.started", runId, ts: 1794771807846, turnId: "f35c2bca-d48e-47a2-a9e5-b7ca87315a5b" },
-      { type: "message.completed", runId, ts: 1794771811121, messageId: "1bd34783-79af-4d45-96ac-cae806af41b8", role: "system", text: "Mara stopped Theo's turn." },
-      { type: "turn.completed", runId, ts: 1794771811148, turnId: "05c66b74-e7f1-4012-923a-ad70eb608d47", status: "cancelled", durationMs: 3302 },
+      { type: "turn.started", runId, ts: 1794771807846, turnId: "turn-stopped-start" },
+      { type: "message.completed", runId, ts: 1794771811121, messageId: "line-stopped", role: "system", text: "Mara stopped Theo's turn." },
+      { type: "turn.completed", runId, ts: 1794771811148, turnId: "turn-stopped-end", status: "cancelled", durationMs: 3302 },
     ],
   });
   render(<Transcript run={runs.get(runId)!} working={false} />);
@@ -513,9 +513,9 @@ it("ends a turn a teammate stopped before its agent said anything as stopped, af
 });
 
 it("names who sent the turn a teammate's answer to a parked ask starts, which no prompt of theirs names", () => {
-  // Walk 9: Mara's turn parked on its question; Theo answered with Answer and continue, which ran as his own turn.
+  // Mara's turn parked on its question; Theo answered with Answer and continue, which ran as his own turn.
   runs.reset();
-  const runId = "hosted:d5117dac-5c2f-4d1a-948a-5fad6b7a1176";
+  const runId = "hosted:00000000-0000-4000-8000-000000000091";
   const question = { questions: [{ question: "Which color should the banner be?", options: [{ label: "Teal" }, { label: "Amber" }] }] };
   runs.applyFrame({
     runId,

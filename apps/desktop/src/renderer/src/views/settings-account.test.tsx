@@ -32,10 +32,10 @@ const pro: Extract<AccountStatus, { state: "signed-in" }> = {
   hours: { leftSeconds: 41 * 3600, monthly: { grantedSeconds: 100 * 3600, leftSeconds: 41 * 3600, resetsAt: Date.parse("2026-12-03T12:00:00Z") }, packsLeftSeconds: 0 },
   sandbox: {
     chosen: null,
-    fallback: "vercel",
+    fallback: "host-a",
     services: [
-      { id: "vercel", name: "Vercel" },
-      { id: "agent37", name: "Agent37" },
+      { id: "host-a", name: "Host A" },
+      { id: "host-b", name: "Host B" },
     ],
   },
   signIns: [{ agent: "claude", provider: "anthropic", label: "Claude Max", ended: false }],
@@ -56,13 +56,11 @@ function fakeCore(start: AccountStatus, offers: BillingOffers | null = null) {
     void queryClient.invalidateQueries();
   };
   vi.mocked(core.call).mockImplementation(async (method: string, params: unknown) => {
-    const p = params as { service?: string };
     if (method === "projects.list") return [];
     if (method === "account.offers") return offers;
     if (method === "account.signIn") status = { ...signedOut, signingIn: { state: "waiting", page: PAGE } };
     if (method === "account.signIn.cancel") status = signedOut;
     if (method === "account.signOut") status = signedOut;
-    if (method === "account.setSandbox" && status.state === "signed-in") status = { ...status, sandbox: { ...status.sandbox!, chosen: p.service! } };
     if (method === "account.billing.open" && status.state === "signed-in") status = { ...status, paying: { ...(params as BillingPage), since: 0 } };
     if (method === "account.billing.leave" && status.state === "signed-in") status = { ...status, paying: null };
     return status;
@@ -133,28 +131,12 @@ it("says a session the server ended ended", async () => {
   expect(await screen.findByText("Your session ended")).toBeTruthy();
 });
 
-it("lets a Pro person choose where their threads run, by the server's names", async () => {
+it("names no place threads run in, even where the server runs them in more than one", async () => {
   fakeCore(pro);
   show(<OpenOrcCloudSection active />);
-  const choice = await screen.findByRole<HTMLSelectElement>("combobox", { name: "Threads run on" });
-  expect(choice.value).toBe("vercel");
-  expect([...choice.options].map((option) => option.text)).toEqual(["Vercel", "Agent37"]);
-  fireEvent.change(choice, { target: { value: "agent37" } });
-  await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.setSandbox", { service: "agent37" }));
-  await waitFor(() => expect(choice.value).toBe("agent37"));
-});
-
-it("offers no choice to a Free person or where the server runs threads in one place", async () => {
-  fakeCore({ ...pro, plan: { pro: false }, hours: null });
-  show(<OpenOrcCloudSection active />);
   await waitFor(() => expect(core.call).toHaveBeenCalled());
   expect(screen.queryByRole("combobox")).toBeNull();
-  cleanup();
-  queryClient.clear();
-  fakeCore({ ...pro, sandbox: { chosen: null, fallback: "vercel", services: [{ id: "vercel", name: "Vercel" }] } });
-  show(<OpenOrcCloudSection active />);
-  await waitFor(() => expect(core.call).toHaveBeenCalled());
-  expect(screen.queryByRole("combobox")).toBeNull();
+  expect(screen.queryByText("Host A")).toBeNull();
 });
 
 const free: AccountStatus = { ...pro, plan: { pro: false }, hours: null };

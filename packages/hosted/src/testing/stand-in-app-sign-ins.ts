@@ -1,5 +1,5 @@
 /**
- * The stand-in's sign-in through the browser, as the contract in the server's app-sign-in routes has it:
+ * The stand-in's sign-in through the browser, as the server does it:
  *   start takes a loopback port, the challenge of the app's verifier and a device name, and answers the web page for
  *   the request, which lasts ten minutes
  *   the page signs the person in with the code mailed to them and approves the request, answering the app's loopback

@@ -24,7 +24,7 @@ function thread(id: string, projectId: string, values: Partial<ThreadSummary> = 
 const projects = [
   { id: "openorc", name: "openorc" },
   { id: "site", name: "website" },
-  { id: "empty", name: "immaculate" },
+  { id: "empty", name: "canvas" },
 ];
 
 describe("sidebar project groups", () => {
@@ -101,7 +101,7 @@ describe("cloudProjects", () => {
 
 describe("the workspace filter", () => {
   it("an unticked workspace's threads leave the list and every other workspace's stay", () => {
-    const rows = [thread("a", "openorc"), thread("b", "immaculate"), thread("c", "openorc")];
+    const rows = [thread("a", "openorc"), thread("b", "canvas"), thread("c", "openorc")];
     expect(inShownWorkspaces(rows, ["openorc"]).map((t) => t.id)).toEqual(["b"]);
     expect(inShownWorkspaces(rows, []).map((t) => t.id)).toEqual(["a", "b", "c"]);
   });
@@ -116,7 +116,7 @@ describe("the workspace filter", () => {
   });
 
   it("forgets a hidden workspace that no longer exists", () => {
-    expect(liveHiddenWorkspaces(["openorc", "removed"], ["openorc", "immaculate"])).toEqual(["openorc"]);
+    expect(liveHiddenWorkspaces(["openorc", "removed"], ["openorc", "canvas"])).toEqual(["openorc"]);
   });
 
   it("the filter's name says the pinned filter and how many workspaces are hidden", () => {

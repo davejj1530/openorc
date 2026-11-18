@@ -29,8 +29,8 @@ describe("private seat words", () => {
 
   it("changes tomorrow to today at local midnight, retaining the exact short deadline", () => {
     const until = Date.parse("2026-11-15T06:05:00Z");
-    expect(graceDeadlineWords(until, Date.parse("2026-11-14T15:59:59Z"), "en-GB", "Asia/Manila")).toEqual({ long: "Pro ends tomorrow at 14:05", short: "Pro ends Sun 14:05" });
-    expect(graceDeadlineWords(until, Date.parse("2026-11-14T16:00:00Z"), "en-GB", "Asia/Manila").long).toBe("Pro ends today at 14:05");
+    expect(graceDeadlineWords(until, Date.parse("2026-11-14T15:59:59Z"), "en-GB", "Asia/Singapore")).toEqual({ long: "Pro ends tomorrow at 14:05", short: "Pro ends Sun 14:05" });
+    expect(graceDeadlineWords(until, Date.parse("2026-11-14T16:00:00Z"), "en-GB", "Asia/Singapore").long).toBe("Pro ends today at 14:05");
   });
 
   it("keeps the short words short on a twelve-hour clock, still naming the day and the time", () => {
@@ -40,16 +40,16 @@ describe("private seat words", () => {
 
   it("names the date for a deadline further off than tomorrow, where a weekday alone could mislead", () => {
     const until = Date.parse("2026-11-25T06:05:00Z");
-    expect(graceDeadlineWords(until, Date.parse("2026-11-14T06:05:00Z"), "en-GB", "Asia/Manila")).toEqual({ long: "Pro ends 25 Nov, 14:05", short: "Pro ends 25 Nov, 14:05" });
+    expect(graceDeadlineWords(until, Date.parse("2026-11-14T06:05:00Z"), "en-GB", "Asia/Singapore")).toEqual({ long: "Pro ends 25 Nov, 14:05", short: "Pro ends 25 Nov, 14:05" });
   });
 
   it("compares calendar days across a daylight-saving change and year boundary", () => {
     expect(graceDeadlineWords(Date.parse("2026-11-01T18:00:00Z"), Date.parse("2026-10-31T17:00:00Z"), "en-GB", "America/New_York").long).toBe("Pro ends tomorrow at 13:00");
-    expect(graceDeadlineWords(Date.parse("2027-01-01T06:05:00Z"), Date.parse("2026-12-31T06:05:00Z"), "en-GB", "Asia/Manila").long).toBe("Pro ends tomorrow at 14:05");
+    expect(graceDeadlineWords(Date.parse("2027-01-01T06:05:00Z"), Date.parse("2026-12-31T06:05:00Z"), "en-GB", "Asia/Singapore").long).toBe("Pro ends tomorrow at 14:05");
   });
 
   it("uses the existing local short-day convention for absolute deadlines", () => {
-    expect(seatDeadline(Date.parse("2026-11-15T06:05:00Z"), "en-GB", "Asia/Manila")).toBe("15 Nov, 14:05");
-    expect(seatDeadline(Date.parse("2026-11-15T06:05:00Z"), "en-US", "Asia/Manila")).toBe("Nov 15, 2:05 PM");
+    expect(seatDeadline(Date.parse("2026-11-15T06:05:00Z"), "en-GB", "Asia/Singapore")).toBe("15 Nov, 14:05");
+    expect(seatDeadline(Date.parse("2026-11-15T06:05:00Z"), "en-US", "Asia/Singapore")).toBe("Nov 15, 2:05 PM");
   });
 });

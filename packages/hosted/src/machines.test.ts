@@ -26,7 +26,7 @@ async function signedIn(email: string) {
 
 const machine = (id: string, stop: { can: true } | { can: false; reason: string } = { can: true }) => ({
   id,
-  serviceName: "Vercel",
+  serviceName: "host-a",
   since: "2026-11-16T10:00:00.000Z",
   seconds: 840,
   threads: [{ id: `thread-${id}`, title: "Fix the login redirect", holds: ["resting" as const] }],

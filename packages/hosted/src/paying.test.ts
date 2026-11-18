@@ -25,7 +25,7 @@ afterEach(async () => {
   await stand.close();
 });
 
-/** Signed in through the browser, whose other pages (Polar's) are only opened; `overrides` apply to the host made then. */
+/** Signed in through the browser, whose other pages (the payment provider's) are only opened; `overrides` apply to the host made then. */
 async function signedIn(overrides: Partial<HostedDeps> = {}): Promise<{ hosted: Hosted; seen: Seen; browser: TestBrowser }> {
   const browser = testBrowser(stand, (url) => void opened.push(url));
   const { deps, seen } = hostDeps(stand, device, { browser, ...overrides });

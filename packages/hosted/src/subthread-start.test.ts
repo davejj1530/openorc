@@ -20,7 +20,7 @@ beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   stand.setBilling(ADA, { pro: true, standing: "live", at: new Date(Date.now() + 20 * 86_400_000).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
   stand.setSignIns(ADA, [{ agent: "claude" }]);
-  project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+  project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
   parent = stand.addThread(ADA, { projectId: project, title: "Ship the launch page" });
   const { deps, browser } = hostDeps(stand, newDevice());
   hosted = createHosted(deps);
@@ -54,7 +54,7 @@ it("reads a person's subthread as a thread of its own: started under its parent,
 });
 
 it("starts none under a thread of another project, and says the server's words under a subthread", async () => {
-  const other = stand.addProject(ADA, { name: "site", fullName: "altalogy/site" });
+  const other = stand.addProject(ADA, { name: "site", fullName: "acme/site" });
   const elsewhere = stand.addThread(ADA, { projectId: other, title: "Another project's thread" });
   await vi.waitFor(() => expect(hosted.threads.holds({ thread: elsewhere })).toBe(true));
   await expect(hosted.threads.call("threads.start", under(elsewhere))).rejects.toThrow("The parent conversation isn't in this space.");

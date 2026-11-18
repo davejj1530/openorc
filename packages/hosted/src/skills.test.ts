@@ -17,7 +17,7 @@ const hosts: Hosted[] = [];
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   device = newDevice();
-  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Altalogy/openorc.git" }];
+  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Acme/openorc.git" }];
   stand.setBilling(ADA, PRO);
   stand.setSignIns(ADA, [{ agent: "claude" }, { agent: "codex" }]);
 });
@@ -56,7 +56,7 @@ const ship = skill("ship");
 
 /** A signed-in host with one thread of the account's, heard, whose device has `own` skills. */
 async function withThread(own: ((agent: string) => Promise<readonly OwnSkill[]>) | undefined, override: Parameters<typeof hostDeps>[2] = {}) {
-  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
   const thread = stand.addThread(ADA, { projectId: project, title: "Retry the cloud start" });
   const { deps, seen, browser } = hostDeps(stand, device, { ...(own && { skills: own }), ...override });
   const hosted = createHosted(deps);

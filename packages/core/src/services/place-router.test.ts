@@ -44,7 +44,7 @@ async function open(options: { accountServer?: string } = { accountServer: stand
 function macProject(opened: OpenOrc) {
   const project =
     projects.list(opened.db).find((each) => each.name === "openorc") ??
-    projects.insert(opened.db, { name: "openorc", rootPath: folder, gitRemote: "https://github.com/altalogy/openorc.git", defaultBranch: "main", settings: {} });
+    projects.insert(opened.db, { name: "openorc", rootPath: folder, gitRemote: "https://github.com/acme/openorc.git", defaultBranch: "main", settings: {} });
   if (!threads.list(opened.db, { projectId: project.id }).length)
     threads.insert(opened.db, { projectId: project.id, title: "On this Mac", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
   return project;
@@ -61,7 +61,7 @@ describe("OpenOrc Cloud threads in the window's calls", () => {
   it("lists them beside this Mac's, under the Mac project with their repository, and answers them by id", async () => {
     const opened = await open();
     const project = macProject(opened);
-    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "Altalogy/openorc" });
+    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "Acme/openorc" });
     const hosted = stand.addThread(EMAIL, { projectId: cloudProject, title: "Retry the cloud start", status: "working" });
     stand.append(hosted, [{ type: "turn.started" }]);
     await signIn();
@@ -79,7 +79,7 @@ describe("OpenOrc Cloud threads in the window's calls", () => {
   it("counts the quiet ones in Resolved beside this Mac's, so the count and the drawer agree", async () => {
     const opened = await open();
     const project = macProject(opened);
-    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "Altalogy/openorc" });
+    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "Acme/openorc" });
     stand.addThread(EMAIL, { projectId: cloudProject, title: "Gone quiet" });
     const quietBefore = Date.now() + 60_000;
     const before = await call("threads.resolvedCount", { projectIds: [project.id], quietBefore });
@@ -90,7 +90,7 @@ describe("OpenOrc Cloud threads in the window's calls", () => {
   it("keeps them through a restart while the server is down, and lets them go on sign-out", async () => {
     let opened = await open();
     const project = macProject(opened);
-    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "altalogy/openorc" });
+    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "acme/openorc" });
     const hosted = stand.addThread(EMAIL, { projectId: cloudProject, title: "Kept" });
     await signIn();
     await vi.waitFor(async () => expect((await list([project.id])).some((row) => row.id === hosted)).toBe(true), { timeout: 5_000 });
@@ -105,7 +105,7 @@ describe("OpenOrc Cloud threads in the window's calls", () => {
   it("opens a thread's newest turn and streams what follows over the server's socket", async () => {
     const opened = await open();
     const project = macProject(opened);
-    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "altalogy/openorc" });
+    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "acme/openorc" });
     const hosted = stand.addThread(EMAIL, { projectId: cloudProject, title: "Streams", status: "working" });
     const say = (text: string) => ({ type: "message.completed", ts: Date.now(), messageId: text, role: "assistant", text });
     stand.append(hosted, [say("first turn"), { type: "turn.completed", ts: Date.now(), turnId: "t1", status: "success", durationMs: 1 }, say("second turn")]);
@@ -122,7 +122,7 @@ describe("OpenOrc Cloud threads in the window's calls", () => {
   it("sends to a cloud thread through the composer's own call, and refuses in words what the server refuses", async () => {
     const opened = await open();
     const project = macProject(opened);
-    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "altalogy/openorc" });
+    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "acme/openorc" });
     const hosted = stand.addThread(EMAIL, { projectId: cloudProject, title: "Send to me" });
     stand.setBilling(EMAIL, { pro: true, standing: "live", at: new Date(Date.now() + 86_400_000).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
     stand.setSignIns(EMAIL, [{ agent: "claude" }]);
@@ -141,7 +141,7 @@ describe("OpenOrc Cloud threads in the window's calls", () => {
     const project = macProject(opened);
     const asked = { projectId: project.id, agent: "codex", mode: "act", permissionMode: "trusted", prompt: "Add a health check", hosted: true } as const;
     await expect(call("threads.start", asked)).rejects.toThrow("Sign in to OpenOrc to start a thread on OpenOrc Cloud.");
-    stand.addProject(EMAIL, { name: "openorc", fullName: "altalogy/openorc" });
+    stand.addProject(EMAIL, { name: "openorc", fullName: "acme/openorc" });
     stand.setBilling(EMAIL, { pro: true, standing: "live", at: new Date(Date.now() + 86_400_000).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
     stand.setSignIns(EMAIL, [{ agent: "codex" }]);
     await signIn();
@@ -155,7 +155,7 @@ describe("OpenOrc Cloud threads in the window's calls", () => {
 
   it("answers this Mac's own Bring about a cloud thread here, never as the thread's place", async () => {
     await open();
-    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "altalogy/openorc" });
+    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "acme/openorc" });
     const hosted = stand.addThread(EMAIL, { projectId: cloudProject, title: "Bring me" });
     await signIn();
     await vi.waitFor(async () => expect((await call("threads.list", { filter: "all", includeChildren: true } as never)).some((row) => row.id === hosted)).toBe(true), { timeout: 5_000 });

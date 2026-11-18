@@ -422,7 +422,7 @@ it("offers no Open thread while the thread that opened the pull request still wo
 
 it("lists the pull requests of an organization's project that lives only in the cloud, read on GitHub by its name", async () => {
   const before = spaceNavigation.getState();
-  spaceNavigation.setState({ current: "org:altalogy", inventory: [{ id: "org:altalogy", accountId: "account-a", personal: false, projects: [], threads: [], taskIds: [] }] } as never);
+  spaceNavigation.setState({ current: "org:acme", inventory: [{ id: "org:acme", accountId: "account-a", personal: false, projects: [], threads: [], taskIds: [] }] } as never);
   lists["cloud-project"] = { open: [pull(4, "Export the activity log")] };
   const answered = vi.mocked(core.call).getMockImplementation()!;
   vi.mocked(core.call).mockImplementation(async (method, params) => {

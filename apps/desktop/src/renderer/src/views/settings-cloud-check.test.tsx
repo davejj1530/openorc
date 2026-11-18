@@ -13,7 +13,7 @@ const running = (): CloudCheck => ({
   id: "c1",
   startedAt: Date.now(),
   done: false,
-  service: "Vercel",
+  service: "host-a",
   broken: null,
   links: CLOUD_CHECK_STEPS.map((step) => ({ step, state: "running", words: null, ms: null })),
 });
@@ -64,7 +64,7 @@ it("runs a check in the space the person is in, reads it as it goes, and says al
   expect(screen.getByText("Start a test machine")).toBeTruthy();
   state = { state: "ready", check: finished() };
   expect(await screen.findByText("Everything works", undefined, { timeout: 3_000 })).toBeTruthy();
-  expect(screen.getByText("On Vercel")).toBeTruthy();
+  expect(screen.queryByText(/host-a/)).toBeNull();
   expect(screen.getByText("No keys.")).toBeTruthy();
   const untried = screen.getByText("Your OpenCode keys").closest("li")!;
   expect(untried.querySelector(".cloud-check-time")?.textContent, "a link not tried has no time").toBe("");

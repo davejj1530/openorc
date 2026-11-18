@@ -1,5 +1,5 @@
 /**
- * The stand-in's notes, with the real server's rules the app depends on (the contract's notes section): a note tags at
+ * The stand-in's notes, with the rules the app depends on, as the server does: a note tags at
  * least one person who reads the thread's project, by ranges of its text; the same id again is the same note, another
  * note under it is refused; a note takes its place after the thread's events stored so far; pages run by `seq`. A note
  * starts nothing and reaches no agent. Each reader reads a note by marking it read by id, never by a high-water mark, so a

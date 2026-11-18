@@ -23,7 +23,7 @@ export type Behavior = { kind: "answer"; delayMs?: number } | { kind: "refuse"; 
 export const lan: Route = { kind: "lan", host: "studio.local", port: 47820 };
 export const lanAddress: Route = { kind: "lan", host: "192.168.1.20", port: 47820 };
 export const tailnet: Route = { kind: "tailnet", host: "100.64.0.7", port: 47820 };
-/** The address an earlier build saved for a cloud brain behind Vercel's proxy. */
+/** The address an earlier build saved for a cloud brain behind its host's proxy. */
 export const publicRoute: Route = { kind: "public", host: "sb-brain.vercel.run", port: 443 };
 
 /**

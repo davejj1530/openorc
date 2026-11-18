@@ -1,13 +1,13 @@
 /**
- * The stand-in's billing: what each person has, and the server's checkout and portal routes as apps call them. Polar
- * is not stood in for: a checkout's page is an address nothing serves, and `pay` is Polar telling the server a page
+ * The stand-in's billing: what each person has, and the server's checkout and portal routes as apps call them. The
+ * payment provider is not stood in for: a checkout's page is an address nothing serves, and `pay` is the payment provider telling the server a page
  * was paid, after which the server tells the person's apps on the `billing` topic, as its webhooks do.
  *
  * The real server's rules kept here:
  *   POST /billing/checkout/pro    takes `{ plan }` of monthly or yearly; 409 for a person who already pays for Pro
  *   POST /billing/checkout/hours  409 for a person who is not Pro
  *   POST /billing/portal          404 for a person who never bought anything
- *   GET /billing/offers           what Pro and a pack cost, a price null where Polar has no single amount; 503 in words
+ *   GET /billing/offers           what Pro and a pack cost, a price null where the payment provider has no single amount; 503 in words
  *                                 where billing is not set up
  */
 import { randomUUID } from "node:crypto";

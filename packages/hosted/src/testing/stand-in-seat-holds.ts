@@ -17,7 +17,7 @@ interface Deps {
 }
 
 /**
- * The seat an invitation holds, as the seats contract's unit 5 words it. A hold counts against the free seats until
+ * The seat an invitation holds, as the server does. A hold counts against the free seats until
  * the invitation is accepted, revoked, declined or expired; an expired invitation remembers its seat for a resend.
  */
 export class StandInSeatHolds {

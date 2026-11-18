@@ -5,7 +5,7 @@ import { harnessCatalog, type HarnessId } from "@openorc/protocol";
 import type { AgentHomes, HomeOwner } from "./agent-sessions.js";
 import type { EnvSnapshot } from "./shell-environment.js";
 
-/* Kept with agent-sessions.ts from the person's own cloud; see the note at the top of that file. */
+/* The agent folders on this Mac a moving thread's session is read from and put back into (agent-sessions.ts). */
 
 export interface AgentHomeDeps {
   environment(): EnvSnapshot;

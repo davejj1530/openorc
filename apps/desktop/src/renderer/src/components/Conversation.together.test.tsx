@@ -308,7 +308,7 @@ it("changes nothing in the reader's own cloud thread while the server keeps shar
 
 it("names the reader's own messages in an organization's thread, which its project's members read, and leaves their turns' sender to them", async () => {
   const thread = ownThread(together(THEO));
-  spaceNavigation.setState({ inventory: [{ id: "altalogy", personal: false, projects: [], threads: [{ id: thread.id, projectId: thread.projectId }], taskIds: [] }] });
+  spaceNavigation.setState({ inventory: [{ id: "acme", personal: false, projects: [], threads: [{ id: thread.id, projectId: thread.projectId }], taskIds: [] }] });
   await open(thread, { viewer: THEO, turnOf: { [PROMPT]: "t1", "reply-1": "t1" }, senders: { t1: THEO }, authors: { [PROMPT]: THEO } });
   expect(document.querySelector(".turn-head-sender")).toBeNull();
   expect([...document.querySelectorAll(".prompt-author")].map((each) => each.textContent)).toEqual(["TLTheo Laurent"]);

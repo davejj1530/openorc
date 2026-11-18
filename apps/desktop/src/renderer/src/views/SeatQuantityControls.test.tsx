@@ -25,7 +25,7 @@ const DAY = accountDay(RENEWS);
 const PAYMENT = "The payment for these seats didn't go through. Update the payment method in billing and try again.";
 function billing(standing: "live" | "ending" | "ended" = "live", pending: number | null = null): OrganizationBilling {
   return {
-    organization: { id: "team-a", name: "Altalogy", logo: null },
+    organization: { id: "team-a", name: "Acme", logo: null },
     revision: "1",
     asOf: 1000,
     subscription: {

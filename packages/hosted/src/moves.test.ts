@@ -18,7 +18,7 @@ afterEach(async () => {
 });
 
 it("says in a cloud thread's summary where it is moving, and why its last move stopped, as this Mac's journal has it", async () => {
-  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
   const thread = stand.addThread(ADA, { projectId: project, title: "Bring the launch page here" });
   const journal = new Map<string, ThreadMoving>();
   const { deps, browser } = hostDeps(stand, newDevice());
@@ -36,7 +36,7 @@ it("says in a cloud thread's summary where it is moving, and why its last move s
 });
 
 it("lets a thread the server let go of leave the list at once, before its word of it comes", async () => {
-  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
   const thread = stand.addThread(ADA, { projectId: project, title: "Moved to this Mac" });
   const { deps, browser } = hostDeps(stand, newDevice());
   const hosted = createHosted(deps);
@@ -50,7 +50,7 @@ it("lets a thread the server let go of leave the list at once, before its word o
 });
 
 it("reads no conversation for a thread that never saved one, rather than failing the move that asks", async () => {
-  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
   const thread = stand.addThread(ADA, { projectId: project, title: "Never ran" });
   const { deps, browser } = hostDeps(stand, newDevice());
   const hosted = createHosted(deps);

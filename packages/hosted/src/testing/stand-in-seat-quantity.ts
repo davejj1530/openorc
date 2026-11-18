@@ -20,7 +20,7 @@ interface Deps {
   changed(spaceId: string): void;
 }
 
-/** Changing an organization's number of seats, as the seats contract's unit 6 words it. */
+/** Changing an organization's number of seats, as the server does. */
 export class StandInSeatQuantity {
   /** A confirmed change stays pending, as while a payment or the provider is still being heard. */
   pending = false;

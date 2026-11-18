@@ -18,7 +18,7 @@ const hosts: Hosted[] = [];
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   device = newDevice();
-  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Altalogy/openorc.git" }];
+  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Acme/openorc.git" }];
   stand.setBilling(ADA, PRO);
   stand.setSignIns(ADA, [{ agent: "claude" }]);
   stand.threadFiles.capabilities = FILES_ON;
@@ -30,7 +30,7 @@ afterEach(async () => {
 });
 
 async function withThread(seed: { status?: "idle" | "working" } = {}) {
-  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
   const thread = stand.addThread(ADA, { projectId: project, title: "Read the attached notes", ...seed });
   const { deps, browser } = hostDeps(stand, device);
   const hosted = createHosted(deps);

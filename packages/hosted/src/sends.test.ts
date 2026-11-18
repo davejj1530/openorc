@@ -15,7 +15,7 @@ const hosts: Hosted[] = [];
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   device = newDevice();
-  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Altalogy/openorc.git" }];
+  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Acme/openorc.git" }];
   stand.setBilling(ADA, PRO);
   stand.setSignIns(ADA, [{ agent: "claude" }]);
 });
@@ -27,7 +27,7 @@ afterEach(async () => {
 
 /** A signed-in host with one thread of the account's, heard. */
 async function withThread(seed: { status?: "idle" | "working" } = {}, now: () => number = Date.now) {
-  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
   const thread = stand.addThread(ADA, { projectId: project, title: "Retry the cloud start", ...seed });
   const { deps, seen, browser } = hostDeps(stand, device, { now });
   const hosted = createHosted(deps);
@@ -63,7 +63,7 @@ describe("sending to an OpenOrc Cloud thread", () => {
   });
 
   it("makes the settings a turn starts with the thread's, as the server does, so the thread names what it ran", async () => {
-    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
     const thread = stand.addThread(ADA, { projectId: project, title: "Export activity log", agent: "codex" });
     const { deps, browser } = hostDeps(stand, device);
     const hosted = createHosted(deps);

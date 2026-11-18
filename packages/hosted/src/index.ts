@@ -123,7 +123,7 @@ export interface HostedDeps {
    */
   mintClaudeToken?(claudeAccountId: string | undefined): { token: Promise<string>; cancel(): void };
   /**
-   * The person's browser, for OpenOrc's sign-in page and GitHub's and Polar's pages: waits on this device's loopback
+   * The person's browser, for OpenOrc's sign-in page and GitHub's and the payment provider's pages: waits on this device's loopback
    * for one return to `path` (its query, or a rejection on timeout or `close`), and opens a page. Absent where the
    * device has neither.
    */

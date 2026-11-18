@@ -1,5 +1,5 @@
 /**
- * The stand-in's GitHub, as the real server's github and projects controllers answer an app in the selected space:
+ * The stand-in's GitHub, answered as the server does for an app in the selected space:
  *   starting an install for an app on a loopback port answers GitHub's page: linking the person's account first when
  *   they have not, then installing OpenOrc's app; a page's state is good once, for the person it was made for
  *   GitHub returns the browser to the server, which sends it on to the app's port with GitHub's query

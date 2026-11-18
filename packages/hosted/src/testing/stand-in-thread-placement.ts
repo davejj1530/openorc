@@ -54,7 +54,7 @@ function whileStopping(thread: Thread, who: string, joins: boolean): Placement {
 
 type Refusal = { status: number; body: unknown };
 
-/** As the real server's rules.ts: how many subthreads a family takes, and its words for one more. */
+/** How many subthreads a family takes, and the words for one more, as the server does. */
 export const SUBTHREADS = 20;
 export const SUBTHREADS_FULL = `This thread has ${SUBTHREADS} subthreads. Delete one to start another.`;
 

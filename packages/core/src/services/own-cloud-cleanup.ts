@@ -21,7 +21,7 @@ const SETTINGS = "(key LIKE 'cloud.%' OR key LIKE 'brain.%' OR key = 'mac.backlo
 
 /**
  * Once, at start: takes what the person's own cloud left in a profile out of it. The app no longer runs threads on a
- * person's own Vercel or Agent37, so nothing else could. A thread that ran in a sandbox becomes a plain worktree
+ * person's own cloud machine, so nothing else could. A thread that ran in a sandbox becomes a plain worktree
  * thread: its worktree here holds its code as of the last sync, and what the sandbox had after that is not brought
  * back. A thread a move had frozen is released. The connections, tokens and kept lists are deleted. Threads still on a
  * cloud brain are out of reach: nothing here can fetch them.

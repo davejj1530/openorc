@@ -65,8 +65,8 @@ it("sends this computer's own skills to the server before a message to a cloud t
   stand.threadFiles.capabilities = { skills: { available: true } };
   stand.setBilling(EMAIL, { pro: true, standing: "live", at: new Date(Date.now() + 86_400_000).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
   stand.setSignIns(EMAIL, [{ agent: "claude" }]);
-  const project = projects.insert(core.db, { name: "openorc", rootPath: folder, gitRemote: "https://github.com/altalogy/openorc.git", defaultBranch: "main", settings: {} });
-  const hosted = stand.addThread(EMAIL, { projectId: stand.addProject(EMAIL, { name: "openorc", fullName: "altalogy/openorc" }), title: "Send to me" });
+  const project = projects.insert(core.db, { name: "openorc", rootPath: folder, gitRemote: "https://github.com/acme/openorc.git", defaultBranch: "main", settings: {} });
+  const hosted = stand.addThread(EMAIL, { projectId: stand.addProject(EMAIL, { name: "openorc", fullName: "acme/openorc" }), title: "Send to me" });
   await call("account.signIn", {});
   await vi.waitFor(async () => expect((await call("threads.list", { projectIds: [project.id], filter: "active", includeChildren: true })).some((row) => row.id === hosted)).toBe(true), {
     timeout: 5_000,
@@ -87,8 +87,8 @@ it("sends a message to a cloud thread of an agent this computer can't list skill
   stand.threadFiles.capabilities = { skills: { available: true } };
   stand.setBilling(EMAIL, { pro: true, standing: "live", at: new Date(Date.now() + 86_400_000).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
   stand.setSignIns(EMAIL, [{ agent: "codex" }]);
-  const project = projects.insert(core.db, { name: "openorc", rootPath: folder, gitRemote: "https://github.com/altalogy/openorc.git", defaultBranch: "main", settings: {} });
-  const hosted = stand.addThread(EMAIL, { projectId: stand.addProject(EMAIL, { name: "openorc", fullName: "altalogy/openorc" }), title: "Send to me", agent: "codex" });
+  const project = projects.insert(core.db, { name: "openorc", rootPath: folder, gitRemote: "https://github.com/acme/openorc.git", defaultBranch: "main", settings: {} });
+  const hosted = stand.addThread(EMAIL, { projectId: stand.addProject(EMAIL, { name: "openorc", fullName: "acme/openorc" }), title: "Send to me", agent: "codex" });
   await call("account.signIn", {});
   await vi.waitFor(async () => expect((await call("threads.list", { projectIds: [project.id], filter: "active", includeChildren: true })).some((row) => row.id === hosted)).toBe(true), {
     timeout: 5_000,

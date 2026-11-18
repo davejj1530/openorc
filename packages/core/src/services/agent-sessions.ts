@@ -6,9 +6,8 @@ import { claudeAccounts, projects, runs, subagents, type Db } from "@openorc/db"
 import { harnessCatalog, type HarnessId, type Thread } from "@openorc/protocol";
 
 /*
- * Kept from the person's own cloud, which is gone, for an OpenOrc Cloud thread's agent session to travel to and from
- * this Mac on (see .local-development/multiplayer/ui/cloud-parity/build/from-own-cloud.md). Nothing in the app calls it
- * today. A refusal is the slots' own `SessionRefused`, in words a person can read.
+ * A thread's agent session, packed to travel with it when it moves between this Mac and OpenOrc Cloud (cloud-moves.ts),
+ * and put back where it lands. A refusal is the slots' own `SessionRefused`, in words a person can read.
  */
 
 /** A thread as a package names it, before its rows are written: whose session it is, and its subagents' native ids. */

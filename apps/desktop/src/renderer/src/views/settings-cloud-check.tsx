@@ -77,7 +77,7 @@ export function CloudCheckSection({ active }: { active: boolean }) {
   const running = check !== null && !check.done;
   return (
     <Section title="Check">
-      <SettingRow label={verdict(check)} hint={check ? `On ${check.service}` : undefined}>
+      <SettingRow label={verdict(check)}>
         <Button
           disabled={running || start.isPending || !space}
           onClick={() => space && start.mutate({ spaceId: space }, { onSuccess: (state) => queryClient.setQueryData(["cloudCheck.read", {}], state) })}

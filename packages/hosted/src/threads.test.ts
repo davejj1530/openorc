@@ -14,7 +14,7 @@ const hosts: Hosted[] = [];
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   device = newDevice();
-  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Altalogy/openorc.git" }];
+  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Acme/openorc.git" }];
 });
 
 afterEach(async () => {
@@ -60,8 +60,8 @@ describe("hosted threads", () => {
   });
 
   it("puts each thread under the Mac project with its repository, or under its own when this Mac has none", async () => {
-    const openorc = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
-    const website = stand.addProject(ADA, { name: "website", fullName: "altalogy/website" });
+    const openorc = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
+    const website = stand.addProject(ADA, { name: "website", fullName: "acme/website" });
     const retry = stand.addThread(ADA, { projectId: openorc, title: "Retry the cloud start", status: "working" });
     const hero = stand.addThread(ADA, { projectId: website, title: "Redraw the hero" });
     const { hosted } = await host();
@@ -74,12 +74,12 @@ describe("hosted threads", () => {
     expect(hosted.threads.holds({ thread: retry })).toBe(true);
     expect(hosted.threads.holds({ run: `hosted:${hero}` })).toBe(true);
     expect(hosted.threads.holds({ thread: "a-mac-thread" })).toBe(false);
-    expect(hosted.threads.project(`openorc-cloud:${website}`)).toMatchObject({ name: "website", gitRemote: "https://github.com/altalogy/website" });
+    expect(hosted.threads.project(`openorc-cloud:${website}`)).toMatchObject({ name: "website", gitRemote: "https://github.com/acme/website" });
     expect(hosted.threads.listed("threads.list", { projectId: "mac-openorc" })?.rows.map((row) => row.id)).toEqual([retry]);
   });
 
   it("is unread once the agent writes past what the person has seen, and not for their own message", async () => {
-    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
     const thread = stand.addThread(ADA, { projectId: project, title: "Ask" });
     stand.append(thread, [{ type: "message.completed", messageId: "m1", role: "user", text: "Hello" }], { by: "user-ada" });
     const { hosted } = await host();
@@ -91,7 +91,7 @@ describe("hosted threads", () => {
   });
 
   it("reads the list again when the server says threads changed", async () => {
-    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
     const { hosted, seen } = await host();
     await signIn(hosted);
     await vi.waitFor(() => expect(hosted.threads.active).toBe(true));
@@ -161,7 +161,7 @@ describe("hosted threads", () => {
   });
 
   it("keeps its rows through a restart with the server down, offline, and lets them go on sign-out", async () => {
-    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
     const thread = stand.addThread(ADA, { projectId: project, title: "Kept" });
     const first = await host();
     await signIn(first.hosted);
@@ -178,7 +178,7 @@ describe("hosted threads", () => {
   });
 
   it("draws an event it cannot read as one plain line in its place, never leaving it out", async () => {
-    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
     const thread = stand.addThread(ADA, { projectId: project, title: "Newer server" });
     stand.append(thread, [
       { type: "message.completed", ts: 1, messageId: "m1", role: "assistant", text: "Before" },
@@ -199,7 +199,7 @@ describe("hosted threads", () => {
   });
 
   it("draws the server's own lines outside any turn as the thread's quiet notice, and keeps the line that ends a turn as its failure", async () => {
-    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
     const thread = stand.addThread(ADA, { projectId: project, title: "Refused" });
     const refusal = "You're out of cloud hours. Add hours to keep working.";
     const paused = "Mara's command is still running. Stop it before starting your turn.";
@@ -221,7 +221,7 @@ describe("hosted threads", () => {
   });
 
   it("shows nothing as running while the server can't be reached, and keeps an ask waiting", async () => {
-    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
     const working = stand.addThread(ADA, { projectId: project, title: "Working", status: "working", backgroundCommands: [{ id: "dev", description: "pnpm dev" }] });
     const asking = stand.addThread(ADA, { projectId: project, title: "Asking", status: "needs_answer" });
     stand.append(working, [{ type: "turn.started", ts: 1, turnId: "t1" }]);
@@ -239,7 +239,7 @@ describe("hosted threads", () => {
   });
 
   it("counts the quiet roots Resolved files by age, but never one waiting on the person", async () => {
-    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
     stand.addThread(ADA, { projectId: project, title: "Quiet" });
     stand.addThread(ADA, { projectId: project, title: "Asking", status: "needs_answer" });
     const { hosted } = await host();
@@ -266,8 +266,8 @@ describe("a team's threads", () => {
   }
 
   it("lists every space's threads, names a teammate as the starter, and asks about each thread in its space", async () => {
-    const team = stand.addTeam("Altalogy", [ADA, BOB]);
-    const shared = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" }, team);
+    const team = stand.addTeam("Acme", [ADA, BOB]);
+    const shared = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" }, team);
     const own = stand.addProject(BOB, { name: "notes", fullName: "bob/notes" });
     const adas = stand.addThread(ADA, { projectId: shared, title: "Ada's in the team" });
     const bobs = stand.addThread(BOB, { projectId: own, title: "Bob alone" });
@@ -285,8 +285,8 @@ describe("a team's threads", () => {
   });
 
   it("never asks a teammate's thread to be ready, since only its starter writes to it", async () => {
-    const team = stand.addTeam("Altalogy", [ADA, BOB]);
-    const shared = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" }, team);
+    const team = stand.addTeam("Acme", [ADA, BOB]);
+    const shared = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" }, team);
     const adas = stand.addThread(ADA, { projectId: shared, title: "Ada's" });
     stand.setBilling(BOB, { pro: true, standing: "live", at: new Date(Date.now() + 86_400_000).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
     stand.setSignIns(BOB, [{ agent: "claude" }]);
@@ -297,7 +297,7 @@ describe("a team's threads", () => {
   });
 
   it("tells windows to read projects again when a space gains a project, so a cloud-only one asked about early appears", async () => {
-    const team = stand.addTeam("Altalogy", [ADA, BOB]);
+    const team = stand.addTeam("Acme", [ADA, BOB]);
     const { hosted, seen } = await hostAs(ADA);
     await vi.waitFor(() => expect(hosted.threads.active).toBe(true));
     const added = stand.addProject(ADA, { name: "api", fullName: "acme/api" }, team);
@@ -322,7 +322,7 @@ describe("a team's threads", () => {
 
 describe("a new cloud thread made ready as its first message is begun", () => {
   it("asks the server once a minute a project, and never for an agent that doesn't run there", async () => {
-    stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
     stand.setBilling(ADA, { pro: true, standing: "live", at: new Date(Date.now() + 20 * 86_400_000).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
     stand.setSignIns(ADA, [{ agent: "claude" }]);
     const { hosted } = await host();

@@ -36,7 +36,7 @@ const state = (blocked: string | null, role: "admin" | "member" = "member") => (
 });
 
 beforeEach(() => {
-  spaceNavigation.getState().initialize("walk", "personal", [
+  spaceNavigation.getState().initialize("account-a", "personal", [
     { id: "personal", personal: true, projects: [], threads: [], taskIds: [] },
     { id: "north", personal: false, projects: [], threads: [], taskIds: [] },
   ]);

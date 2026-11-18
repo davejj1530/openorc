@@ -20,7 +20,7 @@ function billing(standing: "live" | "ending" = "live", pending: number | null = 
     retiresAt: null,
   });
   return {
-    organization: { id: "birch", name: "Altalogy", logo: null },
+    organization: { id: "birch", name: "Acme", logo: null },
     revision: "r1",
     asOf: 1,
     subscription: {
@@ -161,7 +161,7 @@ it("says what ending the subscription does to the people who hold seats", async 
   show();
   type("0");
   fireEvent.click(button("Review change"));
-  await screen.findByRole("dialog", { name: "End Altalogy’s subscription" });
+  await screen.findByRole("dialog", { name: "End Acme’s subscription" });
   expect([fact("Seats"), fact("Takes effect"), fact("Next price")]).toEqual([`5 until ${DAY}`, DAY, "No renewal"]);
   expect(screen.getByText(`People keep these seats until ${DAY}. Those without other Pro then have one day of grace.`)).toBeTruthy();
   expect(button("End subscription")).toBeTruthy();

@@ -1,8 +1,7 @@
 /**
  * Files in a hosted thread's messages. Today's server takes `fileIds` on a message and attaches each finished upload of
- * the sender's once, in the order they finished uploading; the stand-in attaches them in the order named, which is what
- * the server's files unit keeps (contract "Files in a message"). With the `files` capability set, it also keeps the rest
- * of that unit: a thread create sent again under its `requestId` answered as before, and a queued message's files taken
+ * the sender's once, in the order they finished uploading; the stand-in attaches them in the order named, as the server
+ * does. With the `files` capability set, it also keeps the rest of what the server does with them: a thread create sent again under its `requestId` answered as before, and a queued message's files taken
  * over by its edited copy, only from a cancelled message of the same thread and author. Without capabilities,
  * `GET /hosted/capabilities` is a 404, as on a server that predates it.
  */

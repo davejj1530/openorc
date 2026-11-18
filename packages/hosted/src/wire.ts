@@ -51,7 +51,7 @@ export type WireAccountDeletion = z.infer<typeof wireAccountDeletion>;
 
 const wirePrice = z.object({ amount: z.number().int().nonnegative(), currency: z.string().min(1) }).nullable();
 
-/** What Pro and an hours pack cost, as the server reads them from Polar's products. */
+/** What Pro and an hours pack cost, as the server reads them from the payment provider's products. */
 export const wireOffers = z.object({
   monthlySeconds: z.number().int().positive().nullable().default(null),
   pro: z.array(z.object({ plan: z.string(), price: wirePrice })),
@@ -59,7 +59,7 @@ export const wireOffers = z.object({
 });
 export type WireOffers = z.infer<typeof wireOffers>;
 
-/** A page of Polar's the server made for the person: a checkout, or their billing portal. Only the browser is given it. */
+/** A page of the payment provider's the server made for the person: a checkout, or their billing portal. Only the browser is given it. */
 export const wireBillingLink = z.object({ url: z.url() });
 
 /**
@@ -267,7 +267,7 @@ export const ROUTES = {
   checkoutPro: route("POST", "/billing/checkout/pro", wireBillingLink),
   /** A checkout for an hours pack; 409 in words for a person who is not Pro. */
   checkoutHours: route("POST", "/billing/checkout/hours", wireBillingLink),
-  /** Polar's portal, where the person changes or cancels what they pay for; 404 in words when they never bought anything. */
+  /** The payment provider's portal, where the person changes or cancels what they pay for; 404 in words when they never bought anything. */
   portal: route("POST", "/billing/portal", wireBillingLink),
   person: route("GET", "/api/auth/get-session", wirePerson),
   updateProfile: route("PATCH", "/account/profile", z.object({ id: z.string(), name: z.string(), email: z.string(), image: z.string().nullable() })),

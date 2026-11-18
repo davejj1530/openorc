@@ -26,7 +26,7 @@ const actions = { organization } as OrganizationActions;
 const orclings = { active: false, toggle: () => {}, tools: null };
 
 beforeEach(() => {
-  spaceNavigation.getState().initialize("walk", "personal", [
+  spaceNavigation.getState().initialize("account-a", "personal", [
     { id: "personal", personal: true, projects: [], threads: [], taskIds: [] },
     { id: "north", personal: false, projects: [], threads: [], taskIds: [] },
   ]);
@@ -52,7 +52,7 @@ it("lights no row on the organization's own page, which stands in for New thread
 });
 
 it("lights New thread once the organization has a project to start one in", () => {
-  spaceNavigation.getState().initialize("walk", "personal", [
+  spaceNavigation.getState().initialize("account-a", "personal", [
     { id: "personal", personal: true, projects: [], threads: [], taskIds: [] },
     { id: "north", personal: false, projects: [{ key: "api", name: "api", repo: "example/api", localProjectId: null, hostedProjectId: "p1", connected: true }], threads: [], taskIds: [] },
   ]);
@@ -61,7 +61,7 @@ it("lights New thread once the organization has a project to start one in", () =
 });
 
 it("lights no row while the frozen screen stands in for the organization's work", () => {
-  spaceNavigation.getState().initialize("walk", "personal", [
+  spaceNavigation.getState().initialize("account-a", "personal", [
     { id: "personal", personal: true, projects: [], threads: [], taskIds: [] },
     { id: "north", personal: false, projects: [{ key: "api", name: "api", repo: "example/api", localProjectId: null, hostedProjectId: "p1", connected: true }], threads: [], taskIds: [] },
   ]);

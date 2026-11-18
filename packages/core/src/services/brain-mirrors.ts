@@ -6,10 +6,7 @@ import { git, pinObject, treeHash, worktree as worktrees } from "@openorc/git";
 import type { MirrorSnapshot } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 
-/*
- * Kept from the person's own cloud, which is gone, for the code of an OpenOrc Cloud thread to come back to this Mac on
- * (see .local-development/multiplayer/ui/cloud-parity/build/from-own-cloud.md). Nothing in the app calls it today.
- */
+/* The read-only copies of a cloud brain's threads the person's own cloud left on this Mac, opened now only to remove them (own-cloud-cleanup.ts). */
 
 const MIRRORS = "brain.mirrors";
 /** The size one bundle may have as it travelled, base64 inside a single 16 MB message. */

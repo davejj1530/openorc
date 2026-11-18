@@ -17,8 +17,8 @@ const turn = (n: number) => [say(`question ${n}`, "user"), say(`answer ${n}`), {
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   device = newDevice();
-  device.projects = [{ id: "mac", remote: "https://github.com/altalogy/openorc" }];
-  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+  device.projects = [{ id: "mac", remote: "https://github.com/acme/openorc" }];
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
   thread = stand.addThread(ADA, { projectId: project, title: "Follow me", status: "working" });
   for (const n of [1, 2, 3]) stand.append(thread, turn(n));
 });

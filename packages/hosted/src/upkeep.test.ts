@@ -15,7 +15,7 @@ const hosts: Hosted[] = [];
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   device = newDevice();
-  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Altalogy/openorc.git" }];
+  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Acme/openorc.git" }];
   stand.setBilling(ADA, PRO);
   stand.setSignIns(ADA, [{ agent: "claude" }]);
 });
@@ -26,7 +26,7 @@ afterEach(async () => {
 });
 
 async function withThread(seed: { status?: "idle" | "working" } = {}): Promise<{ hosted: Hosted; thread: string; seen: Seen }> {
-  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
   const thread = stand.addThread(ADA, { projectId: project, title: "Retry the cloud start", ...seed });
   const { deps, seen, browser } = hostDeps(stand, device);
   const hosted = createHosted(deps);

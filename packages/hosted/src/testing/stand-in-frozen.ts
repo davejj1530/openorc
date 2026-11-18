@@ -23,7 +23,7 @@ const INVITE = "/api/auth/organization/invite-member";
 const MEMBER = "You need Pro to use this organization. Open Account or ask an admin for a seat.";
 const ADMIN = "You need Pro to use this organization. Open Account, or give yourself a seat in Seats.";
 
-/** The server's one gate over an organization's content, as the seats contract's unit 4 words it. */
+/** The server's one gate over an organization's content, worded as the server does. */
 export class StandInFrozenGate {
   access: (who: string) => Access | undefined = () => undefined;
   constructor(private readonly spaces: StandInSpaces) {}

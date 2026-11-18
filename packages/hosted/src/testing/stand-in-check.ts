@@ -37,7 +37,7 @@ export class StandInCheck {
       id: `check-${starts}`,
       startedAt: new Date().toISOString(),
       done: false,
-      service: "Vercel",
+      service: "host-a",
       links: CLOUD_CHECK_STEPS.map((step) => ({ step, state: "running", words: null, ms: null })),
       broken: null,
     };

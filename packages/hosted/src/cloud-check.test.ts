@@ -38,7 +38,7 @@ describe("the cloud check", () => {
     const ada = await signedIn(ADA);
     expect(await ada.check.read()).toEqual({ state: "ready", check: null });
     const started = await ada.check.start("space-1");
-    expect(started).toMatchObject({ state: "ready", check: { done: false, service: "Vercel", broken: null } });
+    expect(started).toMatchObject({ state: "ready", check: { done: false, service: "host-a", broken: null } });
     expect(stand.check.spaces).toEqual(["space-1"]);
     stand.check.finish(ADA, { codex: "ChatGPT ended this sign-in. Sign in with ChatGPT again." });
     const read = await ada.check.read();

@@ -113,12 +113,15 @@ it("allows changed choices on a new press after stopping the payment watch", asy
 it("keeps an unresolved purchase draft and repeats its exact choices only on a press", async () => {
   const f = await show();
   const chosen = { page: "checkout", plan: "monthly", seats: 3 } as const;
-  f.open.mockResolvedValueOnce({ ...waiting, payment: waiting.payment && { ...waiting.payment, target: chosen, state: "pending", error: "Polar didn't answer. Try again in a moment." } });
+  f.open.mockResolvedValueOnce({
+    ...waiting,
+    payment: waiting.payment && { ...waiting.payment, target: chosen, state: "pending", error: "The payment provider didn't answer. Try again in a moment." },
+  });
   fireEvent.click(screen.getByRole("button", { name: "Buy seats" }));
   fireEvent.change(screen.getByRole("spinbutton", { name: "Seats" }), { target: { value: "3" } });
   await screen.findByText(/19.37 a month/);
   fireEvent.click(screen.getByRole("button", { name: "Buy seats" }));
-  await waitFor(() => expect(screen.getByRole("dialog").textContent).toContain("Polar didn't answer."));
+  await waitFor(() => expect(screen.getByRole("dialog").textContent).toContain("The payment provider didn't answer."));
   expect(screen.getByRole<HTMLInputElement>("spinbutton", { name: "Seats" })).toMatchObject({ value: "3", disabled: true });
   expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
   expect(f.open).toHaveBeenCalledExactlyOnceWith(chosen);

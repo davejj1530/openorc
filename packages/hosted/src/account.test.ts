@@ -135,37 +135,37 @@ describe("the account", () => {
 
   it("says where cloud threads run, in the server's names, and changes it", async () => {
     await stand.close();
-    stand = await standIn({ signup: "open", services: ["vercel", "agent37"] });
+    stand = await standIn({ signup: "open", services: ["host-a", "host-b"] });
     const { account } = await host();
     await signIn(account, ADA);
     expect(account.status()).toMatchObject({
       sandbox: {
         chosen: null,
-        fallback: "vercel",
+        fallback: "host-a",
         services: [
-          { id: "vercel", name: "Vercel" },
-          { id: "agent37", name: "Agent37" },
+          { id: "host-a", name: "Host A" },
+          { id: "host-b", name: "Host B" },
         ],
       },
     });
-    await account.setSandbox("agent37");
-    expect(account.status()).toMatchObject({ sandbox: { chosen: "agent37" } });
-    expect(stand.sandboxes.get(ADA)).toBe("agent37");
+    await account.setSandbox("host-b");
+    expect(account.status()).toMatchObject({ sandbox: { chosen: "host-b" } });
+    expect(stand.sandboxes.get(ADA)).toBe("host-b");
     await expect(account.setSandbox("local")).rejects.toThrow("This server doesn't run threads on this machine.");
-    expect(account.status()).toMatchObject({ sandbox: { chosen: "agent37" } });
+    expect(account.status()).toMatchObject({ sandbox: { chosen: "host-b" } });
     await account.setSandbox(null);
-    expect(account.status()).toMatchObject({ sandbox: { chosen: null, fallback: "vercel" } });
+    expect(account.status()).toMatchObject({ sandbox: { chosen: null, fallback: "host-a" } });
   });
 
   it("shows where threads run offline after a restart, as last heard", async () => {
     await stand.close();
-    stand = await standIn({ signup: "open", services: ["vercel", "agent37"] });
+    stand = await standIn({ signup: "open", services: ["host-a", "host-b"] });
     const first = await host();
     await signIn(first.account, ADA);
-    await first.account.setSandbox("agent37");
+    await first.account.setSandbox("host-b");
     first.hosted.close();
     await stand.down();
     const { account } = await host();
-    expect(account.status()).toMatchObject({ reach: "offline", name: "Ada", sandbox: { chosen: "agent37" } });
+    expect(account.status()).toMatchObject({ reach: "offline", name: "Ada", sandbox: { chosen: "host-b" } });
   });
 });

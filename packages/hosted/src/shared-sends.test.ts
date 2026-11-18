@@ -14,7 +14,7 @@ const hosts: Hosted[] = [];
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   device = newDevice();
-  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Altalogy/openorc.git" }];
+  device.projects = [{ id: "mac-openorc", remote: "git@github.com:Acme/openorc.git" }];
 });
 
 afterEach(async () => {
@@ -35,8 +35,8 @@ async function hostAs(email: string, overrides: Partial<HostedDeps> = {}) {
 
 /** Ada's team thread with shared writing open; Bob has no hours of his own unless `bobPays`. */
 async function shared(bobPays = false) {
-  const team = stand.addTeam("Altalogy", [ADA, BOB]);
-  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" }, team);
+  const team = stand.addTeam("Acme", [ADA, BOB]);
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" }, team);
   stand.setBilling(ADA, pro);
   stand.setSignIns(ADA, [{ agent: "claude" }]);
   if (bobPays) {
@@ -170,8 +170,8 @@ describe("sending, queueing and Stop in a shared thread", () => {
       if (read) last = await answer.clone().text();
       return answer;
     };
-    const team = stand.addTeam("Altalogy", [ADA, BOB]);
-    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" }, team);
+    const team = stand.addTeam("Acme", [ADA, BOB]);
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" }, team);
     for (const email of [ADA, BOB]) {
       stand.setBilling(email, pro);
       stand.setSignIns(email, [{ agent: "claude" }]);
@@ -342,8 +342,8 @@ describe("answering another sender's ask, bound to the phase the reader saw", ()
     let last: string | null = null;
     const listed = (input: unknown) => new URL(String(input)).pathname === "/hosted/threads";
     stand.threadCollaboration.sharedWrites = true;
-    const team = stand.addTeam("Altalogy", [ADA, BOB]);
-    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" }, team);
+    const team = stand.addTeam("Acme", [ADA, BOB]);
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" }, team);
     for (const email of [ADA, BOB]) {
       stand.setBilling(email, pro);
       stand.setSignIns(email, [{ agent: "claude" }]);
@@ -407,8 +407,8 @@ describe("while only joining is open (the slice before handoff)", () => {
     let frozen: string | null = null;
     let last: string | null = null;
     const listed = (input: unknown) => new URL(String(input)).pathname === "/hosted/threads";
-    const team = stand.addTeam("Altalogy", [ADA, BOB]);
-    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" }, team);
+    const team = stand.addTeam("Acme", [ADA, BOB]);
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" }, team);
     stand.setBilling(ADA, pro);
     stand.setSignIns(ADA, [{ agent: "claude" }]);
     stand.threadCollaboration.sharedWrites = true;

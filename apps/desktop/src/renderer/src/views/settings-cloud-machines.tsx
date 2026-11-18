@@ -29,16 +29,16 @@ function duration(ms: number): string {
 /** Hours to a tenth, as the hours a person has are counted. */
 const hours = (seconds: number) => `${Math.round(seconds / 360) / 10} h`;
 
-/** The title of a machine's one thread, when that names it; otherwise it is named by its service. */
+/** The title of a machine's one thread, when that names it. */
 function threadName(machine: CloudMachine): string | null {
   const [only, ...more] = machine.threads;
   return only && !more.length ? only.title : null;
 }
 
-/** How long it has been awake, and where; a machine named by its service says its threads instead, the ones the person reads by name. */
+/** How long it has been awake; a machine not named by its one thread says its threads too, the ones the person reads by name. */
 function details(machine: CloudMachine, now: number): string {
   const awake = `Awake for ${duration(now - machine.since)}`;
-  if (threadName(machine)) return `${awake} · On ${machine.serviceName}`;
+  if (threadName(machine)) return awake;
   const count = machine.threads.length === 1 ? "1 thread" : `${machine.threads.length} threads`;
   const titles = machine.threads.flatMap((thread) => (thread.title ? [thread.title] : [])).join(", ");
   return [awake, machine.threads.length ? count : null, titles || null].filter(Boolean).join(" · ");
@@ -49,7 +49,7 @@ function MachineRow({ machine, now, onStopped }: { machine: CloudMachine; now: n
   const held = machine.stop.can ? undefined : machine.stop.reason;
   return (
     <>
-      <SettingRow label={threadName(machine) ?? `Your machine on ${machine.serviceName}`} hint={<span className="block truncate">{details(machine, now)}</span>}>
+      <SettingRow label={threadName(machine) ?? "Your machine"} hint={<span className="block truncate">{details(machine, now)}</span>}>
         <span className="text-ink-2 tabular-nums">{hours(machine.seconds)} used</span>
         <Button
           size="sm"

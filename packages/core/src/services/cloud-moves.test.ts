@@ -163,7 +163,8 @@ function account() {
       },
       savedSession: async (_space: string, id: string) => {
         const kept = id in cloud.sessionsOf ? cloud.sessionsOf[id] : cloud.session;
-        return kept ? new Response(new Uint8Array(kept)) : new Response(null, { status: 404 });
+        // A thread that never saved a conversation has none to give, as the hosted package answers.
+        return kept ? new Response(new Uint8Array(kept)) : null;
       },
       movedAway: async (_space: string, id: string) => {
         if (fail.movedAway) throw fail.movedAway;

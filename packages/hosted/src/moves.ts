@@ -151,9 +151,17 @@ export class CloudMoves {
     await this.deps.session.in(space).request(MOVE_ROUTES.undo(id));
   }
 
-  /** The thread's saved conversation of `agent`, packed, for the caller to read under its own signal and bounds. */
-  savedSession(space: string, id: string, agent: string, signal: AbortSignal): Promise<Response> {
-    return this.deps.session.stream(space, `${thread(id)}/work-save/session?${new URLSearchParams({ agent })}`, signal);
+  /**
+   * The thread's saved conversation of `agent`, packed, for the caller to read under its own signal and bounds; null
+   * for a thread that never saved one, as one that never ran.
+   */
+  async savedSession(space: string, id: string, agent: string, signal: AbortSignal): Promise<Response | null> {
+    try {
+      return await this.deps.session.stream(space, `${thread(id)}/work-save/session?${new URLSearchParams({ agent })}`, signal);
+    } catch (error) {
+      if (error instanceof Refused && error.status === 404) return null;
+      throw error;
+    }
   }
 
   /** This Mac took the thread: it goes from the cloud. */

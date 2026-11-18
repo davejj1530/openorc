@@ -48,3 +48,16 @@ it("lets a thread the server let go of leave the list at once, before its word o
   expect(hosted.threads.holds({ thread })).toBe(false);
   expect(hosted.threads.holds({ run: `hosted:${thread}` })).toBe(false);
 });
+
+it("reads no conversation for a thread that never saved one, rather than failing the move that asks", async () => {
+  const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+  const thread = stand.addThread(ADA, { projectId: project, title: "Never ran" });
+  const { deps, browser } = hostDeps(stand, newDevice());
+  const hosted = createHosted(deps);
+  hosts.push(hosted);
+  await hosted.start();
+  await signInAs(hosted, browser, ADA);
+  await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(true));
+  const space = hosted.threads.row!(thread).space;
+  expect(await hosted.moves.savedSession(space, thread, "claude", AbortSignal.timeout(10_000))).toBeNull();
+});

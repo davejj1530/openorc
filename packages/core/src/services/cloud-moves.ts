@@ -472,9 +472,7 @@ export class CloudMoves {
   /** The agent's saved conversation, unpacked; null when the thread has none yet. */
   private async savedSession(hosted: Hosted, space: string, threadId: string, agent: string): Promise<PackedSession | null> {
     const response = await hosted.moves.savedSession(space, threadId, agent, AbortSignal.timeout(CURRENT_MS));
-    if (response.status === 404) return null;
-    if (!response.ok) throw new Error(`OpenOrc Cloud didn't give the thread's conversation (${response.status}).`);
-    return unpackSession(Buffer.from(await response.arrayBuffer()));
+    return response ? unpackSession(Buffer.from(await response.arrayBuffer())) : null;
   }
 
   /**

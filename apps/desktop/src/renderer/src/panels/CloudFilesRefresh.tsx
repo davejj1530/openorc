@@ -32,7 +32,8 @@ export function CloudFilesRefresh({ threadId, listed, onFailed }: { threadId: st
     );
   };
   const saved = copy ? ` · saved ${relativeTime(Date.parse(copy.asOf.at))}` : "";
-  const label = refresh.isPending ? (turn ? "Waits for the turn to end" : "Refreshing files…") : `Refresh files${saved}`;
+  const waiting = turn ? "Waits for the turn to end" : "Refreshing files…";
+  const label = refresh.isPending ? waiting : `Refresh files${saved}`;
   return (
     <>
       <Tooltip label={label}>

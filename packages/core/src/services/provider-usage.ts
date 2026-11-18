@@ -534,13 +534,10 @@ export class ProviderUsageService {
     };
     const found = (await this.cloudReadings()).find((each) => each.agent === provider);
     if (!found) return result;
-    const answered =
-      provider === "claude"
-        ? withClaudeAnswer(result, found.reading as ClaudeUsageResult, found.readAt)
-        : provider === "codex"
-          ? withCodexAnswer(result, found.reading as CodexAccountReport, found.readAt)
-          : false;
-    if (provider === "codex" && answered) result.status = result.windows.length || result.credits.length ? "available" : "unavailable";
+    if (provider === "claude") withClaudeAnswer(result, found.reading as ClaudeUsageResult, found.readAt);
+    if (provider === "codex" && withCodexAnswer(result, found.reading as CodexAccountReport, found.readAt)) {
+      result.status = result.windows.length || result.credits.length ? "available" : "unavailable";
+    }
     result.context = `OpenOrc Cloud · ${result.context}`;
     result.refreshedAt = found.readAt;
     return result;

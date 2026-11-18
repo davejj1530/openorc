@@ -60,7 +60,8 @@ describe("ModelPicker", () => {
   });
 
   it("offers a turn on OpenOrc Cloud every agent it runs, whatever this Mac is signed in to", async () => {
-    mocks.call.mockImplementation(async (method) => (method === "cloudModels.catalog" ? { models, providers: [] } : method === "agents.modelCatalog" ? { models: [], providers: [] } : info));
+    const answers: Record<string, unknown> = { "cloudModels.catalog": { models, providers: [] }, "agents.modelCatalog": { models: [], providers: [] } };
+    mocks.call.mockImplementation(async (method: string) => answers[method] ?? info);
     const onChange = vi.fn();
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

@@ -51,8 +51,8 @@ it.each([true, false])("searches messages from a thread in either place, the clo
     taskTitle: null,
     member: null,
   };
-  vi.spyOn(core, "call").mockImplementation((async (method: string) =>
-    method === "threads.get" ? thread : method === "threads.search" ? [hit] : method === "hosted.capabilities" ? SERVED_NOTHING : []) as typeof core.call);
+  const answers: Record<string, unknown> = { "threads.get": thread, "threads.search": [hit], "hosted.capabilities": SERVED_NOTHING };
+  vi.spyOn(core, "call").mockImplementation((async (method: string) => answers[method] ?? []) as typeof core.call);
   render(
     <QueryClientProvider client={queryClient}>
       <CommandPalette open onOpenChange={() => {}} />

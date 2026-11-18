@@ -35,7 +35,8 @@ export function pageOf(thread: Thread, query: URLSearchParams, newestTurns: bool
   const limit = Number(query.get("limit") ?? 500);
   const ends = turnEnds(thread);
   const lastTurns = newestTurns && query.has("lastTurns") ? Number(query.get("lastTurns")) : null;
-  const fromTurn = query.has("fromTurn") ? Math.min(Number(query.get("fromTurn")), ends.length) : lastTurns !== null ? Math.max(0, ends.length - lastTurns) : undefined;
+  const fromLast = lastTurns !== null ? Math.max(0, ends.length - lastTurns) : undefined;
+  const fromTurn = query.has("fromTurn") ? Math.min(Number(query.get("fromTurn")), ends.length) : fromLast;
   if (query.has("before") || (!newestTurns && query.has("lastTurns"))) {
     const before = query.has("before") ? Number(query.get("before")) : headOf(thread) + 1;
     const events = thread.events.filter((stored) => stored.seq < before).slice(-limit);

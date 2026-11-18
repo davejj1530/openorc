@@ -21,8 +21,14 @@ export const backdropGrids = [
 ] as const;
 export type BackdropGrid = (typeof backdropGrids)[number]["id"];
 
-/** What the new thread screen draws behind itself: nothing, a moving pattern, or the user's own image. */
-export type BackdropStyle = "off" | BackdropPattern | "image";
+/**
+ * What the new thread screen draws behind itself: nothing, the scenery that comes with the app (a storm painting in
+ * dark, a green hill in light), a moving pattern, or the user's own image.
+ */
+export type BackdropStyle = "off" | "painting" | BackdropPattern | "image";
+
+/** The styles that put a picture behind the screen rather than a texture. */
+export const isPicture = (style: BackdropStyle) => style === "painting" || style === "image";
 
 export interface Backdrop {
   style: BackdropStyle;
@@ -40,7 +46,7 @@ type Settings = Omit<Backdrop, "image">;
 
 export const backdropLimits = { size: { min: 1, max: 6 }, motion: { min: 0, max: 100 } } as const;
 
-// Plain until chosen: the patterns are there to turn on in Settings.
+// Plain until chosen: the scenery, the patterns and the person's own image are there to turn on in Settings.
 const DEFAULT: Backdrop = { style: "off", image: null, grid: "4x4", size: 2, motion: 12 };
 const KEY = "openorc.backdrop";
 /** The image keeps its own entry, rewritten only when one is chosen or removed. */
@@ -65,7 +71,7 @@ function entryOf(raw: string | null): Entry {
 /** A backdrop read field by field, so an old or damaged entry keeps whatever still makes sense. */
 function backdropOf(value: Entry, image: unknown): Backdrop {
   const kept = isImage(image) ? image : null;
-  const styles = [{ id: "off" as const }, ...backdropPatterns, ...(kept ? [{ id: "image" as const }] : [])];
+  const styles = [{ id: "off" as const }, { id: "painting" as const }, ...backdropPatterns, ...(kept ? [{ id: "image" as const }] : [])];
   return {
     style: oneOf<BackdropStyle>(value.style, styles, DEFAULT.style),
     image: kept,

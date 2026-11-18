@@ -307,6 +307,12 @@
   background: var(--bg);
   overflow: hidden;
 }
+/* A picture shows whole, as a half-size New thread screen. */
+.backdrop-preview:has(> [data-picture]) {
+  width: min(100%, 360px);
+  height: auto;
+  aspect-ratio: 7 / 5;
+}
 .backdrop-controls {
   margin-top: 12px;
 }

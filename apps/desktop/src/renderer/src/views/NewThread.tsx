@@ -11,6 +11,7 @@ import { useMacStart } from "../components/MacStartLine";
 import { loadProjectActivity, ProjectActivity } from "../components/ProjectActivity";
 import { Panel } from "../components/Panel";
 import { NewThreadQuestion } from "../components/ProjectPicker";
+import { NewThreadMark } from "../components/NewThreadMark";
 import { DitherBackdrop } from "../components/DitherBackdrop";
 import { ThreadTabs } from "../components/ThreadTabs";
 import { TopBar } from "../components/TopBar";
@@ -267,6 +268,7 @@ function NewThreadProject({
               </div>
             ) : (
               <>
+                <NewThreadMark />
                 <NewThreadQuestion projectId={projectId} projects={projects} disabled={start.isPending} onProject={onProject} />
                 <div className="relative">
                   {macStart.line ? <div className="mb-2">{macStart.line}</div> : null}

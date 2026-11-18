@@ -29,6 +29,18 @@ it("starts plain when nothing is saved or the entry cannot be read", () => {
   const fallback = { style: "off", image: null, grid: "4x4", size: 2, motion: 12 };
   expect(parseBackdrop(null, null)).toEqual(fallback);
   expect(parseBackdrop("{not json", null)).toEqual(fallback);
+  expect(parseBackdrop(JSON.stringify({ style: "factory" }), null)).toEqual(fallback);
+});
+
+it("keeps a saved choice, the painting included", async () => {
+  expect(parseBackdrop(JSON.stringify({ style: "off" }), null)).toMatchObject({ style: "off" });
+  expect(parseBackdrop(JSON.stringify({ style: "painting" }), null)).toMatchObject({ style: "painting" });
+  expect(parseBackdrop(JSON.stringify({ style: "swirl" }), null)).toMatchObject({ style: "swirl" });
+
+  const backdrop = await launch();
+  expect(backdrop.getState().style).toBe("off");
+  expect(backdrop.getState().change({ style: "painting" })).toBe(true);
+  expect((await launch()).getState().style).toBe("painting");
 });
 
 it("keeps what still makes sense in a damaged entry, clamping the sliders into range", () => {

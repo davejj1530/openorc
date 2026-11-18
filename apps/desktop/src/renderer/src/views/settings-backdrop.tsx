@@ -32,16 +32,23 @@ function Range({ label, value, min, max, unit, disabled, onChange }: { label: st
 }
 
 /**
- * The new thread screen's backdrop: its style (off, one of the dither's patterns, or the user's own image dithered
- * alike), a live preview while one shows, then the grid, the dots' size and how fast a pattern moves.
+ * The new thread screen's backdrop: its style (off, the scenery, one of the dither's patterns, or the user's own image
+ * dithered alike), a live preview while one shows, then the grid, the dots' size and how fast a pattern moves. The
+ * scenery is drawn to its own recipe, so those three apply only to the shader's styles.
  */
 export function BackdropSettings({ report }: { report: Report }) {
   const backdrop = useBackdrop();
   const { change, chooseImage, removeImage } = useBackdrop.getState();
   const file = useRef<HTMLInputElement>(null);
   const [imageHint, setImageHint] = useState<string>();
-  const styles: { id: BackdropStyle; name: string }[] = [{ id: "off", name: "Off" }, ...backdropPatterns, ...(backdrop.image ? [{ id: "image" as const, name: "Image" }] : [])];
+  const styles: { id: BackdropStyle; name: string }[] = [
+    { id: "off", name: "Off" },
+    { id: "painting", name: "Scenery" },
+    ...backdropPatterns,
+    ...(backdrop.image ? [{ id: "image" as const, name: "Image" }] : []),
+  ];
   const shown = backdrop.style !== "off";
+  const tuned = shown && backdrop.style !== "painting";
   const take = async (event: ChangeEvent<HTMLInputElement>) => {
     const chosen = event.target.files?.[0];
     event.target.value = "";
@@ -65,7 +72,7 @@ export function BackdropSettings({ report }: { report: Report }) {
     report(removeImage());
   };
   return (
-    <Section flush title="New thread backdrop" description="The dithered pattern behind a new thread.">
+    <Section flush title="New thread backdrop" description="The picture or pattern behind a new thread.">
       <div className="appearance-modes" role="group" aria-label="Backdrop style">
         {styles.map(({ id, name }) => (
           <button key={id} type="button" aria-pressed={backdrop.style === id} onClick={() => pick(id)}>
@@ -75,7 +82,7 @@ export function BackdropSettings({ report }: { report: Report }) {
       </div>
       {shown ? (
         <div className="backdrop-preview">
-          <DitherBackdrop />
+          <DitherBackdrop miniature />
         </div>
       ) : null}
       <div className="settings-group backdrop-controls">
@@ -94,14 +101,14 @@ export function BackdropSettings({ report }: { report: Report }) {
         <SettingRow label="Grid">
           <span className="appearance-modes" role="group" aria-label="Grid">
             {backdropGrids.map(({ id, name }) => (
-              <button key={id} type="button" aria-pressed={backdrop.grid === id} disabled={!shown} onClick={() => report(change({ grid: id }))}>
+              <button key={id} type="button" aria-pressed={backdrop.grid === id} disabled={!tuned} onClick={() => report(change({ grid: id }))}>
                 {name}
               </button>
             ))}
           </span>
         </SettingRow>
-        <Range label="Dot size" value={backdrop.size} {...backdropLimits.size} unit=" px" disabled={!shown} onChange={(size) => report(change({ size }))} />
-        <Range label="Motion" value={backdrop.motion} {...backdropLimits.motion} unit="%" disabled={!shown || backdrop.style === "image"} onChange={(motion) => report(change({ motion }))} />
+        <Range label="Dot size" value={backdrop.size} {...backdropLimits.size} unit=" px" disabled={!tuned} onChange={(size) => report(change({ size }))} />
+        <Range label="Motion" value={backdrop.motion} {...backdropLimits.motion} unit="%" disabled={!tuned || backdrop.style === "image"} onChange={(motion) => report(change({ motion }))} />
       </div>
     </Section>
   );

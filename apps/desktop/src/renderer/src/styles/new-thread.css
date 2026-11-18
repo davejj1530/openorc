@@ -26,8 +26,19 @@
 .app-shell .new-thread-body:has(> .new-thread-activity) {
   --new-thread-reserve: calc(var(--new-thread-activity-h) + var(--new-thread-activity-floor) - var(--new-thread-bottom));
 }
+/* The mark over the question: at rest in the faint ink, and lit as a working cube while any agent works. */
+.new-thread-mark {
+  align-self: center;
+  margin-bottom: 14px;
+  color: var(--ink-4);
+}
+.new-thread-mark.working-cube {
+  color: var(--working-ink);
+}
+/* The question is centred over the composer, as a title over the one thing on the screen. */
 .new-thread-question {
   color: var(--ink);
+  text-align: center;
   font-size: var(--text-title);
   line-height: var(--text-title--line-height);
   letter-spacing: var(--text-title--letter-spacing);
@@ -335,10 +346,44 @@
 .dither-backdrop canvas {
   image-rendering: pixelated;
 }
-/* An image is a picture rather than a texture: it spans the screen's width and fades out under the
-   composer, leaving the activity on the plain ground. Half strength keeps the title readable over
-   its darkest and lightest parts in either theme. */
-.dither-backdrop[data-style="image"] {
-  opacity: 0.5;
-  mask-image: linear-gradient(#000, rgb(0 0 0 / 0.75) 25%, transparent 58%);
+/* A picture, the painting or the person's own image, is a card behind the mark, the question and the composer: set
+   in from the stage's edges and ending a little under the composer, which anchors it. The year of work stays on the
+   plain ground below it. */
+.composer-new-thread {
+  anchor-name: --new-thread-composer;
+}
+.dither-backdrop[data-picture] {
+  overflow: hidden;
+  mask-image: none;
+}
+.new-thread-body > .dither-backdrop[data-picture] {
+  inset: 14px 14px auto;
+  bottom: calc(anchor(--new-thread-composer bottom) - 64px);
+  border-radius: var(--radius-5xl);
+}
+.dither-backdrop[data-style="painting"] canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* On the card the question keeps a halo of the ground, and the composer is a pane of frosted glass the picture
+   carries through. */
+.new-thread-body:has(> [data-picture]) .new-thread-question {
+  text-shadow:
+    0 0 2px color-mix(in srgb, var(--bg) 90%, transparent),
+    0 2px 22px color-mix(in srgb, var(--bg) 95%, transparent),
+    0 0 44px color-mix(in srgb, var(--bg) 80%, transparent);
+}
+.new-thread-body:has(> [data-picture]) .composer-shell {
+  --composer-input: color-mix(in srgb, var(--bg) 72%, transparent);
+  --control-fill: color-mix(in srgb, var(--ink) 8%, transparent);
+  --well-ring: inset 0 1px 0 rgb(255 255 255 / 0.1), inset 0 0 0 1px rgb(255 255 255 / 0.05), 0 18px 50px -20px rgb(0 0 0 / 0.8);
+  backdrop-filter: blur(26px) saturate(1.1);
+}
+:root[data-theme="light"] .new-thread-body:has(> [data-picture]) .composer-shell {
+  --composer-input: color-mix(in srgb, var(--surface) 78%, transparent);
+  --control-fill: color-mix(in srgb, var(--surface) 72%, transparent);
+  --well-ring: inset 0 0 0 1px rgb(255 255 255 / 0.7), 0 0 0 1px rgb(0 0 0 / 0.05), 0 18px 44px -22px rgb(0 0 0 / 0.28);
+  backdrop-filter: blur(22px) saturate(0.8);
 }

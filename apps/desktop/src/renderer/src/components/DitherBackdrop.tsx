@@ -1,10 +1,13 @@
 import { DitheringShapes, DitheringTypes, ShaderFitOptions, ShaderMount, ditheringFragmentShader, getShaderColorFromString, imageDitheringFragmentShader } from "@paper-design/shaders";
 import { useEffect, useRef, useState } from "react";
+import storm from "../assets/backdrop/rosalie.jpg";
+import day from "../assets/backdrop/grassland.jpg";
 import { cn } from "../lib/cn";
 import { toHex } from "../lib/color";
-import { useBackdrop, type Backdrop, type BackdropPattern } from "../lib/backdrop";
+import { backdropPatterns, isPicture, useBackdrop, type Backdrop, type BackdropPattern } from "../lib/backdrop";
 import { observeOnScreen, useReducedMotion } from "../lib/motion";
 import { useTheme } from "../lib/theme";
+import { darkGrade, ditherDaylight, ditherPainting, type Pixels } from "./painting-dither";
 
 /** The sphere fills the corner it fades from; the other shapes read at the shader's own scale. */
 const SCALE: Partial<Record<BackdropPattern, number>> = { sphere: 2.2 };
@@ -35,7 +38,7 @@ const inkOf = (element: Element): Ink => getShaderColorFromString(toHex(getCompu
 function uniforms(backdrop: Backdrop, ink: Ink) {
   const grid = { u_type: DitheringTypes[backdrop.grid], u_pxSize: backdrop.size };
   if (backdrop.style === "image") return { ...grid, u_colorFront: ink, u_colorHighlight: ink, u_colorBack: [...CLEAR], u_originalColors: true, u_inverted: false, u_colorSteps: 2, u_scale: 1 };
-  const pattern = backdrop.style === "off" ? "sphere" : backdrop.style;
+  const pattern = backdropPatterns.find(({ id }) => id === backdrop.style)?.id ?? "sphere";
   return { ...grid, u_colorFront: ink, u_colorBack: [...CLEAR], u_shape: DitheringShapes[pattern], u_scale: SCALE[pattern] ?? 1 };
 }
 
@@ -59,12 +62,15 @@ function useDecodedImage(source: string | null): HTMLImageElement | null {
   return image;
 }
 
-/** Which shader draws the style: none while off or while its image decodes. */
+/** Which shader draws the style: none while off, for the painting, or while its image decodes. */
 function shaderProgram(style: Backdrop["style"], image: HTMLImageElement | null): "pattern" | "image" | null {
-  if (style === "off") return null;
+  if (style === "off" || style === "painting") return null;
   if (style === "image") return image ? "image" : null;
   return "pattern";
 }
+
+/** What the backdrop's styles key on: the painting, the user's image, or a pattern. */
+const styleOf = (style: Backdrop["style"]) => (isPicture(style) ? style : "pattern");
 
 let webgl2: boolean | undefined;
 
@@ -105,12 +111,123 @@ function animate(mount: ShaderMount, speed: number): () => void {
   };
 }
 
+/** The scenery's dots on the screen, in CSS pixels: whole pixels at every window size keep every dot square. */
+const DOT = 2;
+/** The least time between two redraws while the window is resized. */
+const REDRAW_MS = 150;
+
 /**
- * The backdrop chosen in Settings: a pattern from the shader's shapes in the palette's ink, or the user's image in its own
- * colors, in ordered dots on a clear ground that the mask fades out. It follows the palette and reduced motion, and
- * paints nothing without WebGL2.
+ * A picture the screen shows: its source, how far down from its top the card may show (its sky and far ground, never
+ * the near ground), where its centre of interest sits across and down within that, and how its cells are drawn.
  */
-export function DitherBackdrop({ className }: { className?: string }) {
+interface Scene {
+  source: string;
+  reach: number;
+  focus: { x: number; y: number };
+  draw: (painting: Pixels) => Uint8ClampedArray<ArrayBuffer>;
+}
+
+/** Dark shows a storm over mountains in greens; light shows a green hill under a clear sky in its own colours. */
+const scenes: Record<"dark" | "light", Scene> = {
+  dark: { source: storm, reach: 0.6, focus: { x: 0.3, y: 0.5 }, draw: (painting) => ditherPainting(painting, darkGrade) },
+  light: { source: day, reach: 0.9, focus: { x: 0.5, y: 0.25 }, draw: ditherDaylight },
+};
+
+/**
+ * The picture at one pixel a cell, cropped to the cells' shape around its centre of interest within its reach, as the
+ * window draws it smaller. Null where the window gives no 2D canvas.
+ */
+function fittedPainting(image: HTMLImageElement, { reach, focus }: Scene, width: number, height: number): Pixels | null {
+  const shown = image.naturalHeight * reach;
+  const scale = Math.max(width / image.naturalWidth, height / shown);
+  const cropWidth = width / scale;
+  const cropHeight = height / scale;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return null;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(image, (image.naturalWidth - cropWidth) * focus.x, (shown - cropHeight) * focus.y, cropWidth, cropHeight, 0, 0, width, height);
+  return { data: context.getImageData(0, 0, width, height).data, width, height };
+}
+
+/** What a painting canvas holds: its cells across and down, the dot they are drawn at, and the scene. */
+interface Drawn {
+  width: number;
+  height: number;
+  dot: number;
+  image: HTMLImageElement;
+}
+
+/** Draws the scene into the canvas at its frame's size, unless it already holds that picture at that size. */
+function paint(canvas: HTMLCanvasElement, image: HTMLImageElement, scene: Scene, dot: number, drawn: { current: Drawn | null }) {
+  const frame = canvas.parentElement;
+  const next = { width: Math.ceil((frame?.clientWidth ?? 0) / dot), height: Math.ceil((frame?.clientHeight ?? 0) / dot), dot, image };
+  const { width, height } = next;
+  const held = drawn.current;
+  if (!width || !height || (held && held.width === width && held.height === height && held.dot === dot && held.image === image)) return;
+  const fitted = fittedPainting(image, scene, width, height);
+  const context = canvas.getContext("2d");
+  if (!fitted || !context) return;
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = `${width * dot}px`;
+  canvas.style.height = `${height * dot}px`;
+  context.putImageData(new ImageData(scene.draw(fitted), width, height), 0, 0);
+  drawn.current = next;
+}
+
+/**
+ * The scenery that comes with the app for the theme on screen, dithered on the CPU at the frame's own size: one canvas
+ * pixel a dot, scaled up without smoothing. It is drawn again when the frame's size settles, never animated. Only the
+ * shown theme's picture loads.
+ */
+function PaintingCanvas({ dot }: { dot: number }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const scene = scenes[useTheme((state) => state.resolved)];
+  const decoded = useDecodedImage(scene.source);
+  // Until the new theme's picture decodes, the last one stays rather than being drawn in the wrong scene's colours.
+  const image = decoded?.getAttribute("src") === scene.source ? decoded : null;
+  const drawn = useRef<Drawn | null>(null);
+
+  useEffect(() => {
+    const element = canvas.current;
+    const frame = element?.parentElement;
+    if (!element || !frame || !image) return;
+    let timer = 0;
+    let last = 0;
+    const draw = () => {
+      timer = 0;
+      last = performance.now();
+      paint(element, image, scene, dot, drawn);
+    };
+    draw();
+    const observer = new ResizeObserver(() => {
+      if (!timer) timer = window.setTimeout(draw, Math.max(0, REDRAW_MS - (performance.now() - last)));
+    });
+    observer.observe(frame);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+    };
+  }, [image, scene, dot]);
+
+  return <canvas ref={canvas} />;
+}
+
+interface DitherBackdropProps {
+  className?: string;
+  /** Settings' preview: the picture at half size, so its dots are half size too. */
+  miniature?: boolean;
+}
+
+/**
+ * The backdrop chosen in Settings: the scenery that comes with the app, a pattern from the shader's shapes in the
+ * palette's ink on a clear ground that the mask fades out, or the user's image in its own colors, all in ordered dots.
+ * It follows the palette and reduced motion; the patterns and the image paint nothing without WebGL2.
+ */
+export function DitherBackdrop({ className, miniature }: DitherBackdropProps) {
   const backdrop = useBackdrop();
   // The ink comes from the palette's tokens, so any theme change repaints it.
   const theme = useTheme();
@@ -166,5 +283,9 @@ export function DitherBackdrop({ className }: { className?: string }) {
     return () => observer.disconnect();
   }, [mount]);
 
-  return <div ref={frame} aria-hidden="true" data-style={backdrop.style === "image" ? "image" : "pattern"} className={cn("dither-backdrop", className)} />;
+  return (
+    <div ref={frame} aria-hidden="true" data-style={styleOf(backdrop.style)} data-picture={isPicture(backdrop.style) || undefined} className={cn("dither-backdrop", className)}>
+      {backdrop.style === "painting" ? <PaintingCanvas dot={miniature ? DOT / 2 : DOT} /> : null}
+    </div>
+  );
 }

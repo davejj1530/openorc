@@ -1,45 +1,45 @@
 ---
 name: OpenOrc desktop
-description: A quiet multi-project workspace on a near-white ground, with soft grey fills, white planes lifted by a faint edge, and one ink action per screen.
+description: A quiet multi-project workspace in a black room or a warm off-white one, depth as a step in fill, and light as the one accent.
 colors:
-  ground-light: "#fafafa"
-  ground-dark: "#171717"
-  sidebar-light: "#f9fbfd"
-  sidebar-dark: "#141619"
+  ground-light: "#f5f5f2"
+  ground-dark: "#050505"
+  sidebar-light: "#f5f5f2"
+  sidebar-dark: "#050505"
   plane-light: "#ffffff"
-  plane-dark: "#202020"
-  fill-light: "#f0f0f0"
-  fill-dark: "#262626"
-  fill-strong-light: "#e8e8e8"
-  fill-strong-dark: "#2e2e2e"
-  selected-row-light: "#eef0f3"
-  selected-row-dark: "#23262b"
-  line-light: "#ebebeb"
-  line-dark: "#2a2a2a"
-  line-strong-light: "#dcdcdc"
-  line-strong-dark: "#383838"
-  ink-light: "#252525"
-  ink-dark: "#ececec"
-  reading-light: "#646464"
-  reading-dark: "#a3a3a3"
-  muted-light: "#636465"
-  muted-dark: "#a4a5a7"
-  faint-light: "#6d6d6e"
-  faint-dark: "#8e8f91"
-  line-number-light: "#8a8a8a"
-  line-number-dark: "#6e6e6e"
-  action-light: "#252525"
-  action-dark: "#ececec"
+  plane-dark: "#101010"
+  fill-light: "#ecece9"
+  fill-dark: "#161616"
+  fill-strong-light: "#e5e5e3"
+  fill-strong-dark: "#1e1e1e"
+  selected-row-light: "#ffffff"
+  selected-row-dark: "#191919"
+  line-light: "#e5e5e3"
+  line-dark: "#181818"
+  line-strong-light: "#d8d8d6"
+  line-strong-dark: "#2b2b2b"
+  ink-light: "#171717"
+  ink-dark: "#ededeb"
+  reading-light: "#515150"
+  reading-dark: "#dededb"
+  muted-light: "#626261"
+  muted-dark: "#8f8f8c"
+  faint-light: "#676766"
+  faint-dark: "#848481"
+  line-number-light: "#868684"
+  line-number-dark: "#6a6a67"
+  action-light: "#171717"
+  action-dark: "#ffffff"
   on-action-light: "#ffffff"
-  on-action-dark: "#171717"
-  ok-light: "#367b46"
-  ok-dark: "#63c27a"
-  ok-soft-light: "#e0fae3"
-  ok-soft-dark: "#15291b"
-  bad-light: "#c03737"
-  bad-dark: "#f07878"
-  bad-soft-light: "#fcecea"
-  bad-soft-dark: "#301c1b"
+  on-action-dark: "#050505"
+  ok-light: "#1e7359"
+  ok-dark: "#58b98a"
+  ok-soft-light: "#e4f0ea"
+  ok-soft-dark: "#12201a"
+  bad-light: "#9b5050"
+  bad-dark: "#d98a7e"
+  bad-soft-light: "#f7eae8"
+  bad-soft-dark: "#241715"
   attention-light: "#b26a00"
   attention-dark: "#f0b35a"
 typography:
@@ -56,9 +56,9 @@ typography:
     lineHeight: "16px"
   body:
     fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "14px"
+    fontSize: "15px"
     fontWeight: 400
-    lineHeight: "21px"
+    lineHeight: "24px"
     letterSpacing: "-0.005em"
   heading:
     fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
@@ -90,11 +90,11 @@ rounded:
   md: "10px"
   lg: "12px"
   viewport: "14px"
-  xl: "16px"
-  2xl: "18px"
-  3xl: "20px"
-  4xl: "22px"
-  5xl: "24px"
+  xl: "14px"
+  2xl: "16px"
+  3xl: "16px"
+  4xl: "16px"
+  5xl: "18px"
   pill: "999px"
 spacing:
   chrome: "44px"
@@ -128,12 +128,12 @@ components:
     backgroundColor: "transparent"
     typography: "{typography.interface}"
     rounded: "{rounded.md}"
-    height: "34px"
+    height: "36px"
   row-current:
     backgroundColor: "var(--current-row-fill)"
     textColor: "var(--navigation-ink)"
     rounded: "{rounded.md}"
-    height: "34px"
+    height: "36px"
   chip:
     backgroundColor: "{colors.fill-light}"
     typography: "{typography.label}"
@@ -185,15 +185,16 @@ First-run setup pairs a column of controls with a flat illustrated collage. Abov
 
 **Creative North Star: "A calm place to think with coding agents"**
 
-OpenOrc is a compact desktop workspace for several projects at once. The sidebar, the conversation, the panel and the page toolbars share one near-white ground. Pieces sit on it in white with a thin ring and a faint shadow: the composer and cards in the transcript; Settings' tiles are white with no ring. A control inside a piece is a soft grey key, as a control on the ground is a soft grey fill, and the person's message is a grey bubble. Only what floats is raised: menus and popovers are white planes on a strong hairline and one soft shadow. Dark is the same sheet carved: a neutral #171717 ground with no blue, pieces cut to near black with no ring, keys 8.5% of white over them, menus near black on a strong hairline and one deep shadow. Each screen has one ink pill; everything else is quiet. The interface is set in Immaculate Gothic at one regular weight.
+OpenOrc is a compact desktop workspace for several projects at once. The sidebar, the conversation, the panel and the page toolbars share one ground, with no line under any header; the only lines are the two faint full-height seams beside the conversation. Depth is a step in fill, never a line or a card's border. Dark is a black room (#050505): pieces one quiet step up (#101010) with no ring, keys a step above them, soft off-white ink, and menus on a strong hairline and one deep shadow. Light is a warm off-white room (#f5f5f2): pieces and planes in plain white, fills and lines a few percent of the ink over the ground (#ecece9, #e5e5e3), a neutral near-black ink (#171717) whose greys are mixed from it, the ink as the action, and menus on a faint ring and one soft shadow. There is no brand colour; colour is kept for state (diff red and green, needs-you amber, thinking violet). Light is the one accent: the open row, each screen's one ink pill and a ready send button are lit, a faint glow in dark and a soft shadow in light, and a working thread's cube glows. The interface is set in Immaculate Gothic at one regular weight.
 
 This record describes the built desktop interface. It preserves the workflows in [PRODUCT.md](../../PRODUCT.md), including drafts, task authorization, Orcling privacy, and project context. Original artwork and provider marks are documented in [artwork provenance](../../docs/artwork-provenance.md).
 
 **Key Characteristics:**
 
-- One near-white ground everywhere, white pieces on a thin ring, grey keys inside them, grey fills on the ground, white floating planes.
+- One ground everywhere, black or warm off-white; pieces one fill step off it with keys inside them; no rules under headers.
 - Hierarchy from title ink, the softer reading ink, muted and faint text, and size, never from weight.
-- Round controls: pills for buttons, chips, tracks, and send; 34px rows with r10 corners.
+- Round controls: pills for buttons, chips, tracks, and send; 36px rows with r10 corners; planes a soft 14 to 16px.
+- Light as the accent: the open row, the one ink pill, a ready send button and a working cube are lit (`--lit`, `--lit-strong`, `--lit-mark`, flat in palettes that do not light them).
 - Color only where it means something: diffs, results, attention dots, links, and selection.
 - No keyboard shortcut hints and no capability advertising in the UI. The shortcuts themselves still work.
 
@@ -219,11 +220,11 @@ Immaculate Gothic sets the whole interface by default, in its Text 450 face. Set
 
 The interface uses one weight: `--font-weight-medium` and `--font-weight-semibold` are both 400. Bold survives only for author emphasis inside content (replies, task documents, comments). UI text is 12.5, 13, 14 or 15px; there is no 11px or 10px text. The scale, with its tracking, lives in `@theme static`:
 
-- `xs` 12.5/16 for quiet lines (times, second lines, meta) and code, `sm` 13/16 for section labels, counts and small controls, `base` 14/20 for rows and labels, `md` 14/22 for writing, `header` 15/20 for a column's title in its header, `prose` 14/21 for reading, `lg` 16/22.
+- `xs` 12.5/16 for quiet lines (times, second lines, meta) and code, `sm` 13/16 for section labels, counts and small controls, `base` 14/20 for rows and labels, `md` 15/24 for writing, `header` 15/20 for a column's title in its header, `prose` 15/24 for reading, `lg` 16/22.
 - `title-sm` 22/28 for document and page titles, `title` 28/34 for the New thread question and settings page titles.
 - `stat` 18/22 and `stat-sm` 16/20 for numerals, always tabular.
 
-Replies and prompts are 14/21; code is 12.5/20. Single-line rows use 16px leading. Long prose wraps; code and tables scroll in their own blocks. A table is no piece: it sits on the ground as hairlines under quiet heads, with no fill.
+Replies and prompts are 15/24; code is 12.5/20. Single-line rows use 16px leading. Long prose wraps; code and tables scroll in their own blocks. A table is no piece: it sits on the ground as hairlines under quiet heads, with no fill.
 
 ## Layout
 
@@ -231,7 +232,7 @@ The window has one navigation column, a conversation or destination, and an opti
 
 The conversation column is at most 800px with 32px reading gutters; the composer uses 24px. Both shrink to 12px at 520px and below and in narrow panes. Each column owns its scrolling. Split conversations keep their own header and panel ownership.
 
-The sidebar is one column, 247px by default (224 to 380), on its `--sidebar` ground; a hairline in `--line` runs the window's full height at its right edge, through its header, and goes while the sidebar floats at 900px and narrower. Hidden, nothing of it stays, and the first header clears the traffic lights. Its 44px header has no line under it and clears the traffic lights where the OS draws them. The sidebar toggle leads the first header beside it, open or hidden. The signed-in space switcher shows OpenOrc in Personal and the organization's mark and name in an organization. Back and Forward sit at the end of the sidebar header when they fit beside the whole name. If they do not fit, they follow the sidebar toggle in the work column's header, as they do while the sidebar is hidden, and return when room allows. One measurement chooses their location, so exactly one pair is shown, dimmed when its history is empty. The name is never cut to make room for the arrows; a name too long for the row alone keeps whole-word clipping and its full-name tooltip. Signed out, the existing plain wordmark and header behavior remain. Under the header New thread leads, a pen in full ink, lit while its screen is open; then the app's screens as named rows, 34px apart, each glyph centred in an 18px lead slot 16px in, on the traffic lights' left edge, and the name at 42: Tasks, Pull requests, Schedules and Orclings. There is no Inbox: what waits on the person shows where it lives. A count sits at a row's end only where something waits: on Tasks, tasks whose run asks for an approval, tasks proposed and tasks in review, each once; on Orclings, Orcling chats with a question or a failure. Every count in the sidebar is amber, centred in a 16px slot on the line the row marks share, and counts nothing else; there are no grey totals. A thread waiting on an approval or a question carries its mark on its own row and counts on its project's label and on the folded Workspaces head, however old its work, since a thread that waits never goes to Resolved by age. Orclings is a toggle that swaps the threads for the Orclings list and back; while it does, its row carries New group chat and New Orcling at its end, and the list, with no head of its own, starts 18px under the screens. Memory is reached from the right panel and the palette. While Settings is open, its sections take the screens' and threads' place under Back to app. The 44px footer, under a hairline, holds the weekly usage, the update while one waits, and Settings at the row's end. Its start is the person's: a 36px row, signed in with a 26px face and two lines, the name at 14/16 and the plan at 12/14; signed out, Sign in, drawn as a screen row (a person glyph 16px in, the word in the third ink), which opens OpenOrc's sign-in page in the browser. While the page waits it reads "Signing in…" and its glyph turns, a cross under the pointer that calls the sign-in off; a sign-in that failed says why on a second line in the bad ink, cut to the width with the whole of it on hover. A build with no account server shows nothing there, and Settings has no Account section.
+The sidebar is one column, 247px by default (224 to 380), on its `--sidebar` ground; a hairline in `--line` runs the window's full height at its right edge, through its header, and goes while the sidebar floats at 900px and narrower. Hidden, nothing of it stays, and the first header clears the traffic lights. Its 44px header has no line under it and clears the traffic lights where the OS draws them. The sidebar toggle leads the first header beside it, open or hidden. The signed-in space switcher shows OpenOrc in Personal and the organization's mark and name in an organization. Back and Forward sit at the end of the sidebar header when they fit beside the whole name. If they do not fit, they follow the sidebar toggle in the work column's header, as they do while the sidebar is hidden, and return when room allows. One measurement chooses their location, so exactly one pair is shown, dimmed when its history is empty. The name is never cut to make room for the arrows; a name too long for the row alone keeps whole-word clipping and its full-name tooltip. Signed out, the existing plain wordmark and header behavior remain. Under the header New thread leads, a pen in full ink, lit while its screen is open; then the app's screens as named rows, 34px apart, each glyph centred in an 18px lead slot 16px in, on the traffic lights' left edge, and the name at 42: Tasks, Pull requests, Schedules and Orclings. There is no Inbox: what waits on the person shows where it lives. A count sits at a row's end only where something waits: on Tasks, tasks whose run asks for an approval, tasks proposed and tasks in review, each once; on Orclings, Orcling chats with a question or a failure. Every count in the sidebar is amber, centred in a 16px slot on the line the row marks share, and counts nothing else; there are no grey totals. A thread waiting on an approval or a question carries its mark on its own row and counts on its project's label and on the folded Workspaces head, however old its work, since a thread that waits never goes to Resolved by age. Orclings is a toggle that swaps the threads for the Orclings list and back; while it does, its row carries New group chat and New Orcling at its end, and the list, with no head of its own, starts 18px under the screens. Memory is reached from the right panel and the palette. While Settings is open, its sections take the screens' and threads' place under Back to app. The 44px footer, with no line over it, holds the weekly usage, the update while one waits, and Settings at the row's end. Its start is the person's: a 36px row, signed in with a 26px face and two lines, the name at 14/16 and the plan at 12/14; signed out, Sign in, drawn as a screen row (a person glyph 16px in, the word in the third ink), which opens OpenOrc's sign-in page in the browser. While the page waits it reads "Signing in…" and its glyph turns, a cross under the pointer that calls the sign-in off; a sign-in that failed says why on a second line in the bad ink, cut to the width with the whole of it on hover. A build with no account server shows nothing there, and Settings has no Account section.
 
 Scoped views keep project groups, counts, search and task lists within the selected space. An organization contains the local folders paired with its usable cloud projects and its readable cloud threads; Personal keeps unmatched folders and personal cloud work. A cloud project without a local folder uses the cloud mark and offers OpenOrc Cloud only. The organization filter adds Mine and Everyone's above the existing thread filters, without a heading. A window retains each space's tabs, split panes, destination and Back history independently. The account footer remains personal. Orclings and their group chats stay global, with their existing list and amber count in every space. Switching spaces from them, as from Settings, restores that space's last project-work destination. Tasks, Pull requests and Schedules follow the projects the current space lists, with amber counts using the same scope.
 
@@ -279,14 +280,12 @@ Corner radius is set per component:
 - 10: rows and menu items.
 - 12: tall rows, sheet fields, and diff file heads.
 - 14: the browser viewport.
-- 16: drop menus, command, schedule, and toast cards, code blocks.
-- 18: popovers, prompt bubbles, permission, task, and MCP cards, settings cards.
-- 20: the palette, sheets, dialogs, grown menus (model, branch, context, slash), steps and question cards, the conversation composer.
-- 22: the commit sheet and usage account cards.
-- 24: the New thread composer.
+- 14: drop menus, command, schedule, and toast cards, code blocks.
+- 16: popovers, prompt bubbles, permission, task, and MCP cards, settings cards, the palette, sheets, dialogs, grown menus (model, branch, context, slash), steps and question cards, the conversation composer, the commit sheet and usage account cards.
+- 18: the New thread composer.
 - Full: buttons, chips, tracks, and send.
 
-Control sizes: Button sm 28, md 30, lg 32, xl 36, hero 40. IconButton 24, 28, 30, or 32, always round. Chips and badges 22, rows 34, send 32 (34 on New thread).
+Control sizes: Button sm 28, md 30, lg 32, xl 36, hero 40. IconButton 24, 28, 30, or 32, always round. Chips and badges 22, rows 36, send 32 (34 on New thread).
 
 Icons are [Precision Outline](../../docs/precision-outline-icons.md): a 24-unit grid, 1.75 strokes, rounded joins and caps, `currentColor`, from `components/icons.tsx`. Filled collaboration marks, the Hollow conversation indicator, and upstream framework logos remain deliberate exceptions. Orclings keep their own shapes and colors.
 
@@ -300,7 +299,7 @@ Motion uses tokens only: leaving 160ms; arriving 220ms with opacity, a 4px blur,
 
 Use the shared primitives in `components/ui.tsx`, `Segmented.tsx`, and `menu.ts`. Primary is the ink pill, secondary and danger rest on `--control-fill` (danger with a `--bad` label), ghost is bare with a fill hover. `hover-step` layers the fill step over a control's own fill so hover reads on tile and plane. Segmented controls are a fill track at natural width with a surface knob that slides over 320ms. Switches are an ink track when on and `--surface-3` when off. Fields are fills with no border; focus deepens the fill instead of drawing a ring, while buttons, chips, and segmented choices draw a 2px `--ring` outline on keyboard focus. Badges are neutral fill pills; status reads as a 7px `StatusDot` and a word.
 
-Menus are all one size: r16 with padding 6 and 34px r10 rows, 15px glyphs in the third ink, a hairline between kinds of action, and the destructive one last after a hairline. The palette is the one search, a floating plane 600 wide and r20 over a 30% scrim, its field 48px at lead size with "Search" as its placeholder; before a word is typed it lists recent threads, then actions; searching it lists threads, Orclings, tasks, messages and projects in 38px rows, each with its mark (a thread's state or the working cube, else its agent's), its place in faint ink and its age at the end. Grown menus (model, branch, mode) open out of their pill into an r20 layer. Tooltips are fill-step labels, opened once per group without a second delay. A plain line takes `data-tip` on its element, which the window's one tip layer opens (`TipLayer`); `Tooltip` wraps a control whose tip is more than a line. Nothing uses the browser's `title`, which waits longer and draws outside the app's look; a frame keeps `title` as its name. A tip that only repeats its element's words opens when those words are cut off, and a disabled control's tip says why.
+Menus are all one size: r14 with padding 6 and 34px r10 rows, 15px glyphs in the third ink, a hairline between kinds of action, and the destructive one last after a hairline. The palette is the one search, a floating plane 600 wide and r16 over a 30% scrim, its field 48px at lead size with "Search" as its placeholder; before a word is typed it lists recent threads, then actions; searching it lists threads, Orclings, tasks, messages and projects in 38px rows, each with its mark (a thread's state or the working cube, else its agent's), its place in faint ink and its age at the end. Grown menus (model, branch, mode) open out of their pill into an r16 layer. Tooltips are fill-step labels, opened once per group without a second delay. A plain line takes `data-tip` on its element, which the window's one tip layer opens (`TipLayer`); `Tooltip` wraps a control whose tip is more than a line. Nothing uses the browser's `title`, which waits longer and draws outside the app's look; a frame keeps `title` as its name. A tip that only repeats its element's words opens when those words are cut off, and a disabled control's tip says why.
 
 ### Sidebar
 
@@ -314,9 +313,9 @@ The usage button is the week's share left, filled on its disc and never an arc, 
 
 ### Conversation
 
-The work column's header leads with its tabs, one for each open thread or new thread, in the order they were opened or dragged to; choosing one never moves it. A tab is its mark (the thread's state, its agent or its Orcling's face) and its name at 13px as plain words with no pill: the open one in full ink over a 2px line on the header's hairline, the others in the third ink and the second under the pointer. A tab takes its name's width up to 220px and gives way down to 136px, then the strip scrolls sideways, keeping the open tab in view. Its close shows on the open tab and on one under the pointer or holding focus, and a double-click on the open one renames it. The pen after the strip opens a new thread in a tab of its own. Every control that starts a thread wears the pen; a plus only adds one of the things beside it, and a folder with a plus adds a project. A split pane's header holds its title in a rename box. Then a faint run of facts (activity, pull request, snooze), Close pane, More, Tasks, and the panel toggle as round buttons. On every screen the work column's last header leads its round buttons with an Orcling's face alone: the one with the newest unread message, else the one last talked to, with the 7px unread dot while she has one. It opens a small chat with her under it, r20 and 380 wide, with her latest messages and a composer of attach and send; its corner opens her full chat.
+The work column's header leads with its tabs, one for each open thread or new thread, in the order they were opened or dragged to; choosing one never moves it. A tab is its mark (the thread's state, its agent or its Orcling's face) and its name at 13px as plain words with no pill: the open one in full ink over a 2px line at the header's foot, the others in the third ink and the second under the pointer. A tab takes its name's width up to 220px and gives way down to 136px, then the strip scrolls sideways, keeping the open tab in view. Its close shows on the open tab and on one under the pointer or holding focus, and a double-click on the open one renames it. The pen after the strip opens a new thread in a tab of its own. Every control that starts a thread wears the pen; a plus only adds one of the things beside it, and a folder with a plus adds a project. A split pane's header holds its title in a rename box. Then a faint run of facts (activity, pull request, snooze), Close pane, More, Tasks, and the panel toggle as round buttons. On every screen the work column's last header leads its round buttons with an Orcling's face alone: the one with the newest unread message, else the one last talked to, with the 7px unread dot while she has one. It opens a small chat with her under it, r16 and 380 wide, with her latest messages and a composer of attach and send; its corner opens her full chat.
 
-User prompts are r18 plane bubbles, aligned right, capped at 88% of the column or 72ch, with no border. Replies are unboxed ink prose under a turn head (harness mark, agent, model, a status that swaps in place). Work collapses behind a receipt (thought time, steps, last check). The steps card is r20 with a 2px ink track when there is a plan; commands are r16 cards with their last output line. An approval or a question the agent waits on is not drawn in the thread: it docks on the composer (below). Once answered it is the thread's record of what was asked: a question an r20 card whose chosen options are keys with an ink edge and a check, the rest stepped back; a denied approval one quiet line; an allowed one its tool row. Changes close to one "Changed N files" line with a Review pill. Copy and Fork sit at the end of the turn, shown at rest only on the last visible one. A turn held only in the composer does not hide that row. The cube ends the thread: 24px, in ink and turning while the agent works, in the fourth ink and still at rest. Wherever an agent works (a row, a tab, the palette's thread rows, the project list, a task) the same cube turns at 16px in the third ink, in ink on the open row and the open tab. Its lit face steps top, right, left, each held 0.6s and crossed in 0.2s, and every cube in the window keeps one clock; reduced motion holds the top face lit. A command still running keeps its own mark, and steps and loads keep the ring.
+User prompts are r16 plane bubbles, aligned right, capped at 88% of the column or 72ch, with no border. Replies are unboxed ink prose under a turn head (harness mark, agent, model, a status that swaps in place). Work collapses behind a receipt (thought time, steps, last check). The steps card is r16 with a 2px ink track when there is a plan; commands are r14 cards with their last output line. An approval or a question the agent waits on is not drawn in the thread: it docks on the composer (below). Once answered it is the thread's record of what was asked: a question an r16 card whose chosen options are keys with an ink edge and a check, the rest stepped back; a denied approval one quiet line; an allowed one its tool row. Changes close to one "Changed N files" line with a Review pill. Copy and Fork sit at the end of the turn, shown at rest only on the last visible one. A turn held only in the composer does not hide that row. The cube ends the thread: 24px, in ink and turning while the agent works, in the fourth ink and still at rest. Wherever an agent works (a row, a tab, the palette's thread rows, the project list, a task) the same cube turns at 16px in the third ink, in ink on the open row and the open tab. Its lit face steps top, right, left, each held 0.6s and crossed in 0.2s, and every cube in the window keeps one clock; reduced motion holds the top face lit. A command still running keeps its own mark, and steps and loads keep the ring.
 
 An ask the agent waits on docks at the top of the composer's own piece, above a hairline, and the writing and the bar under it keep their shape. Its top line holds what it asks (the agent's mark for a question, the request's glyph for an approval), then how many more wait ("1 more waits"), and last its one quiet way out, Decline or Deny. A question's choices are keys the width of the piece: a single choice answers when pressed; several toggle, a picked one a key in the piece's fill with an ink edge and a check, and Answer joins the row. One ask of several questions shows one at a time under "1 of 3", each answer kept above as a line that reopens it, and the last Answer sends them all. A question whose agent takes words has its own line ("Something else", or "Your answer" with no choices), masked for a secret. An approval shows its request as summed up, the raw request on demand when it says more, a line "Say what to do instead", then Allow for this run (not for a request that can only be allowed once) and Allow once. The column keeps one ink: Allow once, or Answer once the answer is more than one press, or the line's own pill (Answer, Keep, Deny and send) while it holds words, and the field's own send when the field holds words; a single-choice question has none, and Stop stands aside as the white key. Words in the composer's field are always a message: with an ask waiting Enter queues them and Send now is dimmed with its reason. The keyboard enters an ask only at its question, by arrow up from an empty field or Shift and Tab, never at a choice, so a stray Enter answers nothing; arrows and Tab walk its controls, Escape or a letter goes back to the field, and an answer gives the keyboard back to the field. An ask that takes an answered one's place takes no press for 240ms. A long ask keeps to about half the window and scrolls under its top line. A thread out of reach, or a teammate's the person only reads, shows the ask with its answers dimmed and why on demand. The dock opens from nothing as its parts clear a blur and rise one after another, and leaves by blurring away, then folding; reduced motion shows and hides it at once. Each pane of a split view has its own. Where no composer takes an ask (a task's comment, a task's activity), the same parts sit in a card where it was asked.
 
@@ -330,13 +329,13 @@ A teammate's thread that the person can only read keeps the field editable, with
 
 A teammate's thread waiting on an ask says who it waits on, using the starter's first name. Its question mark stays in quiet ink. It does not enter Needs you counts, parent counts or attention lines at the list's edge. The person's own asks keep their attention mark.
 
-The conversation composer is one r20 surface on `--composer-input` with no inner well. One bar holds attach, the project or destination chip, model, and mode on the left, and activity, the context ring, and send on the right. It never wraps, scrolls or clips: short of room the chips give up words a step at a time, the model's effort, then the mode's and destination's names, then the model's name, keeping their marks. Send, Queue, and Stop are layers of one 32px ink pill. The mode pill grows a small menu of the levels the agent offers; it does not step. Clicking the context ring opens its details; only Compact compacts. When there are uncommitted changes, the Commit chip (Commit plus its +N −M totals) is first in the stack above the writing surface, aligned left. Queued messages, background work, cloud status, recovery, and all other notices follow the chip. Queued messages stack as a pile that fans out on click.
+The conversation composer is one r16 surface on `--composer-input` with no inner well. One bar holds attach, the project or destination chip, model, and mode on the left, and activity, the context ring, and send on the right. It never wraps, scrolls or clips: short of room the chips give up words a step at a time, the model's effort, then the mode's and destination's names, then the model's name, keeping their marks. Send, Queue, and Stop are layers of one 32px ink pill. The mode pill grows a small menu of the levels the agent offers; it does not step. Clicking the context ring opens its details; only Compact compacts. When there are uncommitted changes, the Commit chip (Commit plus its +N −M totals) is first in the stack above the writing surface, aligned left. Queued messages, background work, cloud status, recovery, and all other notices follow the chip. Queued messages stack as a pile that fans out on click.
 
-New thread keeps the tile ground. Its toolbar holds only the panel toggle, which shows and hides the panel; the 28/34 question is the page title; when the checkout has changes, the Commit chip sits right over the composer on its left edge; the r24 white composer has a 15/24 prompt and a 34px send. Nothing sits under it. Where the thread works is one icon in the composer's bar, after attach: the place's glyph, with one sentence on demand ("Works in the local checkout on main", "Works in a new worktree off main", "Works on OpenOrc Cloud, on a new branch from main"). It opens the place menu: Local checkout, Worktree, then a hairline and OpenOrc Cloud, names alone, a pickable row ending in one quiet fact (the hours left). With no project the icon is a folder and opens the folder chooser. No suggested prompts and no list of past threads or tasks. Along the bottom, aligned to the column, a year of the project's finished turns is one dot a day (a week to a column), growing from a 3px speck to 9px and from 10% to 54% ink with the day's rank among active days. The 12/16 line above it gives the turns and steps (tool calls, subagents' included) since the first active day, or "in the last year" once activity reaches the oldest week, and on hover the day, its turns, steps and threads, and each agent's share with its mark. The column's top takes back the activity's room, so the column centres exactly where it would without it; a pane under 600px leaves the activity out. New subthread shares the screen: the backdrop, the question naming the parent, and the project's activity.
+New thread keeps the tile ground. Its toolbar holds only the panel toggle, which shows and hides the panel; the 28/34 question is the page title, centred over the composer; the screen shows no Commit chip; the r18 composer has a 15/24 prompt and a 34px send. Nothing sits under it. Where the thread works is one icon in the composer's bar, after attach: the place's glyph, with one sentence on demand ("Works in the local checkout on main", "Works in a new worktree off main", "Works on OpenOrc Cloud, on a new branch from main"). It opens the place menu: Local checkout, Worktree, then a hairline and OpenOrc Cloud, names alone, a pickable row ending in one quiet fact (the hours left). With no project the icon is a folder and opens the folder chooser. No suggested prompts and no list of past threads or tasks. Along the bottom, aligned to the column, a year of the project's finished turns is one dot a day (a week to a column), growing from a 3px speck to 9px and from 10% to 54% ink with the day's rank among active days. The 12/16 line above it gives the turns and steps (tool calls, subagents' included) since the first active day, or "in the last year" once activity reaches the oldest week, and on hover the day, its turns, steps and threads, and each agent's share with its mark. The column's top takes back the activity's room, so the column centres exactly where it would without it; a pane under 600px leaves the activity out. New subthread shares the screen: the backdrop, the question naming the parent, and the project's activity.
 
 ### Work panel
 
-The panel shares the conversation's ground from the window's top edge to its bottom, with no margin, card, or seam between its header and the open tab's page. The header shares the 44px chrome line. Tabs are 28px pills on the soft fill, the open one a raised white plane; a tab's close shows on the open one and under the pointer. The plus, expand, and hide are bare round buttons. Changes opens as the first tab. The panel's tabs and the work column's reorder by dragging: the held tab follows the pointer on an opaque fill, the tabs it passes step aside, and it glides into place on the drop; a strip that has outgrown its bar scrolls while a tab is held at either end. The round plus opens the New tab page with tool and recent page rows. Each tool page starts with a 48px bar (title, faint meta, actions); Commit is that page's ink pill and grows into the r22 commit sheet. Diffs fill the panel edge to edge with no inset, card, corners or gaps: 36px file heads on the ground with a hairline under them, each right under the row above it and its first line of code right under it; 20px rows of 12.5px mono on the plane, title-ink code on square `--ok-soft` and `--bad-soft` runs, `--line-number` numbers, full-width bars for unchanged runs, and no syntax colors. Web pages get a 44px bar with their own Back/Forward, an address pill, and an r14 inset viewport.
+The panel shares the conversation's ground from the window's top edge to its bottom, with no margin, card, or seam between its header and the open tab's page. The header shares the 44px chrome band, with no line under it. Tabs are 28px pills on the soft fill, the open one on the strong fill with no edge; a tab's close shows on the open one and under the pointer. The plus, expand, and hide are bare round buttons. Changes opens as the first tab. The panel's tabs and the work column's reorder by dragging: the held tab follows the pointer on an opaque fill, the tabs it passes step aside, and it glides into place on the drop; a strip that has outgrown its bar scrolls while a tab is held at either end. The round plus opens the New tab page with tool and recent page rows. Each tool page starts with a 48px bar (title, faint meta, actions); Commit is that page's ink pill and grows into the r16 commit sheet. Diffs fill the panel edge to edge with no inset, card, corners or gaps: 36px file heads on the ground with no line under them, each right under the row above it and its first line of code right under it; 20px rows of 12.5px mono on the palette's `--paper` (the plane unless the palette sets its own), title-ink code on square `--ok-soft` and `--bad-soft` runs, `--line-number` numbers, full-width bars for unchanged runs, and no syntax colors. Web pages get a 44px bar with their own Back/Forward, an address pill, and an r14 inset viewport.
 
 ### Pages, tasks, and settings
 
@@ -346,9 +345,9 @@ Tasks, Pull requests and Schedules share one column, 1056 at most and centred, w
 
 Organization Tasks keeps the existing list, groups, status marks, 44px rows and document fields. Its server rows pack a 16px assignee face, a neutral unseen-assignment dot and the cloud mark into the metadata strip, with no reserved empty slots. Assigned to me and Project join the existing filter. The sidebar counts each task needing this person once; only opening Overview acknowledges the matching assignment. Shared documents keep the 800ms autosave and retain typed words on conflict, showing the last writer with Use saved version and Save my changes. A property conflict asks for another choice without replacing document words. Online image insertion is disabled with its reason on demand until shared task uploads exist; device image addresses are shown as unavailable. Personal and Mac task behavior stays unchanged.
 
-Settings is a plane sheet beside the sidebar, which lists its sections. Like the work panel, it runs flush to the window edges with its toolbar inside it. Each page has a 28/34 title and one faint line of context in a left-aligned 860px column. Groups and cards are tile cards on the sheet (r18, 20px inset), with hairlines between rows. Appearance tiles are fill-only with a navigation ring on the current choice.
+Settings is a plane sheet beside the sidebar, which lists its sections. Like the work panel, it runs flush to the window edges with its toolbar inside it. Each page has a 28/34 title and one faint line of context in a left-aligned 860px column. Groups and cards are tile cards on the sheet (r16, 20px inset), with hairlines between rows. Appearance tiles are fill-only with a navigation ring on the current choice.
 
-Usage uses a wider 1120px column with Cost, Tokens, and Limits views. Its agent filter and date range sit above a total and agent list beside the trend chart; below are token totals, their composition, and a model or day breakdown. Below 760px of content width the summary and chart stack. Cost is labeled API estimate: Codex uses recorded tokens and published model prices, while other agents supply estimates. Unavailable prices and tokens are named explicitly. Limits retains the r22 account cards and 48px rings for the allowance remaining, with reset controls and recovery links intact.
+Usage uses a wider 1120px column with Cost, Tokens, and Limits views. Its agent filter and date range sit above a total and agent list beside the trend chart; below are token totals, their composition, and a model or day breakdown. Below 760px of content width the summary and chart stack. Cost is labeled API estimate: Codex uses recorded tokens and published model prices, while other agents supply estimates. Unavailable prices and tokens are named explicitly. Limits retains the r16 account cards and 48px rings for the allowance remaining, with reset controls and recovery links intact.
 
 Connections lists enabled agents in one group with hairlines between rows. Each row keeps its mark, name, connection status, version, and enable switch visible; expanding the name reveals installation details. Update actions and errors remain visible. Add agents is a compact disclosure at the bottom of the same group, and update preferences sit in a separate group below.
 

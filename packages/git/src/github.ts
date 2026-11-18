@@ -501,9 +501,11 @@ export class GitHubPulls {
   }
 
   private async labels(at: PullsAt): Promise<PullRequestChoice[]> {
-    const out = await this.listing(cwdOf(at), ["label", "list", ...repoFlag(at), "--sort", "name", "--order", "asc", "--limit", LABEL_LIMIT, "--json", "name,color,description"]).catch((error: unknown) => {
-      throw ghFailure(error, "The repository's labels");
-    });
+    const out = await this.listing(cwdOf(at), ["label", "list", ...repoFlag(at), "--sort", "name", "--order", "asc", "--limit", LABEL_LIMIT, "--json", "name,color,description"]).catch(
+      (error: unknown) => {
+        throw ghFailure(error, "The repository's labels");
+      },
+    );
     return (JSON.parse(out) as RawLabel[])
       .filter((raw) => SearchName.safeParse(raw.name).success)
       .map(label)

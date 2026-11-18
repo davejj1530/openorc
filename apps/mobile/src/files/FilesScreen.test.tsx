@@ -18,6 +18,8 @@ const LISTINGS: Record<string, unknown> = {
   "": { root: "", name: "web", entries: [entry("src", "directory"), entry("node_modules", "directory", true), entry("board.png", "file"), entry("README.md", "file")] },
   src: { root: "", name: "web", entries: [entry("src/plans", "directory")] },
   "src/plans": { root: "", name: "web", entries: [] },
+  never: { root: "", name: "web", entries: [], unavailable: { message: "This thread hasn't saved its work yet.", retry: false } },
+  offline: { root: "", name: "web", entries: [], unavailable: { message: "GitHub is out of reach.", retry: true } },
 };
 const place = { root: "", outside: false };
 const READS: Record<string, FileRead> = {
@@ -85,6 +87,19 @@ it("says Empty folder for a folder with nothing in it, and the Mac's words for o
   cleanup();
   show(<FilesScreen />, { threadId: "t1", path: "elsewhere" });
   expect(await screen.findByText("This project isn't on Studio.", {}, { timeout: 10_000 })).toBeTruthy();
+});
+
+it("says once why a cloud thread's copy cannot be had, with Retry only where the Mac says it may help", async () => {
+  show(<FilesScreen />, { threadId: "t1", path: "never" });
+  expect(await screen.findByText("This thread hasn't saved its work yet.")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  expect(screen.queryByText("Empty folder")).toBeNull();
+  cleanup();
+  show(<FilesScreen />, { threadId: "t1", path: "offline" });
+  expect(await screen.findByText("GitHub is out of reach.")).toBeTruthy();
+  const listed = mac.calls.filter(([method]) => method === "files.list").length;
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  await waitFor(() => expect(mac.calls.filter(([method]) => method === "files.list").length).toBe(listed + 1));
 });
 
 it("finds files by name at the folder's root, as the desktop's search does", async () => {

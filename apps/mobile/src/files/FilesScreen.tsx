@@ -107,9 +107,14 @@ export function FilesScreen() {
   );
 }
 
-/** A folder's entries, or what stands in for them: the Mac's words when it could not list them, the wait, or Empty folder. */
+/**
+ * A folder's entries, or what stands in for them: the Mac's words when it could not list them or a cloud thread's copy
+ * cannot be had (with Retry only where the Mac says it may help), the wait, or Empty folder.
+ */
 function Listing({ folder, live, host, onOpen }: { folder: ReturnType<typeof useRpc<"files.list">>; live: boolean; host: string; onOpen: (entry: FileEntry) => void }) {
   if (folder.data) {
+    const { unavailable } = folder.data;
+    if (unavailable) return <FilesNotice text={unavailable.message} onRetry={unavailable.retry && live ? () => void folder.refetch() : undefined} />;
     if (!folder.data.entries.length) return <FilesNotice text="Empty folder" />;
     return folder.data.entries.map((entry) => <EntryRow key={entry.path} entry={entry} onOpen={onOpen} />);
   }

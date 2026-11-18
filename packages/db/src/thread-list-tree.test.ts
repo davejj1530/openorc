@@ -116,3 +116,24 @@ it("breaks equal start times by id and pages each parent independently", () => {
     db.close();
   }
 });
+
+it("reads the threads started under a thread at any depth, put away too, each after its parent, and none of its agent's helpers", () => {
+  const db = Db.memory();
+  try {
+    const project = projects.insert(db, { name: "Launch", rootPath: "/repo", gitRemote: null, defaultBranch: null, settings: {} });
+    const make = (title: string, parent: string | null, relation: "started" | "subagent" | null, archivedAt: number | null = null) => {
+      const made = threads.insert(db, { projectId: project.id, title, agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+      return parent ? threads.update(db, made.id, { parentThreadId: parent, parentRelation: relation, archivedAt }).id : made.id;
+    };
+    const root = make("Root", null, null);
+    const copy = make("Copy", root, "started");
+    make("Helper", root, "subagent");
+    const links = make("Links", copy, "started", 5);
+    const other = make("Other root", null, null);
+    make("Not ours", other, "started");
+    expect(threads.startedUnder(db, root).map((thread) => thread.title)).toEqual(["Copy", "Links"]);
+    expect(threads.startedUnder(db, copy).map((thread) => thread.id)).toEqual([links]);
+  } finally {
+    db.close();
+  }
+});

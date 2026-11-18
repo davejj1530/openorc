@@ -69,7 +69,9 @@ function account() {
     asked: [] as true[],
     arrived: [] as { space: string; id: string; projectId: string }[],
     history: [] as ArrivalLine[],
-    session: null as null | { query: { agent: string; sessionId: string; cliVersion: string }; packed: Uint8Array },
+    session: null as null | { query: { agent: string; sessionId: string; cliVersion: string; thread?: string }; packed: Uint8Array },
+    /** Every conversation sent, the moving thread's and its subthreads', in order. */
+    sessions: [] as { agent: string; sessionId: string; cliVersion: string; thread?: string }[],
     work: null as null | { query: Record<string, string>; bytes: number },
     done: [] as string[],
     undone: [] as string[],
@@ -91,6 +93,9 @@ function account() {
     /** Each subagent's own events, by its thread's id. */
     children: {} as Record<string, AgentEvent[]>,
     summaryProject: "",
+    /** The threads started under the cloud thread, parents first, as the server lists them; and each one's conversation by id. */
+    family: [] as { id: string; parentId: string; title: string; settings: Row["settings"]; createdAt: string; startedByAgent: boolean; archivedAt: string | null }[],
+    sessionsOf: {} as Record<string, Buffer | null>,
     /** Whether the newest save holds the folder as it is, and `asked` as the server names it (undefined: one from before it). */
     current: true,
     asked: false as boolean | undefined,
@@ -107,6 +112,7 @@ function account() {
         return row;
       },
       summary: (id: string) => ({ id, projectId: cloud.summaryProject }),
+      family: (id: string) => (rows.has(id) && !cloud.family.some((one) => one.id === id) ? cloud.family : []),
       cloudProjectFor: () => ({ id: "cloud-app", space: "personal" }),
       // The Mac hears a thread made on the server once it reads the server again.
       refresh: async () => {
@@ -127,8 +133,9 @@ function account() {
         for await (const line of lines()) sent.history.push(line);
         return { turns: sent.history.length };
       },
-      session: async (_space: string, _id: string, query: { agent: string; sessionId: string; cliVersion: string }, packed: Uint8Array) => (
-        (sent.session = { query, packed }),
+      session: async (_space: string, _id: string, query: { agent: string; sessionId: string; cliVersion: string; thread?: string }, packed: Uint8Array) => (
+        sent.sessions.push(query),
+        query.thread ? undefined : (sent.session = { query, packed }),
         { bytes: packed.length }
       ),
       work: async (_space: string, _id: string, upload: { query: Record<string, string>; chunks(): AsyncIterable<Uint8Array> }) => {
@@ -145,7 +152,10 @@ function account() {
       events: async function* (_space: string, id: string) {
         for (const event of cloud.children[id] ?? cloud.events) yield event;
       },
-      savedSession: async () => (cloud.session ? new Response(new Uint8Array(cloud.session)) : new Response(null, { status: 404 })),
+      savedSession: async (_space: string, id: string) => {
+        const kept = id in cloud.sessionsOf ? cloud.sessionsOf[id] : cloud.session;
+        return kept ? new Response(new Uint8Array(kept)) : new Response(null, { status: 404 });
+      },
       movedAway: async (_space: string, id: string) => {
         if (fail.movedAway) throw fail.movedAway;
         sent.away.push(id);
@@ -369,6 +379,69 @@ describe("a thread moving from this Mac to OpenOrc Cloud", () => {
     expect(cloudMoves.moving(db, left.id)).toEqual({ to: "cloud", failed: "This move stopped when OpenOrc closed. Try again." });
   });
 
+  /** A thread started under `parent` here, in its folder, with one exchange: by the agent when `byAgent`. */
+  function startedUnder(parent: string, title: string, options: { byAgent?: boolean; archivedAt?: number; worktreePath?: string } = {}) {
+    const made = threads.insert(db, { projectId: threads.get(db, parent)!.projectId, title, agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "current" });
+    const child = threads.update(db, made.id, {
+      parentThreadId: parent,
+      parentRelation: "started",
+      startedByAgent: options.byAgent ?? false,
+      archivedAt: options.archivedAt ?? null,
+      worktreePath: options.worktreePath ?? threads.get(db, parent)!.worktreePath,
+    });
+    const runId = `run-${child.id}`;
+    runs.insert(db, { id: runId, taskId: null, threadId: child.id, agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+    runs.update(db, runId, { state: "success", endedAt: Date.now() });
+    ledger.push({ type: "message.completed", runId, ts: 3_000, messageId: `user-${child.id}`, role: "user", text: `Ask of ${title}` });
+    ledger.flush();
+    return child;
+  }
+
+  it("takes the threads started under it, each after the one it was started under, and they go from this Mac with it", async () => {
+    const { thread } = await macThread();
+    const landing = startedUnder(thread.id, "Landing copy");
+    const nested = startedUnder(landing.id, "Check the links", { byAgent: true, archivedAt: Date.parse("2026-11-18T09:00:00.000Z") });
+    // The landing subthread's own conversation with its agent, beside the thread's.
+    const landingSession = "5c1d7a2e-3b4f-4c6d-8e9f-0a1b2c3d4e5f" as SessionId;
+    runs.update(db, `run-${landing.id}`, { externalSessionId: landingSession });
+    await writeFile(claudeSessionFile(claude, folder, landingSession), `${JSON.stringify({ type: "user", cwd: folder, sessionId: landingSession, text: "Ask of Landing copy" })}\n`);
+    const { hosted, sent } = account();
+    const deleted: string[] = [];
+    const service = moves(hosted, deleted);
+    expect(await service.check(thread.id)).toMatchObject({ to: "cloud", can: true });
+    await service.move(thread.id, false);
+    await settled(thread.id);
+    expect(sent.history.map((line) => [line.kind, line.kind === "turn" ? line.thread : line.id])).toEqual([
+      ["turn", thread.id],
+      ["subthread", landing.id],
+      ["turn", landing.id],
+      ["subthread", nested.id],
+      ["turn", nested.id],
+    ]);
+    expect(sent.history[1]).toMatchObject({ parentId: thread.id, title: "Landing copy", startedByAgent: false, archivedAt: null, settings: { agent: "claude" } });
+    expect(sent.history[3]).toMatchObject({ parentId: landing.id, startedByAgent: true, archivedAt: "2026-11-18T09:00:00.000Z" });
+    expect(sent.sessions).toEqual([
+      { agent: "claude", sessionId: SESSION, cliVersion: "2.1.317" },
+      { agent: "claude", sessionId: landingSession, cliVersion: "2.1.317", thread: landing.id },
+    ]);
+    expect(deleted, "each subthread before the one it was started under").toEqual([nested.id, landing.id, thread.id]);
+  });
+
+  it("holds a move that would split the family: a subthread alone, in its own folder, of an agent the cloud doesn't run, or too many", async () => {
+    const { thread } = await macThread();
+    const { hosted } = account();
+    const service = moves(hosted);
+    const landing = startedUnder(thread.id, "Landing copy");
+    expect(await service.check(landing.id)).toEqual({ to: "cloud", can: false, reason: "A subthread moves with the thread it was started under." });
+    threads.update(db, landing.id, { worktreePath: path.join(root, "worktrees", "landing") });
+    expect(await service.check(thread.id)).toEqual({ to: "cloud", can: false, reason: "A subthread of this thread works in a folder of its own, so it can't move to OpenOrc Cloud." });
+    threads.update(db, landing.id, { worktreePath: null, agent: "cursor" as never });
+    expect(await service.check(thread.id)).toMatchObject({ can: false, reason: expect.stringMatching(/^A subthread of this thread runs .+, which doesn't run on OpenOrc Cloud\.$/) });
+    threads.update(db, landing.id, { agent: "claude" });
+    for (let one = 0; one < 20; one += 1) startedUnder(landing.id, `Step ${one}`);
+    expect(await service.check(thread.id)).toEqual({ to: "cloud", can: false, reason: "A thread with more than 20 subthreads can't move to OpenOrc Cloud." });
+  });
+
   it("holds a thread that isn't the account's to move, with why", async () => {
     const { thread } = await macThread();
     const { hosted } = account();
@@ -469,6 +542,49 @@ describe("a cloud thread moving to this Mac", () => {
     await settled(id);
     expect(cloudMoves.latest(db, id)).toMatchObject({ phase: "done", error: null });
     expect(made.sent.asked).toEqual([true]);
+  });
+
+  it("comes with the threads started under it, hung as they were there, in its folder, and only the thread is let go there", async () => {
+    const project = projects.insert(db, { name: "App", rootPath: folder, gitRemote: "https://github.com/acme/app.git", defaultBranch: "main", settings: {} });
+    const made = account();
+    const id = await cloudThread(made, project);
+    const settings = { agent: "claude" as const, model: null, effort: null, mode: "act" as const, permissionMode: "trusted" as const };
+    const landing = "1b2c3d4e-0000-4000-8000-00000000000a";
+    const nested = "1b2c3d4e-0000-4000-8000-00000000000b";
+    made.cloud.family = [
+      { id: landing, parentId: id, title: "Landing copy", settings, createdAt: "2026-11-18T08:00:00.000Z", startedByAgent: false, archivedAt: null },
+      { id: nested, parentId: landing, title: "Check the links", settings, createdAt: "2026-11-18T08:05:00.000Z", startedByAgent: true, archivedAt: "2026-11-18T09:00:00.000Z" },
+    ];
+    for (const one of made.cloud.family) made.rows.set(one.id, { id: one.id, space: "personal", projectId: "cloud-app", title: one.title, settings });
+    made.cloud.children[landing] = [{ type: "message.completed", runId: `hosted:${landing}`, ts: 3_000, messageId: "user-l", role: "user", text: "Write the landing copy" }];
+    made.cloud.children[nested] = [{ type: "message.completed", runId: `hosted:${nested}`, ts: 4_000, messageId: "user-n", role: "user", text: "Check every link" }];
+    made.cloud.sessionsOf[nested] = null;
+    const service = moves(made.hosted);
+    expect(await service.check(id)).toMatchObject({ to: "mac", can: true });
+    await service.move(id, false);
+    await settled(id);
+    expect(cloudMoves.latest(db, id)).toMatchObject({ phase: "done", error: null });
+    const root = threads.get(db, id)!;
+    expect(threads.get(db, landing)).toMatchObject({ parentThreadId: id, parentRelation: "started", startedByAgent: false, archivedAt: null, worktreePath: root.worktreePath, branch: root.branch });
+    expect(threads.get(db, nested)).toMatchObject({
+      parentThreadId: landing,
+      parentRelation: "started",
+      startedByAgent: true,
+      archivedAt: Date.parse("2026-11-18T09:00:00.000Z"),
+      worktreePath: root.worktreePath,
+    });
+    const [run] = runs.listForThread(db, landing);
+    expect(listEvents(db, run!.id).map((event) => (event.type === "message.completed" ? event.text : event.type))).toEqual(["Write the landing copy"]);
+    expect(runs.listForThread(db, nested)[0]).toMatchObject({ externalSessionId: null });
+    expect([made.rows.has(id), made.rows.has(landing), made.rows.has(nested)], "the Mac's list lets the family go").toEqual([false, false, false]);
+    expect(made.sent.away, "the server lets the family go with the thread").toEqual([id]);
+  });
+
+  it("holds a cloud subthread alone: it moves with the thread it was started under", async () => {
+    const made = account();
+    const settings = { agent: "claude" as const, model: null, effort: null, mode: "act" as const, permissionMode: "trusted" as const };
+    made.rows.set("sub", { id: "sub", space: "personal", projectId: "cloud-app", title: "Landing copy", settings, relation: "started" } as never);
+    expect(await moves(made.hosted).check("sub")).toEqual({ to: "mac", can: false, reason: "A subthread moves with the thread it was started under." });
   });
 
   it("brings each of its subagents as a thread of its own under its cloud id, with its native record and what it did", async () => {

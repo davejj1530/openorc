@@ -25,8 +25,23 @@ export type ArrivalSettings = { agent: string; model: string | null; effort: str
 /** One line of an arrival's history (the server's `hostedArrivalLine`). */
 export type ArrivalLine =
   | {
+      /** A thread started under the moving thread, by the person or its agent, written before its turns and children. */
+      kind: "subthread";
+      id: string;
+      /** The moving thread, or a subthread written earlier. */
+      parentId: string;
+      title: string;
+      settings: ArrivalSettings;
+      createdAt: string;
+      startedByAgent: boolean;
+      /** Put away by the person moving it; it arrives put away for them alone. */
+      archivedAt: string | null;
+    }
+  | {
       kind: "child";
       id: string;
+      /** The conversation whose agent started it: the moving thread when left out, else one of its subthreads. */
+      thread?: string;
       title: string;
       settings: ArrivalSettings;
       nativeId: string;
@@ -56,7 +71,7 @@ export type ArrivalLine =
 export const MOVE_ROUTES = {
   arrive: { method: "POST", path: "/hosted/arrivals", reply: arrived } satisfies Route<z.infer<typeof arrived>>,
   history: (id: string): Route<z.infer<typeof turns>> => ({ method: "PUT", path: `${thread(id)}/arrival/history`, reply: turns }),
-  session: (id: string, query: { agent: string; sessionId: string; cliVersion: string }): Route<z.infer<typeof bytes>> => ({
+  session: (id: string, query: { agent: string; sessionId: string; cliVersion: string; thread?: string }): Route<z.infer<typeof bytes>> => ({
     method: "PUT",
     path: `${thread(id)}/arrival/session?${new URLSearchParams(query)}`,
     reply: bytes,
@@ -83,8 +98,11 @@ export class CloudMoves {
     return this.deps.session.in(space).request(MOVE_ROUTES.history(id), new RawBody(encoded));
   }
 
-  /** Sends the agent's conversation as the session slot packed it (agents' `packSession`). */
-  session(space: string, id: string, query: { agent: string; sessionId: string; cliVersion: string }, packed: Uint8Array): Promise<{ bytes: number }> {
+  /**
+   * Sends the agent's conversation as the session slot packed it (agents' `packSession`): the moving thread's, or with
+   * `thread` one of its subthreads', sent after the history that names it.
+   */
+  session(space: string, id: string, query: { agent: string; sessionId: string; cliVersion: string; thread?: string }, packed: Uint8Array): Promise<{ bytes: number }> {
     return this.deps.session.in(space).request(
       MOVE_ROUTES.session(id, query),
       new RawBody(async function* () {

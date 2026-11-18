@@ -265,7 +265,9 @@ export interface HostedThreads {
   /** Whether a thread, run or project is the account's. A lookup in what the server listed; never a request. */
   holds(ref: { thread: string } | { run: string } | { project: string }): boolean;
   /** A thread the account has, as last heard: its id, its space, and its cloud project. Rejects in words for one it lacks. */
-  row?(threadId: string): Pick<HeardRow, "id" | "space" | "projectId" | "title" | "settings">;
+  row?(threadId: string): Pick<HeardRow, "id" | "space" | "projectId" | "title" | "settings" | "relation">;
+  /** The threads started under a thread, at any depth, each after the one it was started under, as last heard. */
+  family?(threadId: string): Pick<HeardRow, "id" | "parentId" | "title" | "settings" | "createdAt" | "startedByAgent" | "archivedAt">[];
   /** The cloud project a Mac project is, where a new cloud thread of it starts; null when none is in reach. */
   cloudProjectFor?(macProjectId: string, spaceId?: string): { id: string; space: string } | null;
   /** A thread it holds, in the app's shape. */

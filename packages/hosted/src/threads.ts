@@ -26,6 +26,7 @@ import {
   type ThreadSummary,
 } from "@openorc/protocol";
 import { z } from "zod";
+import { startedFamily } from "./family.js";
 import { ANSWERS, NOT_YET } from "./thread-answers.js";
 import type { HostedDeps, HostedThreads, MergedMethod, PlacePage } from "./index.js";
 import { READ_LIMIT, type Follower } from "./follow.js";
@@ -381,6 +382,10 @@ export class Threads implements HostedThreads {
   /** The threads the account has of one cloud project, as last heard. */
   rowsOfProject(projectId: string): HeardRow[] {
     return [...this.#rows().values()].filter((row) => row.projectId === projectId);
+  }
+
+  family(threadId: string): HeardRow[] {
+    return startedFamily(this.#rows().values(), threadId);
   }
 
   row(threadId: string): HeardRow {

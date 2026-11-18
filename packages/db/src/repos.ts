@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 import { claudeAccounts } from "./claude-accounts.js";
 import type { Db } from "./database.js";
 import { redact, redactJson } from "./redact.js";
-import { retiredTaskIds, retiredTeams, retiredThreadIds } from "./retired-teams.js";
+import { retiredTaskIds, retiredTeams } from "./retired-teams.js";
+import { VISIBLE } from "./thread-visible.js";
 import { jaccard, normalizeTitle, wordSet } from "./task-similarity.js";
 import { threadListLimit, threadListOrder } from "./thread-list-order.js";
 import { threadRootCountSql, threadTreeArgs, threadTreeSql } from "./thread-list-tree.js";
@@ -354,14 +355,6 @@ export interface ThreadInsert {
   createdAt?: number;
 }
 
-/** Raw rows remain available internally; user inventories exclude retired records. */
-/**
- * A thread coming here from OpenOrc Cloud is hidden while its rows are written. Once they are whole it shows, and its
- * reads still go to the cloud for as long as the cloud holds it, so it is never in neither place (thread-relocations.ts).
- */
-const ARRIVING = "SELECT thread_id FROM thread_relocations WHERE role = 'coordinator' AND direction = 'to-mac' AND phase = 'asking'";
-const VISIBLE = `id NOT IN (${retiredThreadIds}) AND id NOT IN (${ARRIVING})`;
-
 export const threads = {
   /**
    * Active includes every unarchived conversation, including legacy done rows.
@@ -482,6 +475,21 @@ export const threads = {
   /** The unarchived threads under `parentId`. */
   children(db: Db, parentId: string): Thread[] {
     return (db.stmt(`SELECT * FROM threads WHERE ${VISIBLE} AND parent_thread_id = ? AND archived_at IS NULL`).all(parentId) as unknown as ThreadRow[]).map(threadFromRow);
+  },
+  /**
+   * Every thread started under `rootId` (relation "started"), at any depth, put away or not, each after the thread it
+   * was started under. Not the root, and not an agent's helpers.
+   */
+  startedUnder(db: Db, rootId: string): Thread[] {
+    const rows = db
+      .stmt(
+        `WITH RECURSIVE family(member, depth) AS (
+          SELECT id, 1 FROM threads WHERE parent_thread_id = ? AND parent_relation = 'started'
+          UNION ALL SELECT t.id, f.depth + 1 FROM threads t JOIN family f ON t.parent_thread_id = f.member WHERE t.parent_relation = 'started'
+        ) SELECT threads.* FROM threads JOIN family ON family.member = threads.id WHERE ${VISIBLE} ORDER BY family.depth, threads.created_at, threads.id`,
+      )
+      .all(rootId) as unknown as ThreadRow[];
+    return rows.map(threadFromRow);
   },
   /** Snoozed threads whose time has come. */
   dueFromSnooze(db: Db, at: number): Thread[] {

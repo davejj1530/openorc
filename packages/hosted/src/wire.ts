@@ -108,6 +108,11 @@ export const wireThread = z.object({
   id: z.string(),
   projectId: z.string().nullable(),
   parentId: z.string().nullable(),
+  /** A thread started under another (`parentId`), and the top of its family; absent from a server from before them. */
+  relation: z.string().nullable().default(null),
+  rootId: z.string().nullable().default(null),
+  /** Started by an agent rather than by the person, as a Mac thread's helper thread is. */
+  startedByAgent: z.boolean().default(false),
   title: z.string(),
   baseBranch: z.string(),
   branch: z.string(),

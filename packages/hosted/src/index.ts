@@ -40,6 +40,7 @@ import { Skills, type OwnSkills } from "./skills.js";
 import { ProjectEnvironment } from "./environment.js";
 import type { MacWorkUpload } from "./mac-start.js";
 export type { MacWorkUpload } from "./mac-start.js";
+export { leaveWithSave, SaveNotMade, type SaveAsking, type WireWorkSave } from "./mac-projects.js";
 export type { WireFileWrite, WireFileWriteOutcome } from "./wire.js";
 import type { WireFileWrite, WireFileWriteOutcome } from "./wire.js";
 import { CloudConnectors } from "./connectors.js";

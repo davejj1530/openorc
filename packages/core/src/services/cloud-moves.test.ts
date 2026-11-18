@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { claudeSessionFile, hostHome, packSession, unpackSession, type SessionId } from "@openorc/agents";
 import { cloudMoves, Db, LedgerWriter, listEvents, projects, runs, subagents, threads } from "@openorc/db";
-import type { ArrivalLine, Hosted } from "@openorc/hosted";
+import { leaveWithSave, type ArrivalLine, type Hosted } from "@openorc/hosted";
 import { computerNames, type AgentEvent } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentSessions, type AgentHomes } from "./agent-sessions.js";
@@ -91,6 +91,11 @@ function account() {
     /** Each subagent's own events, by its thread's id. */
     children: {} as Record<string, AgentEvent[]>,
     summaryProject: "",
+    /** Whether the newest save holds the folder as it is, and `asked` as the server names it (undefined: one from before it). */
+    current: true,
+    asked: false as boolean | undefined,
+    /** A message arriving as the thread leaves keeps its folder in use: the save asked for is made, and never current. */
+    stillInUse: false,
   };
   const hosted = {
     spaces: { status: () => ({ state: "ready", personalSpaceId: "personal" }) },
@@ -148,8 +153,18 @@ function account() {
       },
     },
     macProjects: {
-      workSave: async () => ({ save: cloud.save, current: true, working: false, ends: [] }),
-      ask: async () => (sent.asked.push(true), { asked: true }),
+      workSave: async () => ({ save: cloud.save, current: cloud.current, working: false, ends: [], ...(cloud.asked === undefined ? {} : { asked: cloud.asked }) }),
+      ask: async () => {
+        sent.asked.push(true);
+        cloud.current = !cloud.stillInUse;
+        return { asked: true };
+      },
+      // The hosted package's own wait, over this server's answers, with no time passing.
+      leave: (space: string, threadId: string, ms: number) =>
+        leaveWithSave(
+          { workSave: () => hosted.macProjects.workSave(space, threadId), ask: () => hosted.macProjects.ask(space, threadId), withdraw: async () => {}, now: Date.now, pause: async () => {} },
+          ms,
+        ),
       bundle: async () => new Response(new Uint8Array(await readFile(cloud.bundle))),
     },
   } as unknown as Hosted;
@@ -428,6 +443,32 @@ describe("a cloud thread moving to this Mac", () => {
     expect(git(here.worktreePath!, "status", "--porcelain")).toBe("M README.md");
     const taken = await readFile(claudeSessionFile(claude, here.worktreePath!, SESSION), "utf8");
     expect(taken).toContain(here.worktreePath!);
+  });
+
+  it("has the thread leave its machine with a save first, and moves once that save is made, current or not", async () => {
+    const project = projects.insert(db, { name: "App", rootPath: folder, gitRemote: "https://github.com/acme/app.git", defaultBranch: "main", settings: {} });
+    const made = account();
+    const id = await cloudThread(made, project);
+    made.cloud.current = false;
+    made.cloud.stillInUse = true;
+    const service = moves(made.hosted, []);
+    await service.move(id, false);
+    await settled(id);
+    expect(cloudMoves.latest(db, id)).toMatchObject({ phase: "done", error: null });
+    expect(made.sent.asked).toEqual([true]);
+  });
+
+  it("waits on a server from before `asked` until the save is current", async () => {
+    const project = projects.insert(db, { name: "App", rootPath: folder, gitRemote: "https://github.com/acme/app.git", defaultBranch: "main", settings: {} });
+    const made = account();
+    const id = await cloudThread(made, project);
+    made.cloud.current = false;
+    made.cloud.asked = undefined;
+    const service = moves(made.hosted, []);
+    await service.move(id, false);
+    await settled(id);
+    expect(cloudMoves.latest(db, id)).toMatchObject({ phase: "done", error: null });
+    expect(made.sent.asked).toEqual([true]);
   });
 
   it("brings each of its subagents as a thread of its own under its cloud id, with its native record and what it did", async () => {

@@ -213,17 +213,7 @@ export class MacProjects {
     if (!state.can) throw new BringRefused(state.reason);
     if (state.ends.length && !endsOk) return { confirm: state.ends };
     const spaceId = hosted.threads.row?.(threadId).space ?? "";
-    let work = await hosted.macProjects.workSave(spaceId, threadId);
-    if (!work.current) {
-      await hosted.macProjects.ask(spaceId, threadId);
-      const until = Date.now() + CURRENT_MS;
-      while (!work.current) {
-        if (Date.now() > until) throw new Error("The thread didn't save its work in time. Try again in a moment.");
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        work = await hosted.macProjects.workSave(spaceId, threadId);
-      }
-    }
-    const save = work.save;
+    const save = (await hosted.macProjects.leave(spaceId, threadId, CURRENT_MS)).save;
     if (!save?.bundle) throw new BringRefused("The thread made no commits to bring.");
     const folder = this.folderOf(hosted.threads.row?.(threadId).projectId ?? "");
     if (!folder) throw new BringRefused(ELSEWHERE);

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { Db, projects } from "@openorc/db";
 import { MAC_FILE_BYTES } from "@openorc/git";
-import type { Hosted } from "@openorc/hosted";
+import { leaveWithSave, type Hosted } from "@openorc/hosted";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MacProjects, macOrigins } from "./mac-projects.js";
 import { HISTORY_GONE, packProject } from "./mac-work.js";
@@ -39,7 +39,9 @@ type Save = { branch: string | null; head: string; base: string; bundle: boolean
 function account() {
   const cloud: { id: string; name: string; origin: "mac"; defaultBranch: string; sent: boolean }[] = [];
   const received = new Map<string, Buffer>();
-  const work = { save: null as Save | null, current: true, working: false, ends: [] as string[], bundle: "" };
+  // `asked` as the server names it, or undefined as a server from before it; `stillInUse` as a message arriving as the
+  // thread leaves keeps the folder in use, so the save asked for is made and never current.
+  const work = { save: null as Save | null, current: true, working: false, ends: [] as string[], bundle: "", asked: false as boolean | undefined, stillInUse: false };
   const asks: string[] = [];
   const rows = [{ id: "thread-1", space: "personal", projectId: "cloud-1" }];
   const hosted = {
@@ -64,13 +66,19 @@ function account() {
           cloud.findIndex((one) => one.id === id),
           1,
         ),
-      workSave: async () => ({ save: work.save, current: work.current, working: work.working, ends: work.ends }),
+      workSave: async () => ({ save: work.save, current: work.current, working: work.working, ends: work.ends, ...(work.asked === undefined ? {} : { asked: work.asked }) }),
       ask: async (_space: string, threadId: string) => {
         asks.push(threadId);
-        work.current = true;
+        work.current = !work.stillInUse;
         work.ends = [];
         return { asked: true };
       },
+      // The hosted package's own wait, over this server's answers, with no time passing.
+      leave: (space: string, threadId: string, ms: number) =>
+        leaveWithSave(
+          { workSave: () => hosted.macProjects.workSave(space, threadId), ask: () => hosted.macProjects.ask(space, threadId), withdraw: async () => {}, now: Date.now, pause: async () => {} },
+          ms,
+        ),
       bundle: async () => new Response(readFileSync(work.bundle)),
     },
     threads: { row: (id: string) => rows.find((row) => row.id === id)!, rowsOfProject: (id: string) => rows.filter((row) => row.projectId === id) },
@@ -177,6 +185,22 @@ describe("a thread's work brought to this Mac", () => {
   it("brings without a question when nothing would end", async () => {
     const { mac, work, asks } = await broughtSetUp();
     work.current = false;
+    expect(await mac.bring("thread-1", false)).toMatchObject({ brought: { branch: "fix-login" } });
+    expect(asks).toEqual(["thread-1"]);
+  });
+
+  it("brings once the save it asked for is made, though a message arriving as the thread left keeps its folder in use", async () => {
+    const { mac, work, asks } = await broughtSetUp();
+    work.current = false;
+    work.stillInUse = true;
+    expect(await mac.bring("thread-1", false)).toMatchObject({ brought: { branch: "fix-login" } });
+    expect(asks).toEqual(["thread-1"]);
+  });
+
+  it("waits on a server from before `asked` until the save is current", async () => {
+    const { mac, work, asks } = await broughtSetUp();
+    work.current = false;
+    work.asked = undefined;
     expect(await mac.bring("thread-1", false)).toMatchObject({ brought: { branch: "fix-login" } });
     expect(asks).toEqual(["thread-1"]);
   });

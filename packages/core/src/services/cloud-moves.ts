@@ -368,18 +368,9 @@ export class CloudMoves {
     await this.deps.workspaces.prepareThread(thread, project, held ? base : undefined);
   }
 
-  /** Has the thread leave its machine with a save, as Bring does, and answers that save once it is current. */
-  private async current(hosted: Hosted, space: string, threadId: string) {
-    let work = await hosted.macProjects.workSave(space, threadId);
-    if (work.current) return work;
-    await hosted.macProjects.ask(space, threadId);
-    const until = (this.deps.now ?? Date.now)() + CURRENT_MS;
-    while (!work.current) {
-      if ((this.deps.now ?? Date.now)() > until) throw new Error("The thread didn't leave its cloud machine in time. Try again.");
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      work = await hosted.macProjects.workSave(space, threadId);
-    }
-    return work;
+  /** Has the thread leave its machine with a save, as Bring does, and answers that save once it is made. */
+  private current(hosted: Hosted, space: string, threadId: string) {
+    return hosted.macProjects.leave(space, threadId, CURRENT_MS);
   }
 
   /** The agent's saved conversation, unpacked; null when the thread has none yet. */

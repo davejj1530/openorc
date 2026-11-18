@@ -105,8 +105,16 @@
   --sidebar: var(--bg);
   --navigation-hover: var(--surface-2);
   --raised-shadow: 0 0 #0000;
+  /* Light as an accent (lib/theme-palettes.ts): the open row, the one primary pill and a ready send button, and a
+     working thread's cube. Flat unless the palette lights them. */
+  --lit: 0 0 #0000;
+  --lit-strong: 0 0 #0000;
+  --lit-mark: none;
+  --working-ink: var(--ink-3);
   /* A piece on the ground, its ring, and a control inside it; each palette sets them per mode. */
   --well: var(--surface);
+  /* Code and diffs in the panel: the planes' colour unless the palette gives work panels their own. */
+  --paper: var(--surface);
   --well-ring: 0 0 0 1px var(--line), 0 1px 2px rgb(0 0 0 / 0.05);
   --key: var(--surface-2);
   --prose-ink: var(--ink);
@@ -228,8 +236,8 @@
   /* Keep font-mono utilities linked to the runtime code-font preference. */
   --font-mono: "JetBrains Mono Variable", "SF Mono", Menlo, Consolas, monospace;
   /* Type. Quiet lines (times, second lines, meta) and code are 12.5px; section labels, counts and
-     small controls 13; rows, labels, writing and reading text 14; a column's title in its header 15.
-     Headings are 16, 22 and 28px. Hierarchy comes from size and gray, never weight. Single-line rows
+     small controls 13; rows and labels 14; writing, reading text and a column's title in its header 15,
+     writing and reading on a 24px line. Headings are 16, 22 and 28px. Hierarchy comes from size and gray, never weight. Single-line rows
      set their own 16px leading. */
   --text-xs: 12.5px;
   --text-xs--line-height: 16px;
@@ -240,15 +248,15 @@
   --text-base: 14px;
   --text-base--line-height: 20px;
   --text-base--letter-spacing: -0.005em;
-  --text-md: 14px;
-  --text-md--line-height: 22px;
+  --text-md: 15px;
+  --text-md--line-height: 24px;
   --text-md--letter-spacing: -0.01em;
   --text-header: 15px;
   --text-header--line-height: 20px;
   --text-header--letter-spacing: -0.01em;
   /* Reading size for replies and documents. */
-  --text-prose: 14px;
-  --text-prose--line-height: 21px;
+  --text-prose: 15px;
+  --text-prose--line-height: 24px;
   --text-prose--letter-spacing: -0.005em;
   --text-lg: 16px;
   --text-lg--line-height: 22px;
@@ -284,23 +292,24 @@
   --font-weight-medium: 400;
   --font-weight-semibold: 400;
 
-  /* Radius, set per component:
+  /* Radius, set per component. Planes stay a soft 14 to 16px however large they grow; only the New
+     thread composer goes past it:
      sm 6 labels and diff runs · md 10 rows, menu items, inline fields ·
      lg 12 tall rows, fields in sheets, file heads · viewport 14 browser viewport ·
-     xl 16 drop menus, command, schedule and toast cards, code blocks ·
-     2xl 18 popovers, palette, prompt bubble, summary and permission cards ·
-     3xl 20 panel, sheets, dialogs, grown menus, steps and question cards, conversation composer ·
-     4xl 22 commit sheet and account cards · 5xl 24 New thread composer ·
+     xl 14 drop menus, command, schedule and toast cards, code blocks ·
+     2xl 16 popovers, palette, prompt bubble, summary and permission cards ·
+     3xl 16 panel, sheets, dialogs, grown menus, steps and question cards, conversation composer ·
+     4xl 16 commit sheet and account cards · 5xl 18 New thread composer ·
      pill (rounded-full) buttons, chips, tracks, knobs and send. */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 12px;
   --radius-viewport: 14px;
-  --radius-xl: 16px;
-  --radius-2xl: 18px;
-  --radius-3xl: 20px;
-  --radius-4xl: 22px;
-  --radius-5xl: 24px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+  --radius-3xl: 16px;
+  --radius-4xl: 16px;
+  --radius-5xl: 18px;
   --radius-pill: 999px;
 
   /* Control heights. Every button, chip, select, field and row lands on one.
@@ -309,7 +318,7 @@
   --control-sm: 28px;
   --control-md: 30px;
   --control-lg: 32px;
-  --control-row: 34px;
+  --control-row: 36px;
   --control-xl: 36px;
   --control-hero: 40px;
   /* The round send button: 32 in a conversation, 34 on New thread. */
@@ -809,10 +818,9 @@ body[data-resizing] .sidebar-shell {
   background: var(--ink-3);
 }
 
-/* Every title rail sits on its view's canvas, with one line separating it from the content. */
+/* Every title rail sits on its view's canvas with no line under it: the content scrolls under the rail's ground. */
 .app-topbar {
   padding-top: calc(var(--spacing-well) / 2);
-  border-bottom: var(--hairline) solid var(--line);
 }
 /* The band under a column header: a route's filter row, search row or toolbar. One 44px height
    for all of them, clearing --control-lg with room. min-height rather than height so a
@@ -857,8 +865,8 @@ body[data-resizing] iframe {
 
 /* Every file in a patch folds to its own row: a 36px head that replaces the diff renderer's own, so the path, the
    change letter and the two counts read in the app's ink ramp. The diff fills its panel edge to edge: no inset, no
-   card, no corners and no gaps; each head sits on the ground with a hairline under it, right under the row above it,
-   and its first line of code right under it. It stays on the top edge of the scroller while its file passes under
+   card, no corners and no gaps; each head sits on the ground with no line under it, right under the row above it,
+   and its first line of code right under it, the code's plane the only step. It stays on the top edge of the scroller while its file passes under
    it, opaque there: a hover fill is layered over the ground. */
 .diff-file-header {
   position: sticky;
@@ -867,7 +875,6 @@ body[data-resizing] iframe {
   height: 36px;
   padding: 0 16px;
   background: var(--bg);
-  box-shadow: inset 0 calc(-1 * var(--hairline)) 0 var(--line);
   transition: background-color var(--duration-quick) var(--ease-out);
 }
 .diff-file-header:is(:hover, :focus-visible) {
@@ -875,18 +882,18 @@ body[data-resizing] iframe {
 }
 /* The highlighter paints its theme's own ground, and github-dark's #24292e is a grey slab on a
    near-black column. A declaration on the host outranks the renderer's :host theme rule, so
-   code sits on the plane in both modes. Rows are 20px of 12.5px mono in title ink; added and
+   code sits on the palette's work-panel --paper in both modes. Rows are 20px of 12.5px mono in title ink; added and
    removed lines sit on the soft status fills, every line number in the palette's --line-number. */
 diffs-container {
-  --diffs-light-bg: var(--surface);
-  --diffs-dark-bg: var(--surface);
+  --diffs-light-bg: var(--paper);
+  --diffs-dark-bg: var(--paper);
   --diffs-font-family: var(--font-mono);
   --diffs-font-size: var(--text-xs);
   --diffs-line-height: 20px;
   --diffs-gap-block: 0px;
   --diffs-gap-style: none;
-  --diffs-bg-context-override: var(--surface);
-  --diffs-bg-context-gutter-override: var(--surface);
+  --diffs-bg-context-override: var(--paper);
+  --diffs-bg-context-gutter-override: var(--paper);
   --diffs-bg-separator-override: var(--surface-2);
   --diffs-fg-number-override: var(--line-number);
   --diffs-fg-number-addition-override: var(--line-number);

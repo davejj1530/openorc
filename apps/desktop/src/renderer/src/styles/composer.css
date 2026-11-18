@@ -413,6 +413,10 @@
 .composer-send[data-words] {
   padding-inline: 14px 8px;
 }
+/* Ready to send, the arrow is lit where the palette lights it. */
+.composer-send[data-state="send"]:not(:disabled) {
+  box-shadow: var(--lit-strong);
+}
 .composer-send:hover:not(:disabled) {
   background-image: linear-gradient(color-mix(in srgb, var(--accent-fg) 12%, transparent), color-mix(in srgb, var(--accent-fg) 12%, transparent));
 }

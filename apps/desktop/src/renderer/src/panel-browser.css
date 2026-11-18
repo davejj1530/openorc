@@ -1,7 +1,7 @@
 /* The panel is one plane from the window's top edge to its bottom: the header row and the open
    tab's page share its surface with nothing between them. The pane carries data-plane, so
-   controls anywhere in it take the plane's fill step. The header shares the window's chrome line
-   with the thread header beside it. */
+   controls anywhere in it take the plane's fill step. Like the thread header beside it, the header
+   has no line under it. */
 .panel-header {
   display: flex;
   align-items: center;
@@ -9,7 +9,6 @@
   height: var(--height-topbar);
   min-width: 0;
   flex-shrink: 0;
-  border-bottom: var(--hairline) solid var(--line);
 }
 /* The thread header's panel toggle hides a docked panel; the panel's own Hide is for when it covers that toggle.
    Its tooltip's wrapper goes with it, so no empty gap stays at the end of the row. */

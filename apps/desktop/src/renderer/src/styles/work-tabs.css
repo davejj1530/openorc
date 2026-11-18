@@ -141,8 +141,8 @@
   color: var(--ink-3);
 }
 
-/* The panel's tabs: 28px pills on the soft fill, the current one a raised plane; the strip's 2px keeps that plane's
-   edge and shadow inside its clip. The fills are tints, so a dragged pill draws its own over the chrome's colour. */
+/* The panel's tabs: 28px pills on the soft fill, the current one on the strong fill with no edge; the strip's 2px
+   keeps a dragged pill inside its clip. The fills are tints, so a dragged pill draws its own over the chrome's colour. */
 .panel-tabs {
   padding: 2px;
 }
@@ -157,8 +157,7 @@
 }
 .panel-tabs .work-tab-current,
 .panel-tabs .work-tab-current:hover {
-  background-color: var(--surface);
-  box-shadow: var(--raised-shadow);
+  background-color: var(--surface-3);
 }
 .panel-tabs .work-tab[data-dragged] {
   background: linear-gradient(var(--surface-2), var(--surface-2)) var(--bg);

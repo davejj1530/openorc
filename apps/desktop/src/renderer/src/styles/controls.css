@@ -31,6 +31,10 @@ label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
   --hover-step: color-mix(in srgb, var(--accent-fg) 12%, transparent);
   --press-step: color-mix(in srgb, var(--accent-fg) 20%, transparent);
 }
+/* The primary pill is lit where the palette lights it. */
+.ink-pill:not(:disabled) {
+  box-shadow: var(--lit-strong);
+}
 .hover-step:hover:not(:disabled) {
   background-image: linear-gradient(var(--hover-step), var(--hover-step));
 }

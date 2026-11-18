@@ -1,5 +1,6 @@
 // Built-in palettes. Product colors map to OpenOrc roles; custom themes retain their own identity.
 import { pieceTokens } from "./theme-pieces.js";
+import { palette, statusTokens } from "./theme-roles.js";
 export type ThemePreset = "openorc" | "codex" | "conductor" | "linear" | "cursor" | "claude" | "github" | "halcyon" | "kamakura" | "clickup" | "cyberpunk" | "notion" | "eliron";
 export type Mode = "light" | "dark";
 export interface ThemeTemplate {
@@ -8,101 +9,45 @@ export interface ThemeTemplate {
   description: string;
   colors: Record<Mode, Record<string, string>>;
 }
-// Source colors map to shell roles, not a house tint or contrast ladder.
-// Every palette has the same structure: the window ground (--bg, the conversation and the panel; the sidebar's
-// --sidebar follows it unless a palette tints it), planes one step off it (--surface: sheets, cards, the composer),
-// then the fills.
-// Product presets keep flat paint (no gradient); palettes whose source is one flat light color
-// get a hand-tuned ground step. See docs/theme-references.md for sources and adaptations.
-// Readable supporting text may use the next stronger source role.
-const neutralTokens = {
-  sidebar: "bg",
-  body: "surface",
-  raised: "surface-2",
-  hover: "surface-3",
-  border: "line",
-  borderStrong: "line-strong",
-  text: "ink",
-  secondaryText: "ink-2",
-  mutedText: "ink-3",
-  faintText: "ink-4",
-  bubble: "bubble",
-} as const;
-type Neutrals = Record<keyof typeof neutralTokens, string>;
-function palette(neutrals: Neutrals, accent: string, accentInk: string, accentForeground: string, overrides: Record<string, string> = {}) {
-  return {
-    ...Object.fromEntries(Object.entries(neutralTokens).map(([role, token]) => [`--${token}`, neutrals[role as keyof Neutrals]])),
-    "--paper": "var(--surface)",
-    // The sidebar's own ground, the window's unless a palette tints it.
-    "--sidebar": "var(--bg)",
-    // A sidebar row under the pointer.
-    "--navigation-hover": "var(--surface-2)",
-    // What lifts a raised plane (the composer, cards, the open tab, menus) off a ground it barely steps from. Palettes
-    // whose planes step clearly off their ground keep an empty shadow; it stays a shadow so a rule can add its own.
-    "--raised-shadow": "0 0 #0000",
-    // The agent's reading text. Headings and bold lead-ins stay in --ink.
-    "--prose-ink": "var(--ink)",
-    // A diff's line numbers.
-    "--line-number": "var(--ink-4)",
-    "--accent": accent,
-    "--accent-ink": accentInk,
-    "--accent-fg": accentForeground,
-    "--navigation-accent": accentInk,
-    "--navigation-soft": "",
-    "--content-accent": accentInk,
-    "--accent-soft": `color-mix(in srgb, ${accentInk} 14%, ${neutrals.body})`,
-    "--selection": `color-mix(in srgb, ${accentInk} 26%, ${neutrals.body})`,
-    // The house mascot is ink on the ground; brand palettes give it their own color below.
-    "--mascot-body": /^#[0-9a-f]{8}$/i.test(neutrals.text) ? neutrals.text.slice(0, 7) : neutrals.text,
-    "--mascot-eyes": neutrals.body,
-    "--bubble-ink": neutrals.text,
-    ...overrides,
-  };
-}
-// Status: --ok for +N counts, checks and diff additions; --warn for waiting, approvals and warning
-// text; --bad for failures and diff removals; --attention for status dots, which default to --warn.
-// Every palette starts from these and changes only the ones it names. The soft fills tint their
-// ink unless a palette paints them. Switching palettes only sets properties, never clears them,
-// so every palette carries every key.
-const statusSoft = {
-  "--ok-soft": "color-mix(in srgb, var(--ok) 8%, var(--surface))",
-  "--warn-soft": "color-mix(in srgb, var(--warn) 8%, var(--surface))",
-  "--bad-soft": "color-mix(in srgb, var(--bad) 8%, var(--surface))",
-  "--attention": "var(--warn)",
-};
-const statusTokens: Record<Mode, Record<string, string>> = {
-  light: { "--ok": "#157447", "--warn": "#8b5c0a", "--bad": "#aa4538", ...statusSoft },
-  dark: { "--ok": "#3fae74", "--warn": "#c0973a", "--bad": "#e27d6f", ...statusSoft },
-};
-// OpenOrc: one ground under the sidebar, the columns, every header and the panel; pieces on it with keys inside them;
-// menus float on a strong hairline and one soft shadow; title ink over a softer reading ink, and one ink action.
-// Light is near white with white pieces on a thin ring and grey keys; dark is a neutral grey with no blue, pieces
-// carved to near black with no ring.
+// Each palette fills the roles in theme-roles.ts.
+// OpenOrc: one ground under the sidebar, the columns, every header and the panel, and depth as a step in fill, never
+// a line. Dark is a black room: pieces one quiet step up, off-white ink, and white as the one lit action. Light is a
+// warm off-white room: pieces and planes in plain white on it, fills and lines a few percent of the ink over the
+// ground, a neutral near-black ink with its greys mixed from that ink, and the ink as the action. Light is
+// the accent: the open row, the primary pill, a ready send button and a working cube are lit, a glow in dark and a
+// soft shadow in light. Reading ink sits a step under the title ink in both.
 const openorcColors: ThemeTemplate["colors"] = {
   light: palette(
     {
-      sidebar: "#fafafa",
+      sidebar: "#f5f5f2",
       body: "#ffffff",
-      raised: "#eeeeee",
-      hover: "#e6e6e6",
-      border: "#e8e8e8",
-      borderStrong: "#dadada",
-      text: "#252525",
-      secondaryText: "#555555",
-      mutedText: "#666666",
-      faintText: "#696969",
-      bubble: "#f0f0f0",
+      raised: "#ecece9",
+      hover: "#e5e5e3",
+      border: "#e5e5e3",
+      borderStrong: "#d8d8d6",
+      text: "#171717",
+      secondaryText: "#515150",
+      mutedText: "#626261",
+      faintText: "#676766",
+      bubble: "#ffffff",
     },
-    "#252525",
-    "#252525",
+    "#171717",
+    "#171717",
     "#ffffff",
     {
-      "--navigation-soft": "#eaeaea",
-      "--navigation-hover": "#f2f2f2",
-      "--raised-shadow": "0 0 0 var(--hairline) #dadada, 0 8px 24px -12px rgb(0 0 0 / 0.18)",
-      "--prose-ink": "#555555",
-      "--bubble-ink": "#252525",
-      "--line-number": "#808080",
+      "--navigation-soft": "#ffffff",
+      "--navigation-hover": "#eaeae7",
+      "--raised-shadow": "0 0 0 1px rgb(23 23 23 / 0.06), 0 8px 24px rgb(0 0 0 / 0.1), 0 2px 6px rgb(0 0 0 / 0.06)",
+      "--prose-ink": "#515150",
+      "--bubble-ink": "#171717",
+      "--line-number": "#868684",
+      "--accent-soft": "#ecece9",
+      "--well-ring": "0 0 #0000",
+      "--key": "#f4f4f2",
+      "--lit": "0 0 0 0.5px rgb(23 23 23 / 0.06), 0 1px 2px rgb(23 23 23 / 0.05), 0 10px 24px -12px rgb(23 23 23 / 0.2)",
+      "--lit-strong": "0 1px 2px rgb(23 23 23 / 0.2), 0 10px 22px -10px rgb(23 23 23 / 0.45)",
+      "--lit-mark": "drop-shadow(0 2px 3px rgb(23 23 23 / 0.28))",
+      "--working-ink": "var(--accent)",
       "--ok": "#1e7359",
       "--ok-soft": "#e4f0ea",
       "--warn": "#8f5408",
@@ -113,34 +58,41 @@ const openorcColors: ThemeTemplate["colors"] = {
   ),
   dark: palette(
     {
-      sidebar: "#171717",
-      body: "#0a0a0a",
-      raised: "#272727",
-      hover: "#333333",
-      border: "#2e2e2e",
-      borderStrong: "#414141",
-      text: "#ededed",
-      secondaryText: "#b4b4b4",
-      mutedText: "#9b9b9b",
-      faintText: "#969696",
-      bubble: "#0a0a0a",
+      sidebar: "#050505",
+      body: "#101010",
+      raised: "#161616",
+      hover: "#1e1e1e",
+      border: "#181818",
+      borderStrong: "#2b2b2b",
+      text: "#ededeb",
+      secondaryText: "#b9b9b6",
+      mutedText: "#8f8f8c",
+      faintText: "#848481",
+      bubble: "#131313",
     },
-    "#ededed",
-    "#ededed",
-    "#171717",
+    "#ffffff",
+    "#ffffff",
+    "#050505",
     {
-      "--navigation-soft": "#2c2c2c",
-      "--navigation-hover": "#212121",
-      "--raised-shadow": "0 0 0 var(--hairline) #414141, 0 12px 32px -12px rgb(0 0 0 / 0.7)",
-      "--prose-ink": "#b4b4b4",
-      "--bubble-ink": "#ededed",
-      "--line-number": "#6e6e6e",
-      "--well": "#0a0a0a",
-      "--ok": "#7cc4a2",
-      "--ok-soft": "#19221e",
+      "--navigation-soft": "#191919",
+      "--navigation-hover": "#0e0e0e",
+      "--raised-shadow": "0 0 0 var(--hairline) #2b2b2b, 0 12px 32px -12px rgb(0 0 0 / 0.8)",
+      "--prose-ink": "#dededb",
+      "--bubble-ink": "#ededeb",
+      "--line-number": "#6a6a67",
+      "--accent-soft": "#1b1b1b",
+      "--selection": "#2c2c2c",
+      "--well": "#101010",
+      "--key": "#1a1a1a",
+      "--lit": "inset 0 1px 0 rgb(255 255 255 / 0.1), 0 0 28px -10px rgb(255 255 255 / 0.22)",
+      "--lit-strong": "inset 0 1px 0 rgb(255 255 255 / 0.6), 0 0 32px -6px rgb(255 255 255 / 0.36)",
+      "--lit-mark": "drop-shadow(0 0 5px rgb(255 255 255 / 0.6))",
+      "--working-ink": "var(--accent)",
+      "--ok": "#58b98a",
+      "--ok-soft": "#12201a",
       "--warn": "#f0b35a",
-      "--bad": "#e2a3a3",
-      "--bad-soft": "#261e1e",
+      "--bad": "#d98a7e",
+      "--bad-soft": "#241715",
       "--attention": "#f0b35a",
     },
   ),
@@ -204,7 +156,7 @@ const presets: ThemeTemplate[] = [
   {
     id: "openorc",
     name: "OpenOrc",
-    description: "Near white and soft grey · ink accents",
+    description: "A black room, an off-white room · light as the accent",
     colors: openorcColors,
   },
   // Solid blue controls keep white labels in both modes; the fill meets 4.5:1 contrast.

@@ -18,10 +18,8 @@
 .app-shell .well:has(.app-topbar)::before {
   top: var(--height-topbar);
 }
-/* Its foot is the hairline the sidebar's list starts under, carried across the window to its edge. */
 .app-shell .app-topbar {
   background: var(--bg);
-  border-bottom: var(--hairline) solid var(--line);
 }
 /* The cube at a thread's end: the fourth ink and still while the agent rests, full ink while it works. */
 .agent-presence-mark {
@@ -30,10 +28,12 @@
 .agent-presence-mark[data-state="thinking"] {
   color: var(--content-ink);
 }
-/* The cube on a row, a tab, a palette row or a task: the third ink, and full ink where the person is. */
+/* The cube on a row, a tab, a palette row or a task: the palette's working ink, and full ink where the person is.
+   A palette that lights it gives it its filter. */
 .working-cube {
   flex-shrink: 0;
-  color: var(--ink-3);
+  color: var(--working-ink);
+  filter: var(--lit-mark);
 }
 .thread-preview[data-open] .working-cube,
 .work-tab-face[aria-selected="true"] .working-cube {
@@ -179,8 +179,7 @@
   font-size: 18px;
 }
 /* The panel sits on the window's ground with the sidebar and the conversation, apart from the
-   conversation by the sidebar's seam: a hairline from the title bar's line down, and 60% of the
-   title bar's height beside its tabs. Floating over a narrow work row or covering it expanded,
+   conversation by the sidebar's seam: one hairline from the window's top to its foot. Floating over a narrow work row or covering it expanded,
    it takes an opaque ground, and floating the overlay shadow the sidebar takes there. */
 .app-shell .panel-pane,
 .app-shell .panel-header {
@@ -198,13 +197,13 @@
 /* Above the pane's content: the code view pins an opaque line-number gutter to this same edge, and a diff's sticky
    file heads (z-index 1) run to it. */
 .app-shell .panel-pane::before {
-  top: calc(var(--height-topbar) - var(--hairline));
+  top: var(--height-topbar);
   bottom: 0;
   z-index: 2;
 }
 .app-shell .panel-header::before {
-  top: 20%;
-  bottom: 20%;
+  top: 0;
+  bottom: 0;
 }
 .app-shell .panel-shell[data-side="left"] :is(.panel-pane, .panel-header)::before {
   left: auto;

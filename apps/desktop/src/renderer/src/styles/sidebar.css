@@ -256,6 +256,7 @@ button.sidebar-nav-row:hover {
 }
 .sidebar-nav-row:is([aria-current="page"], [aria-pressed="true"]):not(:focus-visible) {
   background-color: var(--current-row-fill);
+  box-shadow: var(--lit);
 }
 /* What waits on the person or failed, and nothing else, in amber: centred in a 16px slot on the line row marks
    share, 24px in from the sidebar's edge. */
@@ -577,8 +578,10 @@ button.sidebar-nav-row:hover {
 .app-shell .thread-preview:hover {
   background-color: var(--navigation-hover);
 }
+/* The open row is lit where the palette lights it. */
 .app-shell .sidebar-shell .thread-preview[data-open]:not(:focus-visible) {
   background-color: var(--current-row-fill);
+  box-shadow: var(--lit);
 }
 .thread-preview-heading {
   display: flex;
@@ -710,13 +713,15 @@ button.browser-empty:hover,
 }
 .app-shell .sidebar-shell .orcling-contact[aria-current="page"]:not(:focus-visible) {
   background-color: var(--current-row-fill);
+  box-shadow: var(--lit);
   color: var(--navigation-ink);
 }
 .orcling-contact + .orcling-contact {
   margin-top: 2px;
 }
 
-/* The footer, under a hairline: its tools at the row's end, its start kept for the signed-in person. */
+/* The footer, on the sidebar's ground with no line over it: its tools at the row's end, its start kept for the
+   signed-in person. */
 .sidebar-footer {
   container: account-footer / inline-size;
   display: flex;
@@ -726,7 +731,6 @@ button.browser-empty:hover,
   height: var(--height-chrome);
   /* The gear's centre sits on the list's centre line, 24px in from the edge. */
   padding: 0 8px;
-  border-top: var(--hairline) solid var(--line);
 }
 /* The signed-in person at the foot's start: a 26px face, the name in ink, the plan in one quiet line. */
 .sidebar-account {

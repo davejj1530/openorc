@@ -5,8 +5,8 @@ export type { Declarations, Hex };
 /** The two `:root` rules of app.css that every palette sits on: the light defaults and the dark overrides. */
 export type Cascade = { root: Declarations; dark: Declarations };
 
-// Not colors: widths, images and shadows stay with the desktop's CSS.
-const notColors = new Set(["--hairline", "--surface-gradient", "--shadow-overlay", "--raised-shadow", "--well-ring"]);
+// Not colors: widths, images, shadows and filters stay with the desktop's CSS.
+const notColors = new Set(["--hairline", "--surface-gradient", "--shadow-overlay", "--raised-shadow", "--well-ring", "--lit", "--lit-strong", "--lit-mark"]);
 // These change with the ground a control sits on (DESIGN.md, the Contextual Fill Rule), so the phone names its fills directly.
 const contextualFills = new Set(["--current-row-fill", "--control-fill", "--float-fill"]);
 

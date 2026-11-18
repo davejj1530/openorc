@@ -1,0 +1,74 @@
+---
+import { heroLattice } from "../lib/hero-lattice";
+import { svgId } from "../lib/svg-id";
+import LatticeCube from "./hero/LatticeCube.astro";
+
+const { cubes, path, routes, waking } = heroLattice();
+const prefix = svgId("hero-lattice");
+const id = (name: string) => `${prefix}-${name}`;
+const url = (name: string) => `url(#${id(name)})`;
+---
+
+<svg class="hero-lattice" viewBox="0 0 1440 900" width="1440" height="900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    {[4, 10, 26, 60].map((blur) => (
+      <filter id={id(`blur${blur}`)} x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation={blur} /></filter>
+    ))}
+    <radialGradient id={id("air")} cx="1010" cy="420" r="820" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0f0f0f" /><stop offset=".5" stop-color="#080808" /><stop offset="1" stop-color="#050505" />
+    </radialGradient>
+    <radialGradient id={id("fade-x")} cx="0" cy="900" r="1100" gradientUnits="userSpaceOnUse">
+      <stop offset=".6" stop-color="white" stop-opacity="0" /><stop offset=".92" stop-color="white" /><stop offset="1" stop-color="white" />
+    </radialGradient>
+    <linearGradient id={id("fade-y")} x2="0" y2="1">
+      <stop offset=".06" stop-color="white" stop-opacity=".35" /><stop offset=".22" stop-color="white" /><stop offset="1" stop-color="white" />
+    </linearGradient>
+    <mask id={id("mask-x")}><rect width="1440" height="900" fill={url("fade-x")} /></mask>
+    <mask id={id("mask-y")}><rect width="1440" height="900" fill={url("fade-y")} /></mask>
+    <radialGradient id={id("near")}>
+      <stop stop-color="white" /><stop offset=".45" stop-color="white" stop-opacity=".45" /><stop offset="1" stop-color="white" stop-opacity="0" />
+    </radialGradient>
+    <mask id={id("reach")}>
+      {cubes.map(({ origin: [x, y] }) => <circle cx={x} cy={y - 39} r="330" fill={url("near")} />)}
+    </mask>
+    <radialGradient id={id("pool")}>
+      <stop stop-color="white" stop-opacity=".09" /><stop offset=".4" stop-color="white" stop-opacity=".03" /><stop offset="1" stop-color="white" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id={id("left")} x2="0" y2="1">
+      <stop stop-color="#383838" /><stop offset=".4" stop-color="#1a1a1a" /><stop offset="1" stop-color="#0b0b0b" />
+    </linearGradient>
+    <linearGradient id={id("right")} x2="0" y2="1">
+      <stop stop-color="#4c4c4c" /><stop offset=".4" stop-color="#232323" /><stop offset="1" stop-color="#0f0f0f" />
+    </linearGradient>
+    <linearGradient id={id("top")} x2="0" y2="1"><stop stop-color="#2a2a2a" /><stop offset="1" stop-color="#3c3c3c" /></linearGradient>
+  </defs>
+  <rect class="dark-light" width="1440" height="900" fill={url("air")} />
+  <g mask={url("mask-x")}>
+    <g mask={url("mask-y")}>
+      <path class="lattice-lines" d={path} fill="none" stroke-width="1" />
+      <path class="dark-light" d={path} fill="none" stroke="white" stroke-opacity=".2" stroke-width="1" mask={url("reach")} />
+    </g>
+  </g>
+  <g class="dark-light">
+    {cubes.map(({ origin: [x, y] }) => <ellipse cx={x} cy={y - 39} rx="300" ry="250" fill={url("pool")} />)}
+    {routes.map((route) => <polyline points={route} fill="none" stroke="white" stroke-opacity=".55" stroke-width="3" stroke-linejoin="round" filter={url("blur4")} />)}
+  </g>
+  {routes.map((route) => <polyline class="lattice-route" points={route} fill="none" stroke-linejoin="round" stroke-linecap="round" />)}
+  <polygon class="waking-face" points={waking.face} />
+  <polygon class="waking-body" points={waking.body} fill="none" stroke-width="1" stroke-linejoin="round" />
+  {cubes.map((cube) => <LatticeCube cube={cube} prefix={prefix} />)}
+</svg>
+
+<style>
+  .hero-lattice { display: block; pointer-events: none; }
+  .dark-light { display: none; }
+  .lattice-lines { stroke: var(--text); stroke-opacity: .13; }
+  .lattice-route { stroke: var(--text); stroke-width: 1.5; }
+  .waking-face { fill: var(--text); fill-opacity: .05; }
+  .waking-body { stroke: var(--text); stroke-opacity: .4; }
+  :global(:root[data-theme="dark"]) .dark-light { display: inline; }
+  :global(:root[data-theme="dark"]) .lattice-lines { stroke: white; stroke-opacity: .055; }
+  :global(:root[data-theme="dark"]) .lattice-route { stroke: white; stroke-width: 1.25; stroke-opacity: .85; }
+  :global(:root[data-theme="dark"]) .waking-face { fill: white; fill-opacity: .07; }
+  :global(:root[data-theme="dark"]) .waking-body { stroke: white; stroke-opacity: .22; }
+</style>

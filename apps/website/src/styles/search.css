@@ -1,5 +1,5 @@
 /*
- * The header's search, after Immaculate's site search: a pill at the header's center that grows into a 48px field
+ * The header's search: a pill at the header's center that grows into a 48px field
  * over the dimmed page, with a radius 28 panel of results 10px under it. scripts/search-morph.ts moves the field, the
  * panel and its contents between the two; what is here is where they rest.
  */
@@ -39,10 +39,6 @@
 .search-label {
   flex: 1;
   text-align: left;
-}
-.search-key {
-  font: inherit;
-  font-size: 0.8125rem;
 }
 
 /*
@@ -148,7 +144,7 @@
   box-shadow: var(--search-float);
 }
 /* Open, the field takes a query; running back into the pill, it shows the pill's face again. */
-.search[data-state="open"] .search-field :is(.search-label, .search-key),
+.search[data-state="open"] .search-field .search-label,
 .search[data-state="closing"] .search-field :is(.search-input, .search-clear) {
   display: none;
 }
@@ -293,8 +289,8 @@
     width: 36px;
     padding: 0 9px;
   }
-  .search-pill :is(.search-label, .search-key),
-  .search[data-state="closing"] .search-field :is(.search-label, .search-key) {
+  .search-pill .search-label,
+  .search[data-state="closing"] .search-field .search-label {
     display: none;
   }
 }

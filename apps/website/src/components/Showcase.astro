@@ -1,11 +1,10 @@
 ---
 /**
  * The parts of the app, as wide cards in a row that scrolls sideways from the page's left edge off its right one.
- * Each card is a tile: a soft colored visual holding a still of the part on a plane, then its title and a line.
+ * Each card is a tile: a neutral visual holding a still of the part on a plane, then its title and a line.
  * The Slack card's visual plays its thread once when pressed.
  */
 import Icon from "./Icon.astro";
-import MeshGradient from "./MeshGradient.astro";
 import SlackDemo from "./SlackDemo.astro";
 import CodeEditorMock from "./mocks/CodeEditorMock.astro";
 import ImportSessionsMock from "./mocks/ImportSessionsMock.astro";
@@ -17,7 +16,6 @@ interface Card {
   id: string;
   title: string;
   body: string;
-  palette: { light: string[]; dark: string[] };
   /** A still of the part, or a scene that rests on its last moment. */
   visual: typeof TaskListMock;
   /** What the visual still is given, when it has a state to show. */
@@ -33,7 +31,6 @@ const cards: Card[] = [
     id: "threads",
     title: "Communication across threads.",
     body: "One agent asks another before it builds, and the answer lands in both threads.",
-    palette: { light: ["#f3effa", "#d9cff0", "#ece6f7", "#cbbde9"], dark: ["#17141d", "#2c2540", "#100e14", "#3a3052"] },
     visual: ThreadMessageMock,
     label: "The Billing page thread after a message from the Plans migration thread. Claude built the page against the answer, user.subscription with its plan, card, and invoices, and changed one file.",
   },
@@ -41,7 +38,6 @@ const cards: Card[] = [
     id: "review",
     title: "Plan, review, ship.",
     body: "Turn a conversation into tasks, weigh the approach with more than one model, and read the diff where the work happened.",
-    palette: { light: ["#fbf2ea", "#f1d6c2", "#f7e8dc", "#ebc7ab"], dark: ["#1c1612", "#3d2b1f", "#130f0c", "#4a3424"] },
     visual: TaskListMock,
     label: "OpenOrc Tasks view with active tasks grouped by In progress, Ready for review, and Backlog.",
   },
@@ -49,7 +45,6 @@ const cards: Card[] = [
     id: "worktrees",
     title: "Parallel work, without collisions.",
     body: "Give a thread its own worktree and branch. Agents work side by side without touching each other’s files.",
-    palette: { light: ["#f1f4ec", "#d6e0c8", "#e8eedf", "#c7d5b3"], dark: ["#151812", "#2a3223", "#0f110d", "#343f2b"] },
     visual: WorktreeMock,
     props: { menu: true },
     label: "A thread working in its own worktree, its menu open. The menu's first row names the thread's branch, openorc/design-tokens-2c91f0, marked Worktree, then This Mac, then Rename, Pin, Snooze, New subthread, Fork, Open in new window, Resolve and Delete.",
@@ -58,7 +53,6 @@ const cards: Card[] = [
     id: "editor",
     title: "Write code yourself.",
     body: "Open a file beside the conversation, make the change, and save. The agent sees what you changed on its next turn.",
-    palette: { light: ["#eef2f9", "#cfdaf0", "#e6ecf6", "#bccbea"], dark: ["#13161c", "#252e40", "#0d0f13", "#2f3a52"] },
     visual: CodeEditorMock,
     label: "Welcome.tsx open in a tab beside Changes, in the studio project. The button label is being edited to Start your first conversation, and Save waits for the change.",
   },
@@ -66,7 +60,6 @@ const cards: Card[] = [
     id: "slack",
     title: "Pick it up from Slack.",
     body: "Mention your personal bot in a channel. Your agent works on your computer and replies in the thread.",
-    palette: { light: ["#faf0f2", "#efd2da", "#f6e6ea", "#e7c0cb"], dark: ["#1b1416", "#3a252b", "#120d0f", "#472d35"] },
     visual: SlackDemo,
     label: "A sample Slack thread. David asks OpenOrc to simplify the studio welcome screen. OpenOrc posts a progress line naming the model and the tool it is using, which becomes its reply: should Connect a project be the one clear next step? David confirms. A new progress line waits for approval, and a permission request to edit Welcome.tsx offers Allow once and Deny, with buttons that expire after 10 minutes.",
     replay: true,
@@ -75,7 +68,6 @@ const cards: Card[] = [
     id: "import",
     title: "Bring conversations forward.",
     body: "Import Claude Code and Codex sessions and continue them with their history intact.",
-    palette: { light: ["#faf6e8", "#efe2b5", "#f6efd6", "#e8d79e"], dark: ["#1a1811", "#363020", "#11100b", "#433b25"] },
     visual: ImportSessionsMock,
     label: "OpenOrc's list of Claude Code and Codex sessions to import, with their message counts, one of them already imported.",
   },
@@ -93,16 +85,16 @@ const cards: Card[] = [
   <div class="showcase-track" data-reveal>
     <div class="showcase-row" role="region" aria-label="Parts of OpenOrc" tabindex="0" data-showcase-row data-at-start>
       <ul class="showcase-cards">
-        {cards.map(({ id, title, body, palette, visual: Visual, props, label, replay }, index) => {
+        {cards.map(({ id, title, body, visual: Visual, props, label, replay }) => {
           const Frame = replay ? "button" : "div";
           return (
             <li class="showcase-card" data-card={id}>
               <Frame class="showcase-visual" aria-label={label} {...(replay ? { type: "button", "data-replay": "" } : { role: "img" })}>
-                <MeshGradient class="showcase-ground" colors={palette} distortion={0.8} swirl={0.25} frame={2000 + index * 2600}>
-                  <div class="showcase-plane hs-on-plane">
+                <div class="showcase-ground">
+                  <div class="showcase-plane">
                     <Visual {...props} />
                   </div>
-                </MeshGradient>
+                </div>
               </Frame>
               <h3>{title}</h3>
               <p>{body}</p>

@@ -1,7 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Icon from "../components/Icon.astro";
-import MeshGradient from "../components/MeshGradient.astro";
+import HeroLattice from "../components/HeroLattice.astro";
 import DownloadButton from "../components/DownloadButton.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import SiteFooter from "../components/SiteFooter.astro";
@@ -11,22 +11,10 @@ import WatchItWork from "../components/WatchItWork.astro";
 import SetupGrid from "../components/SetupGrid.astro";
 import LogoSprite from "../components/hero/LogoSprite.astro";
 import AppPreview from "../components/mocks/AppPreview.astro";
-import LiquidWord from "../components/LiquidWord.astro";
 import { getPublishedReleases, releaseAnchor } from "../data/changelog";
 import { questions } from "../data/faq";
 import { iphoneAppUrl } from "../data/downloads";
 import "../styles/home.css";
-
-/** The stage: neutral grays drifting slowly under a fine grain. */
-const stage = {
-  colors: { light: ["#f8f8f9", "#d3d6dd", "#eceef1", "#c6cad3"], dark: ["#121213", "#2e3035", "#0b0b0c", "#3a3c42"] },
-  distortion: 0.8,
-  swirl: 0.25,
-  speed: 0.25,
-  frame: 4000,
-  grainMixer: 0.04,
-  grainOverlay: 0.08,
-};
 
 const releases = (await getPublishedReleases()).slice(0, 4);
 const releaseDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -37,23 +25,21 @@ const releaseDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "num
   <main id="main" class="home-page">
     <LogoSprite />
     <section class="hero" aria-labelledby="hero-title">
-      <MeshGradient class="hero-stage" {...stage}>
-        <div class="hero-column">
-          <div class="hero-copy">
-            <h1 id="hero-title" class="hero-title" data-arrive><LiquidWord>Your coding agents,</LiquidWord> <span class="quiet">working together.</span></h1>
-            <div class="hero-actions" data-arrive style="--arrive-index: 1">
-              <div class="hero-buttons">
-                <DownloadButton />
-                <a class="button button-secondary" href={iphoneAppUrl} rel="noopener">Also on iPhone<Icon name="arrow" size={15} /></a>
-              </div>
-              <AgentLogos />
-            </div>
-          </div>
-          <div class="hero-window mock-window" role="group" aria-label="The OpenOrc app with three threads open in tabs. In the studio project, Codex has finished Make the first five minutes count, and the panel beside it holds its changes to src/Welcome.tsx, the project's files, and the new welcome screen in a browser. Claude is still working on A faster command menu, and Tell the product story has a finished result waiting." data-arrive style="--arrive-index: 2">
-            <AppPreview />
-          </div>
+      <HeroLattice />
+      <div class="hero-copy">
+        <h1 id="hero-title" class="hero-title" data-arrive>Your coding agents, <span class="quiet">working together.</span></h1>
+        <div class="hero-actions" data-arrive style="--arrive-index: 1">
+          <DownloadButton />
+          <a class="hero-phone text-link" href={iphoneAppUrl} rel="noopener">Also on iPhone<Icon name="arrow" size={15} /></a>
         </div>
-      </MeshGradient>
+      </div>
+    </section>
+
+    <section class="app-preview-section container" aria-label="OpenOrc app preview">
+      <div class="preview-window mock-window" role="group" aria-label="The OpenOrc app with three threads open in tabs. In the studio project, Codex has finished Make the first five minutes count, and the panel beside it holds its changes to src/Welcome.tsx, the project's files, and the new welcome screen in a browser. Claude is still working on A faster command menu, and Tell the product story has a finished result waiting.">
+        <AppPreview />
+      </div>
+      <AgentLogos />
     </section>
 
     <Showcase />
@@ -61,7 +47,7 @@ const releaseDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "num
     <WatchItWork />
 
     <section class="agents-section container" aria-labelledby="agents-title" data-reveal>
-      <h2 id="agents-title" class="agents-statement"><LiquidWord>Built for the agents you already have.</LiquidWord> Bring your subscriptions, API keys, and favorite coding agents.</h2>
+      <h2 id="agents-title" class="agents-statement"><span class="agents-lead">Built for the agents you already have.</span> Bring your subscriptions, API keys, and favorite coding agents.</h2>
     </section>
 
     <section class="setup-section container" id="your-tools" aria-labelledby="tools-title">
@@ -110,7 +96,7 @@ const releaseDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "num
     </section>
 
     <section class="closing container" aria-labelledby="closing-title" data-reveal>
-      <h2 id="closing-title"><LiquidWord>Every agent.</LiquidWord> <span class="quiet">One workspace.</span></h2>
+      <h2 id="closing-title">Every agent. <span class="quiet">One workspace.</span></h2>
       <p>Start a conversation with the agents you already have, and keep every decision and review in one place.</p>
       <div class="hero-actions">
         <DownloadButton />

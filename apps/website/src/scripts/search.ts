@@ -1,11 +1,10 @@
-import { downloadDevice } from "../lib/download-platform";
 import { search, type SearchEntry } from "../lib/search";
 import { createMorph } from "./search-morph";
 import { createResults } from "./search-results";
 import { play } from "./speaker";
 
 /*
- * The header's search, after Immaculate's: the pill grows into a field over the dimmed page on a click, ⌘K or Ctrl+K,
+ * The header's search pill grows into a field over the dimmed page on a click, ⌘K or Ctrl+K,
  * and runs back into it on ⌘K again, Escape, a press on the page, or a chosen result. The index is fetched the first
  * time it opens; the suggestions ship with the page, so the panel opens at its full size.
  */
@@ -147,8 +146,3 @@ function initSearch(dialog: HTMLElement, pill: HTMLButtonElement) {
 const dialog = document.querySelector<HTMLElement>("[data-search]");
 const pill = document.querySelector<HTMLButtonElement>("[data-search-pill]");
 if (dialog && pill) initSearch(dialog, pill);
-
-const { platform } = downloadDevice(navigator);
-if (platform === "windows" || platform === "linux" || platform === "other") {
-  for (const key of document.querySelectorAll("[data-search-key]")) key.textContent = "Ctrl K";
-}

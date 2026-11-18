@@ -1,14 +1,10 @@
 /*
- * The homepage in the app's own language: a white page, gray tiles the product stands on, white planes inside them,
- * two-tone headings, and one ink pill. The app is shown frameless, since each tile is its ground.
+ * The homepage uses one ground, raised planes, two-tone headings, and one ink pill.
+ * The app is shown frameless, since each tile is its ground.
  */
 .home-page {
   --section-gap: clamp(96px, 10vw, 144px);
-  --window-edge: rgb(20 20 20 / 0.14);
   overflow: clip;
-}
-:root[data-theme="dark"] .home-page {
-  --window-edge: rgb(255 255 255 / 0.12);
 }
 .home-page h2 {
   max-width: none;
@@ -20,50 +16,83 @@
   gap: 10px;
 }
 
-/* Hero: one stage 12px from the page's edges, painted by its drifting mesh gradient. The copy sits at its top left and
-   the app window rises from its floor below, its left edge on the copy's, cut by the stage's bottom edge. */
+/* The first screen is one room. Its field fades before the low-left claim. */
+.site-home {
+  --hero-header-height: 92px;
+  --hero-gutter: clamp(24px, 5.556vw, 80px);
+}
+.site-home .site-header {
+  --header-height: var(--hero-header-height);
+}
+.site-home .site-header[data-at-top] {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.site-home .nav {
+  width: min(1760px, calc(100% - 2 * var(--hero-gutter)));
+}
 .home-page .hero {
-  padding-inline: 12px;
-}
-.home-page .hero-stage {
-  --stage-inset: clamp(20px, 5.84vw, 84px);
+  position: relative;
+  isolation: isolate;
+  min-height: 720px;
+  height: min(100svh, 1080px);
+  margin-top: calc(-1 * var(--hero-header-height));
   overflow: hidden;
-  border-radius: var(--radius-tile);
 }
-.home-page .hero-column {
-  width: min(100% - 2 * var(--stage-inset), var(--content-width, 1376px));
-  margin-inline: auto;
-  padding-top: clamp(48px, 6.1vw, 88px);
+.home-page .hero-lattice {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.home-page .hero-copy {
+  position: absolute;
+  z-index: 1;
+  left: max(var(--hero-gutter), calc((100% - 1760px) / 2));
+  bottom: 96px;
 }
 .home-page .hero-title {
-  font-size: clamp(2.25rem, 3.6vw, 3.25rem);
+  font-size: clamp(40px, 4.306vw, 68px);
   line-height: 1.04;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.038em;
 }
 .home-page .hero-title .quiet {
   display: block;
 }
 .home-page .hero-copy .hero-actions {
-  flex-direction: column;
-  align-items: flex-start;
   gap: 24px;
+  margin-top: 40px;
+}
+.home-page .hero-copy .button {
+  min-height: 46px;
+  padding: 0 22px 0 19px;
+  font-size: 15px;
+  letter-spacing: -0.012em;
+  box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.5);
+}
+:root[data-theme="dark"] .home-page .hero-copy .button {
+  box-shadow:
+    inset 0 -1px 0 rgb(0 0 0 / 0.12),
+    0 0 34px -8px rgb(255 255 255 / 0.42);
+}
+.home-page .hero-phone {
+  min-height: 46px;
+  color: var(--muted);
+  letter-spacing: -0.012em;
+}
+.home-page .app-preview-section {
+  padding-top: 48px;
+}
+.home-page .preview-window {
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+.home-page .app-preview-section .works-with {
   margin-top: 24px;
 }
-.home-page .hero-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.home-page .hero-copy .hero-buttons .button {
-  min-height: 44px;
-  padding: 0 20px;
-  font-size: 0.9375rem;
-}
-.home-page .hero-window {
-  margin-top: clamp(40px, 4.7vw, 56px);
-  border: 0.5px solid var(--window-edge);
-  border-bottom: 0;
-  border-radius: 14px 14px 0 0;
+.home-page .app-preview-section .works-with-marks {
+  filter: grayscale(1);
 }
 
 /* Showcase: the heading in the page's column, then a row of cards that starts at the column's left edge and runs off
@@ -206,6 +235,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
+  container-type: inline-size;
 }
 .home-page .showcase-card h3 {
   padding: 28px 32px 0;
@@ -343,7 +373,7 @@
   line-height: 1.25;
   letter-spacing: -0.025em;
 }
-.home-page .agents-statement strong {
+.home-page .agents-statement .agents-lead {
   color: var(--text);
   font-weight: inherit;
 }
@@ -411,6 +441,9 @@
   background: var(--surface);
   color: var(--text);
   font-size: 0.8125rem;
+}
+:root:not([data-theme="dark"]) .home-page .setup-window {
+  background: var(--bg);
 }
 .home-page .setup-row {
   display: flex;
@@ -906,30 +939,16 @@
 }
 
 @media (max-width: 1100px) {
-  /* The page adapts to the phone; the product remains a desktop window.
-     The camera follows the journey through the same sidebar and split panes. */
-  .home-page .demo-stage {
-    container-type: inline-size;
-  }
-  .home-page .demo-window {
-    --crop-offset: 274px;
-    width: 1000px;
-    height: 560px;
-    aspect-ratio: auto;
-    transform: translateX(calc(-1 * min(var(--crop-offset), max(0px, 1000px - 100cqi))));
-    transition: transform 700ms var(--ease-out);
-  }
-  .home-page .demo-window .hero-scene {
-    --u: calc(100cqi / 1120);
-  }
-  .home-page .demo-window:has([data-scene="handoff"]) {
-    --crop-offset: 234px;
-  }
-  .home-page .demo-window:has([data-scene="workflow"][data-sidebar="open"]) {
-    --crop-offset: 0px;
-  }
   .home-page .releases-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 701px) and (max-width: 1000px) {
+  .home-page .hero-lattice {
+    top: var(--hero-header-height);
+    height: auto;
+    mask-image: linear-gradient(#000 88%, transparent);
   }
 }
 
@@ -937,21 +956,50 @@
   .home-page {
     --section-gap: 80px;
   }
-  /* Phones keep the window, larger and cropped to the conversation: it runs off the stage's right edge and floor, and
-     the scenes stay off the page. */
-  .home-page .watch {
-    display: none;
+  .site-home {
+    --hero-header-height: 56px;
+    --hero-gutter: 24px;
   }
-  .home-page .hero-window {
-    height: 440px;
-    margin: 36px calc(-1 * var(--stage-inset)) 0 0;
-    border-right: 0;
-    border-radius: 14px 0 0 0;
+  .site-home .nav {
+    width: calc(100% - 2 * var(--gutter));
   }
-  .home-page .hero-window .hs-mock-app {
-    --u: 0.82px;
-    width: calc(1456 * var(--u));
-    margin-left: calc(-332 * var(--u));
+  .home-page .hero {
+    min-height: 680px;
+    max-height: 900px;
+  }
+  .home-page .hero-lattice {
+    inset: 64px auto auto 50%;
+    width: min(200%, 780px);
+    transform: translateX(-70%);
+    height: auto;
+    mask-image: linear-gradient(#000 88%, transparent), linear-gradient(to right, #000 90%, transparent);
+    mask-composite: intersect;
+  }
+  .home-page .hero-copy {
+    right: var(--hero-gutter);
+    bottom: 56px;
+  }
+  .home-page .hero-title {
+    font-size: clamp(29px, 8.9vw, 40px);
+  }
+  .home-page .hero-copy .hero-actions {
+    gap: 8px 16px;
+    margin-top: 28px;
+  }
+  .home-page .hero-copy .button {
+    min-height: 44px;
+    padding-inline: 16px;
+    font-size: 14px;
+  }
+  .home-page .hero-phone {
+    font-size: 13px;
+  }
+  .home-page .app-preview-section {
+    padding-top: 32px;
+  }
+  .home-page .watch .segmented button {
+    padding-inline: 11px;
+    font-size: 13px;
   }
   .home-page .showcase-head {
     align-items: flex-start;
@@ -968,6 +1016,7 @@
   .home-page .showcase-plane {
     top: 24px;
     left: 24px;
+    max-width: calc(100% - 48px);
   }
   .home-page .showcase-card h3 {
     padding: 24px 24px 0;
@@ -985,18 +1034,20 @@
     width: 420px;
   }
   .home-page [data-card="slack"] .showcase-plane {
-    left: 16px;
-    width: calc(100% - 32px);
-    height: 400px;
+    left: 24px;
+    width: 470px;
+    max-width: none;
+    height: 440px;
+    transform: scale(calc((100cqi - 48px) / 470px));
+    transform-origin: top left;
   }
   .home-page [data-card="import"] .showcase-plane {
     top: 50%;
-    width: 420px;
-    padding: 14px;
-  }
-  .home-page [data-card="import"] .setup-window {
-    width: 340px;
-    font-size: 0.875rem;
+    width: 560px;
+    max-width: none;
+    padding: 20px;
+    transform: scale(calc((100cqi - 48px) / 560px));
+    transform-origin: left center;
   }
   .home-page .slack-composer-hint {
     display: none;

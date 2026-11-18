@@ -27,29 +27,29 @@
   --type-control: 0.875rem;
   --section-space: 7.5rem;
 
-  --bg: #ffffff;
-  --surface: #f4f4f4;
+  --bg: #f5f5f2;
+  --surface: #ffffff;
   --paper: #ffffff;
-  --tint: #1717170d;
-  --tint-strong: #17171717;
-  --rule: #17171717;
-  --rule-strong: #1717172e;
+  --tint: #ecece9;
+  --tint-strong: #e5e5e3;
+  --rule: color-mix(in srgb, var(--text) 8%, var(--bg));
+  --rule-strong: color-mix(in srgb, var(--text) 16%, var(--bg));
   --text: #171717;
-  --text-2: #3d3d3d;
-  --muted: #555555;
-  --faint: #666666;
+  --text-2: color-mix(in srgb, var(--text) 80%, var(--bg));
+  --muted: var(--text-2);
+  --faint: color-mix(in srgb, var(--text) 66%, var(--bg));
   --ok: #1e7359;
   --bad: #9b5050;
   --ink-button: #171717;
-  --ink-button-hover: #333333;
+  --ink-button-hover: #333331;
   --on-ink: #ffffff;
   --selection: #17171724;
   --scrollbar: #1717172e;
   --hairline: 1px;
 
   --gutter: 32px;
-  --radius-tile: 28px;
-  --radius-card: 20px;
+  --radius-tile: 16px;
+  --radius-card: 14px;
   --radius-row: 10px;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-overshoot: cubic-bezier(0.24, 1.34, 0.38, 1);
@@ -78,26 +78,26 @@
   scrollbar-color: var(--scrollbar) var(--bg);
   -webkit-font-smoothing: antialiased;
 }
-/* Dark: the tile stays a step above the page and planes are carved back down to it, as in the app. */
+/* Planes and controls step up from the dark ground. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0a0a0a;
-  --surface: #171717;
-  --paper: #0a0a0a;
-  --tint: #ffffff12;
-  --tint-strong: #ffffff1f;
-  --rule: #ffffff1c;
-  --rule-strong: #ffffff2e;
-  --text: #ffffff;
-  --text-2: #dedede;
-  --muted: #b8b8b8;
-  --faint: #8e8e8e;
-  --ok: #7cc4a2;
-  --bad: #e2a3a3;
+  --bg: #050505;
+  --surface: #101010;
+  --paper: #191919;
+  --tint: #191919;
+  --tint-strong: #222222;
+  --rule: #181818;
+  --rule-strong: #2b2b2b;
+  --text: #ededeb;
+  --text-2: #b9b9b6;
+  --muted: #b9b9b6;
+  --faint: #8f8f8c;
+  --ok: #58b98a;
+  --bad: #d98a7e;
   --ink-button: #ffffff;
   --ink-button-hover: #e6e6e6;
-  --on-ink: #000000;
-  --selection: #ffffff2e;
+  --on-ink: #050505;
+  --selection: #2c2c2c;
   --scrollbar: #ffffff2e;
 }
 @media (min-resolution: 2dppx) {
@@ -486,7 +486,6 @@ h3 {
     --type-title: 1.125rem;
     --type-lead: 1rem;
     --section-space: 4.5rem;
-    --radius-tile: 22px;
   }
   .site-header {
     --header-height: 56px;
@@ -512,6 +511,21 @@ h3 {
 @media (max-width: 480px) {
   .nav-links .nav-changelog {
     display: none;
+  }
+}
+@media (max-width: 360px) {
+  .nav {
+    gap: 4px;
+  }
+  .nav-start {
+    gap: 2px;
+  }
+  .nav .wordmark {
+    gap: 6px;
+    font-size: 15px;
+  }
+  .nav-links a {
+    padding-inline: 6px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

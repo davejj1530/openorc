@@ -1,0 +1,58 @@
+---
+import type { LatticeCube } from "../../lib/hero-lattice";
+import claude from "../../../../desktop/src/renderer/src/assets/providers/claude.svg?url";
+import codex from "../../../../desktop/src/renderer/src/assets/providers/openai.svg?url";
+import opencode from "../../../../desktop/src/renderer/src/assets/providers/opencode.svg?url";
+
+interface Props { cube: LatticeCube; prefix: string }
+const { cube, prefix } = Astro.props;
+const url = (name: string) => `url(#${prefix}-${name})`;
+const bodyId = `${prefix}-${cube.agent}`;
+const marks = { claude, codex, opencode };
+const [x, y] = cube.origin;
+---
+
+<defs>
+  <mask id={bodyId} maskUnits="userSpaceOnUse" x={x - 156} y={y - 156} width="312" height="312">
+    <polygon points={cube.body} fill="white" stroke="white" stroke-width={cube.rounding} stroke-linejoin="round" />
+  </mask>
+</defs>
+<g class="lattice-cube">
+  <polygon class="light-shadow" points={cube.body} transform="translate(0 26)" fill="black" opacity=".2" filter={url("blur26")} />
+  <polygon class="light-shadow" points={cube.body} transform="translate(0 8)" fill="black" opacity=".22" filter={url("blur10")} />
+  <polygon class="dark-light" points={cube.body} transform="translate(0 16)" fill="black" opacity=".9" filter={url("blur10")} />
+  <polygon class="cube-body" points={cube.body} stroke-width={cube.rounding} stroke-linejoin="round" />
+  <g mask={`url(#${bodyId})`}>
+    <polygon class="cube-left" points={cube.left} fill={url("left")} />
+    <polygon class="cube-right" points={cube.right} fill={url("right")} />
+    <polygon class="cube-top" points={cube.top} fill={url("top")} />
+    <g class="dark-light">
+      <polyline points={cube.rim} fill="none" stroke="white" stroke-opacity=".42" stroke-width="1" />
+      <polygon points={cube.body} fill="none" stroke="white" stroke-opacity=".1" stroke-width="1" stroke-linejoin="round" />
+      <polygon points={cube.face} fill="white" opacity=".55" filter={url("blur10")} />
+    </g>
+  </g>
+  <g class="dark-light">
+    <polygon points={cube.face} fill="white" opacity=".2" filter={url("blur60")} />
+    <polygon points={cube.face} fill="white" opacity=".3" filter={url("blur26")} />
+  </g>
+  <polygon class="cube-face" points={cube.face} fill="white" stroke="white" stroke-width={cube.rounding * .7} stroke-linejoin="round" />
+  <g transform={cube.logoTransform}>
+    <image href={marks[cube.agent]} x=".17" y=".17" width=".66" height=".66" preserveAspectRatio="xMidYMid meet" style="filter: brightness(0)" />
+  </g>
+</g>
+
+<style>
+  .cube-body { fill: var(--text); stroke: var(--text); }
+  .cube-face { fill: var(--surface); stroke: var(--surface); }
+  .light-shadow { fill: var(--text); }
+  .cube-left, .cube-top, .dark-light { display: none; }
+  .cube-right { fill: var(--surface); fill-opacity: .09; }
+  :global(:root[data-theme="dark"]) .cube-face { fill: white; stroke: white; }
+  :global(:root[data-theme="dark"]) .cube-body { fill: #0d0d0d; stroke: #0d0d0d; }
+  :global(:root[data-theme="dark"]) .cube-left,
+  :global(:root[data-theme="dark"]) .cube-top,
+  :global(:root[data-theme="dark"]) .dark-light { display: inline; }
+  :global(:root[data-theme="dark"]) .cube-right { fill: revert-layer; fill-opacity: 1; }
+  :global(:root[data-theme="dark"]) .light-shadow { display: none; }
+</style>

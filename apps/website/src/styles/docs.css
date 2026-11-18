@@ -3,8 +3,8 @@
  * it on wide screens. Tables, notes and cards are fill-only tiles, as in the app's Settings.
  */
 .docs {
-  --warning-bg: #b26a0014;
-  --warning-ink: #7a4a00;
+  --warning-bg: var(--surface);
+  --warning-ink: var(--text);
   --docs-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --docs-body: 0.9375rem;
   display: grid;
@@ -13,11 +13,6 @@
   align-items: start;
   gap: 56px;
   padding-block: 40px var(--section-space);
-}
-
-:root[data-theme="dark"] .docs {
-  --warning-bg: #f0b35a1a;
-  --warning-ink: #f0c98a;
 }
 
 /* Sidebar */
@@ -236,7 +231,7 @@ kbd {
   margin: 18px 0 26px;
   padding: 4px 4px 4px;
   overflow-x: auto;
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 .docs-table table {
@@ -343,7 +338,7 @@ kbd {
   max-width: 72ch;
   margin: 22px 0;
   padding: 14px 18px;
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   color: var(--text-2);
   font-size: 0.875rem;
@@ -423,20 +418,6 @@ kbd {
   margin-top: 12px;
   color: var(--faint);
   font-size: 0.8125rem;
-}
-
-/* Documentation previews also show the desktop product through a crop. */
-@media (max-width: 700px) {
-  .docs-stage {
-    container-type: inline-size;
-  }
-  .docs-visual .mock-window {
-    width: 640px;
-  }
-  .docs-visual .mock-window:has(.hs-mock-worktree) {
-    width: 900px;
-    transform: translateX(calc(-1 * min(299px, max(0px, 900px - 100cqi))));
-  }
 }
 
 /* Diagrams draw a narrow composition instead of shrinking labels. */

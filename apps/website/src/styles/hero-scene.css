@@ -16,25 +16,31 @@
 .hero-scene,
 .hs-mock {
   --u: calc(100cqi / 1360);
-  --hs-bg: #f4f4f4;
+  --hs-bg: #f5f5f2;
   --hs-plane: #ffffff;
-  --hs-fill: #1717170d;
-  --hs-fill-strong: #17171717;
+  --hs-fill: #ecece9;
+  --hs-fill-strong: #e5e5e3;
   /* The fill over the tile, opaque, for a message in flight over moving content. */
-  --hs-fill-solid: #e9e9e9;
-  --hs-line: #17171717;
+  --hs-fill-solid: #ecece9;
+  --hs-line: #e5e5e3;
   --hs-ink: #171717;
-  --hs-muted: #555555;
-  --hs-faint: #666666;
+  --hs-prose: #515150;
+  --hs-bubble: #ffffff;
+  --hs-current: #ffffff;
+  --hs-lit: 0 0 0 calc(0.5 * var(--u)) rgb(23 23 23 / 0.06), 0 var(--u) calc(2 * var(--u)) rgb(23 23 23 / 0.05), 0 calc(10 * var(--u)) calc(24 * var(--u)) calc(-12 * var(--u)) rgb(23 23 23 / 0.2);
+  --hs-key: #f4f4f2;
+  --hs-line-number: #868684;
+  --hs-muted: #515150;
+  --hs-faint: #626261;
   --hs-accent: #171717;
   --hs-on-accent: #ffffff;
-  --hs-code: #e3e3e3;
+  --hs-code: #ecece9;
   --hs-ok: #1e7359;
   --hs-bad: #9b5050;
-  --hs-ok-soft: #e6f0eb;
-  --hs-bad-soft: #f7ebe9;
+  --hs-ok-soft: #e4f0ea;
+  --hs-bad-soft: #f7eae8;
   --hs-attention: #b26a00;
-  --hs-warn: #8b5c0a;
+  --hs-warn: #8f5408;
   /* Secondary controls rest on the plane on the tile, and on the fill inside a plane (the Contextual Fill Rule). */
   --hs-control: var(--hs-plane);
   --hs-mono: "JetBrains Mono Variable", "SF Mono", Menlo, Consolas, monospace;
@@ -56,26 +62,32 @@
   text-rendering: optimizeLegibility;
   user-select: none;
 }
-/* The site in dark mode shows the app's dark theme: planes carved below the tile. */
+/* The site and product pictures follow the same appearance choice. */
 :root[data-theme="dark"] :is(.hero-scene, .hs-mock) {
-  --hs-bg: #171717;
-  --hs-plane: #0a0a0a;
-  --hs-fill: #ffffff12;
-  --hs-fill-strong: #ffffff1f;
-  --hs-fill-solid: #272727;
-  --hs-line: #ffffff1c;
-  --hs-ink: #ffffff;
-  --hs-muted: #b8b8b8;
-  --hs-faint: #8e8e8e;
+  --hs-bg: #050505;
+  --hs-plane: #101010;
+  --hs-fill: #161616;
+  --hs-fill-strong: #1e1e1e;
+  --hs-fill-solid: #161616;
+  --hs-line: #181818;
+  --hs-ink: #ededeb;
+  --hs-prose: #dededb;
+  --hs-bubble: #131313;
+  --hs-current: #191919;
+  --hs-lit: inset 0 var(--u) 0 rgb(255 255 255 / 0.1), 0 0 calc(28 * var(--u)) calc(-10 * var(--u)) rgb(255 255 255 / 0.22);
+  --hs-key: #1a1a1a;
+  --hs-line-number: #6a6a67;
+  --hs-muted: #b9b9b6;
+  --hs-faint: #8f8f8c;
   --hs-accent: #ffffff;
-  --hs-on-accent: #000000;
-  --hs-code: #272727;
-  --hs-ok: #7cc4a2;
-  --hs-bad: #e2a3a3;
-  --hs-ok-soft: #1e735942;
-  --hs-bad-soft: #9b505047;
+  --hs-on-accent: #050505;
+  --hs-code: #161616;
+  --hs-ok: #58b98a;
+  --hs-bad: #d98a7e;
+  --hs-ok-soft: #12201a;
+  --hs-bad-soft: #241715;
   --hs-attention: #f0b35a;
-  --hs-warn: #c0973a;
+  --hs-warn: #f0b35a;
 }
 .hero-scene {
   position: absolute;
@@ -598,7 +610,8 @@
 .hero-scene[data-view="b"] .hs-row[data-row="b"],
 .hero-scene:has(.hs-panes[data-split]) .hs-row[data-row="b"],
 .hs-row[data-current] {
-  background: var(--hs-plane);
+  background: var(--hs-current);
+  box-shadow: var(--hs-lit);
 }
 .hero-scene[data-view="a"] .hs-row[data-row="a"] .hs-row-title,
 .hero-scene[data-view="b"] .hs-row[data-row="b"] .hs-row-title,
@@ -900,7 +913,7 @@
   max-width: min(88%, 72ch);
   padding: calc(12 * var(--u)) calc(16 * var(--u));
   border-radius: calc(18 * var(--u));
-  background: var(--hs-plane);
+  background: var(--hs-bubble);
   font-size: calc(14 * var(--u));
   line-height: calc(22 * var(--u));
   letter-spacing: -0.01em;
@@ -947,6 +960,7 @@
   rotate: 180deg;
 }
 .hs-prose {
+  color: var(--hs-prose);
   font-size: calc(14 * var(--u));
   line-height: calc(22 * var(--u));
   letter-spacing: -0.01em;
@@ -1255,6 +1269,7 @@
   margin: 0 auto;
 }
 .hs-shell {
+  --hs-control: var(--hs-key);
   display: grid;
   gap: calc(14 * var(--u));
   padding: calc(14 * var(--u)) calc(12 * var(--u)) calc(12 * var(--u)) calc(16 * var(--u));
@@ -2349,7 +2364,7 @@
   flex: none;
   width: calc(36 * var(--u));
   padding-right: calc(7.2 * var(--u));
-  color: var(--hs-faint);
+  color: var(--hs-line-number);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -2781,7 +2796,7 @@
   flex: none;
   width: calc(48 * var(--u));
   padding-right: calc(14 * var(--u));
-  color: var(--hs-faint);
+  color: var(--hs-line-number);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -2840,17 +2855,6 @@
 }
 .hs-prose-list .hs-strong {
   color: var(--hs-ink);
-}
-
-/* A still set on a plane instead of the tile: the plane becomes its ground, and what the app draws as planes steps
-   down to the tile's fill, as cards do inside the app's own planes. */
-.hs-on-plane :is(.hero-scene, .hs-mock) {
-  --hs-bg: #ffffff;
-  --hs-plane: #f4f4f4;
-}
-:root[data-theme="dark"] .hs-on-plane :is(.hero-scene, .hs-mock) {
-  --hs-bg: #0a0a0a;
-  --hs-plane: #171717;
 }
 
 /* Scenes with data-motion: scripts/hero-motion.ts opens and closes [data-grow]

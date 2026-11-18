@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useSyncExternalStore, type RefObject } from "react";
-import { Dimensions, type HostInstance } from "react-native";
+import { Dimensions, type HostInstance, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { chunksInView } from "./mono-lines";
 
 /**
@@ -38,6 +38,18 @@ export function createSheetWindow() {
 }
 
 export const SheetWindowContext = createContext(createSheetWindow());
+
+type SheetWindow = ReturnType<typeof createSheetWindow>;
+
+/** What the scroll view long lines sit in reports, so the window follows where it is scrolled and how tall it is. */
+export function windowScroll(sheet: SheetWindow) {
+  return {
+    onScroll: ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => sheet.scrolled(nativeEvent.contentOffset.y, nativeEvent.layoutMeasurement.height),
+    scrollEventThrottle: 16,
+    onLayout: ({ nativeEvent }: LayoutChangeEvent) => sheet.scrolled(sheet.view().top, nativeEvent.layout.height),
+    onContentSizeChange: sheet.resized,
+  };
+}
 
 /**
  * Which of a block's chunks of lines, each `chunkHeight` tall but the last, to draw, first to last, and `measure` for

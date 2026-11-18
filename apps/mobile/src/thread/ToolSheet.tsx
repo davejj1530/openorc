@@ -2,7 +2,7 @@ import { liveVerb, stateLabel, toolCallPresentation, toolInputView, toolOutputVi
 import { TOOL_IMAGE_URL } from "@openorc/protocol";
 import { router, useLocalSearchParams } from "expo-router";
 import { memo, useMemo, useState, type ReactNode } from "react";
-import { ScrollView, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { call, useLinkRead, useRun } from "../client";
 import type { LinkRead } from "../connection/link-hooks";
@@ -11,7 +11,7 @@ import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { ImageTile } from "./images";
 import { matchLines } from "./mono-lines";
-import { createSheetWindow, SheetWindowContext } from "./sheet-window";
+import { createSheetWindow, SheetWindowContext, windowScroll } from "./sheet-window";
 import { toolIcons, toolState, type ToolBlock } from "./tools";
 
 /** Reads a call's output from the Mac's ledger; `key` names the run and the call. */
@@ -180,11 +180,9 @@ export function ToolSheet() {
   const { view, images, state } = useOutput(block, input);
   const [sheet] = useState(createSheetWindow);
   if (!block || !input) return <View className="flex-1 bg-bg" />;
-  const scrolled = ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => sheet.scrolled(nativeEvent.contentOffset.y, nativeEvent.layoutMeasurement.height);
-  const laidOut = ({ nativeEvent }: LayoutChangeEvent) => sheet.scrolled(sheet.view().top, nativeEvent.layout.height);
   return (
     <SheetWindowContext.Provider value={sheet}>
-      <ScrollView className="flex-1 bg-bg" onScroll={scrolled} scrollEventThrottle={16} onLayout={laidOut} onContentSizeChange={sheet.resized} onAccessibilityEscape={() => router.back()}>
+      <ScrollView className="flex-1 bg-bg" {...windowScroll(sheet)} onAccessibilityEscape={() => router.back()}>
         <View ref={sheet.content} className="gap-4 px-5 pt-6" style={{ paddingBottom: insets.bottom + 24 }}>
           <Heading block={block} />
           <InputPart view={input} />

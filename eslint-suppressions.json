@@ -42,11 +42,6 @@
       "count": 3
     }
   },
-  "apps/desktop/src/renderer/src/views/NewThread.tsx": {
-    "react-hooks/exhaustive-deps": {
-      "count": 1
-    }
-  },
   "apps/desktop/src/renderer/src/views/TaskDocument.tsx": {
     "@typescript-eslint/no-floating-promises": {
       "count": 1

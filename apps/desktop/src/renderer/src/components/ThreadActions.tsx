@@ -238,6 +238,7 @@ function ThreadForkActions({ thread, parts: M, header }: { thread: ThreadSummary
 /** What deleting removes, for the thread's place. */
 function deleteCopy(thread: ThreadSummary | null | undefined): string {
   if (isSubagentThread(thread ?? undefined)) return "This saved conversation and its nested subagents are removed. The parent conversation and shared files stay.";
+  if (thread?.parentRelation === "started") return "This conversation is removed. The folder and its work stay with the parent thread.";
   if (thread && placeOf(thread) === PLACES.hosted) return "The conversation and its work on OpenOrc Cloud are removed, for everyone in it.";
   return "The conversation is removed, and its worktree with it. Tasks it created stay, with their worktrees and branches.";
 }

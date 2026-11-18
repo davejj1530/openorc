@@ -69,12 +69,18 @@ it("reads an OpenOrc Cloud subagent's file links as references, which have no fo
   expect(revealFile).not.toHaveBeenCalled();
 });
 
-it("stands among a header's facts as the thread it started from, and opens it", () => {
+it("stands among a header's facts as the thread it started from, the one that gives way, and opens it", () => {
   rows.parent = { id: "parent", title: "Cloud Sandbox Provider Evaluation" } as ThreadSummary;
   useRouter.setState({ route: { view: "thread", threadId: "child" }, history: [], future: [], threadIds: ["child"] });
-  render(<ThreadParent id="parent" fact />);
+  const { container } = render(
+    <span className="thread-header-facts">
+      <ThreadParent id="parent" fact />
+    </span>,
+  );
   const link = screen.getByRole("button", { name: "Cloud Sandbox Provider Evaluation" });
   expect(link.textContent).not.toContain("/");
+  // The facts' own child, so the rule that makes it give way before the tabs reaches it.
+  expect(container.querySelector(".thread-header-facts > .thread-parent-fact")).toBe(link);
   fireEvent.click(link);
   expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "parent" });
 });

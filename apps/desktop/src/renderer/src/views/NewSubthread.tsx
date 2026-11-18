@@ -95,10 +95,12 @@ function SubthreadComposer({ parent }: { parent: ThreadSummary }) {
           <div className="new-thread-column">
             <h1 className="new-thread-question">
               What should we work on under{" "}
-              <button className="new-thread-question-project" data-tip={parent.title} onClick={() => openThread(parent.id)}>
-                {parent.title}
-              </button>
-              ?
+              <span className="inline-flex max-w-full">
+                <button className="new-thread-question-project truncate" data-tip={parent.title} onClick={() => openThread(parent.id)}>
+                  {parent.title}
+                </button>
+                ?
+              </span>
             </h1>
             <Composer
               draftKey={files.draftKey}

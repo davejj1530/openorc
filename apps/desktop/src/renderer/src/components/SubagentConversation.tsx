@@ -89,14 +89,13 @@ export function ThreadParent({ id, fact = false }: { id: string | null | undefin
   const parent = useRpc("threads.get", { id: id ?? "" }, { enabled: Boolean(id) });
   if (!id) return null;
   const title = parent.data?.title ?? "Parent";
-  // Among the header's facts it stands alone, not before a title: a mark and the name, cut short with an ellipsis.
+  // Among the header's facts it stands alone, not before a title: a mark and the name, cut short with an ellipsis. The
+  // button is the tooltip's trigger itself, so it stays the facts' own child, the one that gives way.
   if (fact)
     return (
-      <Tooltip label={`Started from ${title}`}>
-        <button type="button" className="thread-header-fact thread-header-fact-link thread-parent-fact no-drag" onClick={() => openThread(id)}>
-          <CornerUpLeft size={12} />
-          <span className="truncate">{title}</span>
-        </button>
+      <Tooltip label={`Started from ${title}`} render={<button type="button" className="thread-header-fact thread-header-fact-link thread-parent-fact no-drag" onClick={() => openThread(id)} />}>
+        <CornerUpLeft size={12} />
+        <span className="truncate">{title}</span>
       </Tooltip>
     );
   return (

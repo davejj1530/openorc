@@ -62,9 +62,9 @@ export class CloudFolders {
     folder: { root: string },
     input: { path: FolderPath; text: string; expected: FileExpectation },
   ): Promise<Exclude<FileWriteResult, { kind: "conflict" }> | { kind: "conflict" }> {
-    const write = this.deps.hosted()?.threads.writeFile;
-    if (!write) throw new Error(HOSTED_REASONS.fileWrite);
-    const outcome = await write(threadId, { id: randomUUID(), ...input });
+    const threads = this.deps.hosted()?.threads;
+    if (!threads?.writeFile) throw new Error(HOSTED_REASONS.fileWrite);
+    const outcome = await threads.writeFile(threadId, { id: randomUUID(), ...input });
     if (outcome.kind === "refused") throw new Error(outcome.message);
     if (outcome.kind === "conflict") {
       if (!outcome.current) await this.copies.applyWrite(threadId, input.path, null);
@@ -84,7 +84,8 @@ export class CloudFolders {
     const capabilities = await threads?.call("hosted.capabilities", { threadId }).catch(() => null);
     const collaboration = threads?.summary?.(threadId).owner?.collaboration;
     const writes = capabilities?.features.fileWrite?.available === true && collaboration?.canWrite !== false;
-    this.writable.set(threadId, { at: this.now(), writes });
+    // A read that failed says nothing of the server: the next read asks again.
+    if (capabilities) this.writable.set(threadId, { at: this.now(), writes });
     return writes;
   }
 

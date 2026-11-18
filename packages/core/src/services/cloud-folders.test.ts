@@ -71,8 +71,10 @@ function machine(options: { current: boolean; refuse?: boolean; ends?: string[];
       row: () => ({ id: ID, space: "personal" }),
       summary: () => ({ id: ID, projectId }),
       call: async () => ({ version: 1, features: options.writes ? { fileWrite: { available: true } } : {} }),
-      writeFile: async (_: string, write: { path: string; text: string | null }) => {
-        written.push(write);
+      written,
+      // A method of its place, as the hosted package's is: called off its object it has no place to write through.
+      async writeFile(this: { written: typeof written }, _: string, write: { path: string; text: string | null }) {
+        this.written.push(write);
         return {
           kind: "saved",
           version: createHash("sha256")

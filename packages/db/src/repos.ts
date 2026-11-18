@@ -6,6 +6,7 @@ import type { Db } from "./database.js";
 import { redact, redactJson } from "./redact.js";
 import { retiredTaskIds, retiredTeams, retiredThreadIds } from "./retired-teams.js";
 import { jaccard, normalizeTitle, wordSet } from "./task-similarity.js";
+import { reopenThread, resolveThread } from "./thread-family.js";
 import { threadListLimit, threadListOrder } from "./thread-list-order.js";
 import { TREE_VISIBLE, threadRootCountSql, threadTreeArgs, threadTreeSql } from "./thread-list-tree.js";
 
@@ -510,14 +511,8 @@ export const threads = {
   touch(db: Db, id: string): void {
     db.stmt("UPDATE threads SET last_activity_at = ?, updated_at = ? WHERE id = ?").run(now(), now(), id);
   },
-  /**
-   * Brings a thread back from Resolved. That counts as activity, so a thread resolved by its age comes back too; a read
-   * thread stays read.
-   */
-  reopen(db: Db, id: string): void {
-    const at = now();
-    db.stmt("UPDATE threads SET archived_at = NULL, seen_at = CASE WHEN seen_at >= last_activity_at THEN ? ELSE seen_at END, last_activity_at = ?, updated_at = ? WHERE id = ?").run(at, at, at, id);
-  },
+  resolve: resolveThread,
+  reopen: reopenThread,
   delete(db: Db, id: string): void {
     db.transaction(() => {
       const children = db.stmt("SELECT id FROM threads WHERE parent_thread_id = ? AND parent_relation = 'subagent'").all(id);

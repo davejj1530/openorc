@@ -3,7 +3,6 @@ import { newThreadWorkspaceMode, offeredAccount, projectAccountChoice, targetMod
 import { WORKSPACE_ID, executionMode, type ClaudeAccounts, type ModelOption, type Project, type SystemInfo } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Composer } from "../components/Composer";
-import { ComposerCommitChip } from "../components/ComposerCommitChip";
 import { FolderPlus } from "../components/icons";
 import { type PickerAccounts } from "../components/ModelPickerAccounts";
 import { ComposerModelPicker, ModelPicker, type ModelChoice, type OrclingPickerChoices } from "../components/ModelPicker";
@@ -24,7 +23,6 @@ import { cloudRunChoice, useCloudModels } from "../lib/cloud-run-choice";
 import { useCloudStartReady } from "../lib/use-cloud-start-ready";
 import { useMounted } from "../lib/use-mounted";
 import { usePublishComposerAccount } from "../lib/composer-account";
-import { useComposerChanges } from "../lib/composer-changes";
 import { useDefaultHarness } from "../lib/default-harness";
 import { focusedProject, useLayout } from "../lib/layout";
 import { swapInPlace } from "../lib/motion";
@@ -244,7 +242,6 @@ function NewThreadProject({
     if (mounted.current && spaceNavigation.getState().generation === generation && useRouter.getState().route.view === "newthread") openThread(threadId);
   };
 
-  const composerChanges = useComposerChanges(git.tracks && selected && workspaceMode === "current" ? { kind: "project", id: selected.id, projectName: selected.name } : null);
   const panelContext =
     selected && !cloudOnly
       ? { kind: "newthread" as const, project: selected, workingDirectory: draft.workingDirectory ?? selected.rootPath, changes: git.tracks && workspaceMode === "current" }
@@ -272,9 +269,6 @@ function NewThreadProject({
               <>
                 <NewThreadQuestion projectId={projectId} projects={projects} disabled={start.isPending} onProject={onProject} />
                 <div className="relative">
-                  <div className="new-thread-changes empty:hidden">
-                    <ComposerCommitChip changes={composerChanges} />
-                  </div>
                   {macStart.line ? <div className="mb-2">{macStart.line}</div> : null}
                   <Composer
                     draftKey={files.draftKey}

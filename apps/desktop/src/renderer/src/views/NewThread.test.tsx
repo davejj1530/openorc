@@ -58,7 +58,6 @@ vi.mock("../lib/skill-commands", async (original) => ({
   projectScope: (await original<typeof import("../lib/skill-commands")>()).projectScope,
   useSkillCommands: (scope: unknown) => (reads.push(["skills.list", { scope }]), { commands: [], onCommandsWanted: () => {} }),
 }));
-vi.mock("../lib/composer-changes", () => ({ useComposerChanges: () => null }));
 vi.mock("../lib/project-git", async (original) => ({
   ...(await original<object>()),
   loadProjectGit: (id: string) => gitReads[id] ?? Promise.resolve(),
@@ -414,17 +413,15 @@ describe("NewThread", () => {
     models = [];
     cloudModels = { models: [{ id: "", label: "Codex default", agent: "codex", isDefault: true, efforts: [], defaultEffort: null }], providers: [] };
     projects = [{ ...makeProject("p1"), rootPath: "" }];
-    spaceNavigation
-      .getState()
-      .initialize("scoped", "personal", [
-        {
-          id: "personal",
-          personal: true,
-          projects: [{ key: "p1", name: "Canvas", repo: "example/canvas", localProjectId: null, hostedProjectId: "cloud-project", connected: true }],
-          threads: [],
-          taskIds: [],
-        },
-      ]);
+    spaceNavigation.getState().initialize("scoped", "personal", [
+      {
+        id: "personal",
+        personal: true,
+        projects: [{ key: "p1", name: "Canvas", repo: "example/canvas", localProjectId: null, hostedProjectId: "cloud-project", connected: true }],
+        threads: [],
+        taskIds: [],
+      },
+    ]);
     writeNewThreadDraft({ ...readNewThreadDraft("p1"), prompt: "Add a health check" });
     render(<NewThread projectId="p1" />);
     fireEvent.click(screen.getByRole("button", { name: "Send" }));

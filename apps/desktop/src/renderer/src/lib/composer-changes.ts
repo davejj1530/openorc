@@ -3,10 +3,11 @@ import { useMemo } from "react";
 import type { ComposerChanges } from "../components/Composer";
 import { useRpc } from "./client";
 import { withFileScope } from "./file-scope";
-import { useLayout, type WorkspaceChangesTarget } from "./layout";
+import { useLayout } from "./layout";
 import { useThreadMutationPending } from "./thread-mutations";
 
-type ComposerSource = WorkspaceChangesTarget & { projectName: string; team?: boolean; thread?: PublishInput["thread"] };
+/** The thread whose uncommitted work the composer offers to commit. */
+type ComposerSource = { kind: "thread"; id: string; projectName: string; team?: boolean; thread?: PublishInput["thread"] };
 
 /** The composer offers only Commit, so the push and pull request inputs stay empty. */
 const commitOnly = { project: { gitRemote: null, defaultBranch: null }, push: { state: undefined, error: null }, gh: undefined, offline: null } as const;
@@ -22,11 +23,9 @@ function commitReason(source: ComposerSource, { failed, files, team, pending }: 
 
 /** The composer and review panel share these cache entries; only uncommitted work belongs in the strip. */
 export function useComposerChanges(source: ComposerSource | null): ComposerChanges | null {
-  const threadId = source?.kind === "thread" ? source.id : "";
-  const threadDiff = useRpc("review.threadDiff", { threadId, comparison: "head" }, { enabled: Boolean(threadId) });
-  const projectDiff = useRpc("review.projectDiff", { projectId: source?.kind === "project" ? source.id : "" }, { enabled: source?.kind === "project" });
+  const threadId = source?.id ?? "";
+  const diff = useRpc("review.threadDiff", { threadId, comparison: "head" }, { enabled: Boolean(threadId) });
   const pending = useThreadMutationPending(threadId);
-  const diff = source?.kind === "thread" ? threadDiff : projectDiff;
   const counts = useMemo(() => patchStat(diff.data?.patch ?? ""), [diff.data?.patch]);
   const inPanel = useLayout((s) => s.panelOpen && s.panelTab === "changes" && (!threadId || !s.panelThreadId || s.panelThreadId === threadId));
   if (!source) return null;

@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } 
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { invalidateTags, queryClient } from "../lib/client";
 import { useComposerChanges } from "../lib/composer-changes";
-import { useLayout, type WorkspaceChangesTarget } from "../lib/layout";
+import { useLayout } from "../lib/layout";
 import { core } from "../lib/rpc";
 import { ChangesPanel } from "../panels/ChangesPanel";
 import { Composer } from "./Composer";
@@ -77,11 +77,11 @@ beforeEach(() => {
   useLayout.setState({ panelOpen: false, panelTab: "changes", panelThreadId: null, selectedChanges: null, workspaceChanges: null });
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => {
     calls.push({ method, params });
-    if (method === "review.threadDiff" || method === "review.projectDiff") {
+    if (method === "review.threadDiff") {
       if (failRead) throw new Error("Cannot read checkout");
       return (dirty ? binary : clean) as RpcResults[M];
     }
-    if (method === "review.commitThread" || method === "review.commitProject") {
+    if (method === "review.commitThread") {
       if (failCommit) throw new Error("Commit failed; retry");
       dirty = false;
       return { sha: "1234567" } as RpcResults[M];
@@ -97,8 +97,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function Surface({ source, team = false }: { source: WorkspaceChangesTarget; team?: boolean }) {
-  const changes = useComposerChanges({ ...source, projectName: project.name, thread: source.kind === "thread" ? { ...thread, teamInstanceId: team ? "team" : null } : undefined });
+function Surface({ source, team = false }: { source: { kind: "thread"; id: string }; team?: boolean }) {
+  const changes = useComposerChanges({ ...source, projectName: project.name, thread: { ...thread, teamInstanceId: team ? "team" : null } });
   const request = useLayout((s) => s.workspaceChanges);
   const open = useLayout((s) => s.panelOpen);
   return (
@@ -117,23 +117,21 @@ function Surface({ source, team = false }: { source: WorkspaceChangesTarget; tea
         location={{ label: "Local checkout", branch: "feature/composer" }}
         changes={changes}
       />
-      {open && request?.kind === source.kind && request.id === source.id ? (
-        <ChangesPanel project={project} thread={source.kind === "thread" ? { ...thread, id: source.id, teamInstanceId: team ? "team" : null } : undefined} />
-      ) : null}
+      {open && request?.kind === source.kind && request.id === source.id ? <ChangesPanel project={project} thread={{ ...thread, id: source.id, teamInstanceId: team ? "team" : null }} /> : null}
     </>
   );
 }
-const mount = (source: WorkspaceChangesTarget, team = false) =>
+const mount = (source: { kind: "thread"; id: string }, team = false) =>
   render(
     <QueryClientProvider client={queryClient}>
       <Surface source={source} team={team} />
     </QueryClientProvider>,
   );
 
-it.each(["project", "thread"] as const)("reviews and commits binary-only %s changes without submitting the draft", async (kind) => {
-  mount({ kind, id: kind });
+it("reviews and commits a thread's binary-only changes without submitting the draft", async () => {
+  mount({ kind: "thread", id: "thread" });
   fireEvent.click(await screen.findByRole("button", { name: /Review 1 changed file/ }));
-  expect(useLayout.getState().workspaceChanges).toMatchObject({ kind, id: kind, comparison: "head", commit: false });
+  expect(useLayout.getState().workspaceChanges).toMatchObject({ kind: "thread", id: "thread", comparison: "head", commit: false });
   expect(await screen.findByText("image.png")).toBeTruthy();
   // The panel shows the changes with its own Commit, so the composer's chip steps aside.
   expect(document.querySelector(".composer-changes")).toBeNull();
@@ -143,10 +141,7 @@ it.each(["project", "thread"] as const)("reviews and commits binary-only %s chan
   fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "Add image" } });
   fireEvent.click(within(dialog).getByRole("button", { name: "Commit" }));
   await waitFor(() => expect(screen.queryByText("image.png")).toBeNull());
-  expect(calls).toContainEqual({
-    method: kind === "thread" ? "review.commitThread" : "review.commitProject",
-    params: kind === "thread" ? { threadId: kind, message: "Add image" } : { projectId: kind, message: "Add image" },
-  });
+  expect(calls).toContainEqual({ method: "review.commitThread", params: { threadId: "thread", message: "Add image" } });
   expect(messageOf(screen.getByRole("textbox", { name: "Message" }))).toBe("Keep my draft");
   expect(screen.queryByText("feature/composer")).toBeNull();
 });

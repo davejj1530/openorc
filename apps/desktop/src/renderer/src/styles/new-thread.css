@@ -64,9 +64,6 @@
 :root:active-view-transition-type(project) .new-thread-question-name {
   view-transition-name: new-thread-project;
 }
-:root:active-view-transition-type(project) .new-thread-changes {
-  view-transition-name: new-thread-changes;
-}
 :root:active-view-transition-type(project) .composer-new-thread {
   view-transition-name: new-thread-composer;
 }
@@ -104,12 +101,6 @@
   background: var(--surface);
   color: var(--ink-2);
   font-size: var(--text-base);
-}
-
-/* Uncommitted changes sit right over the composer, on its left edge. */
-.new-thread-changes {
-  display: flex;
-  margin-bottom: 10px;
 }
 
 /* The composer: r24 on the writing-area role, a 15px prompt and one bar with a 34px send. */

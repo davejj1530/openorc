@@ -9,7 +9,7 @@ import ProductIcon from "../hero/ProductIcon.astro";
 import Prose from "../hero/Prose.astro";
 import Receipt from "../hero/Receipt.astro";
 import ThreadPane from "../hero/ThreadPane.astro";
-import TurnHead from "../hero/TurnHead.astro";
+import TurnEnd from "../hero/TurnEnd.astro";
 import { handoff, threads } from "../../data/hero/handoff";
 import { duration, elapsed } from "../../data/hero/timeline";
 
@@ -26,11 +26,10 @@ const { a } = threads;
           <span class="hs-notice-toggle">Show details</span>
         </span>
       </div>
-      <TurnHead harness={a.harness} agent={a.agent} model={a.label} took={duration(elapsed(handoff, "aWork", "aFinish"))} />
       <Receipt changes={`+${a.change.added} in 1 file`} />
       <div class="hs-reply"><Prose text={a.result} /></div>
       <ChangeLine files={1} added={a.change.added} removed={a.change.removed} undo />
-      <div class="hs-turn-actions"><ProductIcon name="copy" /></div>
+      <TurnEnd took={duration(elapsed(handoff, "aWork", "aFinish"))} />
     </div>
   </ThreadPane>
 </div>

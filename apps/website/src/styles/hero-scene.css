@@ -244,62 +244,38 @@
 .hs-removed {
   color: var(--hs-bad);
 }
-.hs-ring {
-  flex: none;
-  width: calc(16 * var(--u));
-  height: calc(16 * var(--u));
-  fill: none;
-  stroke-width: 2;
-}
-.hs-ring circle:first-child {
-  stroke: var(--hs-fill-strong);
-}
-.hs-ring circle:last-child {
-  stroke: var(--hs-ink);
-  stroke-linecap: round;
-}
 
-/* Sidebar (Sidebar.tsx, sidebar.css): the window's corner on the top line, over a 50-unit rail of screens beside the
-   272-unit thread list. A hairline seam parts it from the work column: a short stroke beside the corner, then the
-   column's full height under the top line. Like the app's, hairlines stay one device pixel at any scale. */
+/* Sidebar (Sidebar.tsx, sidebar.css): 246 units wide, parted from the work column by a hairline seam from the window's
+   top to its foot. Like the app's, hairlines stay one device pixel at any scale. */
 .hs-sidebar {
   position: relative;
   display: flex;
   flex: none;
   flex-direction: column;
-  width: calc(322 * var(--u));
+  width: calc(246 * var(--u));
   overflow: hidden;
 }
-.hs-sidebar::after,
-.hs-sidebar-head::after {
+.hs-sidebar::after {
   content: "";
   position: absolute;
+  top: 0;
   right: 0;
+  bottom: 0;
   width: var(--hairline);
   background: var(--hs-line);
   pointer-events: none;
 }
-.hs-sidebar::after {
-  top: calc(44 * var(--u) - var(--hairline));
-  bottom: 0;
-}
-/* The window's corner: the wordmark after the traffic lights, then Back, Forward (off, with nothing to go forward to)
-   and the sidebar toggle. */
+/* The window's corner: the wordmark after the traffic lights, then Back and Forward (off, with nothing to go forward to). */
 .hs-sidebar-head {
-  position: relative;
   display: flex;
   flex: none;
   align-items: center;
   height: calc(44 * var(--u));
-  padding: 0 calc(10 * var(--u)) 0 calc(86 * var(--u));
-}
-.hs-sidebar-head::after {
-  top: calc(8.8 * var(--u));
-  bottom: calc(8.8 * var(--u));
+  padding: 0 calc(19 * var(--u)) 0 calc(90 * var(--u));
 }
 .hs-sidebar .hs-round {
-  width: calc(32 * var(--u));
-  height: calc(32 * var(--u));
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
 }
 .hs-wordmark {
   display: flex;
@@ -320,211 +296,115 @@
 .hs-sidebar-head .hs-round[data-off] {
   color: var(--hs-faint);
 }
-/* Inbox on the rail, its count on the glyph's top-right corner. */
-.hs-inbox {
-  position: relative;
-}
-.hs-inbox-count {
-  position: absolute;
-  top: calc(3 * var(--u));
-  right: calc(1 * var(--u));
-  display: grid;
-  place-items: center;
-  min-width: calc(16 * var(--u));
-  height: calc(16 * var(--u));
-  padding: 0 calc(4 * var(--u));
-  border-radius: 999px;
-  background: var(--hs-ink);
-  color: var(--hs-bg);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-  font-variant-numeric: tabular-nums;
-}
-.hs-sidebar-body {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-/* The rail (SidebarRail.tsx): New thread, the screens and Orclings, a short hairline, Projects, another, Inbox, and at
-   its foot the week's usage as a ring, updates and Settings. The open screen sits on the plane. */
-.hs-sidebar-rail {
+/* The screens as 32-unit rows (SidebarNav.tsx): the icon and name, Tasks with its count in amber at the line's end.
+   Rows and thread rows share the same inset, and the open one sits on the current-row fill. */
+.hs-nav {
   display: flex;
   flex: none;
   flex-direction: column;
-  align-items: center;
-  gap: calc(4 * var(--u));
-  width: calc(50 * var(--u));
-  padding: calc(6 * var(--u)) 0 calc(8 * var(--u));
+  gap: calc(2 * var(--u));
+  padding-top: calc(2 * var(--u));
 }
-.hs-rail-button {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: calc(36 * var(--u));
-  height: calc(36 * var(--u));
-  border-radius: 999px;
-  color: var(--hs-muted);
-}
-.hs-rail-button .hs-icon {
-  width: calc(18 * var(--u));
-  height: calc(18 * var(--u));
-}
-.hs-rail-divider {
-  flex: none;
-  width: calc(20 * var(--u));
-  height: var(--hairline);
-  margin: calc(6 * var(--u)) 0;
-  background: var(--hs-line);
-}
-.hs-rail-gap {
-  margin-top: auto;
-}
-.hs-rail-button[hidden] {
-  display: none;
-}
-.hs-rail-usage .hs-ring {
-  width: calc(18 * var(--u));
-  height: calc(18 * var(--u));
-}
-.hero-scene[data-view="task"] .hs-sidebar-rail [data-screen="tasks"] {
-  background: var(--hs-plane);
-  color: var(--hs-ink);
-}
-/* The thread list beside the rail, its edge rounding into the top line. */
-.hs-workspace {
-  position: relative;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  padding-top: calc(6 * var(--u));
-}
-.hs-workspace::before {
-  content: "";
-  position: absolute;
-  inset: calc(-1 * var(--hairline)) 0 0;
-  border-top: var(--hairline) solid var(--hs-line);
-  border-left: var(--hairline) solid var(--hs-line);
-  border-top-left-radius: calc(12 * var(--u));
-  pointer-events: none;
-}
-/* Whose threads the list shows, as the list's own heading. */
-.hs-workspace-name {
+.hs-nav-row,
+.hs-project-head,
+.hs-row {
   display: flex;
   flex: none;
   align-items: center;
   gap: calc(8 * var(--u));
-  height: calc(36 * var(--u));
-  margin: 0 calc(10 * var(--u));
-  padding: 0 calc(10 * var(--u));
-  font-size: calc(14 * var(--u));
-  line-height: calc(22 * var(--u));
-}
-.hs-workspace-name > span {
-  flex: 1;
-}
-.hs-workspace-name .hs-icon {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
-}
-.hs-workspace-name .hs-icon:last-child {
+  height: calc(32 * var(--u));
+  margin: 0 calc(16 * var(--u)) 0 calc(8 * var(--u));
+  padding: 0 calc(8 * var(--u));
+  border-radius: calc(10 * var(--u));
   color: var(--hs-muted);
+  font-size: calc(14 * var(--u));
+  line-height: calc(16 * var(--u));
+  white-space: nowrap;
 }
-/* The list head: Search where the titles start, then the filter and New thread, in ink, at the row's end. */
+.hs-nav-row > span:not(.hs-nav-count),
+.hs-project-head > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hs-nav-count {
+  flex: none;
+  min-width: calc(16 * var(--u));
+  margin-left: auto;
+  color: var(--hs-attention);
+  font-size: calc(13 * var(--u));
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.hero-scene[data-view="new"] .hs-nav-row[data-screen="newthread"],
+.hero-scene[data-view="task"] .hs-nav-row[data-screen="tasks"] {
+  background: var(--hs-current);
+  box-shadow: var(--hs-lit);
+  color: var(--hs-ink);
+}
+/* Workspaces (SidebarListHead.tsx): a quiet heading, then search, a new folder and the filter. */
 .hs-list-head {
   display: flex;
   flex: none;
   align-items: center;
-  gap: calc(2 * var(--u));
-  height: calc(34 * var(--u));
-  margin: calc(6 * var(--u)) calc(10 * var(--u)) 0;
-}
-.hs-list-new {
-  color: var(--hs-ink);
-}
-.hs-search {
-  display: flex;
-  align-items: center;
-  gap: calc(8 * var(--u));
   height: calc(32 * var(--u));
-  margin-right: auto;
-  padding: 0 calc(14 * var(--u)) 0 calc(10 * var(--u));
-  color: var(--hs-muted);
-  line-height: calc(16 * var(--u));
+  margin: calc(12 * var(--u)) calc(8 * var(--u)) 0;
+  padding: 0 calc(10 * var(--u)) 0 calc(8 * var(--u));
+  color: var(--hs-faint);
+  font-size: calc(13 * var(--u));
 }
-/* One list by day: a quiet 28-unit heading, its chevron showing while the section is folded. */
+.hs-list-name {
+  flex: 1;
+}
+.hs-list-tools {
+  display: flex;
+  gap: calc(12 * var(--u));
+  color: var(--hs-muted);
+}
+/* Each project's threads under its folder (SidebarProjectGroup.tsx); a folded project shows its chevron. */
 .hs-threads {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  padding: calc(14 * var(--u)) calc(10 * var(--u)) calc(16 * var(--u));
 }
-.hs-day {
+.hs-project {
   display: flex;
   flex-direction: column;
   gap: calc(2 * var(--u));
 }
-.hs-day + .hs-day {
-  margin-top: calc(10 * var(--u));
+.hs-project + .hs-project {
+  margin-top: calc(7 * var(--u));
 }
-.hs-day-head {
-  display: flex;
-  align-items: center;
-  gap: calc(4 * var(--u));
+.hs-project-head {
   height: calc(28 * var(--u));
-  margin-bottom: calc(-2 * var(--u));
-  padding: 0 calc(10 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
+  margin-right: 0;
 }
-.hs-day-head .hs-icon {
-  width: calc(12 * var(--u));
-  height: calc(12 * var(--u));
-  opacity: 0;
+.hs-project-head .hs-icon:last-child:not(:first-child) {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  margin-left: calc(-4 * var(--u));
 }
-.hs-day[data-folded] .hs-day-head .hs-icon {
-  opacity: 1;
-}
-/* A row: the muted title with what the thread needs at its end, what its agent is doing, then its project and where
-   it works. The open thread sits on the current-row fill with its title in ink. */
-.hs-row {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  justify-content: center;
-  gap: calc(2 * var(--u));
-  min-height: calc(34 * var(--u));
-  padding: calc(8 * var(--u)) calc(10 * var(--u));
-  border-radius: calc(10 * var(--u));
-  color: var(--hs-muted);
-}
-.hs-row-heading,
-.hs-row-line,
-.hs-row-project {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-.hs-row-heading,
-.hs-row-line {
-  gap: calc(8 * var(--u));
-}
+/* A thread row (ThreadLibraryRow.tsx): its title, and the mark of what it needs in a 16-unit slot at the line's end. */
 .hs-row-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  line-height: calc(18 * var(--u));
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
-.hs-row-question,
-.hs-row-spinner {
+.hs-row-cube,
+.hs-row-question {
+  display: none;
+  flex: none;
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+}
+.hs-row-cube {
+  color: var(--hs-ink);
+}
+.hs-row-question {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
   margin: 0 calc(1 * var(--u));
-}
-.hs-row-question {
-  display: none;
   color: var(--hs-attention);
 }
 .hs-row-dot {
@@ -534,76 +414,12 @@
   height: calc(7 * var(--u));
   margin: 0 calc(4.5 * var(--u));
   border-radius: 999px;
-  background: var(--hs-attention);
+  background: var(--hs-ink);
 }
-.hs-row-line {
-  display: none;
-}
-.hs-row-line > span {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hs-row-line > :is(.hs-row-headline, .hs-row-ask, .hs-row-done),
-.hs-row-spinner {
-  display: none;
-}
-.hs-row-spinner {
-  color: var(--hs-faint);
-  animation: hs-spin 1s linear infinite;
-}
-.hs-row-line > .hs-row-ask {
-  color: var(--hs-warn);
-}
-.hs-row:is([data-busy], [data-waiting], [data-done]) .hs-row-line {
-  display: flex;
-}
-.hs-row[data-busy]:not([data-waiting]) :is(.hs-row-headline, .hs-row-spinner),
-.hs-row[data-waiting] :is(.hs-row-ask, .hs-row-question),
-.hs-row[data-done]:not([data-busy], [data-waiting]) :is(.hs-row-done, .hs-row-dot) {
+.hs-row[data-busy]:not([data-waiting]) .hs-row-cube,
+.hs-row[data-waiting] .hs-row-question,
+.hs-row[data-done]:not([data-busy], [data-waiting]) .hs-row-dot {
   display: block;
-}
-/* A working title lights up left to right: a band of full ink sweeps across its muted words. */
-.hs-row[data-busy]:not([data-waiting]) .hs-row-title {
-  background: linear-gradient(90deg, var(--hs-muted) 0% 35%, var(--hs-ink) 50%, var(--hs-muted) 65% 100%);
-  background-size: 250% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: hs-title-sweep 2s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .hs-row[data-busy]:not([data-waiting]) .hs-row-title {
-    animation: none;
-    background: none;
-    -webkit-text-fill-color: currentColor;
-  }
-}
-.hs-row-project {
-  gap: calc(5 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-  white-space: nowrap;
-}
-.hs-row-project .hs-icon {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
-  margin: 0 calc(1 * var(--u));
-}
-.hs-row-place {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.hs-row-place::before {
-  content: "·";
-  margin-right: calc(5 * var(--u));
 }
 /* The open thread takes the current-row fill, and so does every thread open in a split pane. */
 .hero-scene[data-view="a"] .hs-row[data-row="a"],
@@ -612,41 +428,70 @@
 .hs-row[data-current] {
   background: var(--hs-current);
   box-shadow: var(--hs-lit);
-}
-.hero-scene[data-view="a"] .hs-row[data-row="a"] .hs-row-title,
-.hero-scene[data-view="b"] .hs-row[data-row="b"] .hs-row-title,
-.hero-scene:has(.hs-panes[data-split]) .hs-row[data-row="b"] .hs-row-title,
-.hs-row[data-current] .hs-row-title {
   color: var(--hs-ink);
 }
-.hero-scene[data-view="a"] .hs-row[data-row="a"] .hs-row-spinner,
-.hero-scene[data-view="b"] .hs-row[data-row="b"] .hs-row-spinner,
-.hero-scene:has(.hs-panes[data-split]) .hs-row[data-row="b"] .hs-row-spinner,
-.hs-row[data-current] .hs-row-spinner {
-  color: var(--hs-muted);
-}
-/* Resolved at the list's foot, as quiet as the day headings, its count and chevron at the row's end. */
+/* Resolved at the list's foot, quiet, its chevron after the word; then the foot: the week's usage and Settings. */
 .hs-resolved {
   display: flex;
   flex: none;
   align-items: center;
-  gap: calc(8 * var(--u));
-  height: calc(36 * var(--u));
-  margin: calc(4 * var(--u)) calc(10 * var(--u));
-  padding: 0 calc(10 * var(--u));
+  gap: calc(4 * var(--u));
+  height: calc(32 * var(--u));
+  margin: calc(4 * var(--u)) calc(8 * var(--u));
+  padding: 0 calc(8 * var(--u));
   color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-}
-.hs-resolved > span:first-child {
-  flex: 1;
-}
-.hs-resolved-count {
-  font-variant-numeric: tabular-nums;
+  font-size: calc(13 * var(--u));
 }
 .hs-resolved .hs-icon {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
+}
+.hs-sidebar-foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: calc(10 * var(--u));
+  height: calc(44 * var(--u));
+  padding: 0 calc(17 * var(--u));
+}
+.hs-usage {
+  display: flex;
+  align-items: center;
+  gap: calc(5 * var(--u));
+  color: var(--hs-muted);
+  font-size: calc(13 * var(--u));
+  font-variant-numeric: tabular-nums;
+}
+.hs-usage[hidden] {
+  display: none;
+}
+.hs-pie {
+  flex: none;
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+}
+.hs-sidebar-foot .hs-round {
+  width: calc(28 * var(--u));
+  height: calc(28 * var(--u));
+}
+/* The working cube: its light moves around it one face at a time. */
+.hs-cube-face:not([data-face="top"]) {
+  opacity: 0;
+}
+.hs-cube-face {
+  animation: hs-mark-face 2400ms ease-in-out infinite;
+}
+.hs-cube-face[data-face="right"] {
+  animation-delay: -1600ms;
+}
+.hs-cube-face[data-face="left"] {
+  animation-delay: -800ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hs-cube-face {
+    animation: none;
+  }
 }
 
 /* Panes: the conversation on the tile under its header on the window's top line, closed off by a hairline. */
@@ -681,7 +526,6 @@
   gap: calc(8 * var(--u));
   height: calc(44 * var(--u));
   padding: 0 calc(8 * var(--u));
-  border-bottom: var(--hairline) solid var(--hs-line);
   line-height: calc(16 * var(--u));
 }
 .hs-header[data-kind="title"] {
@@ -839,7 +683,9 @@
 }
 .hs-tab-busy {
   color: var(--hs-faint);
-  animation: hs-spin 1s linear infinite;
+}
+.hs-tab[data-current] .hs-tab-busy {
+  color: var(--hs-ink);
 }
 .hs-tab-waiting {
   color: var(--hs-attention);
@@ -851,7 +697,7 @@
   background: currentColor;
 }
 .hs-tab-icon > .hs-tab-unread {
-  background: var(--hs-attention);
+  background: var(--hs-ink);
 }
 .hs-tab-title {
   min-width: 0;
@@ -875,6 +721,44 @@
 .hs-tab-close .hs-icon {
   width: calc(12 * var(--u));
   height: calc(12 * var(--u));
+}
+/* The work column's tabs (work-tabs.css .thread-tabs) stand the header's full height: plain words, the current one in
+   ink over a 2-unit underline, a face that fills under the pointer. */
+.hs-header > .hs-tabs-row,
+.hs-tabs {
+  align-self: stretch;
+}
+.hs-tabs {
+  align-items: stretch;
+}
+.hs-tabs .hs-tab {
+  flex: 0 1 auto;
+  max-width: calc(220 * var(--u));
+  height: auto;
+  border-radius: 0;
+}
+.hs-tabs .hs-tab[data-current],
+.hs-tabs .hs-tab:not([data-current]):has(> button:hover) {
+  background: none;
+}
+.hs-tabs .hs-tab[data-current]::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: calc(2 * var(--u));
+  background: currentColor;
+}
+.hs-tabs .hs-tab-face {
+  align-self: center;
+  height: calc(28 * var(--u));
+  padding: 0 calc(26 * var(--u)) 0 calc(8 * var(--u));
+  border-radius: calc(6 * var(--u));
+}
+.hs-tabs .hs-tab:not([data-current]):has(> button:hover) .hs-tab-face {
+  background: var(--hs-fill);
+}
+.hs-tabs .hs-tab-close {
+  right: calc(4 * var(--u));
 }
 
 /* Transcript: pinned to its newest line, like a conversation scrolled to the end (Transcript.tsx). */
@@ -918,21 +802,6 @@
   line-height: calc(22 * var(--u));
   letter-spacing: -0.01em;
   white-space: pre-wrap;
-}
-.hs-head {
-  display: flex;
-  align-items: center;
-  gap: calc(8 * var(--u));
-  min-width: 0;
-  line-height: calc(16 * var(--u));
-}
-.hs-head-status {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .hs-receipt {
   display: flex;
@@ -1206,14 +1075,28 @@
   line-height: calc(16 * var(--u));
 }
 
-/* Copy rests under the latest finished turn; earlier turns keep its room and show it on hover. */
+/* A turn's end (MessageActions.tsx TurnEnd): where it stands, then copy and fork once it is done. It rests under the
+   latest turn; earlier turns keep its room and show it on hover. */
 .hs-turn > .hs-turn-actions {
   display: flex;
   align-items: center;
-  height: calc(30 * var(--u));
-  margin: calc(10 * var(--u)) 0 0 calc(-7 * var(--u));
-  padding: 0 calc(7 * var(--u));
+  gap: calc(6 * var(--u));
+  height: calc(32 * var(--u));
+  margin-top: calc(10 * var(--u));
   color: var(--hs-faint);
+  font-size: calc(13 * var(--u));
+  line-height: calc(16 * var(--u));
+  white-space: nowrap;
+}
+.hs-turn-tools {
+  display: flex;
+}
+.hs-turn-tools[hidden] {
+  display: none;
+}
+.hs-turn-tools .hs-icon {
+  box-sizing: content-box;
+  padding: calc(8 * var(--u));
 }
 .hs-turn > .hs-reply + .hs-turn-actions {
   margin-top: calc(24 * var(--u));
@@ -1426,13 +1309,6 @@
   color: var(--hs-faint);
   font-variant-numeric: tabular-nums;
 }
-.hs-context .hs-ring {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
-}
-.hs-context .hs-ring circle:last-child {
-  stroke: var(--hs-muted);
-}
 .hs-send {
   display: grid;
   flex: none;
@@ -1564,7 +1440,21 @@
   --dot: 9;
   --shade: 54%;
 }
+/* The mark over the question, at rest in the fourth ink, then the question centred over the composer (new-thread.css). */
+.hs-new-mark {
+  display: flex;
+  justify-self: center;
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
+  margin-bottom: calc(-4 * var(--u));
+  color: var(--hs-faint);
+}
+.hs-new-mark svg {
+  width: 100%;
+  height: 100%;
+}
 .hs-new-question {
+  text-align: center;
   font-size: calc(28 * var(--u));
   line-height: calc(34 * var(--u));
   letter-spacing: -0.02em;
@@ -1582,7 +1472,7 @@
   border-radius: calc(24 * var(--u));
 }
 .hs-composer[data-layout="new"] .hs-prompt {
-  min-height: calc(72 * var(--u));
+  min-height: calc(24 * var(--u));
   font-size: calc(15 * var(--u));
   line-height: calc(24 * var(--u));
 }
@@ -1602,24 +1492,6 @@
 .hs-composer[data-layout="new"] .hs-send {
   width: calc(34 * var(--u));
   height: calc(34 * var(--u));
-}
-.hs-new-location {
-  display: flex;
-  align-items: center;
-  gap: calc(8 * var(--u));
-  height: calc(28 * var(--u));
-  padding: 0 calc(8 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-}
-.hs-new-location .hs-icon {
-  width: calc(13 * var(--u));
-  height: calc(13 * var(--u));
-}
-.hs-new-location .hs-icon:last-child {
-  width: calc(12 * var(--u));
-  height: calc(12 * var(--u));
 }
 /* A Markdown table in a reply, as Streamdown renders it with the app's overrides. */
 .hs-table-wrap {
@@ -1833,9 +1705,13 @@
 .hs-status-mark[data-status="review"] {
   color: var(--hs-attention);
 }
+/* The tab track opens the document's own column. */
 .hs-task-tabs {
   flex: none;
-  padding: calc(2 * var(--u)) calc(20 * var(--u)) calc(6 * var(--u));
+  width: 100%;
+  max-width: calc(800 * var(--u));
+  margin: 0 auto;
+  padding: calc(24 * var(--u)) calc(48 * var(--u)) calc(6 * var(--u));
 }
 .hs-task-tabs .hs-track > span {
   padding: 0 calc(16 * var(--u));
@@ -1847,7 +1723,7 @@
   max-width: calc(800 * var(--u));
   min-height: 100%;
   margin: 0 auto;
-  padding: calc(48 * var(--u)) calc(48 * var(--u)) calc(64 * var(--u));
+  padding: calc(26 * var(--u)) calc(48 * var(--u)) calc(64 * var(--u));
   transition: opacity 450ms ease;
 }
 .hs-doc-title {
@@ -2160,55 +2036,56 @@
 .hs-mock-tasks .hs-header {
   padding: 0 calc(12 * var(--u));
 }
-.hs-page-title {
-  padding: 0 calc(4 * var(--u));
+.hs-mock-tasks .hs-header .hs-title {
+  flex: 0 1 auto;
+  margin-left: 0;
+  padding: 0;
+}
+.hs-crumb-scope {
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+}
+.hs-crumb-scope .hs-icon {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  color: var(--hs-faint);
 }
 .hs-mock-tasks .hs-header-actions {
   gap: calc(4 * var(--u));
 }
+/* Groups under quiet headings, Ready for review with its count in amber; 44-unit rows. */
 .hs-task-list {
-  padding: calc(10 * var(--u)) calc(14 * var(--u)) calc(24 * var(--u));
+  padding: calc(18 * var(--u)) calc(24 * var(--u)) calc(24 * var(--u));
 }
 .hs-task-group + .hs-task-group {
-  margin-top: calc(24 * var(--u));
+  margin-top: calc(22 * var(--u));
 }
 .hs-task-group-head {
   display: flex;
   align-items: center;
-  gap: calc(8 * var(--u));
+  gap: calc(10 * var(--u));
   height: calc(28 * var(--u));
-  margin-bottom: calc(6 * var(--u));
-  padding: 0 calc(12 * var(--u));
+  margin-bottom: calc(4 * var(--u));
   line-height: calc(16 * var(--u));
 }
 .hs-task-group-count {
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
+  color: var(--hs-attention);
+  font-size: calc(13 * var(--u));
 }
 .hs-task-row {
   display: flex;
   align-items: center;
-  gap: calc(8 * var(--u));
+  gap: calc(10 * var(--u));
   height: calc(44 * var(--u));
-  padding: 0 calc(8 * var(--u)) 0 calc(6 * var(--u));
-  border-radius: calc(12 * var(--u));
   line-height: calc(16 * var(--u));
 }
-.hs-task-row[data-hover] {
-  background: var(--hs-fill);
-}
-.hs-task-row-status,
-.hs-task-row-slot {
+.hs-task-row-status {
   display: grid;
   flex: none;
   place-items: center;
-  width: calc(24 * var(--u));
-  height: calc(24 * var(--u));
-  color: var(--hs-muted);
-}
-.hs-task-row-slot .hs-icon {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
 }
 .hs-task-row-title {
   flex: 1;
@@ -2220,26 +2097,40 @@
 .hs-task-row[data-status="backlog"] .hs-task-row-title {
   color: var(--hs-muted);
 }
-.hs-label-chip {
-  display: inline-flex;
+.hs-task-row-label,
+.hs-task-row-meta {
+  display: flex;
   flex: none;
   align-items: center;
-  height: calc(22 * var(--u));
-  padding: 0 calc(8 * var(--u));
-  border-radius: 999px;
-  background: var(--hs-fill);
+  gap: calc(6 * var(--u));
   color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
+  font-size: calc(13 * var(--u));
 }
-.hs-task-row-meta {
-  flex: none;
-  margin-left: calc(4 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
+.hs-task-row-label::before {
+  content: "";
+  width: calc(6 * var(--u));
+  height: calc(6 * var(--u));
+  border-radius: 999px;
+  background: var(--hs-muted);
+}
+.hs-task-row-meta .hs-icon {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
 }
 .hs-task-row-time {
-  width: calc(56 * var(--u));
-  text-align: right;
+  justify-content: flex-end;
+  width: calc(72 * var(--u));
+  color: var(--hs-faint);
+}
+.hs-task-row-end {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  width: calc(64 * var(--u));
+  color: var(--hs-muted);
+}
+.hs-task-review {
+  background: var(--hs-plane);
 }
 
 /* The work panel (Panel.tsx, panel-browser.css) stands on the same ground as the conversation beside it, parted by a
@@ -2311,17 +2202,16 @@
 .hs-panel-refresh {
   margin-left: auto;
 }
+/* A file's head on the ground, then its diff on the plane from edge to edge (DiffView.tsx). */
 .hs-diff-file {
-  padding: 0 calc(10 * var(--u));
+  padding: 0;
 }
 .hs-diff-head {
   display: flex;
   align-items: center;
   gap: calc(8 * var(--u));
-  height: calc(40 * var(--u));
-  padding: 0 calc(10 * var(--u));
-  border-radius: calc(12 * var(--u));
-  background: var(--hs-fill);
+  height: calc(36 * var(--u));
+  padding: 0 calc(16 * var(--u));
   font-family: var(--hs-mono);
   font-size: calc(12 * var(--u));
   line-height: calc(16 * var(--u));
@@ -2348,17 +2238,17 @@
   color: var(--hs-faint);
 }
 .hs-diff {
-  margin-top: calc(10 * var(--u));
-  padding-top: calc(8 * var(--u));
-  color: var(--hs-muted);
+  padding: calc(2 * var(--u)) 0;
+  background: var(--hs-plane);
+  color: var(--hs-ink);
   font-family: var(--hs-mono);
   font-size: calc(12 * var(--u));
-  line-height: calc(22 * var(--u));
+  line-height: calc(20 * var(--u));
   letter-spacing: 0;
 }
 .hs-diff-row {
   display: flex;
-  height: calc(22 * var(--u));
+  height: calc(20 * var(--u));
 }
 .hs-diff-num {
   flex: none;
@@ -2376,13 +2266,11 @@
   overflow: hidden;
   white-space: pre;
 }
-.hs-diff-row[data-type="add"] > * {
+.hs-diff-row[data-type="add"] {
   background: var(--hs-ok-soft);
-  color: var(--hs-ok);
 }
-.hs-diff-row[data-type="del"] > * {
+.hs-diff-row[data-type="del"] {
   background: var(--hs-bad-soft);
-  color: var(--hs-bad);
 }
 .hs-diff-row[data-type="add"] .hs-diff-code::before,
 .hs-diff-row[data-type="del"] .hs-diff-code::before {
@@ -2393,24 +2281,6 @@
 .hs-diff-row[data-type="del"] .hs-diff-code::before {
   content: "-";
 }
-/* A run of changes rounds its ends, and a run of another kind starts apart from it. */
-.hs-diff-row[data-first] .hs-diff-num {
-  border-top-left-radius: calc(6 * var(--u));
-}
-.hs-diff-row[data-first] .hs-diff-code {
-  border-top-right-radius: calc(6 * var(--u));
-}
-.hs-diff-row[data-last] .hs-diff-num {
-  border-bottom-left-radius: calc(6 * var(--u));
-}
-.hs-diff-row[data-last] .hs-diff-code {
-  border-bottom-right-radius: calc(6 * var(--u));
-}
-.hs-diff-row[data-type="del"] + [data-type="add"],
-.hs-diff-row[data-type="add"] + [data-type="del"] {
-  margin-top: calc(2 * var(--u));
-}
-
 .hs-diff-file + .hs-diff-file {
   margin-top: calc(8 * var(--u));
 }
@@ -2639,6 +2509,10 @@
   --hs-canvas: 1456;
   display: flex;
   height: calc(910 * var(--u));
+}
+/* The Commit chip steps aside while the panel shows the open thread's changes (composer-changes.ts). */
+.hs-mock-app:has(.hs-panel-session:not([hidden]) [data-value="changes"][aria-selected="true"]) .hs-app-thread .hs-page:not([hidden]) .hs-changes-bar {
+  display: none;
 }
 .hs-app-panel,
 .hs-pages {

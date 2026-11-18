@@ -6,19 +6,18 @@
  */
 import "../../styles/hero-scene.css";
 import ChangeLine from "../hero/ChangeLine.astro";
-import ProductIcon from "../hero/ProductIcon.astro";
 import Prose from "../hero/Prose.astro";
 import Receipt from "../hero/Receipt.astro";
 import SceneSidebar from "../hero/SceneSidebar.astro";
 import ThreadPane from "../hero/ThreadPane.astro";
-import TurnHead from "../hero/TurnHead.astro";
+import TurnEnd from "../hero/TurnEnd.astro";
 import { branches, models, type SidebarRow } from "../../data/hero/workspace";
 
 const rows: SidebarRow[] = [
   { title: "Simplify the design tokens", branch: branches.tokens, current: true },
-  { title: "Build a thoughtful onboarding", branch: "openorc/onboarding-7c2e1a", busy: true, headline: "Writing the welcome tests" },
+  { title: "Build a thoughtful onboarding", branch: "openorc/onboarding-7c2e1a", busy: true },
   { title: "Make the first five minutes count" },
-  { title: "A faster command menu", branch: "openorc/command-menu-5a1d7e", day: "today", done: "2 files changed · tests passed" },
+  { title: "A faster command menu", branch: "openorc/command-menu-5a1d7e", done: true },
 ];
 interface Props {
   menu?: boolean;
@@ -42,11 +41,10 @@ const change = { added: 12, removed: 4 };
   >
     <div class="hs-turn">
       <div class="hs-user"><div class="hs-bubble">Move every color, radius, and spacing value into one tokens file.</div></div>
-      <TurnHead harness="codex" agent="Codex" model={models.codex.label} took="2m 4s" />
       <Receipt thought="Thought 8s" changes={`+${change.added} −${change.removed} in 3 files`} check="tests passed" />
       <div class="hs-reply"><Prose text="Every color, radius, and spacing step now comes from one `tokens.css`. The old per-component values are gone, and nothing outside this worktree has changed." /></div>
       <ChangeLine files={3} added={change.added} removed={change.removed} undo />
-      <div class="hs-turn-actions"><ProductIcon name="copy" /></div>
+      <TurnEnd took="2m 4s" />
     </div>
   </ThreadPane>
 </div>

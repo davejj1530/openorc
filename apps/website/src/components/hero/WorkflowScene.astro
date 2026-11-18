@@ -5,6 +5,7 @@
  * it, and follows the change into the thread that starts. Content and timing:
  * data/hero/workflow.ts.
  */
+import BrandMark from "../BrandMark.astro";
 import ChangeLine from "./ChangeLine.astro";
 import Composer from "./Composer.astro";
 import FileChips from "./FileChips.astro";
@@ -17,7 +18,7 @@ import TaskPane from "./TaskPane.astro";
 import TaskProperties from "./TaskProperties.astro";
 import ThreadHeader from "./ThreadHeader.astro";
 import ThreadPane from "./ThreadPane.astro";
-import TurnHead from "./TurnHead.astro";
+import TurnEnd from "./TurnEnd.astro";
 import { activity } from "../../data/hero/activity";
 import { busy, workflow, workflowJourney } from "../../data/hero/workflow";
 import { branches, models, project } from "../../data/hero/workspace";
@@ -32,8 +33,8 @@ const at = (windows: string) => timed(workflowJourney, windows);
 const head = { journey: workflowJourney };
 const waiting = { a: "aQuestion~aPick" };
 const rows = [
-  { id: "a", title: thread.title, busy: busy.a, headline: thread.headline, waiting: waiting.a, show: ">aSend" },
-  { id: "b", title: work.title, branch: branches.cacheThread, busy: busy.b, headline: work.headline, show: ">bStart" },
+  { id: "a", title: thread.title, busy: busy.a, waiting: waiting.a, show: ">aSend" },
+  { id: "b", title: work.title, branch: branches.cacheThread, busy: busy.b, show: ">bStart" },
 ];
 const codex = { harness: "codex", label: models.codex.label, effort: models.codex.effort };
 const options = [
@@ -50,15 +51,15 @@ const comments = [
 ] as const;
 ---
 
-<SceneFrame id="workflow" journey={workflowJourney} label={label} rows={rows} inboxPending="aQuestion~aPick">
+<SceneFrame id="workflow" journey={workflowJourney} label={label} rows={rows}>
   <div class="hs-panes" data-views>
     <section class="hs-pane" data-pane="new">
       <ThreadHeader tabs={[{ label: "New thread", icon: "compose", current: true }]} fresh />
       <div class="hs-new-body">
         <div class="hs-new-column">
+          <span class="hs-new-mark"><BrandMark /></span>
           <div class="hs-new-question">What should we work on in <span class="hs-new-project">{project.name}</span>?</div>
           <Composer journey={workflowJourney} layout="new" placeholder="Ask OpenOrc to build, fix bugs, explore" model={codex} permission={models.codex.permission} prompt={{ text: thread.prompt, typo: thread.typo, window: "typeStart~typeEnd", typed: "typeStart~aSend" }} />
-          <div class="hs-new-location"><ProductIcon name="branch" />Works in the local checkout on {project.branch}<ProductIcon name="chevronDown" /></div>
         </div>
         <div class="hs-new-activity">
           <p class="hs-new-activity-line">{activity.summary}</p>
@@ -79,7 +80,6 @@ const comments = [
     >
       <div class="hs-turn" data-grow {...at(">aSend")}>
         <div class="hs-user"><div class="hs-bubble">{thread.prompt}</div></div>
-        <TurnHead {...head} harness="codex" agent="Codex" model={codex.label} clock={{ from: "aSend", writing: "aIntroStart", to: "aDone" }} />
         <Receipt
           {...head}
           thought={[
@@ -140,9 +140,9 @@ const comments = [
           </div>
           <div class="hs-question-foot" {...at(">aPick")}>Sent to Codex</div>
         </div>
+        <TurnEnd {...head} clock={{ from: "aSend", writing: "aIntroStart", to: "aDone" }} />
       </div>
       <div class="hs-turn" data-grow {...at(">aPick")}>
-        <TurnHead {...head} harness="codex" agent="Codex" model={codex.label} clock={{ from: "aPick", writing: "aCreatedStart", to: "aCreated" }} />
         <Receipt {...head} steps="1 step" />
         <ol class="hs-steps" data-grow {...at("aPick~aCreatedStart")}>
           <Step {...head} title="Creating the three tasks" live=">aPick" />
@@ -158,7 +158,7 @@ const comments = [
             <div class="hs-task-card-meta"><span>Backlog</span><span class="hs-task-card-branch"><ProductIcon name="branch" />{project.branch}</span><span>just now</span></div>
           </div>
         ))}
-        <div class="hs-turn-actions" data-grow {...at(">aCreated")}><ProductIcon name="copy" /></div>
+        <TurnEnd {...head} clock={{ from: "aPick", writing: "aCreatedStart", to: "aCreated" }} />
       </div>
     </ThreadPane>
 
@@ -238,7 +238,6 @@ const comments = [
     <ThreadPane id="b" journey={workflowJourney} title={work.title} busy={busy.b} model={codex} permission={models.codex.permission} placeholder="Message Codex…" changes=">bDone" changeStat={{ added, removed }}>
       <div class="hs-turn">
         <div class="hs-user"><div class="hs-bubble">{work.prompt}</div></div>
-        <TurnHead {...head} harness="codex" agent="Codex" model={codex.label} clock={{ from: "bStart", writing: "bReplyStart", to: "bDone" }} />
         <Receipt
           {...head}
           steps={[
@@ -255,7 +254,7 @@ const comments = [
         </ol>
         <div class="hs-reply" data-grow {...at(">bReplyStart")}><Prose text={work.reply} stream="bReplyStart~bReplyEnd" /></div>
         <ChangeLine grow {...at(">bDone")} files={work.change.files.length} added={added} removed={removed} undo />
-        <div class="hs-turn-actions" data-grow {...at(">bDone")}><ProductIcon name="copy" /></div>
+        <TurnEnd {...head} clock={{ from: "bStart", writing: "bReplyStart", to: "bDone" }} />
       </div>
     </ThreadPane>
   </div>

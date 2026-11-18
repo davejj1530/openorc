@@ -18,7 +18,7 @@ import Receipt from "./Receipt.astro";
 import SceneFrame from "./SceneFrame.astro";
 import Step from "./Step.astro";
 import ThreadPane from "./ThreadPane.astro";
-import TurnHead from "./TurnHead.astro";
+import TurnEnd from "./TurnEnd.astro";
 import { busy, handoff, threads } from "../../data/hero/handoff";
 import { timed } from "../../data/hero/timeline";
 import { branches } from "../../data/hero/workspace";
@@ -29,8 +29,8 @@ interface Props {
 const { label } = Astro.props;
 const { a, b } = threads;
 const rows = [
-  { id: "a", title: a.title, busy: busy.a, headline: a.headline },
-  { id: "b", title: b.title, branch: branches.plansThread, busy: busy.b, headline: b.headline },
+  { id: "a", title: a.title, busy: busy.a },
+  { id: "b", title: b.title, branch: branches.plansThread, busy: busy.b },
 ];
 const at = (windows: string) => timed(handoff, windows);
 const head = { journey: handoff };
@@ -52,16 +52,14 @@ const head = { journey: handoff };
     >
       <div class="hs-turn">
         <div class="hs-user"><div class="hs-bubble">{a.earlier.request}</div></div>
-        <TurnHead harness={a.harness} agent={a.agent} model={a.label} took={a.earlier.took} />
         <Receipt {...a.earlier.receipt} />
         <div class="hs-reply"><Prose text={a.earlier.reply} /></div>
-        <div class="hs-turn-actions"><ProductIcon name="copy" /></div>
+        <TurnEnd took={a.earlier.took} />
       </div>
 
       <!-- First turn: read the settings pages, then ask the migration thread before building. -->
       <div class="hs-turn" data-grow {...at(">aSend")}>
         <div class="hs-user"><div class="hs-bubble">{a.prompt}</div></div>
-        <TurnHead {...head} harness={a.harness} agent={a.agent} model={a.label} clock={{ from: "aSend", writing: "aAskedStart", to: "aDone" }} />
         <Receipt
           {...head}
           thought={[
@@ -94,7 +92,7 @@ const head = { journey: handoff };
           </Step>
         </ol>
         <div class="hs-reply" data-grow {...at(">aAskedStart")}><Prose text={a.asked} stream="aAskedStart~aAskedEnd" /></div>
-        <div class="hs-turn-actions" data-grow {...at(">aDone")}><ProductIcon name="copy" /></div>
+        <TurnEnd {...head} clock={{ from: "aSend", writing: "aAskedStart", to: "aDone" }} />
       </div>
 
       <!-- The answer starts a new turn that builds the page against the new shape; the notice opens it. -->
@@ -106,7 +104,6 @@ const head = { journey: handoff };
             <span class="hs-notice-toggle">Show details</span>
           </span>
         </div>
-        <TurnHead {...head} grow {...at(">aWork")} harness={a.harness} agent={a.agent} model={a.label} clock={{ from: "aWork", writing: "aResultStart", to: "aFinish" }} />
         <Receipt
           {...head}
           grow
@@ -121,7 +118,7 @@ const head = { journey: handoff };
         </ol>
         <div class="hs-reply" data-grow {...at(">aResultStart")}><Prose text={a.result} stream="aResultStart~aResultEnd" /></div>
         <ChangeLine grow {...at(">aFinish")} files={1} added={a.change.added} removed={a.change.removed} undo />
-        <div class="hs-turn-actions" data-grow {...at(">aFinish")}><ProductIcon name="copy" /></div>
+        <TurnEnd {...head} data-grow {...at(">aWork")} clock={{ from: "aWork", writing: "aResultStart", to: "aFinish" }} />
       </div>
     </ThreadPane>
 
@@ -129,7 +126,6 @@ const head = { journey: handoff };
       <!-- Mid-migration when the scene opens: the message joins this turn, so its steps keep going. -->
       <div class="hs-turn">
         <div class="hs-user"><div class="hs-bubble">{b.request}</div></div>
-        <TurnHead {...head} harness={b.harness} agent={b.agent} model={b.label} clock={{ from: "bStart" }} />
         <Receipt
           {...head}
           thought="Thought 6s"
@@ -163,6 +159,7 @@ const head = { journey: handoff };
             <span class="hs-notice-toggle" {...at(">bDetails")}>Hide details</span>
           </span>
         </div>
+        <TurnEnd {...head} clock={{ from: "bStart" }} />
       </div>
     </ThreadPane>
   </div>

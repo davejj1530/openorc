@@ -60,7 +60,7 @@ function tick(root: HTMLElement) {
   const start = performance.now();
   setInterval(() => {
     const seconds = Math.floor((performance.now() - start) / 1000);
-    for (const clock of clocks) clock.el.textContent = `working ${duration(clock.from + seconds)}`;
+    for (const clock of clocks) clock.el.textContent = `Working ${duration(clock.from + seconds)}`;
   }, 1000);
 }
 

@@ -1,0 +1,20 @@
+---
+/** An amount as the app's AmountShare draws it: a faint disc under its share, a wedge from twelve o'clock. */
+interface Props {
+  /** The share, from 0 to 1. */
+  fraction: number;
+  class?: string;
+}
+const { fraction, class: className } = Astro.props;
+const radius = 6.5;
+const share = Math.min(1, Math.max(0, fraction));
+const angle = share * 2 * Math.PI;
+const x = (8 + radius * Math.sin(angle)).toFixed(3);
+const y = (8 - radius * Math.cos(angle)).toFixed(3);
+---
+
+<svg class:list={["hs-pie", className]} viewBox="0 0 16 16" aria-hidden="true">
+  <circle cx="8" cy="8" r={radius} fill="currentColor" fill-opacity="0.2" />
+  {share >= 1 ? <circle cx="8" cy="8" r={radius} fill="currentColor" /> : null}
+  {share > 0 && share < 1 ? <path d={`M8 8V${8 - radius}A${radius} ${radius} 0 ${share > 0.5 ? 1 : 0} 1 ${x} ${y}Z`} fill="currentColor" /> : null}
+</svg>

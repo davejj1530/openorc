@@ -1,11 +1,12 @@
 ---
 /**
  * The message composer as the app draws it (Composer.tsx): one plane with the prompt over a bar of attach, model and
- * mode pills, the context ring and send. A conversation with uncommitted lines shows the Commit chip over the plane's
- * left edge. The new-thread page's composer is larger and leaves the project and where it works to the page.
+ * mode pills, the context share and send. A conversation with uncommitted lines shows the Commit chip over the plane's
+ * left edge. The new-thread page's composer is larger, and where the thread works is a branch button after attach.
  */
 import Counts from "./Counts.astro";
 import ProductIcon from "./ProductIcon.astro";
+import SharePie from "./SharePie.astro";
 import { flagged, timed, type Journey } from "../../data/hero/timeline";
 
 interface Props {
@@ -19,13 +20,12 @@ interface Props {
   changeStat?: { added: number; removed: number };
   /** The prompt this composer types, if any. */
   prompt?: { text: string; typo: { at: number; key: string }; window: string; typed: string };
-  /** How much of the context window the conversation uses, as the ring shows it. */
+  /** How much of the context window the conversation uses, as its share shows it. */
   context?: number | null;
   layout?: "thread" | "new";
 }
 const { journey, placeholder, model, permission, changes, changeStat = { added: 8, removed: 2 }, prompt, context = 18, layout = "thread" } = Astro.props;
 const fresh = layout === "new";
-const ring = 2 * Math.PI * 6;
 ---
 
 <div class="hs-composer" data-layout={layout} {...(prompt && journey ? flagged(journey, { typed: prompt.typed }) : {})}>
@@ -47,17 +47,18 @@ const ring = 2 * Math.PI * 6;
     <div class="hs-bar">
       <span class="hs-bar-tools">
         <span class="hs-attach"><ProductIcon name="plus" /></span>
+        {fresh ? <span class="hs-attach hs-place"><ProductIcon name="branch" /></span> : null}
         <span class="hs-pill hs-model">
           <svg class="hs-logo" data-provider={model.harness} aria-hidden="true"><use href={`#hs-logo-${model.harness}`} /></svg>
           <span class="hs-model-name">{model.label}</span>
           <span class="hs-model-effort">{model.effort}</span>
         </span>
-        <span class="hs-pill hs-mode"><ProductIcon name="pencil" /><span>{permission}</span></span>
+        <span class="hs-pill hs-mode"><ProductIcon name="shieldCheck" /><span>{permission}</span></span>
       </span>
       <span class="hs-bar-end">
         {!fresh && context !== null ? (
           <span class="hs-context">
-            <svg class="hs-ring" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" /><circle cx="8" cy="8" r="6" stroke-dasharray={`${(context / 100) * ring} ${ring}`} transform="rotate(-90 8 8)" /></svg>
+            <SharePie fraction={context / 100} />
             <span>{context}%</span>
           </span>
         ) : null}

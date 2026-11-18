@@ -41,11 +41,6 @@ export const threads = {
       ask: "Asking Plans migration for the plan's new shape",
       build: "Building the page against user.subscription",
     },
-    headline: [
-      { text: "Reading the settings pages", show: "<aSending" },
-      { text: "Asking Plans migration", show: "aSending~aDone" },
-      { text: "Building the billing page", show: ">aDone" },
-    ],
   },
   b: {
     ...models.codex,
@@ -71,11 +66,6 @@ export const threads = {
       { path: "src/db/migrations/0042_subscriptions.ts", added: 11 },
     ],
     change: { added: 41, removed: 17 },
-    headline: [
-      { text: "Moving plans into subscriptions", show: "<bWork" },
-      { text: "Answering Billing page", show: "bWork~bDone" },
-      { text: "Updating the billing queries", show: ">bDone" },
-    ],
   },
 };
 

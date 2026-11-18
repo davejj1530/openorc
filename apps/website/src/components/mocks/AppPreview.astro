@@ -9,7 +9,6 @@ import "../../styles/hero-scene.css";
 import BrowserPage from "../hero/BrowserPage.astro";
 import ChangeLine from "../hero/ChangeLine.astro";
 import ChangesDiff from "../hero/ChangesDiff.astro";
-import FileChips from "../hero/FileChips.astro";
 import FilesPage, { type Entry } from "../hero/FilesPage.astro";
 import PanelHeader from "../hero/PanelHeader.astro";
 import ProductIcon from "../hero/ProductIcon.astro";
@@ -20,10 +19,10 @@ import Step from "../hero/Step.astro";
 import TerminalPage from "../hero/TerminalPage.astro";
 import ThreadBody from "../hero/ThreadBody.astro";
 import ThreadHeader from "../hero/ThreadHeader.astro";
-import TurnHead from "../hero/TurnHead.astro";
+import TurnEnd from "../hero/TurnEnd.astro";
 import type { Tab } from "../hero/WorkTab.astro";
 import { commandMenuDiff, storyDiff, welcomeDiff } from "../../data/hero/diffs";
-import { branches, models, type SidebarRow } from "../../data/hero/workspace";
+import { models, type SidebarRow } from "../../data/hero/workspace";
 
 type Thread = "search" | "story" | "welcome";
 const open: Thread = "welcome";
@@ -31,10 +30,9 @@ const codex = { harness: "codex", label: models.codex.label, effort: models.code
 const claude = { harness: "claude", label: models.claude.label, effort: models.claude.effort };
 
 const rows: SidebarRow[] = [
-  { id: "search", title: "A faster command menu", busy: true, headline: "Running the command menu tests" },
+  { id: "search", title: "A faster command menu", busy: true },
   { id: "welcome", title: "Make the first five minutes count", current: true },
-  { id: "story", title: "Tell the product story", project: "website", done: "1 file changed" },
-  { title: "Simplify the design tokens", branch: branches.tokens, day: "today" },
+  { id: "story", title: "Tell the product story", project: "website", done: true },
 ];
 const threadTab = (thread: Thread, label: string, extra: Partial<Tab> = {}): Tab => ({
   label,
@@ -96,7 +94,6 @@ const searchChange = { added: 14, removed: 3 };
         <ThreadBody model={claude} permission={models.claude.permission} placeholder="Message Claude…" changes changeStat={searchChange} context={41}>
           <div class="hs-turn">
             <div class="hs-user"><div class="hs-bubble">The command menu lags on big projects. Make results show up as you type.</div></div>
-            <TurnHead harness="claude" agent="Claude" model={claude.label} working={72} />
             <Receipt thought="Thought 6s" steps="3 steps" />
             <ol class="hs-steps">
               <Step title="Reading the command menu" meta={{ text: "6 files" }} />
@@ -108,6 +105,7 @@ const searchChange = { added: 14, removed: 3 };
                 </div>
               </Step>
             </ol>
+            <TurnEnd working={72} />
           </div>
         </ThreadBody>
       </div>
@@ -115,11 +113,10 @@ const searchChange = { added: 14, removed: 3 };
         <ThreadBody model={claude} permission={models.claude.permission} placeholder="Message Claude…" changes changeStat={{ added: storyDiff.added, removed: storyDiff.removed }} context={12}>
           <div class="hs-turn">
             <div class="hs-user"><div class="hs-bubble">Rewrite the homepage hero so it says what studio does in one line.</div></div>
-            <TurnHead harness="claude" agent="Claude" model={claude.label} took="52s" />
             <Receipt thought="Thought 4s" changes={`+${storyDiff.added} −${storyDiff.removed} in 1 file`} />
             <div class="hs-reply"><Prose text="The hero now says what studio does in one sentence: **Studio turns a folder into a working app.** The line under it gives the next step, and the download link stays where it was." /></div>
             <ChangeLine files={1} added={storyDiff.added} removed={storyDiff.removed} undo />
-            <div class="hs-turn-actions"><ProductIcon name="copy" /></div>
+            <TurnEnd took="52s" />
           </div>
         </ThreadBody>
       </div>
@@ -127,14 +124,11 @@ const searchChange = { added: 14, removed: 3 };
         <ThreadBody model={codex} permission={models.codex.permission} placeholder="Message Codex…" changes>
           <div class="hs-turn">
             <div class="hs-user"><div class="hs-bubble">Let’s make onboarding feel more thoughtful. Help people connect their first project, then give them a clear next step.</div></div>
-            <TurnHead harness="codex" agent="Codex" model={codex.label} took="1m 36s" />
-            <Receipt thought="Thought 7s" changes={`+${welcomeDiff.added} −${welcomeDiff.removed} in 1 file`} check="tests passed" />
+            <Receipt thought="Thought 12s" changes={`+${welcomeDiff.added} −${welcomeDiff.removed} in 1 file`} check="tests passed" />
             <ol class="hs-steps">
-              <Step title="Reading the onboarding flow" meta={{ text: "4 files" }} />
-              <Step title="Writing the welcome screen" open>
-                <FileChips label="Edited" files={[welcomeDiff]} />
-              </Step>
-              <Step title="Running the onboarding tests" meta={{ text: "12 passed" }} />
+              <Step title="Reading the onboarding flow" meta={{ text: "2 files" }} />
+              <Step title="Writing the welcome screen" meta={{ text: "1 file" }} />
+              <Step title="Running the tests" meta={{ text: "1 command" }} />
             </ol>
             <div class="hs-reply">
               <Prose text="The welcome flow is ready to review. It uses the existing components and keeps the first run focused on one decision at a time." />
@@ -144,7 +138,8 @@ const searchChange = { added: 14, removed: 3 };
               </ul>
               <Prose text="The changes are in `src/Welcome.tsx`. You can review them alongside this conversation." />
             </div>
-            <div class="hs-turn-actions"><ProductIcon name="copy" /></div>
+            <ChangeLine files={1} added={welcomeDiff.added} removed={welcomeDiff.removed} undo />
+            <TurnEnd took="1m 12s" />
           </div>
         </ThreadBody>
       </div>

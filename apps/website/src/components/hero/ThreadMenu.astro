@@ -1,8 +1,8 @@
 ---
 /**
  * A thread's menu as the app opens it from the header's ⋯ (ThreadActions.tsx, floating.css): where the thread works
- * on top, its branch marked Worktree or Checkout and then this Mac, each opening the moves away from there; below, the
- * conversation's own actions. Drawn open in stills.
+ * on top, its branch marked Worktree or Checkout, opening the moves away from there (ThreadPlaceItems.tsx); below, the
+ * conversation's own actions, Delete apart at the foot. Drawn open in stills.
  */
 import ProductIcon, { type IconName } from "./ProductIcon.astro";
 
@@ -13,10 +13,7 @@ interface Props {
 const { branch, place = "Worktree" } = Astro.props;
 type Row = { icon: IconName; label: string; tag?: string; more?: boolean; danger?: boolean };
 const groups: Row[][] = [
-  [
-    { icon: "branch", label: branch, tag: place, more: true },
-    { icon: "laptop", label: "This Mac", more: true },
-  ],
+  [{ icon: "branch", label: branch, tag: place, more: true }],
   [
     { icon: "pencil", label: "Rename" },
     { icon: "pin", label: "Pin" },
@@ -27,10 +24,8 @@ const groups: Row[][] = [
     { icon: "gitFork", label: "Fork" },
     { icon: "appWindow", label: "Open in new window" },
   ],
-  [
-    { icon: "circleCheck", label: "Resolve" },
-    { icon: "trash", label: "Delete", danger: true },
-  ],
+  [{ icon: "circleCheck", label: "Resolve" }],
+  [{ icon: "trash", label: "Delete", danger: true }],
 ];
 ---
 

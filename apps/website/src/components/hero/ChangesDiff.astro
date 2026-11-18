@@ -1,8 +1,8 @@
 ---
 /**
  * The Changes page's content (Panel.tsx, DiffView.tsx): the Uncommitted bar with Commit, then each changed file under
- * its head, open with its diff or folded to the head. Rows follow the app's unified view: line numbers, soft runs of
- * additions and removals, no syntax colors.
+ * its head, open with its diff on the plane or folded to the head. Rows follow the app's unified view: line numbers,
+ * additions and removals on soft fills from edge to edge, no syntax colors.
  */
 import Counts from "./Counts.astro";
 import ProductIcon from "./ProductIcon.astro";
@@ -13,15 +13,7 @@ interface Props {
 }
 const { files = [welcomeDiff] } = Astro.props;
 const total = files.reduce((sum, file) => ({ added: sum.added + file.added, removed: sum.removed + file.removed }), { added: 0, removed: 0 });
-/** A run of changed lines rounds its ends, and a run that follows another kind of change starts a little apart. */
-const rows = (lines: NonNullable<DiffFile["lines"]>) =>
-  lines.map(([type, number, code], i) => ({
-    type,
-    number,
-    code,
-    first: type !== "context" && lines[i - 1]?.[0] !== type,
-    last: type !== "context" && lines[i + 1]?.[0] !== type,
-  }));
+const rows = (lines: NonNullable<DiffFile["lines"]>) => lines.map(([type, number, code]) => ({ type, number, code }));
 const split = (path: string) => [path.slice(0, path.lastIndexOf("/") + 1), path.slice(path.lastIndexOf("/") + 1)];
 ---
 
@@ -43,7 +35,7 @@ const split = (path: string) => [path.slice(0, path.lastIndexOf("/") + 1), path.
     {file.lines ? (
       <div class="hs-diff">
         {rows(file.lines).map((row) => (
-          <div class="hs-diff-row" data-type={row.type} data-first={row.first ? "" : undefined} data-last={row.last ? "" : undefined}>
+          <div class="hs-diff-row" data-type={row.type}>
             <span class="hs-diff-num">{row.number}</span>
             <span class="hs-diff-code">{row.code}</span>
           </div>

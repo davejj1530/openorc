@@ -1,0 +1,45 @@
+---
+/**
+ * A turn's end, as the app's TurnEnd draws it: where the turn stands, "Working 12s" while it runs and "Worked for 41s"
+ * once done, then copy and fork once it is. A played turn says Working with its clock, then Writing while the reply
+ * streams, then how long it took. A still's turn that is still working counts on from `working` seconds
+ * (scripts/app-preview.ts). The agent and model are named only where they change (TurnHead.tsx), which no scene does.
+ */
+import ProductIcon from "./ProductIcon.astro";
+import { duration, elapsed, timed, type Journey } from "../../data/hero/timeline";
+
+interface Props extends Record<string, unknown> {
+  journey?: Journey;
+  /** How long a finished turn took. */
+  took?: string;
+  /** A played turn: working from `from`, writing its reply from `writing`, done at `to`. */
+  clock?: { from: string; writing?: string; to?: string };
+  working?: number;
+}
+const { journey, took, clock, working, ...rest } = Astro.props;
+const at = (windows: string) => (journey ? timed(journey, windows) : {});
+const workingUntil = clock ? (clock.writing ?? clock.to) : undefined;
+// Without a player the page shows the journey's last moment, so the words start there.
+const since = (from: string, to?: string) => (journey ? duration(elapsed(journey, from, to)) : "0s");
+const done = took !== undefined || clock?.to !== undefined;
+---
+
+<div class="hs-turn-actions" {...rest}>
+  <span class="hs-turn-status">
+    {took ? `Worked for ${took}` : null}
+    {working !== undefined ? <span data-tick={working}>Working {duration(working)}</span> : null}
+    {clock ? <span {...(workingUntil ? at(`<${workingUntil}`) : {})} data-clock={clock.from} data-clock-text="Working {t}">Working {since(clock.from)}</span> : null}
+    {clock?.writing ? <span {...at(clock.to ? `${clock.writing}~${clock.to}` : `>${clock.writing}`)}>Writing</span> : null}
+    {clock?.to ? (
+      <span {...at(`>${clock.to}`)}>
+        Worked for <span data-duration={`${clock.from}~${clock.to}`}>{since(clock.from, clock.to)}</span>
+      </span>
+    ) : null}
+  </span>
+  {done ? (
+    <span class="hs-turn-tools" {...(clock?.to ? at(`>${clock.to}`) : {})}>
+      <ProductIcon name="copy" />
+      <ProductIcon name="gitFork" />
+    </span>
+  ) : null}
+</div>

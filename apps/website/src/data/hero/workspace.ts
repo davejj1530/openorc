@@ -8,14 +8,8 @@ export const models = {
   claude: { harness: "claude", agent: "Claude", label: "Opus 5.5", effort: "High", permission: "Accept edits" },
 };
 
-export type Day = "recent" | "today" | "yesterday";
-
-/** The sidebar's day sections, in the order it lists them (SidebarThreadBrowser.tsx). Yesterday rests folded. */
-export const days: { id: Day; label: string; folded?: boolean }[] = [
-  { id: "recent", label: "Recent" },
-  { id: "today", label: "Today" },
-  { id: "yesterday", label: "Yesterday", folded: true },
-];
+/** The sidebar's projects in the order it lists them (SidebarThreadBrowser.tsx), each with its threads under it. atlas-api rests folded. */
+export const projects: { name: string; folded?: boolean }[] = [{ name: "studio" }, { name: "website" }, { name: "atlas-api", folded: true }];
 
 /**
  * A thread row (ThreadLibraryRow.tsx). In a scene, `busy` and `waiting` hold during windows; in a still they are
@@ -27,18 +21,14 @@ export interface SidebarRow {
   title: string;
   /** The project's name; studio unless given. */
   project?: string;
-  /** The thread's own branch when it runs in a worktree, which the row calls "worktree". */
+  /** The thread's own branch when it runs in a worktree. */
   branch?: string;
-  /** The day section the row is listed under; Recent unless given. */
-  day?: Day;
   /** Windows during which the thread's agent is working, or `true` in a still. */
   busy?: string | true;
   /** Windows during which the thread waits on the user's answer, or `true` in a still. */
   waiting?: string | true;
-  /** What the row says under the title while the agent works: the step it is on. Steps can follow the scene's windows. */
-  headline?: string | { text: string; show: string }[];
-  /** A finished turn the user has not read: what it came to, after "Done". */
-  done?: string;
+  /** A finished turn the user has not read. */
+  done?: boolean;
   /** The row is the open thread, in a still that has no scene state. */
   current?: boolean;
   /** Windows during which the row exists, for threads the journey creates. */
@@ -56,6 +46,7 @@ export const branches = {
 /** Conversations that make the workspace read as lived in, listed after a scene's own rows. */
 export const otherThreads: SidebarRow[] = [
   { title: "Make the first five minutes count" },
-  { title: "Simplify the design tokens", branch: branches.tokens, day: "today" },
-  { title: "Tell the product story", project: "website", day: "today" },
+  { title: "Simplify the design tokens", branch: branches.tokens },
+  { title: "Build a thoughtful onboarding" },
+  { title: "Tell the product story", project: "website" },
 ];

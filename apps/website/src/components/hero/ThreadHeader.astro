@@ -1,7 +1,7 @@
 ---
 /**
- * A conversation pane's header on the window's top line (ThreadHeader.tsx). The first pane holds the work column's
- * tabs and +; a pane split beside it names its thread instead. Then the faint facts ("Working" while the agent works),
+ * A conversation pane's header on the window's top line (ThreadHeader.tsx). The first pane holds the sidebar toggle,
+ * the work column's tabs and New thread; a pane split beside it names its thread instead. Then the faint facts ("Working" while the agent works),
  * Close pane in a split, the thread's actions as vertical dots, and its tools: the panel's side while the panel is
  * open, and the panel toggle. A new thread's header keeps only its tab and the panel toggle.
  */
@@ -27,11 +27,12 @@ const { journey, tabs, title, tablist, panel, fresh, menu } = Astro.props;
 
 <header class="hs-header" data-kind={tabs ? "tabs" : "title"}>
   {tabs ? (
+    <span class="hs-round hs-sidebar-toggle" aria-hidden="true"><ProductIcon name="panelLeft" /></span>
     <div class="hs-tabs-row">
       <div class="hs-tabs" role={tablist ? "tablist" : undefined} aria-label={tablist}>
         {tabs.map((tab) => <WorkTab journey={journey} {...tab} />)}
       </div>
-      <span class="hs-round" aria-hidden="true"><ProductIcon name="plus" /></span>
+      <span class="hs-round" aria-hidden="true"><ProductIcon name="compose" /></span>
     </div>
   ) : (
     <>

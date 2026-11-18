@@ -14,15 +14,14 @@ interface Props {
   journey: Journey;
   label: string;
   rows: SidebarRow[];
-  inboxPending?: string;
   /** Blocks open with springs and messages fly between threads (scripts/hero-motion.ts). */
   motion?: boolean;
 }
-const { id, journey, label, rows, inboxPending, motion } = Astro.props;
+const { id, journey, label, rows, motion } = Astro.props;
 ---
 
 <div class="hero-scene" role="img" aria-label={label} data-hero-scene data-scene={id} {...restingStates(journey)} data-motion={motion ? "" : undefined} data-paused>
   <span class="hs-lights" aria-hidden="true"><i></i><i></i><i></i></span>
-  <SceneSidebar journey={journey} rows={rows} inboxPending={inboxPending} />
+  <SceneSidebar journey={journey} rows={rows} />
   <slot />
 </div>

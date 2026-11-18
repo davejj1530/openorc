@@ -1,6 +1,6 @@
 ---
 /**
- * The task view (TaskView.tsx, TaskDocument.tsx): the breadcrumb on the top line with the task's status mark, the tab
+ * The task view (TaskView.tsx, TaskDocument.tsx): the sidebar toggle and the breadcrumb on the top line with the task's status mark, the tab
  * track, the scrolling document in the slot, and the footer. The task waits in the backlog until its work starts,
  * then runs in its own worktree on `branch`.
  */
@@ -26,6 +26,7 @@ const tabs = ["Overview", "Activity", "Changes", "Commits", "Memory"];
 
 <section class="hs-pane" data-pane={id}>
   <header class="hs-header hs-task-header">
+    <span class="hs-round hs-sidebar-toggle" aria-hidden="true"><ProductIcon name="panelLeft" /></span>
     <span class="hs-crumb">Tasks</span>
     <span class="hs-crumb-sep">/</span>
     <StatusMark status="backlog" {...waiting} />

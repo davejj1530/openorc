@@ -96,6 +96,8 @@ function account() {
     /** The threads started under the cloud thread, parents first, as the server lists them; and each one's conversation by id. */
     family: [] as { id: string; parentId: string; title: string; settings: Row["settings"]; createdAt: string; startedByAgent: boolean; archivedAt: string | null }[],
     sessionsOf: {} as Record<string, Buffer | null>,
+    /** Whether the server moves a thread with its subthreads (`subthreadMoves`); one before it doesn't. */
+    movesFamilies: true,
     /** Whether the newest save holds the folder as it is, and `asked` as the server names it (undefined: one from before it). */
     current: true,
     asked: false as boolean | undefined,
@@ -127,6 +129,7 @@ function account() {
       },
     },
     moves: {
+      movesFamilies: async () => cloud.movesFamilies,
       arrive: async (space: string, input: { id: string; projectId: string }) => (sent.arrived.push({ space, id: input.id, projectId: input.projectId }), { id: input.id }),
       history: async (_space: string, _id: string, lines: () => AsyncIterable<ArrivalLine>) => {
         if (fail.history) throw fail.history;
@@ -442,6 +445,18 @@ describe("a thread moving from this Mac to OpenOrc Cloud", () => {
     expect(await service.check(thread.id)).toEqual({ to: "cloud", can: false, reason: "A thread with more than 20 subthreads can't move to OpenOrc Cloud." });
   });
 
+  it("holds a thread with subthreads before sending anything when the server can't move them, and moves one without as before", async () => {
+    const { thread } = await macThread();
+    const made = account();
+    made.cloud.movesFamilies = false;
+    const service = moves(made.hosted);
+    expect(await service.check(thread.id)).toEqual({ to: "cloud", can: true, space: { id: "personal", personal: true } });
+    startedUnder(thread.id, "Landing copy");
+    expect(await service.check(thread.id)).toEqual({ to: "cloud", can: false, reason: "Moving a thread with its subthreads isn't available on OpenOrc Cloud yet." });
+    await expect(service.move(thread.id, false)).rejects.toThrow("Moving a thread with its subthreads isn't available on OpenOrc Cloud yet.");
+    expect(made.sent.arrived).toEqual([]);
+  });
+
   it("holds a thread that isn't the account's to move, with why", async () => {
     const { thread } = await macThread();
     const { hosted } = account();
@@ -578,6 +593,19 @@ describe("a cloud thread moving to this Mac", () => {
     expect(runs.listForThread(db, nested)[0]).toMatchObject({ externalSessionId: null });
     expect([made.rows.has(id), made.rows.has(landing), made.rows.has(nested)], "the Mac's list lets the family go").toEqual([false, false, false]);
     expect(made.sent.away, "the server lets the family go with the thread").toEqual([id]);
+  });
+
+  it("holds a cloud thread with subthreads when its server can't move them, before its machine is asked anything", async () => {
+    const project = projects.insert(db, { name: "App", rootPath: folder, gitRemote: "https://github.com/acme/app.git", defaultBranch: "main", settings: {} });
+    const made = account();
+    const id = await cloudThread(made, project);
+    const settings = { agent: "claude" as const, model: null, effort: null, mode: "act" as const, permissionMode: "trusted" as const };
+    made.cloud.family = [{ id: "sub", parentId: id, title: "Landing copy", settings, createdAt: "2026-11-18T08:00:00.000Z", startedByAgent: false, archivedAt: null }];
+    made.cloud.movesFamilies = false;
+    const service = moves(made.hosted);
+    expect(await service.check(id)).toEqual({ to: "mac", can: false, reason: "Moving a thread with its subthreads isn't available on OpenOrc Cloud yet." });
+    await expect(service.move(id, false)).rejects.toThrow("isn't available on OpenOrc Cloud yet.");
+    expect(made.sent.asked).toEqual([]);
   });
 
   it("holds a cloud subthread alone: it moves with the thread it was started under", async () => {

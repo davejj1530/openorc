@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { RawBody } from "./raw-body.js";
+import { PARITY_ROUTES } from "./wire-parity.js";
 import { MAC_ROUTES, type MacWorkUpload } from "./mac-start.js";
-import type { Session } from "./session.js";
+import { Refused, type Session } from "./session.js";
 import { toAppEvent } from "./translate.js";
 import { ROUTES, type Route } from "./wire.js";
 import type { AgentEvent } from "@openorc/protocol";
@@ -83,6 +84,17 @@ export const MOVE_ROUTES = {
 
 export class CloudMoves {
   constructor(private readonly deps: { session: Session }) {}
+
+  /** Whether the space's server moves a thread with the threads started under it, both ways. */
+  async movesFamilies(space: string): Promise<boolean> {
+    try {
+      return (await this.deps.session.in(space).request(PARITY_ROUTES.capabilities)).features.subthreadMoves?.available === true;
+    } catch (error) {
+      // A server from before capabilities moves no families.
+      if (error instanceof Refused && error.status === 404) return false;
+      throw error;
+    }
+  }
 
   /** Makes the thread under its Mac id in `space`, hidden until done; the same arrival again answers the same. */
   arrive(space: string, input: { id: string; projectId: string; title?: string; settings: ArrivalSettings }): Promise<{ id: string }> {

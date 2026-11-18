@@ -24,6 +24,7 @@ export const HOSTED_REASONS = {
   claudeAccount: "This cloud turn uses your Claude sign-in in Account.",
   personSubthreads: "Creating a subthread isn't available in this cloud thread yet.",
   nativeSubthreads: "Subthreads aren't available in this cloud thread yet.",
+  subthreadMoves: "Moving a thread with its subthreads isn't available on OpenOrc Cloud yet.",
   tasks: "Tasks aren't available in this cloud thread yet.",
   terminal: "A terminal isn't available in this cloud thread yet.",
   nativeStop: "Stopping a cloud subthread isn't available yet.",
@@ -58,6 +59,8 @@ export const HostedCapabilities = z.object({
     files: availability,
     nativeSubthreads: availability,
     personSubthreads: availability,
+    /** A thread moving to or from this Mac with the threads started under it; a server without the key takes none. */
+    subthreadMoves: availability,
     tasks: availability,
     skills: availability,
     macCode: availability,

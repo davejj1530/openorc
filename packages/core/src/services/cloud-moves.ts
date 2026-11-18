@@ -27,6 +27,7 @@ import { bringIntoFolder, git } from "@openorc/git";
 import type { ArrivalLine, ArrivalSettings, Hosted } from "@openorc/hosted";
 import {
   harnessShortName,
+  HOSTED_REASONS,
   isHostedAgent,
   movingHold,
   WORKSPACE_ID,
@@ -126,10 +127,10 @@ export class CloudMoves {
     if (moving) return held(moving);
     if (!hosted || hosted.spaces.status().state !== "ready") return held(SIGN_IN);
     if (!isHostedAgent(thread.agent)) return held(`${harnessShortName(thread.agent)} doesn't run on OpenOrc Cloud.`);
-    const family = this.familyHold(thread);
-    if (family) return held(family);
     const cloud = hosted.threads.cloudProjectFor?.(thread.projectId);
     if (!cloud) return held(NOT_IN_CLOUD);
+    const family = await this.familyHold(hosted, thread, cloud.space);
+    if (family) return held(family);
     const status = hosted.spaces.status();
     return { to: "cloud", can: true, space: { id: cloud.space, personal: status.state === "ready" && status.personalSpaceId === cloud.space } };
   }
@@ -138,6 +139,8 @@ export class CloudMoves {
     const held = (reason: string): CloudMoveCheck => ({ to: "mac", can: false, reason });
     const row = hosted.threads.row!(threadId);
     if (row.relation === "started") return held(SUBTHREAD_ALONE);
+    const family = hosted.threads.family?.(threadId) ?? [];
+    if (family.length && !(await hosted.moves.movesFamilies(row.space))) return held(HOSTED_REASONS.subthreadMoves);
     const status = hosted.spaces.status();
     const moving = movingHold(this.moving(threadId), this.deps.here.machine);
     if (moving) return held(moving);
@@ -145,7 +148,7 @@ export class CloudMoves {
     const local = this.localProjectOf(hosted, threadId);
     if (!local) return held(`This project isn't on ${this.deps.here.thisComputer}.`);
     try {
-      for (const one of [row, ...(hosted.threads.family?.(threadId) ?? [])]) await this.deps.sessions.assertTakeable({ id: one.id, agent: one.settings.agent, claudeAccountId: null, children: [] });
+      for (const one of [row, ...family]) await this.deps.sessions.assertTakeable({ id: one.id, agent: one.settings.agent, claudeAccountId: null, children: [] });
     } catch (error) {
       if (error instanceof SessionRefused) return held(error.message);
       throw error;
@@ -159,8 +162,12 @@ export class CloudMoves {
    * Why the threads started under the thread can't go with it, or null. They go in its folder, as the cloud keeps one
    * folder for them all, and each runs there.
    */
-  private familyHold(thread: Thread): string | null {
+  private async familyHold(hosted: Hosted, thread: Thread, space: string): Promise<string | null> {
     const family = threads.startedUnder(this.deps.db, thread.id);
+    if (!family.length) {
+      return this.working(thread.id) ? WORKING : null;
+    }
+    if (!(await hosted.moves.movesFamilies(space))) return HOSTED_REASONS.subthreadMoves;
     if (family.length > MOST_SUBTHREADS) return `A thread with more than ${MOST_SUBTHREADS} subthreads can't move to OpenOrc Cloud.`;
     const elsewhere = family.find((member) => !isHostedAgent(member.agent));
     if (elsewhere) return `A subthread of this thread runs ${harnessShortName(elsewhere.agent)}, which doesn't run on OpenOrc Cloud.`;

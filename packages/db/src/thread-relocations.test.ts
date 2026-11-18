@@ -43,6 +43,28 @@ describe("this Mac's journal of a thread moving to and from the cloud", () => {
     expect(cloudMoves.cameHere(db, "t2")).toBe(true);
   });
 
+  it("hides the threads started under a thread coming from the cloud while it is hidden, and no other thread", () => {
+    const project = projects.insert(db, { name: "App", rootPath: "/app", gitRemote: null, defaultBranch: "main", settings: {} });
+    const make = (id: string, parent: string | null, relation: "started" | "subagent" | null) => {
+      threads.insert(db, { id, projectId: project.id, title: id, agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+      if (parent) threads.update(db, id, { parentThreadId: parent, parentRelation: relation });
+    };
+    const move = cloudMoves.begin(db, { threadId: "top", direction: "to-mac", projectId: project.id });
+    make("top", null, null);
+    make("copy", "top", "started");
+    make("links", "copy", "started");
+    make("elsewhere", null, null);
+    make("theirs", "elsewhere", "started");
+    const listed = () =>
+      threads
+        .list(db, { includeChildren: true })
+        .map((thread) => thread.id)
+        .sort();
+    expect(listed()).toEqual(["elsewhere", "theirs"]);
+    cloudMoves.set(db, move.id, { phase: "received" });
+    expect(listed()).toEqual(["copy", "elsewhere", "links", "theirs", "top"]);
+  });
+
   it("takes the threads started under a thread as come here with it, at any depth, and no other thread under it", () => {
     const project = projects.insert(db, { name: "App", rootPath: "/app", gitRemote: null, defaultBranch: "main", settings: {} });
     const make = (id: string, parent: string | null, relation: "started" | "subagent" | null) => {

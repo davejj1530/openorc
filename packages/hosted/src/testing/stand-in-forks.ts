@@ -1,4 +1,4 @@
-import type { StandInThreadSeed, Thread } from "./stand-in-threads.js";
+import type { StandInThreadSeed, Thread } from "./stand-in-thread-types.js";
 
 type Reply = { status: number; body: unknown };
 

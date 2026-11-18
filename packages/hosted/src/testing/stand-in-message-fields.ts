@@ -1,4 +1,4 @@
-import type { Message } from "./stand-in-threads.js";
+import type { Message } from "./stand-in-thread-types.js";
 
 /** Why a new message waits paused (a join that missed its turn), and the task context it was sent with. */
 export function heldWith(paused: boolean, body: Record<string, unknown>): Pick<Message, "pause" | "task"> {

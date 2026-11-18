@@ -1,6 +1,6 @@
 /** The stand-in's thread log as the server answers it: where turns end, pages of events, and each message's row. */
 import { userOf } from "./stand-in-spaces.js";
-import type { Message, Stored, Thread } from "./stand-in-threads.js";
+import type { Message, Stored, Thread } from "./stand-in-thread-types.js";
 
 export const lastAgentSeq = (thread: Thread) => thread.events.findLast((stored) => stored.by === null)?.seq ?? 0;
 export const headOf = (thread: Thread) => thread.events.at(-1)?.seq ?? 0;

@@ -1,5 +1,5 @@
 import { startTurn } from "./stand-in-thread-placement.js";
-import type { Thread } from "./stand-in-threads.js";
+import type { Thread } from "./stand-in-thread-types.js";
 
 type Reply = { status: number; body: unknown };
 

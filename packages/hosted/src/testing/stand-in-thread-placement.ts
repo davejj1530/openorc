@@ -1,4 +1,4 @@
-import type { Admit, Thread } from "./stand-in-threads.js";
+import type { Admit, Thread } from "./stand-in-thread-types.js";
 
 /** Where a message goes: refused, into the running turn, or queued; paused for its author, or taken once the turn rests. */
 export interface Placement {

@@ -25,7 +25,7 @@ export function ImportProjectDialog({ open, onOpenChange }: { open: boolean; onO
   }, [open]);
 
   const chooseFolder = async () => {
-    const picked = await window.openorc.pickDirectory();
+    const picked = await window.openorc.pickDirectory("project");
     if (picked) setPath(picked);
   };
 

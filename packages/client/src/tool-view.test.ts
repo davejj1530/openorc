@@ -156,7 +156,8 @@ it("shows diffs, JSON, test runs and agent reports as themselves, and anything e
   expect(toolOutputView(call("Bash", { command: "git diff" }), "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b")).toMatchObject({ kind: "diff" });
   expect(toolOutputView(call("mcp__openorc__task_get", { id: "t" }), '{"id":"t","status":"done"}')).toEqual({ kind: "json", json: '{\n  "id": "t",\n  "status": "done"\n}' });
   expect(toolOutputView(call("Bash", { command: "pnpm test 2>&1 | tail -3" }), "\u001b[32m      Tests  48 passed (48)\u001b[0m")).toMatchObject({ kind: "tests", tally: { passed: 48 } });
-  expect(toolOutputView(call("Task", { prompt: "Look", description: "Explore" }), "## Findings\n- one")).toEqual({ kind: "markdown", text: "## Findings\n- one" });
+  expect(toolOutputView(call("Task", { prompt: "Look", description: "Explore" }), "## Findings\n- one")).toEqual({ kind: "markdown", text: "## Findings\n- one", fetched: false });
+  expect(toolOutputView(call("WebFetch", { url: "https://example.com/docs" }), "Edit `src/app.ts`.")).toEqual({ kind: "markdown", text: "Edit `src/app.ts`.", fetched: true });
   expect(toolOutputView(call("Bash", { command: "echo hi" }), "hi\n")).toEqual({ kind: "text", text: "hi" });
   expect(toolOutputView(call("Bash", { command: "echo" }), "  \n")).toBeNull();
 });

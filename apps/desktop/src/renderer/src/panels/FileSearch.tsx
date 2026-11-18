@@ -8,6 +8,7 @@ import { ThreadMedia } from "../components/ThreadImages";
 import { IconButton, Tooltip } from "../components/ui";
 import { cn } from "../lib/cn";
 import { useRpc } from "../lib/client";
+import { startFileDrag } from "../lib/file-drag";
 import { filesKey, type FilesTool } from "../lib/files-tool";
 import { useLayout } from "../lib/layout";
 
@@ -101,6 +102,8 @@ function TreeMatches({ scope, root, paths, query, best }: { scope: FileScope; ro
               aria-label={path}
               data-tip={path}
               onClick={() => open(scope, path)}
+              draggable
+              onDragStart={(event) => startFileDrag(event.dataTransfer, scope, path, false)}
             >
               <span className="w-3 shrink-0" />
               <FileGlyph path={path} size={14} />
@@ -365,6 +368,8 @@ export function FileSearchResults({
                   aria-label={path}
                   data-tip={path}
                   onClick={() => open(scope, path)}
+                  draggable
+                  onDragStart={(event) => startFileDrag(event.dataTransfer, scope, path, false)}
                 >
                   <FileGlyph path={path} size={14} />
                   <span className="truncate">

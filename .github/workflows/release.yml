@@ -103,8 +103,33 @@ jobs:
           require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, `platforms=${JSON.stringify(platforms)}\n`);
           NODE
 
-  build:
+  wsl:
     needs: validate
+    name: Build the core for WSL
+    # Once, on Linux, which it runs on: the Windows app carries this core.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @openorc/desktop bundle:wsl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wsl-core
+          if-no-files-found: error
+          retention-days: 1
+          path: apps/desktop/dist/wsl/wsl-core-*.tgz
+
+  build:
+    needs: [validate, wsl]
     name: Build ${{ matrix.platform }} ${{ matrix.arch }}
     strategy:
       fail-fast: false
@@ -137,6 +162,11 @@ jobs:
           sudo apt-get install -y --no-install-recommends rpm xvfb xauth dbus-daemon gnome-keyring
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        if: matrix.platform == 'win'
+        with:
+          name: wsl-core
+          path: apps/desktop/dist/wsl
       # The download tries again, and falls back to a mirror whose file must match Electron's own checksums, when
       # GitHub's release downloads fail. Packaging still fetches the Electron it ships through electron-builder.
       - name: Prepare Electron runtime and notice files

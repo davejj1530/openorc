@@ -10,7 +10,7 @@ import { OpenOrc } from "../openorc.js";
 import { inheritedProbe } from "./shell-environment.js";
 import { rpcClient } from "../rpc-test-client.js";
 
-let root: string, dataDir: string, core: OpenOrc, taskId: string;
+let root: string, dataRoot: string, dataDir: string, core: OpenOrc, taskId: string;
 const sessions = new Map<string, { spec: RunSpec; handle: RunHandle }>();
 const recipient: CommentRecipient = { agent: "codex", model: "test-model", effort: "high" };
 const call = rpcClient(() => core);
@@ -30,7 +30,10 @@ async function executionStarted(attemptId: string) {
   // second on CI runners, past waitFor's default.
   await vi.waitFor(
     () => {
-      const runId = taskComments.attempt(core.db, attemptId)?.executionRunId;
+      const attempt = taskComments.attempt(core.db, attemptId);
+      // A start that failed reports its own error, not a session that never came.
+      expect(attempt?.error).toBeNull();
+      const runId = attempt?.executionRunId;
       expect(runId).toBeTruthy();
       expect(sessions.has(runId!)).toBe(true);
       expect(tasks.get(core.db, taskId)?.status).toBe("in_progress");
@@ -66,9 +69,13 @@ beforeAll(async () => {
   await git(root, ["config", "user.name", "Fixture"]);
   await writeFile(path.join(root, "README.md"), "# Comments\n");
   await commitAll(root, "Initial");
+  // OpenOrc's data stays outside the checkout. A task's starting checkpoint runs `git add -A` there, and the database
+  // changing while git reads it fails the start ("confused by unstable object source data").
+  dataRoot = await mkdtemp(path.join(tmpdir(), "task-comments-data-"));
 });
 afterAll(async () => {
   await rm(root, { recursive: true, force: true });
+  await rm(dataRoot, { recursive: true, force: true });
 });
 beforeEach(async () => {
   sessions.clear();
@@ -95,7 +102,7 @@ beforeEach(async () => {
   vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation(spawn);
   vi.spyOn(AcpAdapter.prototype, "start").mockImplementation(spawn);
   vi.spyOn(PiAdapter.prototype, "start").mockImplementation(spawn);
-  dataDir = path.join(root, crypto.randomUUID());
+  dataDir = path.join(dataRoot, crypto.randomUUID());
   await openCore();
   const project = await call("projects.import", { rootPath: root });
   taskId = (await call("tasks.create", { projectId: project.id, title: "Comments fixture", spec: "Implement the feature", workspaceMode: "current" })).id;

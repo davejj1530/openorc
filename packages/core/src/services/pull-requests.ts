@@ -15,7 +15,11 @@ import {
   type PullRequestBranches,
   type PullRequestDetail,
   type PullRequestDraftComment,
-  type PullRequestFilter,
+  type PullRequestCounts,
+  type PullRequestStateFilter,
+  type PullRequestChoice,
+  type PullRequestChoiceKind,
+  type PullRequestNarrowing,
   type PullRequestReview,
   type PullRequestReviewAuthor,
   type PullRequestReviewEvent,
@@ -105,8 +109,18 @@ export class PullRequestService {
     this.github = options.github ?? new GitHubPulls();
   }
 
-  async list(projectId: string, filter: PullRequestFilter): Promise<PullRequestSummary[]> {
-    return this.github.list(await this.repository(projectId), filter);
+  async list(projectId: string, state: PullRequestStateFilter, narrowing: PullRequestNarrowing = {}): Promise<PullRequestSummary[]> {
+    return this.github.list(await this.repository(projectId), state, narrowing);
+  }
+
+  /** How many pull requests each state holds under these filters. */
+  async counts(projectId: string, narrowing: PullRequestNarrowing = {}): Promise<PullRequestCounts> {
+    return this.github.counts(await this.repository(projectId), narrowing);
+  }
+
+  /** What one of GitHub's filters offers for the project's repository. */
+  async choices(projectId: string, kind: PullRequestChoiceKind): Promise<PullRequestChoice[]> {
+    return this.github.choices(await this.repository(projectId), kind);
   }
 
   /** The branches a new pull request can target, with `prefer` among them when GitHub has it. */

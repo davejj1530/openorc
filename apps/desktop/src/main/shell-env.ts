@@ -94,6 +94,14 @@ export function loginShellEnv(waitMs = FIRST_SNAPSHOT_WAIT_MS): Promise<ShellEnv
   });
 }
 
+/**
+ * Forgets the snapshot when the core starts again somewhere else, between this computer and a WSL distribution: the
+ * PATH of the place that was left means nothing where the next shell starts, so a panel waits for the new core's.
+ */
+export function forgetShellEnv(): void {
+  current = null;
+}
+
 /** Forgets every snapshot and generation, so each test starts before any core has spoken. */
 export function resetShellEnvForTests(): void {
   current = null;

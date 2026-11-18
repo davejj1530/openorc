@@ -4,8 +4,8 @@ import type { Block } from "@openorc/client";
 import { ToolDetail } from "./ToolDetail";
 
 vi.mock("./ThreadImages", () => ({
-  ThreadRichText: ({ children, lineNumbers }: { children: string; lineNumbers?: boolean }) => (
-    <pre data-testid="rich" data-line-numbers={String(Boolean(lineNumbers))}>
+  ThreadRichText: ({ children, lineNumbers, codePaths }: { children: string; lineNumbers?: boolean; codePaths?: boolean }) => (
+    <pre data-testid="rich" data-line-numbers={String(Boolean(lineNumbers))} data-code-paths={String(Boolean(codePaths))}>
       {children}
     </pre>
   ),
@@ -87,4 +87,17 @@ it("shows an MCP call's arguments as fields, and the raw call on request", () =>
   expect(screen.getByText("Found 8 screens")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Raw call" }));
   expect(screen.getByText(/"query": "onboarding"/)).toBeTruthy();
+});
+
+it("links the paths an agent writes in a brief and its report, and none in what a fetch brought back", () => {
+  render(<ToolDetail block={call("Task", { prompt: "Check `src/a.ts`.", description: "Look" })} output="Fixed `src/a.ts:3`." />);
+  expect(screen.getAllByTestId("rich").map((rich) => [rich.textContent, rich.dataset.codePaths])).toEqual([
+    ["Check `src/a.ts`.", "true"],
+    ["Fixed `src/a.ts:3`.", "true"],
+  ]);
+  cleanup();
+  // Someone else's docs: `src/app.ts` there is their file, not this conversation's.
+  render(<ToolDetail block={call("WebFetch", { url: "https://example.com/docs", prompt: "How is it set up?" })} output="Edit `src/app.ts`." />);
+  const fetched = screen.getAllByTestId("rich").find((rich) => rich.textContent === "Edit `src/app.ts`.");
+  expect(fetched?.dataset.codePaths).toBe("false");
 });

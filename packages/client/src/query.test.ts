@@ -134,6 +134,8 @@ describe("query cache tags", () => {
       "app.settings.get",
       "schedules.list",
       "pulls.list",
+      "pulls.counts",
+      "pulls.choices",
       "pulls.branches",
       "pulls.get",
       "pulls.diff",

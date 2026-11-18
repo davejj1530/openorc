@@ -95,3 +95,20 @@ it("reviews a pull request of a project only the cloud has as any other: its dif
   await waitFor(() => expect(reviewer.shown).toBe(true));
   expect(viewer.props!.onRequestComment).toBeTypeOf("function");
 });
+
+it("heads a merged pull request with its state's mark and leaves out the review decision it closed with", async () => {
+  vi.mocked(core.call).mockImplementation((async (method: RpcMethod) => {
+    if (method === "pulls.get") return { ...pull, state: "merged", isDraft: false, reviewDecision: "changes_requested" };
+    if (method === "pulls.diff") return { patch: patchAt(head), headSha: commit(head) };
+    if (method === "pulls.review.get" || method === "projects.get") return null;
+    return [];
+  }) as typeof core.call);
+  const { container } = render(
+    <QueryClientProvider client={queryClient}>
+      <PullRequestView projectId="project" number={7} />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("Merged");
+  expect(container.querySelector(".pull-glyph-merged")).not.toBeNull();
+  expect(screen.queryByText("Changes requested")).toBeNull();
+});

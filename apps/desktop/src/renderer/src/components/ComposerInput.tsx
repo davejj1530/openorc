@@ -3,6 +3,7 @@ import type { FileScope, UsableConnector } from "@openorc/protocol";
 import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type Ref, type RefObject } from "react";
 import { useRpc } from "../lib/client";
 import { filterMentions, mentionQueryAt, usePickedFiles, type MentionEntry } from "../lib/composer-mentions";
+import { insertReference } from "../lib/file-drag";
 import type { SlashCommand } from "./Composer";
 import {
   asideMatching,
@@ -59,6 +60,15 @@ interface ComposerInputProps {
   ask?: { enter: () => void } | null | undefined;
   /** Who `@` may tag, in a thread with notes. */
   people?: PeoplePicks | undefined;
+  /** What the composer around it can do to the prompt. */
+  handle?: Ref<ComposerInputHandle>;
+}
+
+export interface ComposerInputHandle {
+  /** False while the prompt can't be written in, as while a message sends. */
+  writable: boolean;
+  /** Put a reference, such as a file's path, where the caret last was, a word of its own, and the caret after it. */
+  insert: (reference: string) => void;
 }
 
 /** Opens the list of one kind at the caret, as typing `@` or `/` there would, showing only that kind. */
@@ -137,7 +147,8 @@ export function ComposerInput(props: ComposerInputProps) {
   const { compact: heldCompact, fork: heldFork } = useHeldCommands();
   const held = useMemo(() => ({ compact: heldCompact, fork: heldFork }), [heldCompact, heldFork]);
   const fileSearch = fileReason ? undefined : props.fileSearch;
-  const [caret, setCaret] = useState(0);
+  // A restored draft is picked up at its end, as typing or a dropped file there would expect.
+  const [caret, setCaret] = useState(() => value.length);
   const [cursor, setCursor] = useState(0);
   const [suggestionsActive, setSuggestionsActive] = useState(true);
   const { editor } = props;
@@ -148,6 +159,19 @@ export function ComposerInput(props: ComposerInputProps) {
   const sources = useMemo(() => ({ commands, connectors, members: mentions, files: picked.files, people: named }), [commands, connectors, mentions, picked.files, named]);
   const token = useMemo(() => tokenAtCaret(value, caret), [value, caret]);
   const scope = useListKind(props.lists, { token, caret, value, editor, onOpen: () => setSuggestionsActive(true) });
+  useImperativeHandle(
+    props.handle,
+    () => ({
+      writable: !disabled,
+      insert: (reference: string) => {
+        const next = insertReference(value, caret, reference);
+        editor.current?.write(next.text, next.caret);
+        setCaret(next.caret);
+        editor.current?.focus();
+      },
+    }),
+    [disabled, value, caret, editor],
+  );
   const memberQuery = useMemo(() => (mentions?.length && (scope === null || scope === "orcling") ? mentionQueryAt(value, caret) : null), [mentions, value, caret, scope]);
   const memberMatches = useMemo(() => (memberQuery ? filterMentions(mentions ?? [], memberQuery.query) : []), [memberQuery, mentions]);
   const atQuery = token?.token.startsWith("@") ? token.token.slice(1) : null;

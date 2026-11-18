@@ -1069,6 +1069,47 @@ describe("thread lifecycle", () => {
     expect(core.threads.get(unread.id)).toMatchObject({ unread: true, lastActivityAt: expect.toSatisfy((at: number) => at >= before) });
   });
 
+  it("resolves the threads started under a thread with it, and reopens the ones that went with it", () => {
+    const own = projects.insert(core.db, { name: "Resolved family", rootPath: path.join(os.tmpdir(), "resolved-family"), gitRemote: null, defaultBranch: "main", settings: {} });
+    const insert = (title: string, parentThreadId?: string, parentRelation?: "subagent") => {
+      const thread = threads.insert(core.db, { projectId: own.id, title, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+      return parentThreadId ? threads.update(core.db, thread.id, { parentThreadId, parentRelation }) : thread;
+    };
+    const archivedAt = (thread: { id: string }) => core.threads.get(thread.id)?.archivedAt;
+    const parent = insert("Parent");
+    const child = insert("Started under it", parent.id);
+    const grandchild = insert("Started under that", child.id);
+    const helper = insert("Its subagent", parent.id, "subagent");
+    const underHelper = insert("Started under its subagent", helper.id);
+    const pinned = insert("Pinned under it", parent.id);
+    const snoozed = insert("Snoozed under it", parent.id);
+    const underSnoozed = insert("Started under the snoozed one", snoozed.id);
+    core.threads.update(pinned.id, { pinned: true });
+    core.threads.update(snoozed.id, { snoozedUntil: Date.now() + 60_000 });
+    const apart = insert("Resolved on its own", parent.id);
+    core.threads.update(apart.id, { archived: true });
+    // A minute earlier: two resolves in the same millisecond would reopen as one.
+    core.db.stmt("UPDATE threads SET archived_at = archived_at - 60000 WHERE id = ?").run(apart.id);
+    const apartAt = archivedAt(apart);
+    const roots = (filter: "active" | "archived") => {
+      const rows = core.threads.list({ projectIds: [own.id], filter, includeChildren: true });
+      return rows.filter((row) => !rows.some((other) => other.id === row.parentThreadId)).map((row) => row.title);
+    };
+    const family = [parent, child, grandchild, underHelper];
+
+    core.threads.update(parent.id, { archived: true });
+    expect(roots("active").sort()).toEqual(["Pinned under it", "Snoozed under it"]);
+    expect(roots("archived")).toEqual(["Parent"]);
+    expect(family.map(archivedAt)).toEqual(family.map(() => archivedAt(parent)));
+    expect([helper, pinned, snoozed, underSnoozed].map(archivedAt)).toEqual([null, null, null, null]);
+    expect(archivedAt(apart)).toBe(apartAt);
+
+    core.threads.update(parent.id, { archived: false });
+    expect(family.map(archivedAt)).toEqual(family.map(() => null));
+    expect(roots("active")).toEqual(["Parent"]);
+    expect(roots("archived")).toEqual(["Resolved on its own"]);
+  });
+
   it("handles a rejected send-now while another follow-up waits on the same delivery", async () => {
     const t = insert("Rejected steering");
     const r = runRepo.insert(core.db, { id: "steer-rejected-run", taskId: null, threadId: t.id, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });

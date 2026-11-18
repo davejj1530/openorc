@@ -33,6 +33,7 @@ Electron, node-pty, ONNX Runtime, and sqlite-vec include platform-specific depen
 - Desktop windows, OS capabilities, and protected storage: `apps/desktop/src/main`.
 - User interaction and rendering: `apps/desktop/src/renderer/src`.
 - The iPhone app's screens: `apps/mobile/src`.
+- Running the core inside a WSL distribution: `apps/desktop/src/main/wsl` on the Windows side, `apps/desktop/src/core/wsl` inside the distribution.
 
 Keep behavior close to the module that owns its invariants. Prefer a small interface that hides meaningful implementation details. Add an adapter seam when there are real alternative implementations, such as the provider adapters or a test transport. Avoid pass-through layers introduced only to make files shorter. A feature that touches agent-specific state, such as sessions, sign-ins, or CLI files, needs a per-agent part that Claude Code, Codex, and OpenCode each implement.
 
@@ -109,7 +110,7 @@ Live-provider modes in the smoke tools can use your authenticated provider accou
 
 The iPhone app needs Xcode. `pnpm --filter @openorc/mobile ios` generates the ignored `apps/mobile/ios` project, builds a development build, and runs it in the iOS Simulator; `pnpm --filter @openorc/mobile start` serves JavaScript to a development build that is already installed. The phone's colors, icons, and fonts are generated from the desktop's sources. Run `pnpm --filter @openorc/mobile design:sync` after changing them; `design:check` fails when the generated files are stale. App Store builds come from EAS Build with the `production` profile in `apps/mobile/eas.json`, which also submits them to App Store Connect. Phones from the App Store run older client code against newer desktops, so give a new event or result a per-phone capability in `packages/core/src/remote` and keep the phone tolerant of event types it does not know.
 
-OpenOrc Cloud's server is not in this repository. A development build reaches the server that `OPENORC_ACCOUNT_SERVER` names, from the shell or from `apps/desktop/.env.development.local`, and shows no account or cloud features without it. The tests of `packages/hosted` and of the cloud parts of the core and the apps run against the stand-in server in `packages/hosted/src/testing`, so they need no account.
+OpenOrc Cloud's server is not in this repository. A development build reaches the server that `OPENORC_ACCOUNT_SERVER` names, from the shell or from `apps/desktop/.env.development.local`, and shows no account or cloud features without it. The tests of `packages/hosted` and of the cloud parts of the core and the apps run against the stand-in server in `packages/hosted/src/testing`, so they need no account. The core the Windows app runs inside a WSL distribution is built on Linux or inside WSL: `pnpm --filter @openorc/desktop bundle:wsl` writes it to `apps/desktop/dist/wsl`, and packaging for Windows refuses to continue without it. [Running inside WSL](docs/wsl.md) covers how to run that route on x64 Linux with a stand-in distribution.
 
 ## Dependency notices and artwork
 

@@ -37,6 +37,14 @@ beforeEach(() => {
 afterEach(() => {
   style().removeProperty("--window-controls-left");
   style().removeProperty("--window-controls-right");
+  delete document.documentElement.dataset.platform;
+});
+
+it("marks the root with the platform, which styles that differ by OS key on", async () => {
+  await load("win32");
+  expect(document.documentElement.dataset.platform).toBe("win32");
+  await load("linux");
+  expect(document.documentElement.dataset.platform).toBe("linux");
 });
 
 it("clears Linux's window controls at whichever end the desktop puts them", async () => {

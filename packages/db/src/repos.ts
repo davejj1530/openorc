@@ -7,8 +7,9 @@ import { redact, redactJson } from "./redact.js";
 import { retiredTaskIds, retiredTeams } from "./retired-teams.js";
 import { VISIBLE } from "./thread-visible.js";
 import { jaccard, normalizeTitle, wordSet } from "./task-similarity.js";
+import { reopenThread, resolveThread } from "./thread-family.js";
 import { threadListLimit, threadListOrder } from "./thread-list-order.js";
-import { threadRootCountSql, threadTreeArgs, threadTreeSql } from "./thread-list-tree.js";
+import { threadListStatement, threadRootCountSql } from "./thread-list-tree.js";
 
 const now = () => Date.now();
 
@@ -393,8 +394,6 @@ export const threads = {
       where.push("project_id != ?");
       args.push(WORKSPACE_ID);
     }
-    // Exclude hidden records before applying pagination, including archived and all views.
-    where.push(VISIBLE);
     if (filter.excludeSubagents) where.push("COALESCE(parent_relation, '') != 'subagent'");
     if (filter.pinnedOnly) where.push("pinned_at IS NOT NULL");
     // Unread as the thread summary reads it, or with a run that is working or waiting on you.
@@ -406,11 +405,8 @@ export const threads = {
     if (kind === "active") where.push("archived_at IS NULL");
     else if (kind === "done") where.push("archived_at IS NULL AND done_at IS NOT NULL");
     else if (kind === "archived") where.push("archived_at IS NOT NULL");
-    const limit = threadListLimit(filter);
-    const order = threadListOrder(kind, filter.orderBy);
-    const sql = filter.includeChildren ? threadTreeSql(where.join(" AND "), order, limit) : `SELECT * FROM threads WHERE ${where.join(" AND ")} ORDER BY ${order}${limit}`;
-    if (filter.includeChildren) args.unshift(...threadTreeArgs(filter));
-    return (db.stmt(sql).all(...args) as unknown as (ThreadRow & { hidden_children?: number; tree_activity?: number | null })[]).map((row) => ({
+    const statement = threadListStatement(db, filter, { where, args, order: threadListOrder(kind, filter.orderBy), limit: threadListLimit(filter) });
+    return (db.stmt(statement.sql).all(...statement.args) as unknown as (ThreadRow & { hidden_children?: number; tree_activity?: number | null })[]).map((row) => ({
       ...threadFromRow(row),
       ...(row.hidden_children === undefined ? {} : { hiddenChildren: row.hidden_children }),
       ...(row.tree_activity == null ? {} : { treeActivityAt: row.tree_activity }),
@@ -514,14 +510,8 @@ export const threads = {
   touch(db: Db, id: string): void {
     db.stmt("UPDATE threads SET last_activity_at = ?, updated_at = ? WHERE id = ?").run(now(), now(), id);
   },
-  /**
-   * Brings a thread back from Resolved. That counts as activity, so a thread resolved by its age comes back too; a read
-   * thread stays read.
-   */
-  reopen(db: Db, id: string): void {
-    const at = now();
-    db.stmt("UPDATE threads SET archived_at = NULL, seen_at = CASE WHEN seen_at >= last_activity_at THEN ? ELSE seen_at END, last_activity_at = ?, updated_at = ? WHERE id = ?").run(at, at, at, id);
-  },
+  resolve: resolveThread,
+  reopen: reopenThread,
   delete(db: Db, id: string): void {
     db.transaction(() => {
       const children = db.stmt("SELECT id FROM threads WHERE parent_thread_id = ? AND parent_relation = 'subagent'").all(id);

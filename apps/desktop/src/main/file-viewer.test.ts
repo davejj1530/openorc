@@ -1,6 +1,6 @@
-import { chmod, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import type { IpcMainInvokeEvent } from "electron";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { signFileUrl } from "@openorc/core/file-url";
@@ -119,4 +119,42 @@ it("keeps programs, swapped links and missing files closed, and says so in the a
   await writeFile(join(dir, "data.bin"), Buffer.from([0, 1]));
   fake.openPath.mockResolvedValue("No application knows this file.");
   await expect(open(event("https://app.test/"), signed(join(dir, "data.bin")))).resolves.toBe("Could not open this file.");
+});
+
+it("reads a file through a distribution's share by the path main opens, and still refuses a link put in its place or in a folder above it", async () => {
+  // The core named a Linux path; main opens it somewhere else, where a real path never matches the one asked for.
+  const shared = () => ({
+    toMain: (path: string) => join(dir, path.slice("/inside/".length)),
+    toCore: (path: string) =>
+      path.startsWith(`${dir}${sep}`)
+        ? `/inside/${path
+            .slice(dir.length + 1)
+            .split(sep)
+            .join("/")}`
+        : null,
+  });
+  const ask = (path: string) => fileResponse(new Request(signed(path)), key, shared);
+  await writeFile(join(dir, "notes.txt"), "kept");
+  const served = await ask("/inside/notes.txt");
+  expect(served.status).toBe(200);
+  expect(await served.text()).toBe("kept");
+  await writeFile(join(dir, "secret.txt"), "key material");
+  await symlink(join(dir, "secret.txt"), join(dir, "swapped.png"));
+  expect((await ask("/inside/swapped.png")).status).toBe(404);
+  expect((await ask("/inside/gone.png")).status).toBe(404);
+  // The file is a real one, in a folder that was swapped for a link after the core signed its path.
+  await mkdir(join(dir, "private"));
+  await writeFile(join(dir, "private", "config"), "key material");
+  await symlink(join(dir, "private"), join(dir, "docs"));
+  expect((await ask("/inside/docs/config")).status).toBe(404);
+  expect((await ask("/inside/private/config")).status).toBe(200);
+  // Unsigned, the same path names nothing, wherever main would have opened it.
+  expect((await fileResponse(new Request(signed("/inside/notes.txt").replace("notes", "other")), key, shared)).status).toBe(403);
+
+  installFileViewer(key, () => true, shared);
+  const open = fake.ipcHandle.mock.calls.findLast((call) => call[0] === "shell:openFile")![1] as (event: IpcMainInvokeEvent, url: unknown) => Promise<string>;
+  fake.openPath.mockResolvedValue("");
+  await expect(open(event("https://app.test/"), signed("/inside/notes.txt"))).resolves.toBe("");
+  expect(fake.openPath).toHaveBeenCalledWith(join(dir, "notes.txt"));
+  await expect(open(event("https://app.test/"), signed("/inside/swapped.png"))).resolves.toBe("Could not open this file.");
 });

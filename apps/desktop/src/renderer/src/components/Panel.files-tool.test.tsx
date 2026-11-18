@@ -1,6 +1,7 @@
 import "fake-indexeddb/auto";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FileVersion, FolderPath, WORKSPACE_ID, type FileRead, type FindResult, type Project, type RpcMethod, type RpcParams, type RpcResults, type ThreadSummary } from "@openorc/protocol";
 import { NewFileDialog } from "../dialogs/NewFileDialog";
@@ -16,7 +17,9 @@ import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 import { useRouter } from "../lib/router";
 import type { CodeEditorProps } from "./code-editor";
+import { Composer } from "./Composer";
 import { Panel } from "./Panel";
+import { messageOf } from "./composer-editor/testing";
 
 vi.mock("../lib/window", () => ({ useTrafficLights: () => false, useWindowsControls: () => false }));
 vi.mock("./code-editor", () => ({
@@ -631,4 +634,86 @@ it("says once why a folder's files can't be read here, with Retry only where try
   answerList = null;
   fireEvent.click(retry);
   expect(await within(tree).findByRole("treeitem", { name: "src" })).toBeTruthy();
+});
+
+/** A composer searching the conversation's folder, as the one beside the Files tool does. */
+function ConversationComposer() {
+  const [value, setValue] = useState("");
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Composer
+        value={value}
+        onChange={setValue}
+        onSubmit={async () => {}}
+        placeholder="Message"
+        model={null}
+        onModel={() => {}}
+        mode="act"
+        onMode={() => {}}
+        permission="trusted"
+        onPermission={() => {}}
+        location={{ label: null, branch: null }}
+        fileSearch={{ kind: "thread", id: thread.id }}
+      />
+    </QueryClientProvider>
+  );
+}
+
+/** Drags a row of the Files tool onto the composer and lets go. */
+function dragToComposer(handle: Element) {
+  const composer = document.querySelector(".composer-shell")!;
+  const data = new Map<string, string>();
+  const dataTransfer = {
+    effectAllowed: "all",
+    dropEffect: "none",
+    items: [],
+    files: [],
+    types: [] as string[],
+    setData: (type: string, value: string) => data.set(type, value),
+    getData: (type: string) => data.get(type) ?? "",
+  };
+  Object.defineProperty(dataTransfer, "types", { get: () => [...data.keys()] });
+  fireEvent.dragStart(handle, { dataTransfer });
+  expect(dataTransfer.effectAllowed).toBe("copy");
+  fireEvent.dragEnter(composer, { dataTransfer });
+  fireEvent.dragOver(composer, { dataTransfer });
+  fireEvent.drop(composer, { dataTransfer });
+  fireEvent.dragEnd(handle, { dataTransfer });
+}
+
+const prompt = () => screen.getByRole("textbox", { name: "Message" });
+
+it("drags a file or folder from the tree into the conversation's composer as its path", async () => {
+  useLayout.setState({ panelOpen: true });
+  render(
+    <>
+      <Window />
+      <ConversationComposer />
+    </>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Files" }));
+  fireEvent.click(await screen.findByRole("treeitem", { name: "src" }));
+  dragToComposer((await screen.findByRole("treeitem", { name: "cart.ts" })).querySelector(".file-tree-row")!);
+  dragToComposer(screen.getByRole("treeitem", { name: "src" }).querySelector(".file-tree-row")!);
+  expect(messageOf(prompt())).toBe("src/cart.ts src/ ");
+});
+
+it("drags a file found by name into the composer, from the open folders and from the rest of the project", async () => {
+  disk.set("docs/cart-notes.md", "# Cart\n");
+  useLayout.setState({ panelOpen: true });
+  render(
+    <>
+      <Window />
+      <ConversationComposer />
+    </>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Files" }));
+  fireEvent.click(await screen.findByRole("treeitem", { name: "src" }));
+  await screen.findByRole("treeitem", { name: "cart.ts" });
+  fireEvent.change(await search(), { target: { value: "cart" } });
+  const tree = await screen.findByRole("group", { name: "In open folders" });
+  dragToComposer(await within(tree).findByRole("button", { name: "src/cart.ts" }));
+  const elsewhere = screen.getByRole("region", { name: "More in the project" });
+  dragToComposer(within(elsewhere).getByRole("button", { name: "docs/cart-notes.md" }));
+  expect(messageOf(prompt())).toBe("src/cart.ts docs/cart-notes.md ");
 });

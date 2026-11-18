@@ -10,6 +10,8 @@ interface WindowState {
 export const useWindow = create<WindowState>(() => ({ fullscreen: false, controls: { left: 0, right: 0 } }));
 
 export function installWindowState(): void {
+  // Styles that differ by OS key on this, such as the select list Windows and Linux draw in the page.
+  document.documentElement.dataset.platform = platform;
   const syncChrome = () => {
     void window.openorc.syncWindowChrome().then((zoom) => {
       document.documentElement.style.setProperty("--window-zoom", String(zoom));

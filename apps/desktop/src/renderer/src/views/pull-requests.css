@@ -1,40 +1,37 @@
-/* Pull request rows: two lines on the ground with no rules between them, the glyph in the lead slot, then status as a
-   dot and a word, the diff, the age and the move in fixed columns, so each lines up down the page. */
+/* Pull request rows: rounded two-line rows on the tile with no rules between them. The state's glyph leads, then status
+   as a dot and a word, the size, comments and age, and the move in fixed columns, so each lines up down the page; hover
+   is the fill step. */
 .pull-list {
   display: flex;
   flex-direction: column;
+  gap: 16px;
 }
 
-.pull-row {
+.pull-row-item {
+  /* The move's column: wide enough for "Finish review", or Review and the reviewer's key; empty on a row whose move
+     is not the person's. */
+  --pull-move: 188px;
+  position: relative;
   display: flex;
   min-width: 0;
-  min-height: 60px;
   align-items: center;
   gap: 12px;
   padding-right: 12px;
   border-radius: var(--radius-lg);
   transition: background-color var(--duration-leave) var(--ease-out);
 }
-.pull-row:hover {
+.pull-row-item:hover {
   background: var(--surface-2);
 }
-.pull-row-open {
+.pull-row {
   display: flex;
   flex: 1;
   min-width: 0;
-  align-self: stretch;
+  min-height: 58px;
   align-items: center;
-  gap: var(--list-lead-gap);
-  padding: 8px 0 8px 12px;
+  gap: 14px;
+  padding: 9px 0 9px 12px;
   text-align: left;
-}
-.pull-row-lead {
-  display: grid;
-  width: var(--list-lead);
-  height: 20px;
-  flex-shrink: 0;
-  align-self: flex-start;
-  place-items: center;
 }
 .pull-row-status {
   display: inline-flex;
@@ -43,25 +40,11 @@
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
-  margin-left: 12px;
   font-size: var(--text-sm);
 }
-.pull-row-diff {
-  width: 88px;
-  flex-shrink: 0;
-  margin-left: 12px;
-  font-size: var(--text-sm);
-  text-align: right;
-  white-space: nowrap;
-}
-.pull-row-age {
-  width: 64px;
-  margin-left: 12px;
-}
-/* Wide enough for "Finish review", or Review and the reviewer's key; empty on a row whose move is not the person's. */
 .pull-row-move {
   display: flex;
-  width: 188px;
+  width: var(--pull-move);
   flex-shrink: 0;
   justify-content: flex-end;
   gap: 6px;
@@ -70,4 +53,397 @@
   max-width: 88px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Copy link and open in a new tab: shown on hover or keyboard focus, in the place of the time the row was updated,
+   which is the last column before the move's. */
+.pull-row-actions {
+  position: absolute;
+  top: 50%;
+  right: calc(var(--pull-move) + 24px);
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity var(--duration-leave) var(--ease-out);
+}
+.pull-row-item:hover > .pull-row-actions,
+.pull-row-item:focus-within > .pull-row-actions {
+  opacity: 1;
+}
+.pull-row-item:hover .pull-row-time,
+.pull-row-item:focus-within .pull-row-time {
+  visibility: hidden;
+}
+
+/* As tall as the title's line, so the glyph sits on it. */
+.pull-row-mark {
+  width: 16px;
+  height: 20px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  display: grid;
+  place-items: center;
+}
+
+/* A label after the title: its GitHub color as a dot, then its name, quieter than the title. */
+.pull-label {
+  display: inline-flex;
+  max-width: 128px;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.pull-label-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--ink-4);
+}
+
+/* State glyphs in the tones the list has always used: open is ok, merged full ink, closed bad,
+   a draft faint. */
+.pull-glyph-open {
+  color: var(--ok);
+}
+.pull-glyph-draft {
+  color: var(--ink-4);
+}
+.pull-glyph-merged {
+  color: var(--ink);
+}
+.pull-glyph-closed {
+  color: var(--bad);
+}
+.pull-glyph-any {
+  color: var(--ink-3);
+}
+
+/* A person's face: their initial on a soft wash of their own hue, readable in either theme. */
+.pull-face {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--ink-2);
+  line-height: 1;
+}
+.pull-faces {
+  display: inline-flex;
+}
+.pull-faces > .pull-face {
+  box-shadow: 0 0 0 1.5px var(--control-fill);
+}
+.pull-faces > .pull-face + .pull-face {
+  margin-left: -5px;
+}
+
+/* The title: "Pull requests / ★ Bug squad", the view's name opening its menu. */
+.pull-crumbs {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+.pull-crumb-root {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.pull-crumb {
+  display: inline-flex;
+  min-width: 0;
+  height: 28px;
+  align-items: center;
+  gap: 6px;
+  margin-left: -2px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.pull-crumb:hover,
+.pull-crumb[data-popup-open] {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.pull-crumb:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.pull-default-star {
+  color: var(--navigation-ink);
+  fill: currentColor;
+}
+.pull-edited {
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--navigation-soft);
+  color: var(--navigation-ink);
+  font-size: var(--text-xs);
+  line-height: 20px;
+}
+.pull-view-menu {
+  min-width: 248px;
+}
+
+/* State tabs on the left of one underlined row, the filter and sort tools on its right. */
+.pull-toolbar {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 4px 16px;
+  margin-bottom: 12px;
+  box-shadow: inset 0 calc(-1 * var(--hairline)) 0 var(--line);
+}
+.pull-state-tabs {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 0 22px;
+}
+.pull-state-tab {
+  display: inline-flex;
+  height: 40px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 1px;
+  color: var(--ink-3);
+  font-size: var(--text-base);
+  box-shadow: inset 0 -2px 0 transparent;
+  transition:
+    color var(--duration-leave) var(--ease-out),
+    box-shadow var(--duration-leave) var(--ease-out);
+}
+.pull-state-tab:hover {
+  color: var(--ink);
+}
+.pull-state-tab[aria-pressed="true"] {
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--ink);
+}
+.pull-state-tab:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+.pull-state-count {
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.pull-toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  padding-bottom: 6px;
+}
+.pull-tool {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  border-radius: var(--radius-md);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.pull-tool:hover:not(:disabled),
+.pull-tool[data-popup-open] {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.pull-tool:disabled {
+  color: var(--ink-4);
+}
+.pull-tool:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.pull-tool-set {
+  color: var(--navigation-ink);
+}
+
+/* The filters set, one quiet token each under the tabs. */
+.pull-tokens {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -2px 0 12px;
+}
+.pull-token {
+  display: inline-flex;
+  max-width: 340px;
+  height: 26px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 3px 0 10px;
+  border-radius: var(--radius-md);
+  background: var(--control-fill);
+  font-size: var(--text-sm);
+}
+.pull-token .pull-palette-dot {
+  width: 7px;
+  height: 7px;
+  margin: 0;
+}
+.pull-token-x {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--ink-4);
+  transition:
+    background-color var(--duration-leave) var(--ease-out),
+    color var(--duration-leave) var(--ease-out);
+}
+.pull-token-x:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.pull-token-x:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/* The filter palette: a field across the top, grouped rows that scroll under it, and the keys
+   along the bottom. */
+.pull-palette {
+  width: 440px;
+  max-width: calc(100vw - 32px);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.pull-palette-field {
+  display: flex;
+  flex-shrink: 0;
+  height: 50px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  box-shadow: inset 0 calc(-1 * var(--hairline)) 0 var(--line);
+}
+.pull-palette-field input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-md);
+  outline: none;
+}
+.pull-palette-field input::placeholder {
+  color: var(--ink-4);
+}
+.pull-palette-list {
+  max-height: min(360px, calc(var(--available-height) - 120px));
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+}
+.pull-palette-group + .pull-palette-group {
+  margin-top: 4px;
+}
+.pull-palette-label {
+  padding: 4px 4px 2px;
+}
+/* A group's header folds it away; folded, it says how many rows it holds. */
+.pull-palette-fold {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 6px 0 4px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  transition:
+    background-color var(--duration-leave) var(--ease-out),
+    color var(--duration-leave) var(--ease-out);
+}
+.pull-palette-fold:hover {
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.pull-palette-fold:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.pull-palette-chevron {
+  transition: transform var(--duration-leave) var(--ease-out);
+}
+.pull-palette-chevron-folded {
+  transform: rotate(-90deg);
+}
+.pull-palette-hidden {
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  text-align: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pull-palette-chevron {
+    transition: none;
+  }
+}
+.pull-palette-item {
+  gap: 10px;
+}
+.pull-palette-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  margin: 0 5.5px;
+  border-radius: var(--radius-pill);
+  background: var(--ink-4);
+}
+.pull-palette-blank {
+  width: 20px;
+  flex-shrink: 0;
+}
+.pull-palette-more {
+  display: grid;
+  place-items: center;
+  color: var(--ink-4);
+}
+.pull-palette .menu-empty {
+  padding: 10px 16px;
+}
+
+/* Sort's reactions, a row of emoji as on GitHub. */
+.page-filter-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 0 4px 2px;
+}
+.page-filter-reaction {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  cursor: default;
+  outline: none;
+}
+.page-filter-reaction[data-highlighted] {
+  background: var(--surface-2);
+}
+.page-filter-reaction-chosen {
+  box-shadow: inset 0 0 0 1.5px var(--navigation-ink);
 }

@@ -10,6 +10,7 @@ import {
   ompConnectorDriver,
   openCodeConnectorDriver,
   readableConnectorError,
+  captureLaunchEnvironment,
   type AgentLaunchEnvironment,
   type ConnectorDriver,
   type ConnectorRow,
@@ -18,6 +19,9 @@ import { harnessName, type AgentConnector, type Connector, type ConnectorList, t
 import { iconImage, LOGO_BYTES, logoSource, SiteLogos } from "./connector-logos.js";
 import { nothingRemembered, type RememberedConnectors } from "./remembered-connectors.js";
 import type { AppSettingsService } from "./settings.js";
+import type { ClaudeAccountService } from "./claude-accounts.js";
+import type { EnvSnapshot } from "./shell-environment.js";
+import { claudeAccounts as storedClaudeAccounts, type Db } from "@openorc/db";
 
 type Launch = Pick<AgentLaunchEnvironment, "binary" | "env">;
 
@@ -41,6 +45,29 @@ export interface ConnectorPlaces {
   pi(): Launch;
   antigravity(): Launch;
   fx(): Launch;
+}
+
+/** Where each agent answers about connectors: Codex, OpenCode, Oh My Pi and every enabled Claude account. */
+export function connectorPlaces(db: Db, environment: () => EnvSnapshot, accounts: ClaudeAccountService): ConnectorPlaces {
+  return {
+    claudeAccounts: () =>
+      storedClaudeAccounts.list(db).flatMap((account) => {
+        if (!account.enabled) return [];
+        try {
+          return [{ id: account.id, name: account.name, launch: captureLaunchEnvironment("claude", accounts.environment(environment(), account.id)) }];
+        } catch {
+          return [];
+        }
+      }),
+    claudeLogin: () => captureLaunchEnvironment("claude", environment()),
+    codex: () => captureLaunchEnvironment("codex", environment()),
+    opencode: () => captureLaunchEnvironment("opencode", environment()),
+    omp: () => captureLaunchEnvironment("omp", environment()),
+    cursor: () => captureLaunchEnvironment("cursor", environment()),
+    pi: () => captureLaunchEnvironment("pi", environment()),
+    antigravity: () => captureLaunchEnvironment("antigravity", environment()),
+    fx: () => captureLaunchEnvironment("fx", environment()),
+  };
 }
 
 export interface ConnectorDrivers {

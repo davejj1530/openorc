@@ -1,14 +1,14 @@
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { closeCoreForUpdate } from "./update-handoff";
+import { closeCore, closeCoreForUpdate } from "./update-handoff";
 
 class Child extends EventEmitter {
-  request: { type: string; id: string } | null = null;
-  postMessage(message: { type: string; id: string }) {
+  request: { type: string; id: string; purpose?: string } | null = null;
+  postMessage(message: { type: string; id: string; purpose?: string }) {
     this.request = message;
   }
-  reply(type: string, reason?: string) {
-    this.emit("message", { type, id: this.request?.id, reason });
+  reply(type: string, reason?: string, more: object = {}) {
+    this.emit("message", { type, id: this.request?.id, reason, ...more });
   }
 }
 afterEach(() => vi.useRealTimers());
@@ -52,5 +52,49 @@ describe("update shutdown handoff", () => {
     child.reply("update:prepared");
     child.emit("exit", 0);
     expect(child.listenerCount("exit")).toBe(0);
+  });
+
+  it("asks for a switch by name, and says whether a refusal passes by itself", async () => {
+    const child = new Child();
+    const busy = closeCore(child, "switch");
+    expect(child.request?.purpose).toBe("switch");
+    child.reply("update:blocked", "OpenOrc is processing a request. Try again in a moment.", { retry: true });
+    await expect(busy).resolves.toEqual({ reason: "OpenOrc is processing a request. Try again in a moment.", retry: true });
+    const working = closeCore(child, "switch");
+    child.reply("update:blocked", "Wait for agent work to finish first, then switch.");
+    await expect(working).resolves.toEqual({ reason: "Wait for agent work to finish first, then switch.", retry: false });
+    const update = closeCore(child, "update");
+    expect(child.request?.purpose).toBeUndefined();
+    child.reply("update:prepared");
+    child.emit("exit", 0);
+    await expect(update).resolves.toBeNull();
+  });
+
+  it("waits for a switch's core to exit however long it takes, once it has said it is closing", async () => {
+    vi.useFakeTimers();
+    const child = new Child();
+    const settled = vi.fn();
+    const result = closeCore(child, "switch", 100).then(settled);
+    child.reply("update:prepared");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(settled).not.toHaveBeenCalled();
+    child.emit("exit", 0);
+    await result;
+    expect(settled).toHaveBeenCalledWith(null);
+  });
+
+  it("gives up on a switch whose core never answers", async () => {
+    vi.useFakeTimers();
+    const child = new Child();
+    const result = expect(closeCore(child, "switch", 100)).rejects.toThrow("The core is still shutting down. OpenOrc is still running where it was.");
+    await vi.advanceTimersByTimeAsync(100);
+    await result;
+  });
+
+  it("says a switch that could not close left OpenOrc where it was", async () => {
+    const child = new Child();
+    const result = closeCore(child, "switch");
+    child.emit("exit", 1);
+    await expect(result).rejects.toThrow("The core did not confirm a clean shutdown. OpenOrc is still running where it was.");
   });
 });

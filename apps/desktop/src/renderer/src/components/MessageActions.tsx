@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { Check, Copy, GitFork } from "./icons";
 import { IconButton } from "./ui";
 import { cn } from "../lib/cn";
+import { useCopy, type CopyState } from "../lib/use-copy";
 import { relativeTime, turnStatusWords, type TurnStatus } from "@openorc/client";
 
 /** When the message landed. Hidden until hover, the way the chat apps do it. */
@@ -14,7 +15,7 @@ export function MessageTime({ at, className }: { at: number | undefined; classNa
   );
 }
 
-function copyMessageLabel(state: "idle" | "copied" | "error"): string {
+function copyMessageLabel(state: CopyState): string {
   if (state === "copied") return "Message copied";
   if (state === "error") return "Could not copy message";
   return "Copy message";
@@ -22,27 +23,10 @@ function copyMessageLabel(state: "idle" | "copied" | "error"): string {
 
 /** Copy widens just enough to say so: a fill and "Copied" in place, then it gives them back. */
 export function CopyMessage({ text }: { text: string }) {
-  const [state, setState] = useState<"idle" | "copied" | "error">("idle");
-  useEffect(() => {
-    if (state === "idle") return;
-    const timer = window.setTimeout(() => setState("idle"), 2000);
-    return () => window.clearTimeout(timer);
-  }, [state]);
+  const [state, copy] = useCopy(text);
   const label = copyMessageLabel(state);
   return (
-    <button
-      type="button"
-      aria-label={label}
-      data-tip={label}
-      data-state={state}
-      className="copy-action message-action"
-      onClick={() => {
-        void navigator.clipboard.writeText(text).then(
-          () => setState("copied"),
-          () => setState("error"),
-        );
-      }}
-    >
+    <button type="button" aria-label={label} data-tip={label} data-state={state} className="copy-action message-action" onClick={copy}>
       <span className="copy-action-glyph motion-swap" aria-hidden="true">
         <Copy size={16} aria-hidden={state === "copied" ? "true" : undefined} />
         <Check size={16} aria-hidden={state === "copied" ? undefined : "true"} />

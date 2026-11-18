@@ -545,6 +545,18 @@ importers:
         specifier: ^5.9.0
         version: 5.9.3
 
+  apps/wsl-core:
+    dependencies:
+      fastembed:
+        specifier: 2.1.0
+        version: 2.1.0(patch_hash=fd226f3b860b9f30c87a0a66ce6bd63cdbce457d46844e0e2e9f1a5e3e2e7161)
+      onnxruntime-node:
+        specifier: 1.21.0
+        version: 1.21.0
+      sqlite-vec:
+        specifier: 0.1.9
+        version: 0.1.9
+
   packages/agents:
     dependencies:
       '@agentclientprotocol/sdk':

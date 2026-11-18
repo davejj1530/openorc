@@ -306,7 +306,7 @@ export function Composer(props: ComposerProps) {
     }
     acknowledge();
   }, [submission, value, onChange, acknowledge]);
-  const drop = useComposerDrop((dropped) => void addFiles(dropped));
+  const drop = useComposerDrop((dropped) => void addFiles(dropped), props.fileSearch);
   const attachmentBlock = files.pendingReason ?? (attachments.length > 0 ? files.blocked : null);
   // A note goes where the server lets the reader post notes (`notes`), whatever holds their messages.
   const canSend = note.isNote ? Boolean(note.post) && !submitting : messageSends(props, { attachments: attachments.length, uploading, submitting, attachmentBlock });
@@ -361,7 +361,7 @@ export function Composer(props: ComposerProps) {
         }
         changes={props.changes}
       />
-      <div ref={shell} className="composer-shell" data-dragging={drop.dragging || undefined} {...drop.handlers}>
+      <div ref={shell} className="composer-shell" data-dragging={drop.hover !== null || undefined} {...drop.handlers}>
         <ComposerAsk asks={asks} label={props.asksLabel} blocked={props.asksBlocked ?? null} continues={props.askContinues} fieldHasWords={Boolean(props.value.trim())} focusField={focusField} />
         {attachments.length > 0 || uploading > 0 ? <div className="composer-attachments">{files.content}</div> : null}
         <div className="composer-prompt">
@@ -369,6 +369,7 @@ export function Composer(props: ComposerProps) {
             value={props.value}
             onChange={props.onChange}
             onSubmit={submit}
+            handle={drop.input}
             onFiles={addFiles}
             onReady={props.readOnlyReason || note.isNote ? undefined : readyForMessages(props.onReady, Boolean(props.notes))}
             draftKey={props.draftKey}
@@ -427,7 +428,7 @@ export function Composer(props: ComposerProps) {
             />
           </div>
         </div>
-        {drop.dragging ? <ComposerDropZone count={drop.count} /> : null}
+        {drop.hover ? <ComposerDropZone hover={drop.hover} /> : null}
       </div>
     </div>
   );

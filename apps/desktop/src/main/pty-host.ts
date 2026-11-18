@@ -2,6 +2,7 @@ import { statSync } from "node:fs";
 import os from "node:os";
 import { isAbsolute } from "node:path";
 import { COMMAND_SETTLE_MS, commandSettleWatcher, type CommandSettleWatcher } from "../shared/command-settle";
+import { hostDistro } from "./host";
 import { loginShellEnv } from "./shell-env";
 
 /**
@@ -92,10 +93,11 @@ export function clampSize(cols: number, rows: number): TerminalSize {
  * three things was wrong, because "could not start" reads the same for a typo
  * and for a worktree that was removed underneath the thread.
  */
-export function validateCwd(cwd: string): string {
+export function validateCwd(cwd: string, folder: (cwd: string) => string = (same) => same): string {
   if (cwd.length === 0 || cwd.includes("\0")) throw new Error("A terminal needs a directory to start in.");
+  // A path inside a WSL distribution starts with a slash, which reads as absolute on Windows too.
   if (!isAbsolute(cwd)) throw new Error(`A terminal needs an absolute directory, and ${cwd} is relative.`);
-  const stat = statSync(cwd, { throwIfNoEntry: false });
+  const stat = statSync(folder(cwd), { throwIfNoEntry: false });
   if (!stat) throw new Error(`${cwd} no longer exists, so no shell can start there.`);
   if (!stat.isDirectory()) throw new Error(`${cwd} is a file, not a directory.`);
   return cwd;
@@ -203,6 +205,8 @@ export class PtyHost {
     private readonly sink: PtySink,
     private readonly flushMs = FLUSH_MS,
     private readonly settleMs = COMMAND_SETTLE_MS,
+    /** Where main looks at a directory the window named, once the name itself has been checked. The path itself, except for a shell inside a WSL distribution. */
+    private readonly folder: (cwd: string) => string = (cwd) => cwd,
   ) {}
 
   private updating = false;
@@ -231,7 +235,7 @@ export class PtyHost {
     // Checked before the lookup: as the right-hand side of a `??` this is
     // skipped on the branch that joins an in-flight start, which is exactly
     // where a directory that went away between two opens shows up.
-    const cwd = validateCwd(input.cwd);
+    const cwd = validateCwd(input.cwd, this.folder);
     const start = this.starting.get(input.id) ?? this.begin(input.id, cwd, size);
     const session = await start.session;
     // Killed before it ever ran. Nothing was installed, so there is nothing to
@@ -480,6 +484,13 @@ export function ptyEnv(base: NodeJS.ProcessEnv, path: string | null): Record<str
   return env;
 }
 
+/** The environment wsl.exe starts with for a panel's shell. Windows hands a distribution only the variables WSLENV lists. */
+export function distroPtyEnv(base: NodeJS.ProcessEnv): Record<string, string> {
+  const env = ptyEnv(base, null);
+  env["WSLENV"] = [env["WSLENV"], "COLORTERM", "TERM_PROGRAM"].filter(Boolean).join(":");
+  return env;
+}
+
 /**
  * node-pty carries a native binding, so it loads on first use rather than at
  * startup: a missing prebuild then fails one panel with a message the panel
@@ -487,6 +498,12 @@ export function ptyEnv(base: NodeJS.ProcessEnv, path: string | null): Record<str
  */
 const spawnShell: SpawnPty = async ({ cwd, cols, rows }) => {
   const { spawn } = await import("node-pty");
+  const distro = hostDistro();
+  if (distro) {
+    // A shell inside the distribution: wsl.exe starts the account's own login shell there, which builds its own PATH.
+    const shell = distro.terminal(cwd);
+    return spawn(shell.file, shell.args, { name: "xterm-256color", cols, rows, env: distroPtyEnv(process.env), ...(shell.cwd ? { cwd: shell.cwd } : {}) });
+  }
   const { args, path } = await shellLaunch();
   return spawn(terminalShell(), args, { name: "xterm-256color", cwd, cols, rows, env: ptyEnv(process.env, path) });
 };
@@ -523,16 +540,22 @@ export function installPtyHost(ipcMain: Electron.IpcMain, options: { getWindow: 
     const contents = win.webContents;
     if (!contents.isDestroyed()) contents.send(channel, id, payload);
   };
-  const live = new PtyHost(spawnShell, {
-    data: (id, chunk) => send("terminal:data", id, chunk),
-    exit: (id, code) => send("terminal:exit", id, code),
-    // Any window may be showing a diff of the checkout the command changed, not only the terminal's own.
-    settled: (id) => {
-      for (const win of options.getWindows()) {
-        if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send("terminal:settled", id, null);
-      }
+  const live = new PtyHost(
+    spawnShell,
+    {
+      data: (id, chunk) => send("terminal:data", id, chunk),
+      exit: (id, code) => send("terminal:exit", id, code),
+      // Any window may be showing a diff of the checkout the command changed, not only the terminal's own.
+      settled: (id) => {
+        for (const win of options.getWindows()) {
+          if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send("terminal:settled", id, null);
+        }
+      },
     },
-  });
+    undefined,
+    undefined,
+    (cwd) => hostDistro()?.toHost(cwd) ?? cwd,
+  );
   host = live;
 
   ipcMain.handle("terminal:open", (_event, input: unknown) => live.open(openInput(input)));

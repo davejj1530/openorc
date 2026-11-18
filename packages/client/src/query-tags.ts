@@ -123,6 +123,8 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "inbox.list": ["inbox", "tasks"],
   // GitHub's side of a pull request, and the draft review kept here.
   "pulls.list": ["pulls"],
+  "pulls.counts": ["pulls"],
+  "pulls.choices": ["pulls"],
   "pulls.branches": ["pulls"],
   "pulls.get": ["pulls"],
   "pulls.diff": ["pulls"],

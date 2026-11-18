@@ -53,7 +53,7 @@ The `device` tool exists only on a computer with simulators or emulators. It ref
 `thread_send` has three more rules:
 
 - A message to a conversation in the same or a stricter mode is allowed. That conversation acts under its own permissions, so it can do nothing the sender could not.
-- A chain of agent messages stops after 20 messages in a row with no one writing in between. The count is per conversation and kept in memory. A message from a person, in the app, Slack or a schedule, resets it.
+- A chain of agent messages stops after 50 messages in a row with no one writing in between. The count is per conversation and kept in memory. A message from a person, in the app, Slack or a schedule, resets it.
 - A retried call with the same `request_key` is delivered once. Without a key, the same text to the same conversation from the same run counts as a retry.
 
 ## Memory and passwords

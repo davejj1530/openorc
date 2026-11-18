@@ -386,8 +386,8 @@ describe("a project only OpenOrc Cloud has", () => {
     const calls: { cwd: string; args: string[] }[] = [];
     const gh: GhRunner = async (cwd, args) => {
       calls.push({ cwd, args });
-      if (args[0] === "api") return "ada\n";
-      return args[1] === "list" ? "[]" : detail("h".repeat(40), "b".repeat(40));
+      if (args[0] === "api") return args[1] === "user" ? "ada\n" : JSON.stringify({ data: { repository: { pullRequests: { nodes: [] } } } });
+      return detail("h".repeat(40), "b".repeat(40));
     };
     const service = new PullRequestService(Db.memory(), {
       dataDir: root,
@@ -408,10 +408,8 @@ describe("a project only OpenOrc Cloud has", () => {
     const key = { projectId: cloudProject.id, number: 7 };
     expect(await service.list(cloudProject.id, "open")).toEqual([]);
     expect(await service.get(key)).toMatchObject({ number: 7 });
-    expect(calls.filter((call) => call.args[0] === "pr").map((call) => call.args.slice(call.args.indexOf("--repo"), call.args.indexOf("--repo") + 2))).toEqual([
-      ["--repo", "acme/app"],
-      ["--repo", "acme/app"],
-    ]);
+    expect(calls.filter((call) => call.args[0] === "pr").map((call) => call.args.slice(call.args.indexOf("--repo"), call.args.indexOf("--repo") + 2))).toEqual([["--repo", "acme/app"]]);
+    expect(calls.find((call) => call.args[1] === "graphql")!.args).toEqual(expect.arrayContaining(["owner=acme", "repo=app"]));
     expect(service.review(key)).toBeNull();
     await expect(service.start(key, { agent: "claude", model: "claude-opus-5-5", effort: null, fastMode: false })).rejects.toThrow(PULL_REVIEW_NEEDS_FOLDER);
     expect(() => service.comment({ ...key, commitId: "h".repeat(40), ...yours })).toThrow(PULL_REVIEW_NEEDS_FOLDER);

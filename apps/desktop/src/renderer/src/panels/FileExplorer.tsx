@@ -4,6 +4,7 @@ import { FileGlyph } from "../components/FileGlyph";
 import { ChevronRight, Folder, Search } from "../components/icons";
 import { Input } from "../components/ui";
 import { isAbsoluteFilePath, ROOT_FOLDERS, relativeFilePath, useFileExplorer } from "../lib/file-explorer";
+import { startFileDrag } from "../lib/file-drag";
 import { EMPTY_SEARCH, filesKey, useFilesFocus, useFilesToolState, type FilesTool } from "../lib/files-tool";
 import { useLayout } from "../lib/layout";
 import { useRpc } from "../lib/client";
@@ -130,7 +131,14 @@ function TreeEntry({ entry, level, tree }: { entry: FileEntry; level: number; tr
         else useLayout.getState().openFile({ path: entry.path, scope: tree.scope });
       }}
     >
-      <div className={entry.ignored ? "file-tree-row file-tree-ignored" : "file-tree-row"} data-tip={entry.path} style={{ paddingLeft: 8 + (level - 1) * 14 }}>
+      {/* The row, not the item, is what drags: the item holds an open folder's whole subtree. */}
+      <div
+        className={entry.ignored ? "file-tree-row file-tree-ignored" : "file-tree-row"}
+        data-tip={entry.path}
+        style={{ paddingLeft: 8 + (level - 1) * 14 }}
+        draggable
+        onDragStart={(event) => startFileDrag(event.dataTransfer, tree.scope, entry.path, folder)}
+      >
         {folder ? <ChevronRight size={12} className={expanded ? "rotate-90" : ""} /> : <span className="w-3 shrink-0" />}
         {folder ? <Folder size={14} className="file-tree-folder" /> : <FileGlyph path={entry.path} size={14} />}
         <span className="truncate">{entry.name}</span>

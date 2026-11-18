@@ -1,0 +1,12 @@
+{
+  "name": "@openorc/wsl-core",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "description": "The native modules the desktop core loads inside a WSL distribution, which the Windows app carries (apps/desktop/scripts/build-wsl-core.mjs).",
+  "dependencies": {
+    "fastembed": "2.1.0",
+    "onnxruntime-node": "1.21.0",
+    "sqlite-vec": "0.1.9"
+  }
+}

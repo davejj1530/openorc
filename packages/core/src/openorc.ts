@@ -18,7 +18,7 @@ import {
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { busyReason, fenceForUpdate, type BusyReason } from "./activity.js";
+import { busyReason, fenceForSwitch, fenceForUpdate, type BusyReason } from "./activity.js";
 import { BenchGenerator } from "./bench.js";
 import { DeviceService } from "./devices/service.js";
 import { FrameCoalescer } from "./frames.js";
@@ -33,7 +33,7 @@ import { createBenchHandlers } from "./handlers/bench.js";
 import { createCatalogHandlers } from "./handlers/catalog.js";
 import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
 import { createConnectorHandlers } from "./handlers/connectors.js";
-import { ConnectorService, type ConnectorPlaces } from "./services/connectors.js";
+import { ConnectorService, connectorPlaces } from "./services/connectors.js";
 import { accountFor } from "./services/openorc-account.js";
 import { HostedSkills } from "./services/hosted-skills.js";
 import { createHostedSkillsCloudHandlers } from "./handlers/hosted-skills-cloud.js";
@@ -114,7 +114,7 @@ import { RunService, type Notification, type RunHooks } from "./services/runs.js
 import { ScheduleService } from "./services/schedules.js";
 import { OrclingWakeService } from "./services/orcling-wakes.js";
 import { AppSettingsService } from "./services/settings.js";
-import { ShellEnvironment, inheritedProbe, type EnvSnapshot } from "./services/shell-environment.js";
+import { ShellEnvironment, inheritedProbe } from "./services/shell-environment.js";
 import { SlackService } from "./services/slack/service.js";
 import { SystemService } from "./services/system.js";
 import { TaskCheckoutService } from "./services/task-checkout.js";
@@ -135,29 +135,6 @@ import { startCoreMcp } from "./mcp-host/core-tools.js";
  * The renderer talks to it only through `handle`, so every capability is a
  * validated method and every push is a typed message.
  */
-/** Where each agent answers about connectors: Codex, OpenCode, Oh My Pi and every enabled Claude account. */
-function connectorPlaces(db: Db, environment: () => EnvSnapshot, accounts: ClaudeAccountService): ConnectorPlaces {
-  return {
-    claudeAccounts: () =>
-      storedClaudeAccounts.list(db).flatMap((account) => {
-        if (!account.enabled) return [];
-        try {
-          return [{ id: account.id, name: account.name, launch: captureLaunchEnvironment("claude", accounts.environment(environment(), account.id)) }];
-        } catch {
-          return [];
-        }
-      }),
-    claudeLogin: () => captureLaunchEnvironment("claude", environment()),
-    codex: () => captureLaunchEnvironment("codex", environment()),
-    opencode: () => captureLaunchEnvironment("opencode", environment()),
-    omp: () => captureLaunchEnvironment("omp", environment()),
-    cursor: () => captureLaunchEnvironment("cursor", environment()),
-    pi: () => captureLaunchEnvironment("pi", environment()),
-    antigravity: () => captureLaunchEnvironment("antigravity", environment()),
-    fx: () => captureLaunchEnvironment("fx", environment()),
-  };
-}
-
 export class OpenOrc {
   readonly slack: SlackService;
   readonly db: Db;
@@ -673,6 +650,11 @@ export class OpenOrc {
     const refusal = fenceForUpdate(this);
     if (refusal === null) this.closingForUpdate = true;
     return refusal;
+  }
+
+  /** The same before the desktop starts its core somewhere else, such as inside a WSL distribution: this one stays closed until someone switches back. */
+  prepareForSwitch(): string | null {
+    return fenceForSwitch(this);
   }
 
   async close(): Promise<void> {

@@ -9,6 +9,7 @@ import { useLayout, type FileSelection } from "../lib/layout";
 import { citationLinks, type Block } from "@openorc/client";
 import { Button } from "./ui";
 import { RichText } from "./RichText";
+import { codePathLinks } from "../lib/code-path-links";
 import { rehypeMentionNames } from "../lib/mention-names";
 import { CoversPreview } from "../lib/browser-preview";
 import { ImageDownload } from "./ImageDownload";
@@ -254,11 +255,24 @@ export const threadMarkdownComponents: Components = {
 export const threadUrlTransform: UrlTransform = (url, key, node) => (localPath(url) || imageSource(url) ? url : defaultUrlTransform(url, key, node));
 
 /** Resolve relative citations in the workspace before Markdown's URL sanitizer runs. */
-export function ThreadRichText(props: StreamdownProps) {
-  const { basePath, fileLinks, mentionNames } = useContext(MediaContext);
+export function ThreadRichText({
+  codePaths = false,
+  ...props
+}: StreamdownProps & {
+  /**
+   * Inline code that names a file links to it. Only an agent's own words ask: it writes paths from the folder it works
+   * in, while a document's or a fetched page's are from somewhere else, such as the repository's root for a file under
+   * docs/, or another project altogether.
+   */
+  codePaths?: boolean;
+}) {
+  const { basePath, fileScope, fileLinks, mentionNames } = useContext(MediaContext);
+  // A path in inline code is a link only where a link can open it: in the Files tool, or in the folder it is in.
+  const pathLinks = Boolean(codePaths) && fileLinks !== "cite" && Boolean(fileScope || basePath);
   const rehypePlugins = useMemo<NonNullable<StreamdownProps["rehypePlugins"]>>(() => {
     const plugins: NonNullable<StreamdownProps["rehypePlugins"]> = [
       defaultRehypePlugins.raw!,
+      ...(pathLinks ? [codePathLinks] : []),
       [localFileLinks, { basePath, cite: fileLinks === "cite" }],
       ...Object.entries(defaultRehypePlugins)
         .filter(([name]) => name !== "raw")
@@ -268,7 +282,7 @@ export function ThreadRichText(props: StreamdownProps) {
     // serializes as {}, which would reuse names from another conversation.
     if (mentionNames?.size) plugins.push([rehypeMentionNames, { names: [...mentionNames] }]);
     return plugins;
-  }, [basePath, fileLinks, mentionNames]);
+  }, [basePath, fileLinks, mentionNames, pathLinks]);
   const text = typeof props.children === "string" ? citationLinks(props.children) : props.children;
   return (
     <RichText {...props} components={threadMarkdownComponents} rehypePlugins={rehypePlugins} urlTransform={threadUrlTransform}>

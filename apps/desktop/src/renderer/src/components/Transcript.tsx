@@ -612,7 +612,7 @@ function ReplyMessage({ block, actions }: { block: Extract<Block, { kind: "messa
   return (
     <div className="group journal-message journal-response">
       <div className="text-prose text-ink prose-chat">
-        <ThreadRichText mode="streaming" isAnimating={block.streaming} animated={wordFade}>
+        <ThreadRichText mode="streaming" isAnimating={block.streaming} animated={wordFade} codePaths>
           {block.text}
         </ThreadRichText>
       </div>

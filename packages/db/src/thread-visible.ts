@@ -1,3 +1,4 @@
+import type { Db } from "./database.js";
 import { retiredThreadIds } from "./retired-teams.js";
 
 /**
@@ -12,3 +13,8 @@ const ARRIVING = `WITH RECURSIVE arriving(member) AS (
 
 /** The threads a person's lists read: raw rows remain available internally, but retired and arriving ones are left out. */
 export const VISIBLE = `id NOT IN (${retiredThreadIds}) AND id NOT IN (${ARRIVING})`;
+
+/** The threads hidden while they arrive, read on their own for a query that can't nest the search (thread-list-tree.ts). */
+export function arrivingThreadIds(db: Db): string[] {
+  return (db.stmt(ARRIVING).all() as { member: string }[]).map((row) => row.member);
+}

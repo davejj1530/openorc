@@ -44,7 +44,8 @@ export type OutputView =
   | { kind: "diff"; patch: string }
   | { kind: "tests"; tally: TestTally; text: string }
   | { kind: "json"; json: string }
-  | { kind: "markdown"; text: string }
+  /** `fetched` when the text is what a fetch brought back, whose paths are another project's, not an agent's own words. */
+  | { kind: "markdown"; text: string; fetched: boolean }
   | { kind: "text"; text: string };
 
 type Input = Record<string, unknown>;
@@ -405,6 +406,7 @@ export function toolOutputView(block: ToolBlock, raw: string): OutputView | null
   }
   const paths = /^(grep|glob)$/i.test(name) ? fileList(text) : null;
   if (paths) return { kind: "files", paths };
-  if (/^(task|agent|webfetch|fetch)$/i.test(name)) return { kind: "markdown", text };
+  if (/^(task|agent)$/i.test(name)) return { kind: "markdown", text, fetched: false };
+  if (/^(webfetch|fetch)$/i.test(name)) return { kind: "markdown", text, fetched: true };
   return json(text) ?? { kind: "text", text };
 }

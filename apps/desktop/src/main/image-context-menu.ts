@@ -29,7 +29,9 @@ function imageFilename(source: string): string | null {
   return null;
 }
 
-async function imageBytes(source: string, dataDir: string): Promise<Uint8Array> {
+type ReadAsset = (request: Request) => Promise<Response>;
+
+async function imageBytes(source: string, read: ReadAsset): Promise<Uint8Array> {
   if (source.startsWith("data:")) {
     const data = source.slice(source.indexOf(",") + 1);
     if (data.length > Math.ceil(maxImageBytes / 3) * 4) throw new Error("Image exceeds 32 MB.");
@@ -38,12 +40,12 @@ async function imageBytes(source: string, dataDir: string): Promise<Uint8Array> 
     if (!bytes.length || bytes.length > maxImageBytes) throw new Error("The image data is unavailable or exceeds 32 MB.");
     return bytes;
   }
-  const response = await imageAssetResponse(new Request(source), dataDir);
+  const response = await read(new Request(source));
   if (!response.ok) throw new Error(response.status === 413 ? "Image exceeds 32 MB." : "The image may have moved or been deleted.");
   return new Uint8Array(await response.arrayBuffer());
 }
 
-async function downloadImage(window: BrowserWindow, source: string, filename: string, dataDir: string): Promise<void> {
+async function downloadImage(window: BrowserWindow, source: string, filename: string, read: ReadAsset): Promise<void> {
   try {
     const result = await dialog.showSaveDialog(window, {
       title: "Download image",
@@ -52,7 +54,7 @@ async function downloadImage(window: BrowserWindow, source: string, filename: st
     });
     if (result.canceled || !result.filePath) return;
     // Retain the original encoding (including animation/vector data), not a screenshot.
-    const bytes = await imageBytes(source, dataDir);
+    const bytes = await imageBytes(source, read);
     await writeFile(result.filePath, bytes);
   } catch (error) {
     if (!window.isDestroyed()) {
@@ -65,8 +67,11 @@ async function downloadImage(window: BrowserWindow, source: string, filename: st
   }
 }
 
-/** Chromium supplies link destinations and image hit-test coordinates for the native menu. */
-export function installImageContextMenu(window: BrowserWindow, dataDir: string): void {
+/**
+ * Chromium supplies link destinations and image hit-test coordinates for the native menu. `read` answers the asset
+ * protocol's URLs; by default from the profile in `dataDir`.
+ */
+export function installImageContextMenu(window: BrowserWindow, dataDir: string, read: ReadAsset = (request) => imageAssetResponse(request, dataDir)): void {
   const contents = window.webContents;
   contents.on("context-menu", (_event, params) => {
     const links = linkMenuItems(window, params.linkURL);
@@ -87,7 +92,7 @@ export function installImageContextMenu(window: BrowserWindow, dataDir: string):
       {
         label: "Download image…",
         click: () => {
-          if (!window.isDestroyed()) void downloadImage(window, params.srcURL, filename, dataDir);
+          if (!window.isDestroyed()) void downloadImage(window, params.srcURL, filename, read);
         },
       },
     ]).popup({ window });

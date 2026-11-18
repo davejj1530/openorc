@@ -744,6 +744,8 @@ describe("enforced execution modes", () => {
       const tools = args[args.indexOf("--tools") + 1]!.split(",");
       expect(tools).not.toContain("Agent");
       expect(tools).toContain("Skill");
+      // Publishing writes outside the plan file, so only a plan goes without it.
+      expect(tools.includes("Artifact")).toBe(mode !== "plan");
       if (mode === "plan") {
         expect(args[args.indexOf("--permission-mode") + 1]).toBe("plan");
         expect(settings.permissions.deny).toEqual(expect.arrayContaining(["Bash", "NotebookEdit"]));
@@ -790,6 +792,42 @@ describe("Claude MCP startup", () => {
       handle.close();
       await handle.wait();
     }
+  });
+});
+
+describe("Claude Artifact tool", () => {
+  /** The arguments and Artifact switch an Autonomous launch, or a plan, starts Claude with. */
+  const launched = async (artifact: string | undefined, mode: "act" | "plan" = "act") => {
+    mockProcess();
+    const configDir = mkdtempSync(path.join(tmpdir(), "openorc-claude-artifact-"));
+    const handle = new ClaudeAdapter().start(
+      { runId: "artifact", agent: "claude", cwd: process.cwd(), prompt: "Fixture only", mode, permissionMode: mode === "plan" ? "review" : "autonomous" },
+      { ...launch, env: { ...process.env, CLAUDE_CONFIG_DIR: configDir, CLAUDE_CODE_ARTIFACT: artifact } },
+    );
+    try {
+      const [, args, options] = vi.mocked(spawn).mock.lastCall!;
+      return { args: args as string[], artifact: (options as { env: NodeJS.ProcessEnv }).env["CLAUDE_CODE_ARTIFACT"] };
+    } finally {
+      handle.close();
+      await handle.wait();
+      rmSync(configDir, { recursive: true, force: true });
+    }
+  };
+
+  it("turns on the tool print mode hides", async () => {
+    expect((await launched(undefined)).artifact).toBe("1");
+  });
+
+  it("keeps a value the user set", async () => {
+    expect((await launched("0")).artifact).toBe("0");
+  });
+
+  it("reaches an Autonomous thread through its full tool set, with no --tools list", async () => {
+    expect((await launched(undefined)).args).not.toContain("--tools");
+  });
+
+  it("stays hidden while planning", async () => {
+    expect((await launched(undefined, "plan")).artifact).toBeUndefined();
   });
 });
 

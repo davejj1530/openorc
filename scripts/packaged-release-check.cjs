@@ -117,6 +117,15 @@ function verifyNativeCode() {
   console.log(`PASS native code: none inside the archive; every executable file is signed by team ${team}`);
 }
 
+/** A Windows package carries the core it runs inside a WSL distribution. Without it the app works until someone chooses one. */
+function verifyWslCore() {
+  if (!windows) return;
+  const dir = path.join(appPath, "resources", "wsl");
+  const carried = fs.existsSync(dir) ? fs.readdirSync(dir).filter((name) => /^wsl-core-[A-Za-z0-9._-]{1,64}\.tgz$/.test(name)) : [];
+  assert.equal(carried.length, 1, `A Windows package must carry exactly one core for WSL in resources/wsl; found ${carried.length}`);
+  console.log(`PASS core for WSL: ${carried[0]}`);
+}
+
 function launch(args, extraEnv = {}) {
   const child = spawn(executable, args, { cwd: home, env: { ...env, ...extraEnv }, detached: !windows, stdio: ["ignore", "pipe", "pipe"] });
   const run = { child, output: "", exited: false };
@@ -194,6 +203,7 @@ async function verifyLaunch() {
 async function main() {
   await verifyFuses();
   verifyNativeCode();
+  verifyWslCore();
   await verifyLaunch();
 }
 

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { KeyValue } from "../scratch-store";
-import { PHONE_CLOUD_RELEASE, whatsNewAtLaunch } from "./whats-new";
+import { BUNDLE_RELEASE, PHONE_CLOUD_RELEASE, whatsNewAtLaunch } from "./whats-new";
 
 const store = (seen?: string): KeyValue & { seen: () => string | undefined } => {
   const values = new Map<string, string>(seen ? [["seen", seen]] : []);
@@ -33,5 +33,18 @@ it("waits for the cloud release, and comes to a phone that settled an earlier ve
   expect(whatsNewAtLaunch(kept, "1.2.0", true).take()).toBe(false);
   expect(kept.seen()).toBe("1.2.0");
   expect(whatsNewAtLaunch(kept, "1.4.0", true).take()).toBe(true);
-  expect(whatsNewAtLaunch(store(), null, true).take()).toBe(false);
+});
+
+it("comes once with the update's bundle to a phone that settled the 1.2.0 store build, whose store version stays", () => {
+  const kept = store("1.2.0");
+  const launch = whatsNewAtLaunch(kept, BUNDLE_RELEASE, true);
+  expect(launch.take()).toBe(true);
+  launch.close();
+  expect(whatsNewAtLaunch(kept, BUNDLE_RELEASE, true).take()).toBe(false);
+});
+
+it("never comes with the update's bundle to a fresh install with no Mac", () => {
+  const kept = store();
+  expect(whatsNewAtLaunch(kept, BUNDLE_RELEASE, false).take()).toBe(false);
+  expect(whatsNewAtLaunch(kept, BUNDLE_RELEASE, true).take()).toBe(false);
 });

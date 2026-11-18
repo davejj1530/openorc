@@ -1,7 +1,6 @@
 import { createClientState, createTeamChat, type RpcQueryOptions, type TeamChatDraftStorage } from "@openorc/client";
 import { CLOUD_THREADS, PHONE_CAPABILITIES, type AssetRef, type CloudRemoteMethod, type Project, type RemoteMethod, type RpcMethod, type RpcParams, type RpcResults } from "@openorc/protocol";
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
-import { nativeApplicationVersion } from "expo-application";
 import Constants from "expo-constants";
 import { addNetworkStateListener, getNetworkStateAsync, NetworkStateType, type NetworkState } from "expo-network";
 import { useSyncExternalStore } from "react";
@@ -35,7 +34,7 @@ import { knowCloudSender } from "./notifications/on-screen";
 import { PhoneCloud } from "./cloud/phone-cloud";
 import { RoutedConnection } from "./cloud/routed-connection";
 import { timeFrame } from "./thread/perf-probe";
-import { whatsNewAtLaunch } from "./whats-new/whats-new";
+import { BUNDLE_RELEASE, whatsNewAtLaunch } from "./whats-new/whats-new";
 
 /** The app's own key-value store on disk. Only saved Macs use it directly; the demo never touches them. */
 const kept = createMMKV({ id: "openorc" });
@@ -48,7 +47,7 @@ const macs = storedMacs(kept);
 dropSavedBrains(macs, (id) => void Promise.all([keychainKeys.remove(id), forgetDoorKey(id)]).catch(() => undefined));
 
 /** The steps on what this update brought, decided once at launch, before a pairing: due to a phone that had a Mac paired. */
-export const whatsNew = whatsNewAtLaunch(createMMKV({ id: "openorc-whats-new" }), nativeApplicationVersion, macs.list().length > 0);
+export const whatsNew = whatsNewAtLaunch(createMMKV({ id: "openorc-whats-new" }), BUNDLE_RELEASE, macs.list().length > 0);
 
 /** The phone's connection to the Mac it shows. Created at load, so the route race starts while React mounts. */
 export const link = new ConnectionManager({

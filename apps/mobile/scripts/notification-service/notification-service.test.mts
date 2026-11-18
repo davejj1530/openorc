@@ -134,7 +134,7 @@ describe.runIf(process.platform === "darwin")("the notification service extensio
     ]);
     const plain = (name: string, body: string) =>
       expect(shown.get(name)).toEqual({ name, title: "", subtitle: "", body, threadIdentifier: "", categoryIdentifier: "", userInfo: {}, asked: shown.get(name)!.asked });
-    plain("forgotten Mac", "From a Mac or account this iPhone no longer uses.");
+    plain("forgotten Mac", "From a Mac this iPhone no longer pairs with.");
     plain("newer scheme", "Update OpenOrc on this iPhone to read this.");
     for (const name of ["before first unlock", ...Object.keys(unopenable), "not ours"]) plain(name, "New activity on your Mac");
     expect(shown.get("newer scheme")!.asked).toEqual([]);

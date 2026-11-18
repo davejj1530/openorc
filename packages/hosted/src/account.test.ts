@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Account } from "./account.js";
 import { createHosted, type Hosted } from "./index.js";
 import { hostDeps, newDevice, signInAs, storedToken, type Device, type TestBrowser } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
@@ -90,6 +91,17 @@ describe("the account", () => {
     expect(account.status()).toMatchObject({ state: "signed-in", email: ADA, reach: "offline", plan: { pro: true, standing: "live" }, hours: { leftSeconds: 7_200 } });
     await stand.up();
     await vi.waitFor(() => expect(account.status()).toMatchObject({ reach: "live" }));
+  });
+
+  it("keeps nothing of an answer that arrives after its host closed", async () => {
+    const { account, hosted } = await host();
+    await signIn(account, ADA);
+    const kept = structuredClone(device.kept);
+    stand.setBilling(ADA, { pro: true, standing: "live", at: RENEWS, monthlyLeftSeconds: 7_200, packsLeftSeconds: 0 });
+    const read = (account as Account).reread();
+    hosted.close();
+    await read;
+    expect(device.kept).toEqual(kept);
   });
 
   it("forgets the token and the kept answers before it tells the server, and signs out with the server down", async () => {

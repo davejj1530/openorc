@@ -70,6 +70,7 @@ export class Account implements HostedAccount {
   #error: string | null = null;
   #announced = "";
   #personRead = 0;
+  #closed = false;
   readonly #signingIn: BrowserSignInTrip;
   readonly #signIns: SignIns;
   readonly #github: GithubConnect;
@@ -285,8 +286,9 @@ export class Account implements HostedAccount {
     return offers && toOffers(offers);
   }
 
-  /** The host is closing: nothing is watched any more. */
+  /** The host is closing: nothing is watched any more, and an answer still on its way is not kept. */
   close(): void {
+    this.#closed = true;
     this.#signingIn.forget();
     this.#paying.forget();
   }
@@ -386,6 +388,7 @@ export class Account implements HostedAccount {
 
   /** Puts what the server just answered for `email` beside what it said before, keeps it, and tells the windows. */
   #hear(email: string, parts: Partial<Omit<Heard, "email">>): void {
+    if (this.#closed) return;
     const before = this.#heard?.email === email ? this.#heard : { email, userId: null, billing: null, person: null, sandbox: null, signIns: null, ended: [], github: null };
     this.#heard = { ...before, ...parts };
     if (parts.billing) this.#paying.heard(parts.billing);

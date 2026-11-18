@@ -121,6 +121,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @openorc/desktop bundle:wsl
+        env:
+          # The core in the distribution signs in to the same OpenOrc Cloud server as the app it serves.
+          OPENORC_ACCOUNT_SERVER: ${{ secrets.OPENORC_ACCOUNT_SERVER }}
       - uses: actions/upload-artifact@v4
         with:
           name: wsl-core

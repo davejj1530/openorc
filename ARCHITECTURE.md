@@ -32,7 +32,7 @@ flowchart LR
 
 Entry points: [`main/index.ts`](apps/desktop/src/main/index.ts), [`preload/index.ts`](apps/desktop/src/preload/index.ts), [`core/index.ts`](apps/desktop/src/core/index.ts), [`renderer/src/main.tsx`](apps/desktop/src/renderer/src/main.tsx), and [`apps/mobile/index.ts`](apps/mobile/index.ts).
 
-A release build has no OpenOrc Cloud address built in yet. A development or QA build reaches the server that `OPENORC_ACCOUNT_SERVER` names, and has no account or cloud features without one.
+A build reaches the OpenOrc Cloud server that `OPENORC_ACCOUNT_SERVER` names when it is built, so the repository never names it: the release workflow passes it from a repository secret, and a development build may also read it from `apps/desktop/.env.development.local`. A development or QA build may be pointed at another server at launch. A build given none has no account or cloud features.
 
 ## Module responsibilities and seams
 

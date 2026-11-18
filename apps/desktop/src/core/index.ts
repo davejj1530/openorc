@@ -10,6 +10,7 @@ import { Worker } from "node:worker_threads";
 import type { MessagePortMain } from "electron";
 import { OpenOrc, WorkerEmbedder, WorkerFormatter, WorkerIntelligence, type Broadcast, type EnvSnapshot, type RequestOrigin, type RpcReply, type SpawnTerminal, type Transport } from "@openorc/core";
 import type { RpcRequest } from "@openorc/protocol";
+import { accountServerAt } from "../shared/account-server";
 
 /**
  * Utility-process entry. Main forks this once and hands it a MessagePort per
@@ -69,9 +70,7 @@ const opened = OpenOrc.open({
   remoteSecrets: secrets.store("remote.secrets"),
   pushSecrets: secrets.store("push.secrets"),
   accountSecrets: secrets.store("account.secrets"),
-  // No address is built in yet: a development or QA build talks to the server OPENORC_ACCOUNT_SERVER names at launch,
-  // else to the one a development build was given (electron.vite.config.ts), and to none without either.
-  accountServer: __OPENORC_QA__ ? process.env["OPENORC_ACCOUNT_SERVER"] || __OPENORC_DEV_ACCOUNT_SERVER__ || undefined : undefined,
+  accountServer: accountServerAt(__OPENORC_ACCOUNT_SERVER__, __OPENORC_QA__, process.env),
   terminal,
   presence: presence.inUse,
   trash: trash.move,

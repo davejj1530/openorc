@@ -192,6 +192,8 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          # The OpenOrc Cloud server the app is built with; the repository never names it.
+          OPENORC_ACCOUNT_SERVER: ${{ secrets.OPENORC_ACCOUNT_SERVER }}
         run: |
           if [[ "$UNSIGNED_WINDOWS_BETA" == "true" ]]; then
             export OPENORC_UNSIGNED_WINDOWS_BETA="${RELEASE_TAG#v}"

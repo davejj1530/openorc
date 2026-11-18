@@ -4,6 +4,7 @@ import { loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import typegpu from "unplugin-typegpu/vite";
+import { builtAccountServer } from "./src/shared/account-server";
 
 // Electron and native modules load at runtime instead of being bundled; they
 // carry platform binaries or resolve their own, so they must be direct
@@ -16,12 +17,13 @@ export default defineConfig(({ mode }) => {
   // Test switches (autorun, benchmarks, screenshots) exist only in development and QA builds. OPENORC_QA_BUILD=1 keeps
   // them in a production build for the benchmark job; release and local packages leave them out entirely.
   const define = { __OPENORC_QA__: JSON.stringify(mode === "development" || process.env["OPENORC_QA_BUILD"] === "1") };
-  // A development build signs in to the OpenOrc server named by OPENORC_ACCOUNT_SERVER, from the shell or from
-  // .env.development.local beside this file (git ignores it). Every other build is given none here.
-  const accountServer = mode === "development" ? (loadEnv(mode, import.meta.dirname, "OPENORC_ACCOUNT_SERVER")["OPENORC_ACCOUNT_SERVER"] ?? "") : "";
+  // The OpenOrc Cloud server comes from outside the repository: OPENORC_ACCOUNT_SERVER where the build runs (the release
+  // workflow's secret), or for development also .env.development.local beside this file (git ignores it).
+  const accountServer = builtAccountServer(mode, process.env, () => loadEnv(mode, import.meta.dirname, "OPENORC_ACCOUNT_SERVER"));
+  if (!accountServer) console.log("OPENORC_ACCOUNT_SERVER is not set: this build has no OpenOrc Cloud server.");
   return {
     main: {
-      define: { ...define, __OPENORC_DEV_ACCOUNT_SERVER__: JSON.stringify(accountServer) },
+      define: { ...define, __OPENORC_ACCOUNT_SERVER__: JSON.stringify(accountServer) },
       build: {
         rollupOptions: {
           input: {

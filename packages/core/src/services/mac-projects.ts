@@ -17,7 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import { projects, settings, type Db } from "@openorc/db";
 import { bringIntoFolder, BringRefused, git, NOT_THAT_FOLDER, packMacHistory } from "@openorc/git";
-import { githubRepoOf, type Hosted } from "@openorc/hosted";
+import { githubRepoOf, type Hosted, type WireWorkSave } from "@openorc/hosted";
 import type { BringResult, BringState, MacProjects as MacProjectsView, MacProjectSending } from "@openorc/protocol";
 
 const FOLDERS = "mac.projects.folders";
@@ -25,6 +25,7 @@ const FOLDERS = "mac.projects.folders";
 const HEADS = "mac.projects.heads";
 const STILL_WORKING = "The agent is still working. Bring its work once it stops.";
 const ELSEWHERE = "This project's folder is on another Mac.";
+const NO_COMMITS = "The thread made no commits to bring.";
 /** How long a bring waits for the thread to leave its machine with a save. */
 const CURRENT_MS = 3 * 60_000;
 /** How often a send's progress is told to the windows. */
@@ -196,10 +197,8 @@ export class MacProjects {
     const project = projects.get(this.deps.db, localId);
     if (!project || !(await stat(project.rootPath).catch(() => null))) return { mac: true, can: false, reason: `The folder ${project?.name ?? "this project"} was in isn't on this Mac anymore.` };
     const work = await hosted.macProjects.workSave(row.space, threadId);
-    if (work.working) return { mac: true, can: false, reason: STILL_WORKING };
-    if (work.save && (await git(project.rootPath, ["cat-file", "-e", `${work.save.base}^{commit}`], { okCodes: [0, 1, 128] })).code !== 0) return { mac: true, can: false, reason: NOT_THAT_FOLDER };
-    if (!work.save && work.current) return { mac: true, can: false, reason: "The thread has no work to bring yet." };
-    return { mac: true, can: true, ends: work.current ? [] : work.ends };
+    const held = await heldBy(work, project.rootPath);
+    return held ? { mac: true, can: false, reason: held } : { mac: true, can: true, ends: work.current ? [] : work.ends };
   }
 
   /**
@@ -214,7 +213,7 @@ export class MacProjects {
     if (state.ends.length && !endsOk) return { confirm: state.ends };
     const spaceId = hosted.threads.row?.(threadId).space ?? "";
     const save = (await hosted.macProjects.leave(spaceId, threadId, CURRENT_MS)).save;
-    if (!save?.bundle) throw new BringRefused("The thread made no commits to bring.");
+    if (!save?.bundle) throw new BringRefused(NO_COMMITS);
     const folder = this.folderOf(hosted.threads.row?.(threadId).projectId ?? "");
     if (!folder) throw new BringRefused(ELSEWHERE);
     const dir = await mkdtemp(path.join(os.tmpdir(), "openorc-bring-"));
@@ -241,4 +240,13 @@ export class MacProjects {
     if (!hosted || !personal) throw new Error("Sign in to OpenOrc to add a project from this Mac.");
     return { hosted, personal };
   }
+}
+
+/** Why a thread's work can't come to `folder` now, read off what it saved; null when it can. */
+async function heldBy(work: WireWorkSave, folder: string): Promise<string | null> {
+  if (work.working) return STILL_WORKING;
+  if (work.save && (await git(folder, ["cat-file", "-e", `${work.save.base}^{commit}`], { okCodes: [0, 1, 128] })).code !== 0) return NOT_THAT_FOLDER;
+  // Its newest work is saved, and holds no commits past its start: nothing would come.
+  if (work.current && !work.save?.bundle) return work.save ? NO_COMMITS : "The thread has no work to bring yet.";
+  return null;
 }

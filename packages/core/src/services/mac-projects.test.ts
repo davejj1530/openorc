@@ -205,13 +205,17 @@ describe("a thread's work brought to this Mac", () => {
     expect(asks).toEqual(["thread-1"]);
   });
 
-  it("holds Bring with why: the agent working, the folder gone, or not the thread's history", async () => {
+  it("holds Bring with why: the agent working, nothing committed, the folder gone, or not the thread's history", async () => {
     const { at, mac, work } = await broughtSetUp();
+    const saved = work.save!;
     work.working = true;
     expect(await mac.bringState("thread-1")).toEqual({ mac: true, can: false, reason: "The agent is still working. Bring its work once it stops." });
     work.working = false;
     work.save = { ...work.save!, base: "f".repeat(40) };
     expect(await mac.bringState("thread-1")).toEqual({ mac: true, can: false, reason: "This folder doesn't hold this thread's history, so its work can't come here." });
+    // Saved as it is now, with no commits past its start: nothing would come, and Bring says so before it is pressed.
+    work.save = { ...saved, bundle: false };
+    expect(await mac.bringState("thread-1")).toEqual({ mac: true, can: false, reason: "The thread made no commits to bring." });
     rmSync(at, { recursive: true, force: true });
     expect(await mac.bringState("thread-1")).toEqual({ mac: true, can: false, reason: "The folder sketches was in isn't on this Mac anymore." });
   });

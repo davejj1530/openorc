@@ -501,6 +501,71 @@
   padding: 12px 20px 20px;
 }
 
+/* The image viewer is a sheet the size of its picture, 85% of the window at most; a picture zoomed past that scrolls
+   inside it. Its zoom is one pill under the picture, with the file's path below. */
+.image-viewer {
+  --image-viewer-chrome: 148px;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: fit-content;
+  height: fit-content;
+  min-width: min(26rem, 85vw);
+  max-width: 85vw;
+  max-height: 85vh;
+  margin: auto;
+  overflow: hidden;
+  border-radius: var(--radius-3xl);
+  background: var(--surface);
+  color: var(--ink);
+  outline: none;
+}
+.image-viewer-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 12px 10px 20px;
+}
+.image-viewer-head > button {
+  align-self: center;
+}
+.image-viewer-canvas {
+  display: grid;
+  min-height: 0;
+  place-items: safe center;
+  overflow: auto;
+  padding: 0 16px;
+}
+.image-viewer-picture {
+  display: block;
+  max-width: none;
+  border-radius: var(--radius-md);
+}
+.image-viewer-picture[data-fit] {
+  max-width: calc(85vw - 32px);
+  max-height: calc(85vh - var(--image-viewer-chrome));
+  object-fit: contain;
+}
+.image-viewer-foot {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px 14px;
+}
+.image-viewer-zoom {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--control-fill);
+}
+
 /* The command palette, the app's one search: a floating plane, r20 and 600 wide, over its 30% scrim, on the
    float's hairline and shadow. A 48px field at lead size over a hairline, then 38px rows: a 15px mark, the
    label, where it lives in faint ink, and its age at the end. The highlighted row takes the fill step. */

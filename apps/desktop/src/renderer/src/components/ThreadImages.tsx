@@ -80,7 +80,7 @@ export function ThreadMedia({
         <BaseDialog.Portal>
           <CoversPreview />
           <BaseDialog.Backdrop className="fixed inset-0 z-50 bg-black/60" />
-          <BaseDialog.Popup aria-label="Image viewer" finalFocus={opener} className="fixed inset-6 z-50 flex flex-col overflow-hidden rounded-3xl bg-surface text-ink outline-none">
+          <BaseDialog.Popup aria-label="Image viewer" finalFocus={opener} className="image-viewer">
             {selected ? <ImageViewer key={selected.src} image={selected} /> : null}
           </BaseDialog.Popup>
         </BaseDialog.Portal>
@@ -94,20 +94,41 @@ function ImageViewer({ image }: { image: ImageSelection }) {
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [failed, setFailed] = useState(false);
   const zoomBy = (step: number) => setZoom((value) => Math.min(4, Math.max(0.25, (value ?? 1) + step)));
+  const zoomed = zoom !== null && size ? { width: size.width * zoom, height: size.height * zoom } : undefined;
   return (
     <>
-      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-line px-4 py-2">
-        <Image size={16} className="shrink-0 text-ink-3" />
-        <div className="min-w-24 flex-1">
-          <BaseDialog.Title className="truncate text-base">{image.label}</BaseDialog.Title>
-          <BaseDialog.Description className="whitespace-nowrap text-xs text-ink-3">{size && !image.download ? `${size.width} × ${size.height}` : "Image preview"}</BaseDialog.Description>
-        </div>
-        <div className="flex items-center gap-1">
+      <header className="image-viewer-head">
+        <BaseDialog.Title className="min-w-0 truncate text-base">{image.label}</BaseDialog.Title>
+        <BaseDialog.Description className="mr-auto shrink-0 whitespace-nowrap text-xs text-ink-3">
+          {size && !image.download ? `${size.width} × ${size.height}` : "Image preview"}
+        </BaseDialog.Description>
+        <BaseDialog.Close aria-label="Close image viewer" className="shrink-0 rounded-full p-1.5 text-ink-3 hover:bg-surface-2 hover:text-ink">
+          <X size={18} />
+        </BaseDialog.Close>
+      </header>
+      <div className="image-viewer-canvas" tabIndex={0} aria-label="Image canvas">
+        {failed ? (
+          <div role="status" className="grid gap-2 px-6 py-10 text-center text-sm text-ink-3">
+            <Image size={32} className="mx-auto" />
+            <p>Image unavailable</p>
+            <p>{image.path ? "The file may have moved, been deleted, or exceeded 32 MB." : "The image data could not be displayed."}</p>
+          </div>
+        ) : (
+          <img
+            src={image.src}
+            alt={image.label}
+            onError={() => setFailed(true)}
+            onLoad={(event) => setSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
+            className="image-viewer-picture"
+            data-fit={zoomed ? undefined : ""}
+            style={zoomed}
+          />
+        )}
+      </div>
+      <footer className="image-viewer-foot">
+        <div className="image-viewer-zoom" role="group" aria-label="Zoom">
           <Button variant="ghost" aria-label="Zoom out" disabled={failed || zoom === 0.25} onClick={() => zoomBy(-0.25)}>
             <ZoomOut size={16} />
-          </Button>
-          <Button variant="ghost" onClick={() => setZoom(null)}>
-            Fit
           </Button>
           <Button variant="ghost" aria-label="Actual size" onClick={() => setZoom(1)}>
             {zoom === null ? "100%" : `${Math.round(zoom * 100)}%`}
@@ -115,37 +136,17 @@ function ImageViewer({ image }: { image: ImageSelection }) {
           <Button variant="ghost" aria-label="Zoom in" disabled={failed || zoom === 4} onClick={() => zoomBy(0.25)}>
             <ZoomIn size={16} />
           </Button>
+          <Button variant="ghost" onClick={() => setZoom(null)}>
+            Fit
+          </Button>
           <ImageFileAction image={image} />
         </div>
-        <BaseDialog.Close aria-label="Close image viewer" className="rounded-md p-1.5 text-ink-3 hover:bg-surface-2 hover:text-ink">
-          <X size={18} />
-        </BaseDialog.Close>
-      </header>
-      <div className="min-h-0 flex-1 overflow-auto bg-surface-2 p-4" tabIndex={0} aria-label="Image canvas">
-        {failed ? (
-          <div role="status" className="grid h-full place-content-center gap-2 text-center text-sm text-ink-3">
-            <Image size={32} className="mx-auto" />
-            <p>Image unavailable</p>
-            <p>{image.path ? "The file may have moved, been deleted, or exceeded 32 MB." : "The image data could not be displayed."}</p>
-          </div>
-        ) : (
-          <div className="flex min-h-full min-w-full items-center justify-center" style={zoom !== null && size ? { width: size.width * zoom, height: size.height * zoom } : { height: "100%" }}>
-            <img
-              src={image.src}
-              alt={image.label}
-              onError={() => setFailed(true)}
-              onLoad={(event) => setSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
-              className={zoom === null ? "block max-h-full max-w-full object-contain" : "block shrink-0 max-w-none"}
-              style={zoom !== null && size ? { width: size.width * zoom, height: size.height * zoom } : undefined}
-            />
-          </div>
-        )}
-      </div>
-      {image.path ? (
-        <footer className="shrink-0 truncate border-t border-line px-4 py-2 text-xs text-ink-3" data-tip={image.path}>
-          {image.path}
-        </footer>
-      ) : null}
+        {image.path ? (
+          <p className="max-w-full truncate text-xs text-ink-3" data-tip={image.path}>
+            {image.path}
+          </p>
+        ) : null}
+      </footer>
     </>
   );
 }

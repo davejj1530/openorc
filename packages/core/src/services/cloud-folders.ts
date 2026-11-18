@@ -2,7 +2,8 @@
  * A cloud thread's files as this Mac's file browser reads them: the reading copy of the thread's newest work save
  * (CloudCopies). A read never asks anything of the machine and never waits on it: the copy is the last save, made again
  * when a newer save is there, and how old it is is the copy's own `asOf`, never passed off as live. Only the person's
- * Refresh has the machine leave with its newer work, and asks them first when that would end something running there.
+ * Refresh has the machine leave with its newer work, once a turn running there has ended, and asks them first when
+ * leaving would end something else running there.
  * (Asking on every read raced a turn starting: the machine left beneath it, and the turn was carried on as if lost.)
  */
 import { randomUUID } from "node:crypto";
@@ -14,8 +15,8 @@ import { conversationFolder, type ConversationFolder } from "./conversation-fold
 
 /** How long a copy is read as it is before its machine is asked again, so a listing's many reads ask once. */
 const CHECK_MS = 30_000;
-/** The `after` for a thread with no save yet: any save is newer. */
-const NONE = new Date(0).toISOString();
+/** How long a Refresh waits for the thread to leave with a save, a turn running there included, before it gives up. */
+const LEAVE_MS = 5 * 60_000;
 
 export class CloudFolders {
   readonly copies: CloudCopies;
@@ -92,31 +93,25 @@ export class CloudFolders {
     return writes;
   }
 
-  /** The file browser's Refresh: the copy brought up to its machine, or what that would end, named unless `endsOk`. */
+  /**
+   * The file browser's Refresh: the copy after the machine left with a save of what its folder holds, a turn there
+   * waited for, or what leaving would end, named unless `endsOk`.
+   */
   async refresh(threadId: string, endsOk: boolean): Promise<{ copy: CloudCopy } | { confirm: string[] }> {
-    const work = await this.work(threadId);
+    const hosted = this.deps.hosted();
+    if (!hosted?.threads.holds({ thread: threadId })) throw new Error("That conversation isn't on OpenOrc Cloud.");
+    const space = hosted.threads.row!(threadId).space;
+    const work = await hosted.macProjects.workSave(space, threadId);
     if (!work.current && work.ends.length && !endsOk) return { confirm: work.ends };
-    return { copy: await this.bringUp(threadId, work, !work.current) };
+    if (!work.current || work.asked) await hosted.macProjects.leave(space, threadId, LEAVE_MS);
+    const copy = await this.copies.ensure(threadId, { fresh: true });
+    this.checked.set(threadId, this.now());
+    return { copy };
   }
 
   /** A read's copy: the last save, made again only when a newer one is there. */
   private async read(threadId: string): Promise<CloudCopy> {
     const copy = await this.copies.ensure(threadId);
-    this.checked.set(threadId, this.now());
-    return copy;
-  }
-
-  private async work(threadId: string) {
-    const hosted = this.deps.hosted();
-    if (!hosted?.threads.holds({ thread: threadId })) throw new Error("That conversation isn't on OpenOrc Cloud.");
-    const space = hosted.threads.row!(threadId).space;
-    return { hosted, space, ...(await hosted.macProjects.workSave(space, threadId)) };
-  }
-
-  /** The copy, after the machine was asked to leave with its newer work when `leave`. A turn running there refuses. */
-  private async bringUp(threadId: string, work: Awaited<ReturnType<CloudFolders["work"]>>, leave: boolean): Promise<CloudCopy> {
-    const asked = leave ? await work.hosted.macProjects.ask(work.space, threadId).catch(() => null) : null;
-    const copy = await this.copies.ensure(threadId, asked?.asked ? { after: work.save?.savedAt ?? NONE } : {});
     this.checked.set(threadId, this.now());
     return copy;
   }

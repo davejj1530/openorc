@@ -18,6 +18,8 @@ const workSave = z.object({
   current: z.boolean(),
   working: z.boolean(),
   ends: z.array(z.string()),
+  /** A save someone asked for is still to be made; a server from before it names none. */
+  asked: z.boolean().optional(),
 });
 export type WireWorkSave = z.infer<typeof workSave>;
 
@@ -34,7 +36,61 @@ export const MAC_PROJECT_ROUTES = {
   remove: (projectId: string): Route<null> => ({ method: "DELETE", path: `/projects/${encodeURIComponent(projectId)}`, reply: null }),
   workSave: (threadId: string): Route<WireWorkSave> => ({ method: "GET", path: thread(threadId), reply: workSave }),
   ask: (threadId: string): Route<{ asked: boolean }> => ({ method: "POST", path: `${thread(threadId)}/ask`, reply: z.object({ asked: z.boolean() }) }),
+  withdraw: (threadId: string): Route<null> => ({ method: "DELETE", path: `${thread(threadId)}/ask`, reply: null }),
 };
+
+/** How a wait for a save reaches the server, and its clock. */
+export interface SaveAsking {
+  workSave(): Promise<WireWorkSave>;
+  ask(): Promise<{ asked: boolean }>;
+  withdraw(): Promise<void>;
+  now(): number;
+  pause(ms: number): Promise<void>;
+}
+
+/** The answer of a server asked for a save while a turn runs: ask again once it has ended. */
+const turnRunning = (error: unknown) => error instanceof Refused && error.status === 409;
+
+/**
+ * Has the thread leave its machine with a save of what its folder holds, and answers the newest save once that one is
+ * made. A turn running there goes on: the ask waits for it to end, and the server's `asked` says when the save is made
+ * (a message arriving as the thread leaves keeps the folder in use, so `current` alone may never come). A server from
+ * before `asked` is waited on until the save is current. After `ms` it gives up, and takes back an ask nothing was
+ * done about yet, so the thread doesn't leave later for a wait that ended.
+ */
+export async function leaveWithSave(calls: SaveAsking, ms: number): Promise<WireWorkSave> {
+  const until = calls.now() + ms;
+  const pending = (work: WireWorkSave) => work.asked ?? !work.current;
+  let work = await calls.workSave();
+  if (work.current && !work.asked) return work;
+  let asked = work.asked === true;
+  for (;;) {
+    if (asked) {
+      if (!pending(work)) return work;
+    } else if (!work.working) {
+      const answer = await calls.ask().catch((error: unknown) => {
+        if (turnRunning(error)) return null;
+        throw error;
+      });
+      if (answer && !answer.asked) return calls.workSave();
+      asked = answer !== null;
+    }
+    if (calls.now() > until) {
+      if (asked) await calls.withdraw().catch(() => undefined);
+      throw new SaveNotMade(work.working);
+    }
+    await calls.pause(1_000);
+    work = await calls.workSave();
+  }
+}
+
+/** A wait for a save that gave up: the turn on the machine still ran (`working`), or the save didn't come. */
+export class SaveNotMade extends Error {
+  constructor(readonly working: boolean) {
+    super(working ? "The thread's turn is still running. Try again once it ends." : "The thread didn't save its work in time. Try again.");
+    this.name = "SaveNotMade";
+  }
+}
 
 export class CloudMacProjects {
   constructor(private readonly deps: { session: Session }) {}
@@ -76,6 +132,21 @@ export class CloudMacProjects {
 
   ask(space: string, threadId: string): Promise<{ asked: boolean }> {
     return this.deps.session.in(space).request(MAC_PROJECT_ROUTES.ask(threadId));
+  }
+
+  /** The thread's newest save once it left its machine with one, a turn there waited for (leaveWithSave). */
+  leave(space: string, threadId: string, ms: number): Promise<WireWorkSave> {
+    const place = this.deps.session.in(space);
+    return leaveWithSave(
+      {
+        workSave: () => place.request(MAC_PROJECT_ROUTES.workSave(threadId)),
+        ask: () => place.request(MAC_PROJECT_ROUTES.ask(threadId)),
+        withdraw: async () => void (await place.request(MAC_PROJECT_ROUTES.withdraw(threadId))),
+        now: Date.now,
+        pause: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      },
+      ms,
+    );
   }
 
   /** The newest work save's bundle, for the caller to read under its own signal and bounds. */

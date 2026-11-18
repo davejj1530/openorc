@@ -93,12 +93,13 @@ function machine(options: { current: boolean; refuse?: boolean; ends?: string[];
         return { save: saves.at(-1)?.save ?? null, current, working: false, ends: current ? [] : (options.ends ?? []) };
       },
       bundle: async () => new Response(await readFile(saves.at(-1)!.bundle)),
-      ask: async () => {
+      // Leaving with a save, a turn there waited for: what the hosted package's wait answers once the save is made.
+      leave: async () => {
         asked.asks += 1;
-        if (options.refuse) throw new Error("A turn is running.");
+        if (options.refuse) throw new Error("The thread's turn is still running. Try again once it ends.");
         saves.push(cloudSave("second", "2026-11-18T10:05:00.000Z"));
         current = true;
-        return { asked: true };
+        return { save: saves.at(-1)!.save, current, working: false, ends: [], asked: false };
       },
     },
   } as unknown as Hosted;
@@ -193,4 +194,17 @@ it("says once why a thread's files can't be read here, with Retry only where try
   const unsaved = machine({ current: false, unsaved: true });
   expect((await unsaved.folders.of({ kind: "thread", id: ID })).unavailable).toEqual({ message: "This thread hasn't saved its work yet. Refresh has it save.", retry: false });
   expect(unsaved.asked.asks).toBe(0);
+});
+
+it("gives a Refresh's wait for the machine the words it gave up with, and the copy stays the last save", async () => {
+  const { folders, asked } = machine({ current: false, refuse: true });
+  await expect(folders.refresh(ID, true)).rejects.toThrow("The thread's turn is still running. Try again once it ends.");
+  expect(asked.asks).toBe(1);
+  expect(await fix((await folders.of({ kind: "thread", id: ID })).root)).toBe("first");
+});
+
+it("refreshes a copy whose save is current without asking the machine anything", async () => {
+  const { folders, asked } = machine({ current: true });
+  expect("copy" in (await folders.refresh(ID, false))).toBe(true);
+  expect(asked.asks).toBe(0);
 });

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { FileScope } from "@openorc/protocol";
 import { HostedControlReason } from "../components/HostedControlReason";
 import { Plus, RefreshCw } from "../components/icons";
@@ -9,37 +10,47 @@ import { CloudFilesRefresh } from "./CloudFilesRefresh";
 
 /**
  * The explorer's title and its actions. A cloud thread's files are a copy of its newest save, whose age is read once
- * they are `listed`; New file makes one on its machine once its server writes them.
+ * they are `listed`, and a Refresh of them that couldn't be done says why below; New file makes one on its machine once
+ * its server writes them.
  */
 export function FileExplorerToolbar({ scope, listed }: { scope: FileScope; listed: boolean }) {
   const thread = useRpc("threads.get", { id: scope.id }, { enabled: scope.kind === "thread" }).data;
   const cloud = scope.kind === "thread" && thread?.owner?.brain === "hosted";
   const newFileReason = useHostedCapabilities(cloud ? thread : null).reason("fileWrite");
+  // A cloud Refresh that couldn't be done, in its words, until the next press.
+  const [failed, setFailed] = useState<string | null>(null);
   return (
-    <header className="file-explorer-toolbar">
-      <span className="text-xs text-ink-3 flex-1">Explorer</span>
-      {cloud ? (
-        <CloudFilesRefresh threadId={scope.id} listed={listed} />
-      ) : (
-        <Tooltip label="Refresh files">
-          <IconButton size="xs" aria-label="Refresh files" onClick={() => void queryClient.invalidateQueries({ queryKey: ["files.list"] })}>
-            <RefreshCw size={13} />
-          </IconButton>
-        </Tooltip>
-      )}
-      {newFileReason ? (
-        <HostedControlReason label="New file" reason={newFileReason}>
-          <IconButton size="xs" aria-label="New file" disabled>
-            <Plus size={14} />
-          </IconButton>
-        </HostedControlReason>
-      ) : (
-        <Tooltip label="New file">
-          <IconButton size="xs" aria-label="New file" onClick={() => useUi.getState().setNewFile(scope)}>
-            <Plus size={14} />
-          </IconButton>
-        </Tooltip>
-      )}
-    </header>
+    <>
+      <header className="file-explorer-toolbar">
+        <span className="text-xs text-ink-3 flex-1">Explorer</span>
+        {cloud ? (
+          <CloudFilesRefresh threadId={scope.id} listed={listed} onFailed={setFailed} />
+        ) : (
+          <Tooltip label="Refresh files">
+            <IconButton size="xs" aria-label="Refresh files" onClick={() => void queryClient.invalidateQueries({ queryKey: ["files.list"] })}>
+              <RefreshCw size={13} />
+            </IconButton>
+          </Tooltip>
+        )}
+        {newFileReason ? (
+          <HostedControlReason label="New file" reason={newFileReason}>
+            <IconButton size="xs" aria-label="New file" disabled>
+              <Plus size={14} />
+            </IconButton>
+          </HostedControlReason>
+        ) : (
+          <Tooltip label="New file">
+            <IconButton size="xs" aria-label="New file" onClick={() => useUi.getState().setNewFile(scope)}>
+              <Plus size={14} />
+            </IconButton>
+          </Tooltip>
+        )}
+      </header>
+      {failed ? (
+        <p role="alert" className="file-tree-notice">
+          {failed}
+        </p>
+      ) : null}
+    </>
   );
 }

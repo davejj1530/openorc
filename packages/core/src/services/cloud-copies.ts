@@ -60,11 +60,12 @@ export class CloudCopies {
 
   /**
    * The thread's reading copy, made again only when its newest save moved on. With `after`, waits until there is a save
-   * newer than that one first. Reads asked at once share one making.
+   * newer than that one first; with `fresh`, a making begun before a save just made never stands in for it. Reads asked
+   * at once share one making.
    */
-  ensure(threadId: string, options: { after?: string } = {}): Promise<CloudCopy> {
+  ensure(threadId: string, options: { after?: string; fresh?: boolean } = {}): Promise<CloudCopy> {
     const under = this.making.get(threadId);
-    if (under && !options.after) return under;
+    if (under && !options.after && !options.fresh) return under;
     const made = (under ?? Promise.resolve()).catch(() => undefined).then(() => this.make(threadId, options.after));
     const kept = made.finally(() => {
       if (this.making.get(threadId) === kept) this.making.delete(threadId);

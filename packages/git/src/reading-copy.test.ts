@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -145,5 +145,64 @@ describe("a reading copy of a project with no folder here", () => {
     // The repository no longer has the commit.
     expect(await reason(`file://${repository("rewritten")}`)).toBe("gone");
     expect(existsSync(path.join(root, "copies", "unfetched"))).toBe(false);
+  });
+
+  it("reads this computer's sign-in for the repository once and never keeps it, so a keychain that waits can't hold the fetch", async () => {
+    const remote = repository("private");
+    const saved = save(remote, "private");
+    const projects = path.dirname(remote);
+    // The repository as GitHub serves it to a sign-in: git's own http-backend behind Basic auth.
+    const served = createServer((request, response) => {
+      if (request.headers.authorization !== `Basic ${Buffer.from("ana:secret").toString("base64")}`) return void response.writeHead(401, { "WWW-Authenticate": 'Basic realm="GitHub"' }).end();
+      const url = new URL(request.url ?? "/", "http://here");
+      const backend = spawn("git", ["http-backend"], {
+        env: {
+          ...env,
+          GIT_PROJECT_ROOT: projects,
+          GIT_HTTP_EXPORT_ALL: "1",
+          PATH_INFO: url.pathname,
+          QUERY_STRING: url.search.slice(1),
+          REQUEST_METHOD: request.method ?? "GET",
+          CONTENT_TYPE: request.headers["content-type"] ?? "",
+          REMOTE_USER: "ana",
+          ...(typeof request.headers["git-protocol"] === "string" ? { GIT_PROTOCOL: request.headers["git-protocol"] } : {}),
+        },
+      });
+      request.pipe(backend.stdin);
+      const out: Buffer[] = [];
+      backend.stdout.on("data", (chunk: Buffer) => out.push(chunk));
+      backend.on("close", () => {
+        const whole = Buffer.concat(out);
+        const end = whole.indexOf("\r\n\r\n");
+        const headers = Object.fromEntries(
+          whole
+            .subarray(0, end)
+            .toString("utf8")
+            .split("\r\n")
+            .map((line) => [line.slice(0, line.indexOf(":")), line.slice(line.indexOf(":") + 1).trim()]),
+        );
+        const status = Number(String(headers["Status"] ?? "200").split(" ")[0]);
+        delete headers["Status"];
+        response.writeHead(status, headers).end(whole.subarray(end + 4));
+      });
+    });
+    await new Promise<void>((resolve) => served.listen(0, "127.0.0.1", resolve));
+    // The person's own credential helper, which knows the sign-in and notes every ask of it.
+    const asked = path.join(root, "helper-asks.txt");
+    Object.assign(process.env, {
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "credential.helper",
+      GIT_CONFIG_VALUE_0: `!f() { echo "$1" >> ${asked}; if [ "$1" = get ]; then echo username=ana; echo password=secret; fi; }; f`,
+    });
+    try {
+      const store = path.join(root, "starts", "private.git");
+      const to = path.join(root, "copies", "thread-private");
+      await makeReadingCopy({ store, remote: `http://127.0.0.1:${(served.address() as AddressInfo).port}/${path.basename(remote)}` }, to, saved, saved.bundle);
+      expect(readFileSync(path.join(to, "FIX.md"), "utf8")).toBe("committed in the cloud\n");
+      expect(readFileSync(asked, "utf8").trim().split("\n"), "asked once for the sign-in, never to keep one").toEqual(["get"]);
+    } finally {
+      for (const key of ["GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"]) delete process.env[key];
+      await new Promise((resolve) => served.close(resolve));
+    }
   });
 });

@@ -7,6 +7,14 @@ const QUIET = { okCodes: [0, 1, 128] };
 const HELD = "refs/saved/";
 /** How long a start's fetch may go without a byte from the repository before it is called out of reach. */
 const STALLED_S = 20;
+/** How long this computer's git may take to give its sign-in for a repository, as a locked keychain may keep it. */
+const SIGN_IN_MS = 30_000;
+/**
+ * The only credential helper a start's fetch has: it gives the sign-in read for it, from its own environment, and never
+ * keeps one. Git keeps a sign-in it used with every helper the person has, which may wait on their keychain after the
+ * fetch is done.
+ */
+const GIVE_ONLY = `!f() { if [ "$1" = get ]; then printf 'username=%s\\npassword=%s\\n' "$OPENORC_START_USERNAME" "$OPENORC_START_PASSWORD"; fi; }; f`;
 
 /** The project's folder here doesn't hold the commit the thread started from, and its remote didn't give it. */
 export const START_NOT_HERE = "This project's folder doesn't hold the commit the thread started from. Pull it, then try again.";
@@ -86,7 +94,11 @@ async function startInStore(store: string, remote: string, base: string): Promis
       if (await holds(store, base)) return;
       // A repository that answers nothing for STALLED_S is out of reach; one that sends, however large, may take its time.
       const stalled = ["-c", "http.lowSpeedLimit=1", "-c", `http.lowSpeedTime=${STALLED_S}`];
-      const answer = await git(store, [...stalled, "fetch", "-q", "--depth=1", "--no-tags", "--no-write-fetch-head", remote, base], { ...QUIET, timeoutMs: 10 * 60_000 }).catch((error: unknown) => {
+      const signIn = await signInFor(store, remote);
+      const helpers = ["-c", "credential.helper=", ...(signIn ? ["-c", `credential.helper=${GIVE_ONLY}`] : [])];
+      const env = signIn ? { OPENORC_START_USERNAME: signIn.username, OPENORC_START_PASSWORD: signIn.password } : {};
+      const args = [...stalled, ...helpers, "fetch", "-q", "--depth=1", "--no-tags", "--no-write-fetch-head", remote, base];
+      const answer = await git(store, args, { ...QUIET, env, timeoutMs: 10 * 60_000 }).catch((error: unknown) => {
         if (error instanceof GitError) return { code: error.code ?? -1, stderr: error.stderr };
         throw error;
       });
@@ -100,6 +112,16 @@ async function startInStore(store: string, remote: string, base: string): Promis
     if (fetching.get(store) === fetched) fetching.delete(store);
   }
   return store;
+}
+
+/** The sign-in this computer's git has for `remote`, read and never written back; null for none, or none in time. */
+async function signInFor(cwd: string, remote: string): Promise<{ username: string; password: string } | null> {
+  const filled = await git(cwd, ["credential", "fill"], { input: `url=${remote}\n\n`, timeoutMs: SIGN_IN_MS, okCodes: [0, 128] }).catch(() => null);
+  if (filled?.code !== 0) return null;
+  const said = new Map(filled.stdout.split("\n").map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)] as const));
+  const username = said.get("username");
+  const password = said.get("password");
+  return username && password ? { username, password } : null;
 }
 
 /** What a failed fetch's words say of why: a repository that may not be read, a commit it no longer has, or no way to reach it. */

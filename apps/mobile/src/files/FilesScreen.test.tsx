@@ -84,7 +84,9 @@ vi.mock("../thread/images", () => ({
   ImageTile: ({ asset, label }: { asset: unknown; label: string }) => <img alt={label} data-asset={JSON.stringify(asset)} />,
   CloudThreadFileTile: ({ path, label }: { path: string; label: string }) => <img alt={label} data-cloud={path} />,
 }));
-vi.mock("../changes/PanelTitle", () => ({ PanelTitle: ({ title, line }: { title: string; line: string | null }) => <h1>{[title, line].filter(Boolean).join(" · ")}</h1> }));
+vi.mock("../changes/PanelTitle", () => ({
+  PanelTitle: ({ title, line, fromCloud }: { title: string; line: string | null; fromCloud?: boolean }) => <h1 data-from-cloud={fromCloud}>{[title, line].filter(Boolean).join(" · ")}</h1>,
+}));
 
 afterEach(() => {
   cleanup();
@@ -208,7 +210,7 @@ it("reads a cloud thread's files from OpenOrc Cloud while the Mac is out of reac
   });
   ownCloud.threadFiles.search.mockResolvedValue({ paths: ["notes/long.txt"], source: saved });
   show(<FilesScreen />, { threadId: "t1" });
-  expect(await screen.findByRole("heading", { name: "launch · Saved 10m ago" })).toBeTruthy();
+  expect((await screen.findByRole("heading", { name: "launch · Saved 10m ago" })).dataset.fromCloud).toBe("true");
   expect(screen.getByRole("button", { name: "README.md" })).toBeTruthy();
   expect(screen.queryByText(/^Read at /)).toBeNull();
   expect(screen.queryByText("Waiting for Studio")).toBeNull();

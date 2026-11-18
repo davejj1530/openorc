@@ -112,7 +112,7 @@ export function FilesScreen() {
   const open = (entry: FileEntry) => (entry.kind === "directory" ? openFolder(threadId, entry.path) : openFile(threadId, entry.path));
   return (
     <View className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={title} line={line} /> }} />
+      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={title} line={line} fromCloud={source === "cloud"} /> }} />
       <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerClassName="pt-2 pb-8">
         {/* A folder refused, as to a reader who may not act in the thread, has no names to find either. */}
         {!path && !folder.data?.unavailable ? <SearchField query={query} onChange={setQuery} /> : null}

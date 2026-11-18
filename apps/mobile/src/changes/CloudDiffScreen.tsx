@@ -19,7 +19,7 @@ export function CloudDiffScreen() {
   return (
     <View className="flex-1 bg-bg">
       {/* The folder under the name, for a file in one; a file at the top is named once. */}
-      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={fileName(path)} line={fileName(path) === path ? null : path} /> }} />
+      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={fileName(path)} line={fileName(path) === path ? null : path} fromCloud /> }} />
       {read.error ? <FailedBlock message={read.error.message} onRetry={() => void read.refetch()} /> : null}
       {!diff && !read.error ? (
         <View className="items-center py-10">

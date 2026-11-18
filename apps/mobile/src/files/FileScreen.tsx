@@ -60,7 +60,7 @@ export function FileScreen() {
   const [sheet] = useState(createSheetWindow);
   return (
     <SheetWindowContext.Provider value={sheet}>
-      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={placeName(path, "")} line={folder || null} /> }} />
+      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={placeName(path, "")} line={folder || null} fromCloud={source === "cloud"} /> }} />
       <ScrollView className="flex-1 bg-bg" {...windowScroll(sheet)}>
         <View ref={sheet.content} className="gap-2 px-3 pt-2 pb-8">
           {kept && read.data ? <Text className="px-2 text-sm text-ink-4">{readAt(read.readAt)}</Text> : null}

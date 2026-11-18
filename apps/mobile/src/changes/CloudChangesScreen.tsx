@@ -166,7 +166,7 @@ export function CloudChangesScreen() {
   const recorded = changes.data?.state === "recorded" ? changes.data : null;
   return (
     <View className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={panelToolLabels.changes} line={recorded ? changesLine(recorded.totals) : null} /> }} />
+      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={panelToolLabels.changes} line={recorded ? changesLine(recorded.totals) : null} fromCloud /> }} />
       <ScrollView contentContainerStyle={{ paddingBottom: footer + 12 }}>
         {/* A server that says it does not serve changes is answered by its reason alone: nothing failed to retry. */}
         {off ? <Text className="px-5 py-10 text-center text-ink-4">{off}</Text> : <Files threadId={threadId} changes={changes.data} error={changes.error} retry={() => void changes.refetch()} />}

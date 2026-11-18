@@ -126,8 +126,12 @@ it("reads the latest completed message from a bounded authorized event page and 
   stand.append(id, [{ type: "message.completed", ts: 50, role: "assistant", messageId: "reply-1", text: "A saved reply" }]);
   hosted.awoke();
   await vi.waitFor(async () => expect(await hosted.threads.call("threads.lastMessage", { id })).toMatchObject({ id: "reply-1", text: "A saved reply", role: "assistant", createdAt: 50 }));
-  reads.length = 0;
-  await hosted.threads.call("threads.lastMessage", { id });
+  // The thread's new head may be heard after the first read; from then on the message is read from what was kept.
+  await vi.waitFor(async () => {
+    reads.length = 0;
+    await hosted.threads.call("threads.lastMessage", { id });
+    expect(reads).toEqual([]);
+  });
   await hosted.threads.call("threads.lastMessage", { id });
   expect(reads).toEqual([]);
   stand.append(id, [{ type: "message.completed", ts: 60, role: "assistant", messageId: "reply-2", text: "The next saved reply" }]);

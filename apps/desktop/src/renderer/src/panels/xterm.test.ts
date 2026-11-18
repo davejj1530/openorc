@@ -51,26 +51,33 @@ app.whenReady().then(async () => {
 const folder = mkdtempSync(path.join(tmpdir(), "openorc-xterm-fit-"));
 afterAll(() => rmSync(folder, { recursive: true, force: true }));
 
-it("fits a padded host so a full line's last character and the last row are inside its box", async () => {
-  const bundled = await build({ stdin: { contents: page, resolveDir: import.meta.dirname, loader: "ts" }, bundle: true, platform: "browser", format: "iife", write: false });
-  const require = createRequire(import.meta.url);
-  const css = readFileSync(require.resolve("@xterm/xterm/css/xterm.css"), "utf8");
-  // The host's padding and sizing as the panels draw it (pl-5 pr-2.5 pb-2.5 under Tailwind's border-box).
-  const html = `<!doctype html><html><head><style>${css}
+// Chromium opens no window without a display, which a Linux runner has none of; macOS and Windows always have one.
+const noDisplay = process.platform === "linux" && !process.env["DISPLAY"] && !process.env["WAYLAND_DISPLAY"];
+
+it.skipIf(noDisplay)(
+  "fits a padded host so a full line's last character and the last row are inside its box",
+  async () => {
+    const bundled = await build({ stdin: { contents: page, resolveDir: import.meta.dirname, loader: "ts" }, bundle: true, platform: "browser", format: "iife", write: false });
+    const require = createRequire(import.meta.url);
+    const css = readFileSync(require.resolve("@xterm/xterm/css/xterm.css"), "utf8");
+    // The host's padding and sizing as the panels draw it (pl-5 pr-2.5 pb-2.5 under Tailwind's border-box).
+    const html = `<!doctype html><html><head><style>${css}
     *, ::before, ::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-size: 14px; letter-spacing: -0.005em; }
     #host { position: absolute; left: 0; top: 0; width: 640px; height: 300px; padding: 0 10px 10px 20px; }
   </style></head><body><div id="host"></div><script>${bundled.outputFiles[0]!.text}</script></body></html>`;
-  const file = path.join(folder, "page.html");
-  writeFileSync(file, html);
-  const entry = path.join(folder, "main.cjs");
-  writeFileSync(entry, main);
-  const electron = require("electron") as unknown as string;
-  const run = spawnSync(electron, [entry, file], { encoding: "utf8", timeout: 30_000 });
-  const result = JSON.parse(run.stdout) as { cols: number; lastChar: string; lastRight: number; screenRight: number; screenBottom: number; inner: { right: number; bottom: number } };
-  expect(result.lastChar).toBe("Z");
-  expect(result.lastRight).toBeLessThanOrEqual(result.inner.right);
-  // Each character is drawn in its own cell: the line ends where xterm's screen does, never past it.
-  expect(result.lastRight).toBeLessThanOrEqual(result.screenRight + 0.5);
-  expect(result.screenBottom).toBeLessThanOrEqual(result.inner.bottom);
-}, 60_000);
+    const file = path.join(folder, "page.html");
+    writeFileSync(file, html);
+    const entry = path.join(folder, "main.cjs");
+    writeFileSync(entry, main);
+    const electron = require("electron") as unknown as string;
+    const run = spawnSync(electron, [entry, file], { encoding: "utf8", timeout: 30_000 });
+    const result = JSON.parse(run.stdout) as { cols: number; lastChar: string; lastRight: number; screenRight: number; screenBottom: number; inner: { right: number; bottom: number } };
+    expect(result.lastChar).toBe("Z");
+    expect(result.lastRight).toBeLessThanOrEqual(result.inner.right);
+    // Each character is drawn in its own cell: the line ends where xterm's screen does, never past it.
+    expect(result.lastRight).toBeLessThanOrEqual(result.screenRight + 0.5);
+    expect(result.screenBottom).toBeLessThanOrEqual(result.inner.bottom);
+  },
+  60_000,
+);

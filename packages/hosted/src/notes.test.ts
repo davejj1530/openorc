@@ -143,6 +143,7 @@ describe("reading a thread's notes", () => {
     hosts.push(ada);
     await ada.start();
     await signInAs(ada, browser, ADA);
+    await vi.waitFor(() => expect(ada.spaces.status().state).toBe("ready"));
     const asked = () => stand.requests.filter((request) => request.path === "/hosted/mentions").length;
     expect(await ada.spaces.mentions()).toEqual({ spaceIds: [] });
     expect(await ada.spaces.mentions()).toEqual({ spaceIds: [] });

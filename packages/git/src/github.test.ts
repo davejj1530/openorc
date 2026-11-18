@@ -28,6 +28,8 @@ const raw = {
 /** What `gh repo view --json url --jq .url` prints in a checkout of acme/app. */
 const REPO_URL = "https://github.com/acme/app\n";
 
+const EMPTY_LIST = JSON.stringify({ data: { repository: { pullRequests: { nodes: [] } } } });
+
 /** Records each gh call and answers from a table keyed by the first two arguments. */
 function fakeGh(answers: Record<string, string | GhError>) {
   const calls: { args: string[]; input?: string }[] = [];
@@ -92,25 +94,31 @@ describe("pull request records", () => {
 });
 
 describe("GitHubPulls", () => {
-  it("reads open, merged and every pull request from gh's own list, and drafts and closed ones from a search", async () => {
-    const { gh, calls } = fakeGh({ "pr list": JSON.stringify([raw]), "repo view": REPO_URL, "api graphql": JSON.stringify({ data: { search: { nodes: [] } } }) });
+  it("reads open, merged, closed and every pull request from the repository's own list, and drafts from a search", async () => {
+    const node = { ...raw, author: { __typename: "User", login: "ada" }, labels: { nodes: [] }, totalCommentsCount: 4 };
+    const answer = (args: string[]) => (args.some((arg) => arg.startsWith("q=")) ? { data: { search: { nodes: [] } } } : { data: { repository: { pullRequests: { nodes: [node] } } } });
+    const calls: string[][] = [];
+    const gh: GhRunner = async (_cwd, args) => {
+      calls.push(args);
+      return args[0] === "repo" ? REPO_URL : JSON.stringify(answer(args));
+    };
     const pulls = new GitHubPulls(gh);
-    expect(await pulls.list("/repo", "open")).toHaveLength(1);
+    expect(await pulls.list("/repo", "open")).toEqual([expect.objectContaining({ number: 7, author: "ada", comments: 4 })]);
     await pulls.list("/repo", "merged");
     await pulls.list("/repo", "any");
     await pulls.list("/repo", "draft");
     await pulls.list("/repo", "closed");
-    expect(calls.slice(0, 3).map((call) => call.args.slice(0, 4))).toEqual([
-      ["pr", "list", "--state", "open"],
-      ["pr", "list", "--state", "merged"],
-      ["pr", "list", "--state", "all"],
-    ]);
-    // The search names the repository itself, read once for the checkout.
-    expect(calls.filter((call) => call.args[0] === "repo")).toHaveLength(1);
-    const searches = calls.filter((call) => call.args[1] === "graphql");
-    // gh's own "closed" takes merged pull requests in, so closed without merging is a search.
-    expect(searches[0]!.args).toContain("q=repo:acme/app is:pr is:open draft:true sort:created-desc");
-    expect(searches[1]!.args).toContain("q=repo:acme/app is:pr is:closed is:unmerged sort:created-desc");
+    // The repository is read once for the checkout, and named as raw fields so gh leaves a name of digits a string.
+    expect(calls.filter((args) => args[0] === "repo")).toHaveLength(1);
+    const requests = calls.filter((args) => args[1] === "graphql");
+    const query = (args: string[]) => args.find((arg) => arg.startsWith("query="))!;
+    expect(requests[0]).toEqual(expect.arrayContaining(["-f", "owner=acme", "-f", "repo=app"]));
+    const listed = requests.filter((args) => !args.some((arg) => arg.startsWith("q=")));
+    expect(listed.map((args) => /states: (\[[A-Z, ]+\])/.exec(query(args))?.[1])).toEqual(["[OPEN]", "[MERGED]", "[OPEN, CLOSED, MERGED]", "[CLOSED]"]);
+    expect(query(requests[0]!)).toContain("orderBy: { field: CREATED_AT, direction: DESC }");
+    expect(query(requests[0]!)).toContain("totalCommentsCount");
+    // The repository's list has no drafts alone, so drafts are a search.
+    expect(requests[3]).toContain("q=repo:acme/app is:pr is:open draft:true sort:created-desc");
   });
 
   it("counts every state under the same filters in one request", async () => {
@@ -125,25 +133,32 @@ describe("GitHubPulls", () => {
     expect(request!.args).not.toContain("-F");
   });
 
-  it("keeps a list with nothing but the newest-first order on gh's own list", async () => {
-    const { gh, calls } = fakeGh({ "pr list": "[]" });
+  it("keeps a list with nothing but the newest-first order on the repository's own list", async () => {
+    const { gh, calls } = fakeGh({ "repo view": REPO_URL, "api graphql": EMPTY_LIST });
     await new GitHubPulls(gh).list("/repo", "open", { sort: "newest" });
-    expect(calls[0]!.args.slice(0, 2)).toEqual(["pr", "list"]);
+    expect(calls[1]!.args.some((arg) => arg.startsWith("q="))).toBe(false);
   });
 
   it("asks for a filtered list as one advanced search and reads its pull requests", async () => {
-    const node = { ...raw, author: { __typename: "User", login: "ada" }, labels: { nodes: [{ name: "bug", color: "d73a4a", description: "Broken" }] } };
+    const node = { ...raw, author: { __typename: "User", login: "ada" }, labels: { nodes: [{ name: "bug", color: "d73a4a", description: "Broken" }] }, totalCommentsCount: 2 };
     const { gh, calls } = fakeGh({ "repo view": REPO_URL, "api graphql": JSON.stringify({ data: { search: { nodes: [node, {}] } } }) });
     const pulls = await new GitHubPulls(gh).list("/repo", "open", { authors: ["ada", "linus"], sort: "oldest" });
-    expect(pulls).toEqual([expect.objectContaining({ number: 7, author: "ada", labels: [{ name: "bug", color: "d73a4a", description: "Broken" }] })]);
+    expect(pulls).toEqual([expect.objectContaining({ number: 7, author: "ada", comments: 2, labels: [{ name: "bug", color: "d73a4a", description: "Broken" }] })]);
     expect(calls[1]!.args).toContain("q=repo:acme/app is:pr is:open (author:ada OR author:linus) sort:created-asc");
     expect(calls[1]!.args.find((arg) => arg.startsWith("query="))).toContain("type: ISSUE_ADVANCED");
+    expect(calls[1]!.args.find((arg) => arg.startsWith("query="))).toContain("totalCommentsCount");
   });
 
   it("names an app's pull requests as gh's own list does, so its author filter finds them", async () => {
-    const node = { ...raw, author: { __typename: "Bot", login: "dependabot" }, labels: { nodes: [] } };
+    const node = { ...raw, author: { __typename: "Bot", login: "dependabot" }, labels: { nodes: [] }, totalCommentsCount: 0 };
     const { gh } = fakeGh({ "repo view": REPO_URL, "api graphql": JSON.stringify({ data: { search: { nodes: [node] } } }) });
     expect((await new GitHubPulls(gh).list("/repo", "draft"))[0]!.author).toBe("app/dependabot");
+  });
+
+  it("reads a pull request GitHub sends no comment count for as having none", async () => {
+    const node = { ...raw, author: { __typename: "User", login: "ada" }, labels: { nodes: [] }, totalCommentsCount: null };
+    const { gh } = fakeGh({ "repo view": REPO_URL, "api graphql": JSON.stringify({ data: { repository: { pullRequests: { nodes: [node] } } } }) });
+    expect((await new GitHubPulls(gh).list("/repo", "open"))[0]!.comments).toBe(0);
   });
 
   it("reads the repository again after a failed read", async () => {
@@ -326,12 +341,12 @@ describe("GitHubPulls choices", () => {
     let running = 0;
     let most = 0;
     const releases: (() => void)[] = [];
-    const gh: GhRunner = async () => {
+    const gh: GhRunner = async (_cwd, args) => {
       running += 1;
       most = Math.max(most, running);
       await new Promise<void>((resolve) => releases.push(resolve));
       running -= 1;
-      return "[]";
+      return args[0] === "repo" ? REPO_URL : EMPTY_LIST;
     };
     const pulls = new GitHubPulls(gh);
     const lists = Array.from({ length: 20 }, () => pulls.list("/repo", "open"));
@@ -346,9 +361,9 @@ describe("GitHubPulls choices", () => {
   it("reads a pull request without waiting behind the list page's reads", async () => {
     const held: (() => void)[] = [];
     const gh: GhRunner = async (_cwd, args) => {
-      if (args[0] === "pr" && args[1] === "list") {
+      if (args[1] === "graphql") {
         await new Promise<void>((resolve) => held.push(resolve));
-        return "[]";
+        return EMPTY_LIST;
       }
       if (args[0] === "repo") return REPO_URL;
       if (args[0] === "api") return "ada\n";
@@ -368,7 +383,7 @@ describe("GitHubPulls choices", () => {
   });
 
   it("says what to do instead of repeating gh's output", async () => {
-    const signedOut = fakeGh({ "pr list": new GhError("To get started with GitHub CLI, please run:  gh auth login\nAlternatively, populate the GH_TOKEN environment variable.") });
+    const signedOut = fakeGh({ "repo view": new GhError("To get started with GitHub CLI, please run:  gh auth login\nAlternatively, populate the GH_TOKEN environment variable.") });
     await expect(new GitHubPulls(signedOut.gh).list("/repo", "open")).rejects.toThrow("Sign in to GitHub first: run gh auth login in a terminal.");
     const own = fakeGh({ "api --method": new GhError("gh: Unprocessable Entity (HTTP 422)", JSON.stringify({ message: "Unprocessable Entity", errors: ["Can not approve your own pull request"] })) });
     await expect(new GitHubPulls(own.gh).submitReview("/repo", raw.url, { commitId: "c".repeat(40), event: "approve", body: "", comments: [] })).rejects.toThrow(

@@ -1,7 +1,7 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { useQueries } from "@tanstack/react-query";
 import type { Project, PullRequestCounts, PullRequestLabel, PullRequestStateFilter, PullRequestSummary } from "@openorc/protocol";
-import { RefreshCw } from "../components/icons";
+import { Check, ExternalLink, Link2, MessageSquare, RefreshCw } from "../components/icons";
 import { ListGroupHeading } from "../components/ListGroupHeading";
 import { LabelDot, PersonFace, PullRequestPalette, PullRequestSortMenu, PullRequestTokens } from "../components/PullRequestPalette";
 import { PullRequestEditActions, PullRequestViewMenu, SaveViewDialog } from "../components/PullRequestViewMenu";
@@ -37,6 +37,7 @@ import {
 } from "../lib/pull-requests";
 import { tagsFor, relativeTime } from "@openorc/client";
 import { useRpc, useRpcs } from "../lib/client";
+import { useCopy } from "../lib/use-copy";
 import { core } from "../lib/rpc";
 import { openPullRequest } from "../lib/router";
 import "./pull-requests.css";
@@ -44,9 +45,10 @@ import "./pull-requests.css";
 function PullRequestRow({ pull, projectId }: { pull: PullRequestSummary; projectId: string }) {
   const tone = pullRequestTone(pull);
   const decision = pull.state === "open" && pull.reviewDecision ? reviewDecisionLabel[pull.reviewDecision] : null;
+  const comments = `${pull.comments} ${pull.comments === 1 ? "comment" : "comments"}`;
   return (
-    <div>
-      <button type="button" onClick={() => openPullRequest(projectId, pull.number)} className="pull-row" aria-label={`${pull.title}, #${pull.number}, ${pullRequestToneLabel[tone]}`}>
+    <div className="pull-row-item">
+      <button type="button" onClick={() => openPullRequest(projectId, pull.number)} className="pull-row" aria-label={`${pull.title}, #${pull.number}, ${pullRequestToneLabel[tone]}, ${comments}`}>
         <span className="pull-row-mark" data-tip={pullRequestToneLabel[tone]}>
           <PullStateGlyph state={tone} size={15} />
         </span>
@@ -72,9 +74,34 @@ function PullRequestRow({ pull, projectId }: { pull: PullRequestSummary; project
         <span className="shrink-0 font-mono text-xs tabular">
           <span className="text-ok">+{pull.additions}</span> <span className="text-bad">-{pull.deletions}</span>
         </span>
-        <span className={cn(metaSlot, "w-16 text-sm")}>{relativeTime(pull.updatedAt)}</span>
+        {/* A slot of its own, so the counts line up down the list; none is shown for no comments, as GitHub does. */}
+        <span className={cn(metaSlot, "flex w-10 items-center justify-end gap-1 text-sm")} data-tip={pull.comments > 0 ? comments : undefined}>
+          {pull.comments > 0 ? (
+            <>
+              <MessageSquare size={13} aria-hidden="true" />
+              {pull.comments}
+            </>
+          ) : null}
+        </span>
+        <span className={cn(metaSlot, "pull-row-time w-16 text-sm")}>{relativeTime(pull.updatedAt)}</span>
       </button>
+      <span className="pull-row-actions">
+        <CopyLinkButton pull={pull} />
+        <IconButton size="sm" className="hover:bg-surface-3" aria-label={`Open #${pull.number} in new tab`} data-tip="Open in new tab" onClick={() => window.openorc.openExternal(pull.url)}>
+          <ExternalLink size={14} />
+        </IconButton>
+      </span>
     </div>
+  );
+}
+
+function CopyLinkButton({ pull }: { pull: PullRequestSummary }) {
+  const [state, copy] = useCopy(pull.url);
+  const tip = { idle: "Copy link", copied: "Link copied", error: "Couldn’t copy link" }[state];
+  return (
+    <IconButton size="sm" className="hover:bg-surface-3" aria-label={state === "idle" ? `Copy link to #${pull.number}` : tip} data-tip={tip} onClick={copy}>
+      {state === "copied" ? <Check size={14} /> : <Link2 size={14} />}
+    </IconButton>
   );
 }
 

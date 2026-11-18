@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import type { PullRequestSummary } from "@openorc/protocol";
+import type { OpenOrcApi } from "../../../shared/types";
 import { core } from "../lib/rpc";
 import { useLayout } from "../lib/layout";
 import { queryClient } from "../lib/client";
@@ -22,6 +23,7 @@ const pull = (number: number, title: string) =>
   ({
     number,
     title,
+    url: `https://github.com/acme/studio/pull/${number}`,
     state: "open",
     isDraft: false,
     reviewDecision: null,
@@ -32,6 +34,7 @@ const pull = (number: number, title: string) =>
     deletions: 1,
     updatedAt: 1,
     labels: [],
+    comments: number === 2 ? 4 : 0,
   }) as unknown as PullRequestSummary;
 
 beforeEach(() => {
@@ -73,6 +76,36 @@ it("groups every project's pull requests and folds a group away like a task grou
   expect(heading.getAttribute("aria-expanded")).toBe("false");
   expect(within(studio).queryByRole("button", { name: /Create the welcome flow/ })).toBeNull();
   expect(screen.getByRole("button", { name: /Speed up search/ })).toBeTruthy();
+});
+
+it("counts a pull request's comments, copies its link, and opens it in a new tab", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  const api = window.openorc;
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  const openExternal = vi.fn();
+  window.openorc = { openExternal } as unknown as OpenOrcApi;
+  onTestFinished(() => {
+    if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
+    else Reflect.deleteProperty(navigator, "clipboard");
+    window.openorc = api;
+  });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <PullRequestList />
+    </QueryClientProvider>,
+  );
+  await screen.findByRole("button", { name: /Polish the picker/ });
+  const commented = screen.getByRole("button", { name: /Polish the picker, #2, Open, 4 comments/ });
+  expect(commented.querySelector('[data-tip="4 comments"]')?.textContent).toBe("4");
+  // No comments shows no count, as GitHub does.
+  const quiet = screen.getByRole("button", { name: /Create the welcome flow, #1, Open, 0 comments/ });
+  expect(quiet.querySelector('[data-tip$="comments"], [data-tip$="comment"]')).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Copy link to #2" }));
+  expect(writeText).toHaveBeenCalledWith("https://github.com/acme/studio/pull/2");
+  await screen.findByRole("button", { name: "Link copied" });
+  fireEvent.click(screen.getByRole("button", { name: "Open #2 in new tab" }));
+  expect(openExternal).toHaveBeenCalledWith("https://github.com/acme/studio/pull/2");
 });
 
 const page = () =>

@@ -111,11 +111,8 @@ interface RawBranchPage {
   };
 }
 
-/**
- * The states gh's own list shows unfiltered. Its "closed" takes merged ones in too, and it has no drafts alone, so
- * those two are always searches.
- */
-const plainStates: Partial<Record<PullRequestStateFilter, string>> = { open: "open", merged: "merged", any: "all" };
+/** The states the repository's own list shows unfiltered, as GitHub names them. It has no drafts alone, so those are a search. */
+const plainStates: Partial<Record<PullRequestStateFilter, string>> = { open: "[OPEN]", merged: "[MERGED]", closed: "[CLOSED]", any: "[OPEN, CLOSED, MERGED]" };
 
 /** Each state as search terms: drafts are open, and closed means closed without merging. */
 const stateTerms: Record<PullRequestStateFilter, string[]> = {
@@ -196,6 +193,22 @@ export function searchQuery(repository: string, state: PullRequestStateFilter, n
   return terms.filter(Boolean).join(" ");
 }
 
+/** The fields a list shows. gh's own list can't count comments: it reads every one, and only the conversation's. */
+const LIST_FIELDS = `number title url author { __typename login } state isDraft headRefName baseRefName createdAt updatedAt
+        additions deletions changedFiles reviewDecision totalCommentsCount labels(first: 20) { nodes { name color description } }`;
+
+/**
+ * The repository's own pull requests in some states. `states` is written into the query as it is, so it is only ever
+ * one of `plainStates`, never anything a user typed.
+ */
+const repositoryQuery = (states: string) => `query($owner: String!, $repo: String!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(states: ${states}, first: ${LIST_LIMIT}, orderBy: { field: CREATED_AT, direction: DESC }) {
+      nodes { ${LIST_FIELDS} }
+    }
+  }
+}`;
+
 /**
  * GitHub's advanced search, which takes OR and parentheses, for the fields a list shows. gh's own list can't ask for
  * one author or another: two `author:` terms there mean both.
@@ -204,8 +217,7 @@ const SEARCH_QUERY = `query($q: String!) {
   search(query: $q, type: ISSUE_ADVANCED, first: ${LIST_LIMIT}) {
     nodes {
       ... on PullRequest {
-        number title url author { __typename login } state isDraft headRefName baseRefName createdAt updatedAt
-        additions deletions changedFiles reviewDecision labels(first: 20) { nodes { name color description } }
+        ${LIST_FIELDS}
       }
     }
   }
@@ -216,19 +228,30 @@ const COUNTS_QUERY = `query(${STATES.map((state) => `$${state}: String!`).join("
   ${STATES.map((state) => `${state}: search(query: $${state}, type: ISSUE_ADVANCED, first: 0) { issueCount }`).join("\n  ")}
 }`;
 
-/** A pull request as the search gives it: its author with their kind, its labels one page of a connection. */
-type RawSearchNode = Omit<RawPullRequest, "author" | "labels"> & { author: { __typename: string; login: string } | null; labels?: { nodes: RawLabel[] } | null };
+/** A pull request as a GraphQL list gives it: its author with their kind, its labels one page of a connection. */
+type RawListNode = Omit<RawPullRequest, "author" | "labels"> & {
+  author: { __typename: string; login: string } | null;
+  labels?: { nodes: RawLabel[] } | null;
+  /** GitHub's schema lets this be null; a list shows none then. */
+  totalCommentsCount: number | null;
+};
 
-/**
- * The search's author as gh's own list names them, so a list reads the same whichever way it was asked for: gh calls
- * anyone but a user, such as an app, `app/<login>`, which is also how a search asks for their pull requests.
- */
-const searchAuthor = (author: RawSearchNode["author"]) => (author && author.__typename !== "User" ? { login: `app/${author.login}` } : author);
+/** The author as gh names them: anyone but a user, such as an app, is `app/<login>`, as a search asks for them. */
+const listedAuthor = (author: RawListNode["author"]) => (author && author.__typename !== "User" ? { login: `app/${author.login}` } : author);
 
 /** Anything the search finds that isn't a pull request comes back without its fields. */
 interface RawSearch {
-  data: { search: { nodes: Partial<RawSearchNode>[] } };
+  data: { search: { nodes: Partial<RawListNode>[] } };
 }
+
+interface RawRepositoryPulls {
+  data: { repository: { pullRequests: { nodes: RawListNode[] } } };
+}
+
+const listedPullRequest = (node: RawListNode): PullRequestSummary => ({
+  ...pullRequestSummary({ ...node, author: listedAuthor(node.author), labels: node.labels?.nodes ?? [] }),
+  comments: node.totalCommentsCount ?? 0,
+});
 
 /** The projects linked to the repository, which GitHub's Projects filter offers. Reading them needs gh's read:project scope. */
 const PROJECTS_QUERY = `query($owner: String!, $repo: String!) {
@@ -280,7 +303,7 @@ interface RawPullRequestDetail extends RawPullRequest {
 const decisions: Record<string, PullRequestReviewDecision> = { APPROVED: "approved", CHANGES_REQUESTED: "changes_requested", REVIEW_REQUIRED: "review_required" };
 
 /** A pull request as gh's JSON describes it, in the app's own terms. A deleted account reads as GitHub's "ghost". */
-export function pullRequestSummary(raw: RawPullRequest): PullRequestSummary {
+export function pullRequestSummary(raw: RawPullRequest): Omit<PullRequestSummary, "comments"> {
   return {
     number: raw.number,
     title: raw.title,
@@ -392,31 +415,32 @@ export class GitHubPulls {
   }
 
   /**
-   * One list. Open, merged or every pull request with nothing else asked is gh's own list, which shows a pull request
-   * the moment it opens. Drafts, closed without merging, any filter or another order make it one GitHub search, which
-   * can take a few seconds to see a new one.
+   * One list. Open, merged, closed or every pull request with nothing else asked is the repository's own list, which
+   * shows a pull request the moment it changes. Drafts, any filter or another order make it one GitHub search, which can
+   * take a few seconds to see a new one.
    */
   async list(cwd: string, state: PullRequestStateFilter, narrowing: PullRequestNarrowing = {}): Promise<PullRequestSummary[]> {
     const plain = plainStates[state];
     if (plain && !isNarrowed(narrowing)) {
-      const out = await this.listing(cwd, ["pr", "list", "--state", plain, "--limit", LIST_LIMIT, "--json", SUMMARY_FIELDS]).catch((error: unknown) => {
+      const out = await this.graphql(cwd, (repository) => {
+        const [owner, repo] = repository.split("/");
+        return ["-f", `owner=${owner}`, "-f", `repo=${repo}`, "-f", `query=${repositoryQuery(plain)}`];
+      }).catch((error: unknown) => {
         throw ghFailure(error, "Pull requests");
       });
-      return (JSON.parse(out) as RawPullRequest[]).map(pullRequestSummary);
+      return (JSON.parse(out) as RawRepositoryPulls).data.repository.pullRequests.nodes.map(listedPullRequest);
     }
-    const out = await this.search(cwd, (repository) => ["-f", `q=${searchQuery(repository, state, narrowing)}`, "-f", `query=${SEARCH_QUERY}`]).catch((error: unknown) => {
+    const out = await this.graphql(cwd, (repository) => ["-f", `q=${searchQuery(repository, state, narrowing)}`, "-f", `query=${SEARCH_QUERY}`]).catch((error: unknown) => {
       throw ghFailure(error, "Pull requests");
     });
-    return (JSON.parse(out) as RawSearch).data.search.nodes
-      .filter((node): node is RawSearchNode => typeof node.number === "number")
-      .map((node) => pullRequestSummary({ ...node, author: searchAuthor(node.author), labels: node.labels?.nodes ?? [] }));
+    return (JSON.parse(out) as RawSearch).data.search.nodes.filter((node): node is RawListNode => typeof node.number === "number").map(listedPullRequest);
   }
 
   /** How many pull requests each state holds under the same filters. The order searched for changes no count. */
   async counts(cwd: string, narrowing: PullRequestNarrowing = {}): Promise<PullRequestCounts> {
     const { sort: _sort, ...filters } = narrowing;
     const queries = (repository: string) => STATES.flatMap((state) => ["-f", `${state}=${searchQuery(repository, state, filters)}`]);
-    const out = await this.search(cwd, (repository) => [...queries(repository), "-f", `query=${COUNTS_QUERY}`]).catch((error: unknown) => {
+    const out = await this.graphql(cwd, (repository) => [...queries(repository), "-f", `query=${COUNTS_QUERY}`]).catch((error: unknown) => {
       throw ghFailure(error, "Pull request counts");
     });
     const data = (JSON.parse(out) as { data: Record<PullRequestStateFilter, { issueCount: number }> }).data;
@@ -424,10 +448,10 @@ export class GitHubPulls {
   }
 
   /**
-   * One GraphQL request whose search text names the checkout's repository. The text goes as a raw field: gh fills its
-   * `{owner}` and `:owner` placeholders into typed fields wherever they appear, label and milestone names included.
+   * One GraphQL request on the checkout's repository, in raw fields: gh fills its `{owner}` and `:owner` placeholders
+   * into typed fields wherever they appear, label and milestone names included, and reads a name of digits as a number.
    */
-  private async search(cwd: string, fields: (repository: string) => string[]): Promise<string> {
+  private async graphql(cwd: string, fields: (repository: string) => string[]): Promise<string> {
     const { name, host } = await this.repository(cwd, this.listing);
     return this.listing(cwd, ["api", "graphql", ...fields(name), ...hostname(host)]);
   }

@@ -34,7 +34,7 @@ import { attachedPath, StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInCollaboration } from "./stand-in-collaboration.js";
 import { StandInNotes } from "./stand-in-notes.js";
 import { headOf, lastAgentSeq, messageOf, pageOf, toolOutputOf, turnEnd, turnEnds, wire } from "./stand-in-thread-log.js";
-import { parentOf, placeOwn, placeShared, startTurn } from "./stand-in-thread-placement.js";
+import { familyFull, parentOf, placeOwn, placeShared, startTurn } from "./stand-in-thread-placement.js";
 import { StandInCompactions } from "./stand-in-compactions.js";
 import { StandInForks } from "./stand-in-forks.js";
 import { heldWith, sentSettings } from "./stand-in-message-fields.js";
@@ -106,7 +106,7 @@ export class StandInThreads {
     const space = this.spaces.resolve(who, request.space);
     if (typeof space !== "string") return space;
     if (method === "GET" && path === "/projects") return { status: 200, body: this.spaces.listed(space, who, request.query.get("origins")?.split(",")) };
-    if (method === "GET" && path === "/hosted/capabilities") return this.files.capabilityReply();
+    if (method === "GET" && path === "/hosted/capabilities") return this.files.capabilityReply(familyFull(this.#threads, request.query.get("threadId")));
     const asked = /^\/hosted\/asks\/([^/]+)\/answer$/.exec(path);
     if (asked && method === "POST") return this.#answer(who, space, decodeURIComponent(asked[1]!), body);
     if (method === "POST" && path === "/hosted/threads") return this.#create(who, space, body);

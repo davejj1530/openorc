@@ -63,15 +63,14 @@ it("starts none under a thread of another project, and says the server's words u
   await expect(hosted.threads.call("threads.start", under(child.thread.id))).rejects.toThrow("A subthread can't have subthreads of its own.");
 });
 
-it("holds New subthread in the server's words once a family is full, until one of its subthreads goes", async () => {
+it("asks the server for the thread's own capabilities, so New subthread is held while its family has all it takes", async () => {
   stand.threadFiles.capabilities = { personSubthreads: { available: true } };
   const family: string[] = [];
-  for (let n = 0; n < SUBTHREADS; n++) family.push((await hosted.threads.call("threads.start", under(parent))).thread.id);
   const subthreads = async (threadId: string) => (await hosted.threads.call("hosted.capabilities", { threadId })).features.personSubthreads;
-  expect(await subthreads(parent)).toEqual({ available: true });
-  await expect(hosted.threads.call("threads.start", under(parent))).rejects.toThrow(SUBTHREADS_FULL);
+  for (let n = 0; n < SUBTHREADS; n++) family.push((await hosted.threads.call("threads.start", under(parent))).thread.id);
   expect(await subthreads(parent)).toEqual({ available: false, reason: SUBTHREADS_FULL });
   expect(await subthreads(family[0]!)).toEqual({ available: false, reason: SUBTHREADS_FULL });
+  await expect(hosted.threads.call("threads.start", under(parent))).rejects.toThrow(SUBTHREADS_FULL);
   await hosted.threads.call("threads.delete", { id: family[0]! });
-  await vi.waitFor(async () => expect(await subthreads(parent)).toEqual({ available: true }));
+  expect(await subthreads(parent)).toEqual({ available: true });
 });

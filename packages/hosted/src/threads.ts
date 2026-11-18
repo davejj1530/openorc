@@ -56,7 +56,6 @@ import { readNativeRows } from "./subthreads.js";
 import { nativeRowsFromEvents, withNativeSummary, withSubthreads } from "./translate-subthreads.js";
 import { assertNativeCall } from "./subthread-calls.js";
 import { ThreadVoices } from "./thread-voices.js";
-import { SubthreadLimit } from "./subthread-limit.js";
 import { toCollaboration } from "./wire-collaboration.js";
 
 const GONE = "That conversation isn't on OpenOrc Cloud.";
@@ -113,8 +112,6 @@ export class Threads implements HostedThreads {
   readonly terminals: TerminalWatch;
   /** Each explicit Start of a paused message not answered yet, with what it carries: shared-sends.ts. */
   readonly starts = new Map<string, QueuedStart>();
-  /** The families the server said take no more subthreads. */
-  readonly #limit = new SubthreadLimit();
 
   constructor(private readonly deps: ThreadsDeps) {
     this.terminals = new TerminalWatch({ session: deps.session, push: deps.push });
@@ -293,10 +290,7 @@ export class Threads implements HostedThreads {
     // From this Mac's folder: its work is packed before anything leaves, and goes up before the first message.
     const mac = await packedFor(this.deps.macWork, params);
     const body = { projectId: project.id, ...under, ...(params.title && { title: params.title }), settings, ready: true };
-    const { reply, refusal } = await startWith(on, body, await firstMessage(on, params), settings, mac).catch((error: unknown) => {
-      if (under.parentThreadId) this.#noteFull(error, under.parentThreadId);
-      throw error;
-    });
+    const { reply, refusal } = await startWith(on, body, await firstMessage(on, params), settings, mac);
     if (refusal !== null) return sends.refuse(this.calls, refusal, settings);
     if (generation !== this.deps.session.generation) throw new Refused("Your OpenOrc session changed. Try again.");
     if (!this.#heard?.projects.some((row) => row.id === project.id && row.space === project.space)) throw new Refused("You no longer have access to this project.");
@@ -392,18 +386,6 @@ export class Threads implements HostedThreads {
 
   family(threadId: string): HeardRow[] {
     return startedFamily(this.#rows().values(), threadId);
-  }
-
-  /** The server's words while the family `threadId` is in has as many subthreads as it takes; null otherwise. */
-  subthreadsFull(threadId: string): string | null {
-    const root = this.#rows().get(threadId)?.rootId ?? threadId;
-    return this.#limit.held(root, this.family(root).length);
-  }
-
-  #noteFull(error: unknown, parentId: string): void {
-    const root = this.#rows().get(parentId)?.rootId ?? parentId;
-    const family = [root, ...this.family(root).map((row) => row.id)];
-    if (this.#limit.note(error, root, family.length - 1)) this.deps.push({ type: "invalidate", keys: family.map((id) => `thread:${id}`) });
   }
 
   row(threadId: string): HeardRow {

@@ -7,6 +7,7 @@
  * `GET /hosted/capabilities` is a 404, as on a server that predates it.
  */
 import type { UploadedFile } from "../wire-files.js";
+import { SUBTHREADS_FULL } from "./stand-in-thread-placement.js";
 
 type Reply = { status: number; body: unknown };
 type Availability = { available: true } | { available: false; reason: string };
@@ -37,9 +38,11 @@ export class StandInThreadFiles {
     return this.capabilities?.["files"]?.available === true;
   }
 
-  capabilityReply(): Reply {
+  /** For a thread whose family is `full`, New subthread is held in the server's words. */
+  capabilityReply(full = false): Reply {
     if (!this.capabilities) return { status: 404, body: { message: "Cannot GET /hosted/capabilities", error: "Not Found", statusCode: 404 } };
-    return { status: 200, body: { version: 1, features: this.capabilities } };
+    const held = full && this.capabilities["personSubthreads"]?.available ? { personSubthreads: { available: false, reason: SUBTHREADS_FULL } } : {};
+    return { status: 200, body: { version: 1, features: { ...this.capabilities, ...held } } };
   }
 
   /** The files a new message names, attached to it; a refusal attaches none. A cancelled message's files move only once the unit is on. */

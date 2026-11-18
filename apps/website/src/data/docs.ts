@@ -123,7 +123,7 @@ export const docGroups: DocGroup[] = [
           { id: "when-it-finishes", title: "When a turn finishes" },
           { id: "changes", title: "Review or undo a turn" },
           { id: "questions-and-approvals", title: "Questions and approvals" },
-          { id: "inbox", title: "The Inbox" },
+          { id: "waiting", title: "What waits on you" },
           { id: "next-steps", title: "Next steps" },
         ],
       },

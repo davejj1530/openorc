@@ -10,7 +10,7 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="while-it-works">
     <h2 id="while-it-works">While the agent works</h2>
-    <p>Each turn has a head with the agent's name and model. While the turn runs, the head says <strong>working</strong> with a clock, such as <strong>working 12s</strong>, and <strong>Writing</strong> once the reply starts. Below it, the agent's work reads as steps in one card. Click the row under the head to fold the steps away. The step in progress then stays visible as a single line. To end the turn early, click <strong>Stop</strong> in the composer.</p>
+    <p>Under your message, the agent's work reads as steps in one card. Click the row above the steps to fold them away. The step in progress then stays visible as a single line. At the turn's end, a line says where it stands: <strong>Working</strong> with a clock, such as <strong>Working 12s</strong>, then <strong>Writing</strong> once the reply starts, and <strong>Worked for 41s</strong> when it's done, beside <strong>Copy</strong> and <strong>Fork</strong>. A turn names its agent and model only when they changed from the turn before. To end the turn early, click <strong>Stop</strong> in the composer.</p>
     <p>A step starts when the agent says what it's about to do, and takes its title from those words. With Claude Code, that's the sentence it writes before a batch of tool calls. With Codex, it's usually the title of its reasoning. When the agent says nothing first, the step is named after what it did, such as <strong>Read 3 files, ran 2 commands</strong>.</p>
     <p>The current step shows a spinner and what it's doing now. A finished step gets a check, and a failed one a cross. A finished step folds to its title and what it came to, such as <strong>Opened #218</strong> or <strong>1 failed</strong>, or a hint of what's inside, such as <strong>6 files · 2 commands</strong>.</p>
     <p>Inside a step, each thing the agent worked on gets a row, with a verb for what it did:</p>
@@ -100,7 +100,7 @@ import { docHref } from "../../data/docs";
         </tbody>
       </table>
     </div>
-    <p>An item with nothing to report is left out. A turn with nothing else to report says how many steps it took. The sidebar gives you the same news without opening the thread. A thread's row shows the step its agent is on, <strong>Needs approval</strong> with the command it's waiting on, or <strong>Has a question for you</strong>. A finished turn you haven't read shows what it came to, such as <strong>Done · 2 files changed · tests passed</strong>, until OpenOrc closes the idle agent.</p>
+    <p>An item with nothing to report is left out. A turn with nothing else to report says how many steps it took. The sidebar gives you the same news without opening the thread. A thread's row shows the turning cube while its agent works, an amber question mark while it waits for your approval or your answer, and a dot while a finished turn waits for you to read it.</p>
     <p>
       A reply can show images, such as a screenshot the agent took, and they open full size when you click them. It can also hold a visualization: a diagram, chart, or small interactive explanation that the agent draws with OpenOrc's <code>visualize</code> tool. A visualization runs in a sandbox of its own with no network access, and stays in the conversation's history.
     </p>
@@ -124,42 +124,17 @@ import { docHref } from "../../data/docs";
     <h2 id="questions-and-approvals">Questions and approvals</h2>
     <p>An agent can stop to ask you something. The question card shows its options, or a text field when there are none.</p>
     <ol class="docs-steps">
-      <li>Pick an option. When the card has a <strong>Write a different answer…</strong> field, you can type your own answer there instead.</li>
+      <li>Pick an option, or type your own answer in the <strong>Something else</strong> field.</li>
       <li>Click <strong>Answer</strong>. <strong>Decline</strong> closes the question without an answer.</li>
     </ol>
     <p>A question waits for you in every mode, Autonomous included. When it asks for something secret, the field hides what you type, and the card shows <strong>Answer hidden</strong> afterwards.</p>
-    <p>An approval card looks similar. It asks whether to <strong>Allow</strong> a tool and offers <strong>Allow</strong>, <strong>Allow for this run</strong> and <strong>Deny</strong>, or only <strong>Allow</strong> and <strong>Deny</strong> for a request that can't be allowed for longer, such as a password. Which requests ask first depends on the thread's mode. See <a href={docHref("permissions") + "#approvals"}>Modes and permissions</a>.</p>
-    <p>Both cards appear under the turn's work, and the turn waits until you answer.</p>
+    <p>An approval card looks similar. It shows the command or tool the agent wants to run and offers <strong>Allow once</strong>, <strong>Allow for this run</strong> and <strong>Deny</strong>, or only <strong>Allow once</strong> and <strong>Deny</strong> for a request that can't be allowed for longer, such as a password. To deny it and tell the agent what to do instead, type in <strong>Say what to do instead</strong> and click <strong>Deny and send</strong>. Which requests ask first depends on the thread's mode. See <a href={docHref("permissions") + "#approvals"}>Modes and permissions</a>.</p>
+    <p>Both cards dock on the composer, and the turn waits until you answer. When more than one request waits, the card says how many more wait.</p>
   </section>
 
-  <section aria-labelledby="inbox">
-    <h2 id="inbox">The Inbox</h2>
-    <p>The <strong>Inbox</strong> collects what's waiting on you across every project. Open it with <strong>Inbox</strong> on the sidebar's rail, under your projects, or choose <strong>Inbox</strong> in the command palette (<kbd>⌘K</kbd>). The number on the button counts what's waiting.</p>
-    <div class="docs-table">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Item</th>
-            <th scope="col">What the row says</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>An approval or a question</td>
-            <td>The request itself, such as the command or the question.</td>
-          </tr>
-          <tr>
-            <td>A task an agent proposed</td>
-            <td><strong>Proposed by the agent, waiting for your go-ahead</strong></td>
-          </tr>
-          <tr>
-            <td>A task whose run finished</td>
-            <td><strong>Finished run waiting for your review</strong></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <p>Click a row to open its thread or task. When nothing is waiting, the Inbox says <strong>Inbox zero</strong>.</p>
+  <section aria-labelledby="waiting">
+    <h2 id="waiting">What waits on you</h2>
+    <p>What waits on you shows where it lives. A thread waiting for your approval or your answer shows an amber question mark on its row in the sidebar, and its project's name counts it, even while the project is folded. Tasks that wait on you, such as one an agent proposed or one ready for review, count on <strong>Tasks</strong> in the sidebar and lead its list.</p>
     <Callout>Desktop notifications cover the same moments when you're looking at something else: a finished turn, a question, an approval, or a failure. Turn them off in <a href={docHref("settings") + "#general"}>Settings</a>.</Callout>
   </section>
 

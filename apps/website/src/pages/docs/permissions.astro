@@ -89,7 +89,7 @@ import { docHref } from "../../data/docs";
         </thead>
         <tbody>
           <tr>
-            <td><strong>Allow</strong></td>
+            <td><strong>Allow once</strong></td>
             <td>This request runs.</td>
           </tr>
           <tr>
@@ -104,10 +104,10 @@ import { docHref } from "../../data/docs";
       </table>
     </div>
     <p>A run lasts as long as the agent's process, across turns. It ends when OpenOrc closes an idle agent, or when you change the thread's mode or agent.</p>
-    <p>A waiting request also shows in the thread's row in the sidebar, as <strong>Needs approval</strong> with the command, and in the <strong>Inbox</strong>. If you're looking elsewhere, a desktop notification tells you. Stopping the turn or quitting OpenOrc denies every request still waiting.</p>
+    <p>A waiting request also shows on the thread's row in the sidebar as an amber question mark, counted on its project's name. If you're looking elsewhere, a desktop notification tells you. Stopping the turn or quitting OpenOrc denies every request still waiting.</p>
     <Callout>
       For Claude Code's own tools, the same kind of request means the same command, the same file, the same site, or the same MCP tool. When nothing can keep allowing a request, such as a password field or a Codex MCP tool's confirmation, the
-      card offers only <strong>Allow</strong> and <strong>Deny</strong>.
+      card offers only <strong>Allow once</strong> and <strong>Deny</strong>.
     </Callout>
     <p>A question card waits for your answer in every mode, Autonomous included. See <a href={docHref("work") + "#questions-and-approvals"}>Following the work</a>.</p>
   </section>

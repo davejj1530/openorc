@@ -39,3 +39,17 @@ export async function cloudFileUri(hosted: Hosted, scope: HostedFileScope, path:
 
 /** A file a team chat message carries, kept as a cloud message's is. */
 export const chatFileUri = (hosted: Hosted, scope: HostedFileScope, file: TeamChatFile): Promise<string> => keptFile(hosted, scope, { id: file.id, name: file.name });
+
+/**
+ * A picture in a cloud thread's folder, read from OpenOrc Cloud through the phone's own session and kept in the cache
+ * by its place, so a view shows it by a `file://` URI. Read again each time it is asked, as the folder may have moved on.
+ */
+export async function threadFileUri(hosted: Hosted, threadId: string, path: string): Promise<string> {
+  if (!hosted.threads.holds({ thread: threadId })) throw new Error("This thread isn't on OpenOrc Cloud.");
+  const space = hosted.threads.row!(threadId).space;
+  const response = await hosted.threadFiles.raw(space, threadId, path, AbortSignal.timeout(60_000));
+  const kept = new File(new Directory(Paths.cache, "thread-files", threadId), encodeURIComponent(path));
+  if (!kept.parentDirectory.exists) kept.parentDirectory.create({ intermediates: true });
+  await kept.write(new Uint8Array(await response.arrayBuffer()));
+  return kept.uri;
+}

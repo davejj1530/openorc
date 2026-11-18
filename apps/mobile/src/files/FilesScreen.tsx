@@ -1,10 +1,9 @@
 import { panelToolLabels, relativeTime } from "@openorc/client";
 import { placeOf, type FileEntry } from "@openorc/protocol";
-import { keepPreviousData } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ScrollView, TextInput, View } from "react-native";
-import { useLinkState, useRpc } from "../client";
+import { useRpc } from "../client";
 import { PanelTitle } from "../changes/PanelTitle";
 import { ChevronRight, FilePlain, Folder, Search } from "../generated/icons";
 import { cn } from "../ui/cn";
@@ -12,7 +11,8 @@ import { ListPressable } from "../ui/ListPressable";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { FilesNotice, readAt } from "./FilesNotice";
-import { parentPlace, placeName, threadScope } from "./thread-files";
+import { useFilesSource, useFolder, useNames, useSavedAt, type FilesSourceNow, type FolderView, type Read } from "./files-source";
+import { parentPlace, placeName } from "./thread-files";
 
 /** As many names as the desktop's search shows. */
 const NAME_LIMIT = 50;
@@ -41,8 +41,8 @@ function EntryRow({ entry, onOpen }: { entry: FileEntry; onOpen: (entry: FileEnt
 }
 
 /** The files whose names match, best first, as the desktop's search lists them; each opens to read. */
-function NameHits({ threadId, query }: { threadId: string; query: string }) {
-  const names = useRpc("files.search", { scope: threadScope(threadId), query, limit: NAME_LIMIT }, { placeholderData: keepPreviousData });
+function NameHits({ threadId, query, source }: { threadId: string; query: string; source: FilesSourceNow }) {
+  const names = useNames(threadId, query, NAME_LIMIT, source);
   if (names.error && !names.data) return <FilesNotice text={names.error.message} />;
   if (!names.data) return <View className="items-center py-10">{<Spinner />}</View>;
   if (!names.data.length) return <FilesNotice text="No file names match." />;
@@ -90,32 +90,34 @@ function SearchField({ query, onChange }: { query: string; onChange: (query: str
 }
 
 /**
- * A thread's files, a folder at a time, as the desktop's Files reads them through the Mac: the thread's folder there,
- * or a cloud thread's copy of its newest save, which the header says the age of. Read only. While the Mac is out of
- * reach, a folder read before stays with when it was read, and one never read waits for the Mac.
+ * A thread's files, a folder at a time, as the desktop's Files reads them: through the Mac, the thread's folder there
+ * or a cloud thread's copy of its newest save; or, for a cloud thread while the Mac is out of reach, from OpenOrc Cloud
+ * itself. The root says how old a save it reads is. Read only. Else, while the Mac is out of reach, a folder read
+ * before stays with when it was read, and one never read waits for the Mac.
  */
 export function FilesScreen() {
   const { threadId, path = "" } = useLocalSearchParams<{ threadId: string; path?: string }>();
   const thread = useRpc("threads.get", { id: threadId });
-  const cloud = Boolean(thread.data && placeOf(thread.data).elsewhere);
-  const link = useLinkState();
-  const live = link.kind === "connected";
-  const folder = useRpc("files.list", { scope: threadScope(threadId), path: path as never }, { staleTime: 30_000 });
-  const copy = useRpc("threads.cloudCopy", { threadId }, { enabled: cloud && !path, staleTime: 60_000 });
+  const elsewhere = Boolean(thread.data && placeOf(thread.data).elsewhere);
+  const { source, live, host } = useFilesSource(thread.data);
+  const folder = useFolder(threadId, path, source);
+  const savedAt = useSavedAt(threadId, elsewhere && !path, source, folder.data);
   const [query, setQuery] = useState("");
   const searching = !path && query.trim().length > 0;
-  const title = placeName(path, folder.data?.name ?? panelToolLabels.file);
-  // Below the root a folder says where it is, as a file says its folder; the root says how old a cloud copy is.
-  const saved = copy.data ? `Saved ${relativeTime(Date.parse(copy.data.asOf.at))}` : null;
+  const title = placeName(path, folder.data?.name || panelToolLabels.file);
+  // Below the root a folder says where it is, as a file says its folder; the root says how old a save it reads is.
+  const saved = savedAt ? `Saved ${relativeTime(Date.parse(savedAt))}` : null;
   const line = path ? parentPlace(path) || null : saved;
+  const kept = source === "mac" && !live;
   const open = (entry: FileEntry) => (entry.kind === "directory" ? openFolder(threadId, entry.path) : openFile(threadId, entry.path));
   return (
     <View className="flex-1 bg-bg">
       <Stack.Screen options={{ headerTitle: () => <PanelTitle title={title} line={line} /> }} />
       <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerClassName="pt-2 pb-8">
-        {!path ? <SearchField query={query} onChange={setQuery} /> : null}
-        {!live && folder.data ? <Text className="px-5 pb-1 text-sm text-ink-4">{readAt(folder.dataUpdatedAt)}</Text> : null}
-        {searching ? <NameHits threadId={threadId} query={query.trim()} /> : <Listing folder={folder} live={live} host={link.kind === "unpaired" ? "" : link.mac.name} onOpen={open} />}
+        {/* A folder refused, as to a reader who may not act in the thread, has no names to find either. */}
+        {!path && !folder.data?.unavailable ? <SearchField query={query} onChange={setQuery} /> : null}
+        {kept && folder.data ? <Text className="px-5 pb-1 text-sm text-ink-4">{readAt(folder.readAt)}</Text> : null}
+        {searching ? <NameHits threadId={threadId} query={query.trim()} source={source} /> : <Listing folder={folder} reachable={!kept} deciding={source === null} host={host} onOpen={open} />}
       </ScrollView>
     </View>
   );
@@ -125,14 +127,15 @@ export function FilesScreen() {
  * A folder's entries, or what stands in for them: the Mac's words when it could not list them or a cloud thread's copy
  * cannot be had (with Retry only where the Mac says it may help), the wait, or Empty folder.
  */
-function Listing({ folder, live, host, onOpen }: { folder: ReturnType<typeof useRpc<"files.list">>; live: boolean; host: string; onOpen: (entry: FileEntry) => void }) {
-  if (folder.data) {
+function Listing({ folder, reachable, deciding, host, onOpen }: { folder: Read<FolderView>; reachable: boolean; deciding: boolean; host: string; onOpen: (entry: FileEntry) => void }) {
+  if (folder.data && !deciding) {
     const { unavailable } = folder.data;
-    if (unavailable) return <FilesNotice text={unavailable.message} onRetry={unavailable.retry && live ? () => void folder.refetch() : undefined} />;
+    if (unavailable) return <FilesNotice text={unavailable.message} onRetry={unavailable.retry && reachable ? folder.refetch : undefined} />;
     if (!folder.data.entries.length) return <FilesNotice text="Empty folder" />;
     return folder.data.entries.map((entry) => <EntryRow key={entry.path} entry={entry} onOpen={onOpen} />);
   }
-  if (!live) return <FilesNotice text={`Waiting for ${host}`} />;
-  if (folder.error) return <FilesNotice text={folder.error.message} onRetry={() => void folder.refetch()} />;
+  if (deciding) return <View className="items-center py-10">{<Spinner />}</View>;
+  if (!reachable) return <FilesNotice text={`Waiting for ${host}`} />;
+  if (folder.error) return <FilesNotice text={folder.error.message} onRetry={folder.refetch} />;
   return <View className="items-center py-10">{<Spinner />}</View>;
 }

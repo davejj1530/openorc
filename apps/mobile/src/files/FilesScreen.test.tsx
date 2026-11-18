@@ -30,7 +30,25 @@ const READS: Record<string, FileRead> = {
   "gone.ts": { kind: "missing", ...place, path: "gone.ts" } as FileRead,
 };
 
-const mac = vi.hoisted(() => ({ phone: null as FakeMac | null, state: null as unknown, params: {} as Record<string, string>, cloud: false, calls: [] as [string, unknown][] }));
+const mac = vi.hoisted(() => ({
+  phone: null as FakeMac | null,
+  state: null as unknown,
+  params: {} as Record<string, string>,
+  cloud: false,
+  calls: [] as [string, unknown][],
+  own: false,
+  refused: false,
+}));
+const saved = { from: "save" as const, savedAt: new Date(Date.now() - 600_000).toISOString() };
+/** The phone's own session of OpenOrc Cloud, which holds thread t1 and reads its files from the server. */
+const ownCloud = vi.hoisted(() => ({
+  served: [] as string[],
+  threadFiles: {
+    list: vi.fn(),
+    search: vi.fn(),
+    read: vi.fn(),
+  },
+}));
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
   mac.phone = fakeMac((method: RpcMethod, params) => {
@@ -40,18 +58,32 @@ vi.mock("../client", async () => {
     if (method === "files.list") return LISTINGS[path!] ? Promise.resolve(LISTINGS[path!]) : Promise.reject(new Error("This project isn't on Studio."));
     if (method === "files.read") return Promise.resolve(READS[path!]);
     if (method === "files.search") return Promise.resolve(query === "team" ? ["src/plans/team.ts"] : []);
+    if (method === "hosted.capabilities") return Promise.resolve({ version: 1, features: { threadFiles: { available: true } } });
     if (method === "threads.cloudCopy")
       return Promise.resolve({ folder: "", savedAt: new Date(Date.now() - 180_000).toISOString(), head: "h", asOf: { turnId: null, at: new Date(Date.now() - 180_000).toISOString() } });
     return Promise.reject(new Error(`no ${method}`));
   });
-  return { ...mac.phone.module, useLinkState: () => mac.state ?? connected };
+  const hosted = { threads: { holds: () => true, row: () => ({ space: "personal" }) }, threadFiles: ownCloud.threadFiles };
+  const cloud = {
+    ...mac.phone.module.cloud,
+    get holds() {
+      return mac.own;
+    },
+    get hosted() {
+      return mac.own ? hosted : null;
+    },
+  };
+  return { ...mac.phone.module, cloud, useLinkState: () => mac.state ?? connected };
 });
 vi.mock("expo-router", () => {
   const Stack = ({ children }: { children?: ReactNode }) => <>{children}</>;
   Stack.Screen = ({ options }: { options: { headerTitle: () => ReactNode } }) => <header>{options.headerTitle()}</header>;
   return { router: { push: vi.fn() }, Stack, useLocalSearchParams: () => mac.params };
 });
-vi.mock("../thread/images", () => ({ ImageTile: ({ asset, label }: { asset: unknown; label: string }) => <img alt={label} data-asset={JSON.stringify(asset)} /> }));
+vi.mock("../thread/images", () => ({
+  ImageTile: ({ asset, label }: { asset: unknown; label: string }) => <img alt={label} data-asset={JSON.stringify(asset)} />,
+  CloudThreadFileTile: ({ path, label }: { path: string; label: string }) => <img alt={label} data-cloud={path} />,
+}));
 vi.mock("../changes/PanelTitle", () => ({ PanelTitle: ({ title, line }: { title: string; line: string | null }) => <h1>{[title, line].filter(Boolean).join(" · ")}</h1> }));
 
 afterEach(() => {
@@ -59,7 +91,9 @@ afterEach(() => {
   mac.phone!.module.queryClient.clear();
   mac.state = null;
   mac.cloud = false;
+  mac.own = false;
   mac.calls = [];
+  for (const read of Object.values(ownCloud.threadFiles)) read.mockReset();
   vi.mocked(router.push).mockClear();
 });
 const search = (query: string) => act(() => (nativeProps.get(screen.getByLabelText("Search files"))!.onChangeText as (text: string) => void)(query));
@@ -158,4 +192,62 @@ it("never shows a file the phone did not read while the Mac is out of reach", as
   show(<FileScreen />, { threadId: "t1", path: "README.md" });
   await waitFor(() => expect(screen.getByText("Waiting for Studio")).toBeTruthy());
   expect(screen.queryByText(/Free, Pro and Team/)).toBeNull();
+});
+
+it("reads a cloud thread's files from OpenOrc Cloud while the Mac is out of reach, by the save's age, never as kept", async () => {
+  mac.state = asleep;
+  mac.cloud = true;
+  mac.own = true;
+  ownCloud.threadFiles.list.mockResolvedValue({
+    name: "launch",
+    entries: [
+      { name: "assets", path: "assets", kind: "directory" },
+      { name: "README.md", path: "README.md", kind: "file" },
+    ],
+    source: saved,
+  });
+  ownCloud.threadFiles.search.mockResolvedValue({ paths: ["notes/long.txt"], source: saved });
+  show(<FilesScreen />, { threadId: "t1" });
+  expect(await screen.findByRole("heading", { name: "launch · Saved 10m ago" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "README.md" })).toBeTruthy();
+  expect(screen.queryByText(/^Read at /)).toBeNull();
+  expect(screen.queryByText("Waiting for Studio")).toBeNull();
+  expect(ownCloud.threadFiles.list).toHaveBeenCalledWith("personal", "t1", "");
+  expect(mac.calls.map(([method]) => method)).not.toContain("files.list");
+  search("long");
+  expect(await screen.findByRole("button", { name: "long.txt, in notes" })).toBeTruthy();
+});
+
+it("says once why the cloud will not show a reader the files, with no search to make", async () => {
+  mac.state = asleep;
+  mac.cloud = true;
+  mac.own = true;
+  ownCloud.threadFiles.list.mockResolvedValue({ name: "launch", entries: [], source: saved, unavailable: { message: "Hosted threads are part of Pro.", retry: false } });
+  show(<FilesScreen />, { threadId: "t1" });
+  expect(await screen.findByText("Hosted threads are part of Pro.")).toBeTruthy();
+  expect(screen.queryByLabelText("Search files")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+});
+
+it("reads a cloud thread's file and its picture from OpenOrc Cloud while the Mac is out of reach", async () => {
+  mac.state = asleep;
+  mac.cloud = true;
+  mac.own = true;
+  ownCloud.threadFiles.read.mockImplementation(async (_space: string, _thread: string, path: string) =>
+    path === "README.md" ? { kind: "file", text: "# Launch\nSpring page.\n", size: 22, source: saved } : { kind: "binary", media: "image", mime: "image/png", size: 4096, source: saved },
+  );
+  show(<FileScreen />, { threadId: "t1", path: "README.md" });
+  expect(await screen.findByText(/Spring page\./)).toBeTruthy();
+  expect(screen.queryByText(/^Read at /)).toBeNull();
+  cleanup();
+  show(<FileScreen />, { threadId: "t1", path: "assets/hero.png" });
+  expect((await screen.findByAltText("hero.png")).getAttribute("data-cloud")).toBe("assets/hero.png");
+});
+
+it("keeps reading through the Mac while it is connected, cloud thread or not", async () => {
+  mac.cloud = true;
+  mac.own = true;
+  show(<FilesScreen />, { threadId: "t1" });
+  expect(await screen.findByRole("button", { name: "README.md" })).toBeTruthy();
+  expect(ownCloud.threadFiles.list).not.toHaveBeenCalled();
 });

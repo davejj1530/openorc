@@ -134,9 +134,12 @@ export interface PullRequestSummary {
   changedFiles: number;
   reviewDecision: PullRequestReviewDecision | null;
   labels: PullRequestLabel[];
+  /** Comments on the conversation and in reviews, as GitHub's own list counts them. */
+  comments: number;
 }
 
-export interface PullRequestDetail extends PullRequestSummary {
+/** gh's view of one pull request can't count its review comments, so its page carries no count. */
+export interface PullRequestDetail extends Omit<PullRequestSummary, "comments"> {
   body: string;
   headSha: string;
   baseSha: string;

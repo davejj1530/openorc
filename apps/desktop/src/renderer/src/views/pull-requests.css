@@ -18,8 +18,31 @@
   text-align: left;
   transition: background-color var(--duration-leave) var(--ease-out);
 }
-.pull-row:hover {
+.pull-row-item:hover > .pull-row {
   background: var(--surface-2);
+}
+
+/* Copy link and open in a new tab: shown on hover or keyboard focus, in the place of the time the row was updated. */
+.pull-row-item {
+  position: relative;
+}
+.pull-row-actions {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity var(--duration-leave) var(--ease-out);
+}
+.pull-row-item:hover > .pull-row-actions,
+.pull-row-item:focus-within > .pull-row-actions {
+  opacity: 1;
+}
+.pull-row-item:hover .pull-row-time,
+.pull-row-item:focus-within .pull-row-time {
+  visibility: hidden;
 }
 
 /* As tall as the title's line, so the glyph sits on it. */

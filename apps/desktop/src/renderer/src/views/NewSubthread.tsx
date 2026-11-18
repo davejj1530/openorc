@@ -15,6 +15,7 @@ import { useRpc, useRpcMutation } from "../lib/client";
 import { readDraft, writeDraft } from "../lib/drafts";
 import { openThread, useRouter } from "../lib/router";
 import { useComposerSuggestions } from "../lib/connector-mentions";
+import { useHostedCapabilities } from "../hooks/useHostedCapabilities";
 import { useNewThreadFiles } from "../lib/new-thread-files";
 import { useMounted } from "../lib/use-mounted";
 
@@ -49,8 +50,8 @@ function SubthreadComposer({ parent }: { parent: ThreadSummary }) {
   const [mode, setMode] = useState(parent.mode);
   const [permission, setPermission] = useState(parent.permissionMode);
   const start = useRpcMutation("threads.start");
-  const { files, picker: accountPicker, claudeAccountId, missing } = useSubthreadPlace(parent, start.isPending, () => start.reset());
-  const accountsMissing = choice?.agent === "claude" ? missing : null;
+  const { files, picker: accountPicker, claudeAccountId, missing, held } = useSubthreadPlace(parent, start.isPending, () => start.reset());
+  const blocked = held ?? (choice?.agent === "claude" ? missing : null);
   const suggestions = useComposerSuggestions({ kind: "thread", id: parent.id }, choice?.agent, executionMode(mode, permission), claudeAccountId);
   const mounted = useMounted();
   const changePrompt = (text: string) => {
@@ -60,7 +61,7 @@ function SubthreadComposer({ parent }: { parent: ThreadSummary }) {
   };
   const submit = async (text: string, attachments: string[]) => {
     if (!choice) throw new Error("Choose a model first.");
-    if (accountsMissing) throw new Error(accountsMissing);
+    if (blocked) throw new Error(blocked);
     const scope = spaceNavigation.getState();
     const { thread } = await start.mutateAsync({
       ...(scope.current ? { spaceId: scope.current } : {}),
@@ -127,7 +128,7 @@ function SubthreadComposer({ parent }: { parent: ThreadSummary }) {
               fileSearch={{ kind: "thread", id: parent.id }}
               {...suggestions}
               busy={start.isPending}
-              disabledReason={choice ? accountsMissing : "Choose a model first."}
+              disabledReason={choice ? blocked : "Choose a model first."}
               error={start.error?.message ?? null}
             />
           </div>
@@ -140,15 +141,17 @@ function SubthreadComposer({ parent }: { parent: ThreadSummary }) {
 
 /**
  * Where a subthread starts and on what. Under a cloud thread it starts on OpenOrc Cloud too, on the person's cloud
- * sign-in and with the cloud's files; under a thread here, on this Mac with its project's Claude accounts. `missing`
- * says why a Claude subthread here can't start yet.
+ * sign-in and with the cloud's files, once its server says it starts one there (`held` until then, in its words, as the
+ * thread's menu says it); under a thread here, on this Mac with its project's Claude accounts. `missing` says why a
+ * Claude subthread here can't start yet.
  */
 function useSubthreadPlace(parent: ThreadSummary, starting: boolean, onChoose: () => void) {
   const cloud = placeOf(parent) === PLACES.hosted;
   const hosted = useNewThreadFiles(parent.projectId, cloud, parent.id);
   const { list, picker, claudeAccountId } = useSubthreadAccount(parent, !cloud, starting, onChoose);
+  const held = useHostedCapabilities(parent).reason("personSubthreads");
   const files = cloud ? hosted : { draftKey: `${draftKey(parent.id)}.attachments`, hostedFiles: undefined };
-  return { files, picker, claudeAccountId, missing: cloud || list.data ? null : (list.error?.message ?? "Loading Claude accounts…") };
+  return { files, picker, claudeAccountId, held, missing: cloud || list.data ? null : (list.error?.message ?? "Loading Claude accounts…") };
 }
 
 /**

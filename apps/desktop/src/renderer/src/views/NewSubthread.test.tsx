@@ -8,6 +8,7 @@ const start = vi.fn();
 let accounts: RpcResults["claude.accounts.list"] | undefined;
 let project: Project | null;
 let parent: Thread;
+let capabilities: RpcResults["hosted.capabilities"] | undefined;
 const codexParent = {
   id: "home",
   projectId: "p1",
@@ -27,7 +28,7 @@ const codexParent = {
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
   useRpc: (method: string) => {
-    const data: Record<string, unknown> = { "threads.get": parent, "claude.accounts.list": accounts, "projects.get": project };
+    const data: Record<string, unknown> = { "threads.get": parent, "claude.accounts.list": accounts, "projects.get": project, "hosted.capabilities": capabilities };
     return { data: data[method], error: null, isPending: false, refetch: vi.fn() };
   },
   useRpcMutation: () => ({ mutateAsync: start, reset: vi.fn(), isPending: false, error: null }),
@@ -74,6 +75,7 @@ const send = (text: string) => {
 beforeEach(() => {
   localStorage.clear();
   parent = codexParent;
+  capabilities = undefined;
   project = { id: "p1", name: "Landing", settings: {} } as Project;
   accounts = {
     defaultId: "personal",
@@ -131,4 +133,18 @@ it("offers only the accounts the project uses, starting on its default when the 
   expect(chosenAccount()).toBe("client");
   send("Use the project's account");
   await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ claudeAccountId: "client" })));
+});
+
+it("holds a subthread under a cloud thread in its server's words until it starts one there", async () => {
+  parent = { ...codexParent, owner: { brain: "hosted", reach: "live", heardAt: 1 } } as Thread;
+  const words = "Creating a subthread isn't available in this cloud thread yet.";
+  capabilities = { features: { personSubthreads: { available: false, reason: words } } } as RpcResults["hosted.capabilities"];
+  const { rerender } = render(<NewSubthread parentId="home" />);
+  send("Split the pricing page");
+  expect(screen.getByRole("button", { name: "Send" }).getAttribute("data-tip")).toBe(words);
+  expect(start).not.toHaveBeenCalled();
+  capabilities = { features: { personSubthreads: { available: true } } } as RpcResults["hosted.capabilities"];
+  rerender(<NewSubthread parentId="home" />);
+  send("Split the pricing page");
+  await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ parentThreadId: "home", agent: "codex" })));
 });

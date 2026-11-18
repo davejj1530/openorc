@@ -108,6 +108,8 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "providers.limits": ["provider-usage", "claude-accounts", "system"],
   "agents.models": ["models"],
   "agents.modelCatalog": ["models"],
+  // OpenOrc Cloud's, read again when a turn's end there keeps a new listing, and for whoever signs in.
+  "cloudModels.catalog": ["cloud-models", "account"],
   "memory.settings.get": ["settings"],
   "app.settings.get": ["settings"],
   "textGeneration.settings.get": ["text-generation", "system", "models"],

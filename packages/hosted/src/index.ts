@@ -334,7 +334,7 @@ function parityServices(
   threads: Pick<Threads, "cloudProjectFor">,
 ): Pick<Hosted, "environment" | "connectors" | "machines" | "check" | "macProjects" | "moves" | "pullReviews" | "models"> {
   return {
-    models: new CloudModels({ session }),
+    models: new CloudModels({ session, push }),
     pullReviews: new CloudPullReviews({ session, project: (id) => threads.cloudProjectFor(id), push }),
     environment: new ProjectEnvironment({ session, now }),
     connectors: new CloudConnectors({ session }),

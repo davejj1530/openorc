@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createHosted, type Hosted } from "./index.js";
-import { hostDeps, newDevice, signInAs } from "./test-fixtures/host.js";
+import { hostDeps, newDevice, signInAs, type Seen } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
 
 /* The models OpenOrc Cloud runs for the person: its server's answer, and none from a server from before the catalog. */
 const email = "reader@example.com";
 let stand: StandIn;
 let hosted: Hosted;
+let seen: Seen;
 let status: number;
 let asked: number;
 
@@ -24,6 +25,7 @@ beforeEach(async () => {
     },
   });
   hosted = createHosted(host.deps);
+  seen = host.seen;
   await hosted.start();
   await signInAs(hosted, host.browser, email);
 });
@@ -39,4 +41,10 @@ it("reads the person's cloud catalog, and from a server without one answers none
   expect(await hosted.models.read()).toBeNull();
   expect(asked).toBe(2);
   await vi.waitFor(() => expect(hosted.account.status().state).toBe("signed-in"));
+});
+
+it("has the windows read the catalog again once the server says a turn's end kept a new listing", async () => {
+  const before = seen.pushes.length;
+  stand.tell(email, ["models"]);
+  await vi.waitFor(() => expect(seen.pushes.slice(before)).toContainEqual({ type: "invalidate", keys: ["cloud-models"] }));
 });

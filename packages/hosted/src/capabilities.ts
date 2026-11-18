@@ -4,8 +4,17 @@ import type { Threads } from "./threads.js";
 import { PARITY_ROUTES } from "./wire-parity.js";
 import { REVIEW_ROUTES } from "./wire-review.js";
 
-/** Availability is a requested hint. Every operation still checks its own current access. */
-export async function capabilities(threads: Threads, { threadId }: { threadId: string }): Promise<HostedCapabilities> {
+/**
+ * Availability is a requested hint. Every operation still checks its own current access. A family the server said is
+ * full of subthreads holds New subthread in its words.
+ */
+export async function capabilities(threads: Threads, params: { threadId: string }): Promise<HostedCapabilities> {
+  const answer = await served(threads, params);
+  const full = threads.subthreadsFull(params.threadId);
+  return full ? { ...answer, features: { ...answer.features, personSubthreads: { available: false, reason: full } } } : answer;
+}
+
+async function served(threads: Threads, { threadId }: { threadId: string }): Promise<HostedCapabilities> {
   const on = threads.on(threadId);
   try {
     return await on.request(PARITY_ROUTES.capabilities);

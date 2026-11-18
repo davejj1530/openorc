@@ -54,12 +54,18 @@ function whileStopping(thread: Thread, who: string, joins: boolean): Placement {
 
 type Refusal = { status: number; body: unknown };
 
+/** As the real server's rules.ts: how many subthreads a family takes, and its words for one more. */
+export const SUBTHREADS = 20;
+export const SUBTHREADS_FULL = `This thread has ${SUBTHREADS} subthreads. Delete one to start another.`;
+
 /** The thread a new one starts under, when the body names one: a thread of its own in the same space and project; else the refusal. */
 export function parentOf(threads: ReadonlyMap<string, Thread>, parentThreadId: unknown, space: string, projectId: string): { parent: Thread | null } | { refusal: Refusal } {
   if (parentThreadId === undefined) return { parent: null };
   const parent = typeof parentThreadId === "string" ? threads.get(parentThreadId) : undefined;
   if (parent?.parentId) return { refusal: { status: 409, body: { message: "A subthread can't have subthreads of its own.", statusCode: 409 } } };
   if (parent?.space !== space || parent.projectId !== projectId) return { refusal: { status: 403, body: { message: "You can't start a thread under that one.", statusCode: 403 } } };
+  if ([...threads.values()].filter((thread) => thread.parentId === parent.id).length >= SUBTHREADS)
+    return { refusal: { status: 409, body: { message: SUBTHREADS_FULL, statusCode: 409, code: "subthreads_full" } } };
   return { parent };
 }
 

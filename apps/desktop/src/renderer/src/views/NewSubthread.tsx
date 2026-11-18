@@ -93,14 +93,14 @@ function SubthreadComposer({ parent }: { parent: ThreadSummary }) {
         <div className="new-thread-body flex-1 min-h-0 overflow-y-auto">
           <DitherBackdrop />
           <div className="new-thread-column">
+            {/* The mark is joined to the name's last word, so it never wraps alone; its own box keeps the underline off it. */}
             <h1 className="new-thread-question">
               What should we work on under{" "}
-              <span className="inline-flex max-w-full">
-                <button className="new-thread-question-project truncate" data-tip={parent.title} onClick={() => openThread(parent.id)}>
-                  {parent.title}
-                </button>
-                ?
-              </span>
+              <button className="new-thread-question-project" aria-label={parent.title} data-tip={parent.title} onClick={() => openThread(parent.id)}>
+                {parent.title}
+                {"\u2060"}
+                <span className="inline-block">?</span>
+              </button>
             </h1>
             <Composer
               draftKey={files.draftKey}

@@ -92,9 +92,9 @@ it("starts the subthread under its parent on the parent's settings, then opens i
       <NewSubthread parentId="home" />
     </StrictMode>,
   );
-  expect(screen.getByRole("heading").textContent).toBe("What should we work on under Landing page?");
-  // The parent's name and its question mark are one unit on one line, so the mark never stands alone.
-  expect(screen.getByRole("button", { name: "Landing page" }).parentElement?.textContent).toBe("Landing page?");
+  expect(screen.getByRole("heading").textContent).toBe("What should we work on under Landing page\u2060?");
+  // The mark is joined to the parent's name, so it never wraps onto a line of its own.
+  expect(screen.getByRole("button", { name: "Landing page" }).textContent).toBe("Landing page\u2060?");
   const message = screen.getByRole("textbox", { name: "Message" });
   type(message, "Fix the flaky signup test");
   fireEvent.keyDown(message, { key: "Enter", code: "Enter" });

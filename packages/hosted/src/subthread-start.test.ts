@@ -3,6 +3,7 @@ import { createHosted, type Hosted } from "./index.js";
 import { CLOUD_PROJECT } from "./translate.js";
 import { hostDeps, newDevice, signInAs } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
+import { SUBTHREADS, SUBTHREADS_FULL } from "./testing/stand-in-thread-placement.js";
 
 /*
  * A person starts a thread of their own under a cloud thread, as under a thread on this Mac: it starts on OpenOrc Cloud
@@ -60,4 +61,17 @@ it("starts none under a thread of another project, and says the server's words u
   const child = await hosted.threads.call("threads.start", under(parent));
   await vi.waitFor(() => expect(hosted.threads.holds({ thread: child.thread.id })).toBe(true));
   await expect(hosted.threads.call("threads.start", under(child.thread.id))).rejects.toThrow("A subthread can't have subthreads of its own.");
+});
+
+it("holds New subthread in the server's words once a family is full, until one of its subthreads goes", async () => {
+  stand.threadFiles.capabilities = { personSubthreads: { available: true } };
+  const family: string[] = [];
+  for (let n = 0; n < SUBTHREADS; n++) family.push((await hosted.threads.call("threads.start", under(parent))).thread.id);
+  const subthreads = async (threadId: string) => (await hosted.threads.call("hosted.capabilities", { threadId })).features.personSubthreads;
+  expect(await subthreads(parent)).toEqual({ available: true });
+  await expect(hosted.threads.call("threads.start", under(parent))).rejects.toThrow(SUBTHREADS_FULL);
+  expect(await subthreads(parent)).toEqual({ available: false, reason: SUBTHREADS_FULL });
+  expect(await subthreads(family[0]!)).toEqual({ available: false, reason: SUBTHREADS_FULL });
+  await hosted.threads.call("threads.delete", { id: family[0]! });
+  await vi.waitFor(async () => expect(await subthreads(parent)).toEqual({ available: true }));
 });

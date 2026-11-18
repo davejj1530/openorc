@@ -103,6 +103,7 @@ export const ArrowRight = icon("ArrowRight", <path d="M4 12h16m-6-6 6 6-6 6" />)
 export const ArrowLeft = icon("ArrowLeft", <path d="M20 12H4m6-6-6 6 6 6" />);
 export const ArrowUp = icon("ArrowUp", <path d="M12 20V4m-6 6 6-6 6 6" />);
 export const ArrowDown = icon("ArrowDown", <path d="M12 4v16m-6-6 6 6 6-6" />);
+export const ArrowDownUp = icon("ArrowDownUp", <path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4m-3.5 3.5L17 4l3.5 3.5" />);
 export const ArrowLeftRight = icon("ArrowLeftRight", <path d="M4 8h16m-4-4 4 4-4 4 M20 16H4m4-4-4 4 4 4" />);
 export const ArrowUpRight = icon("ArrowUpRight", <path d="M6 18 18 6 M7 6h11v11" />);
 export const ExternalLink = icon(
@@ -444,6 +445,7 @@ export const ArchiveRestore = icon(
   </>,
 );
 export const Pin = icon("Pin", pin);
+export const Star = icon("Star", <path d="M12 4l2.35 4.76 5.25.77-3.8 3.7.9 5.23L12 15.99l-4.7 2.47.9-5.23-3.8-3.7 5.25-.77z" />);
 export const PinOff = icon(
   "PinOff",
   <>

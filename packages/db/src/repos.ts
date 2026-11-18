@@ -7,7 +7,7 @@ import { redact, redactJson } from "./redact.js";
 import { retiredTaskIds, retiredTeams, retiredThreadIds } from "./retired-teams.js";
 import { jaccard, normalizeTitle, wordSet } from "./task-similarity.js";
 import { threadListLimit, threadListOrder } from "./thread-list-order.js";
-import { threadRootCountSql, threadTreeArgs, threadTreeSql } from "./thread-list-tree.js";
+import { TREE_VISIBLE, threadRootCountSql, threadTreeArgs, threadTreeSql } from "./thread-list-tree.js";
 
 const now = () => Date.now();
 
@@ -356,18 +356,19 @@ export interface ThreadInsert {
 
 /** Raw rows remain available internally; user inventories exclude retired records. */
 const VISIBLE = `id NOT IN (${retiredThreadIds})`;
-/**
- * `VISIBLE` for the thread trees, which take the retired ids as a JSON list instead: SQLite 3.54.0 and 3.54.1 count every
- * copy of a CTE toward one limit per statement, and a tree's CTEs copy its filter dozens of times.
- */
-const VISIBLE_GIVEN = "id NOT IN (SELECT value FROM json_each(?))";
-const retiredIds = (db: Db) => (db.stmt(retiredThreadIds).all() as { id: string }[]).map((row) => row.id);
 
-/** The filter that keeps retired threads out of a list, the values it takes, and for a tree the retired ids. */
-function visibility(db: Db, tree: boolean | undefined): { where: string; args: string[]; retired: string[] } {
-  if (!tree) return { where: VISIBLE, args: [], retired: [] };
-  const retired = retiredIds(db);
-  return { where: VISIBLE_GIVEN, args: [JSON.stringify(retired)], retired };
+/**
+ * A list's statement for `where`, as a page of threads or of trees, with hidden records left out before pagination in
+ * every view. A tree is passed the retired ids, read here, rather than searching for them inside its own query.
+ */
+function threadListStatement(
+  db: Db,
+  filter: { includeChildren?: boolean; selectedId?: string; childLimits?: Record<string, number>; attentionIds?: readonly string[] },
+  query: { where: readonly string[]; args: readonly (string | number)[]; order: string; limit: string },
+): { sql: string; args: (string | number)[] } {
+  if (!filter.includeChildren) return { sql: `SELECT * FROM threads WHERE ${[VISIBLE, ...query.where].join(" AND ")} ORDER BY ${query.order}${query.limit}`, args: [...query.args] };
+  const tree = threadTreeArgs({ ...filter, retiredIds: retiredTeams.threadIds(db) });
+  return { sql: threadTreeSql([TREE_VISIBLE, ...query.where].join(" AND "), query.order, query.limit), args: [...tree, ...query.args] };
 }
 
 export const threads = {
@@ -408,10 +409,6 @@ export const threads = {
       where.push("project_id != ?");
       args.push(WORKSPACE_ID);
     }
-    // Exclude hidden records before applying pagination, including archived and all views.
-    const visible = visibility(db, filter.includeChildren);
-    where.push(visible.where);
-    args.push(...visible.args);
     if (filter.excludeSubagents) where.push("COALESCE(parent_relation, '') != 'subagent'");
     if (filter.pinnedOnly) where.push("pinned_at IS NOT NULL");
     // Unread as the thread summary reads it, or with a run that is working or waiting on you.
@@ -423,11 +420,8 @@ export const threads = {
     if (kind === "active") where.push("archived_at IS NULL");
     else if (kind === "done") where.push("archived_at IS NULL AND done_at IS NOT NULL");
     else if (kind === "archived") where.push("archived_at IS NOT NULL");
-    const limit = threadListLimit(filter);
-    const order = threadListOrder(kind, filter.orderBy);
-    const sql = filter.includeChildren ? threadTreeSql(where.join(" AND "), order, limit) : `SELECT * FROM threads WHERE ${where.join(" AND ")} ORDER BY ${order}${limit}`;
-    if (filter.includeChildren) args.unshift(...threadTreeArgs(filter, visible.retired));
-    return (db.stmt(sql).all(...args) as unknown as (ThreadRow & { hidden_children?: number; tree_activity?: number | null })[]).map((row) => ({
+    const statement = threadListStatement(db, filter, { where, args, order: threadListOrder(kind, filter.orderBy), limit: threadListLimit(filter) });
+    return (db.stmt(statement.sql).all(...statement.args) as unknown as (ThreadRow & { hidden_children?: number; tree_activity?: number | null })[]).map((row) => ({
       ...threadFromRow(row),
       ...(row.hidden_children === undefined ? {} : { hiddenChildren: row.hidden_children }),
       ...(row.tree_activity == null ? {} : { treeActivityAt: row.tree_activity }),
@@ -474,9 +468,8 @@ export const threads = {
    */
   resolvedCount(db: Db, { projectIds, quietBefore, now: at }: { projectIds: readonly string[]; quietBefore: number; now: number }): number {
     const projects = projectIds.length ? `project_id IN (${projectIds.map(() => "?").join(",")})` : "0";
-    const retired = JSON.stringify(retiredIds(db));
     const count = (where: string, rootWhere: string, args: (string | number)[]) =>
-      Number((db.stmt(threadRootCountSql(`${VISIBLE_GIVEN} AND ${projects} AND ${where}`, rootWhere)).get(retired, retired, ...projectIds, ...args) as { n: number }).n);
+      Number((db.stmt(threadRootCountSql(`${VISIBLE} AND ${projects} AND ${where}`, rootWhere)).get(...projectIds, ...args) as { n: number }).n);
     const quiet = "roots.pinned_at IS NULL AND (roots.snoozed_until IS NULL OR roots.snoozed_until <= ?) AND latest.tree_activity < ?";
     return count("archived_at IS NOT NULL", "1", []) + count("archived_at IS NULL", quiet, [at, quietBefore]);
   },

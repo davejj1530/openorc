@@ -311,7 +311,7 @@ export class Session {
     const headers: Record<string, string> = { [ACCOUNT_PROTOCOL_HEADER]: String(ACCOUNT_PROTOCOL_VERSION) };
     if (token) headers["authorization"] = `Bearer ${token}`;
     if (space) headers[SPACE_HEADER] = space;
-    const sending = outgoing(body, signal, REQUEST_TIMEOUT_MS);
+    const sending = outgoing(body, signal, route.waitMs ?? REQUEST_TIMEOUT_MS);
     if (sending.contentType) headers["content-type"] = sending.contentType;
     try {
       return await this.deps.fetch(new URL(route.path, this.deps.server), { method: route.method, headers, ...sending.init, redirect: signal ? "error" : "follow" });

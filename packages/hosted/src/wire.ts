@@ -16,6 +16,8 @@ export interface Route<T> {
   reply: z.ZodType<T> | null;
   /** Optional validated refusal for routes with a structured conflict. */
   refusal?: (status: number, body: unknown) => Error | undefined;
+  /** How long the server may take to answer, for a route that waits on a machine or a person; the session's own when unset. */
+  waitMs?: number;
 }
 
 const iso = z.iso.datetime();
@@ -342,11 +344,13 @@ export const ROUTES = {
       }),
     ),
   /** One file of a thread's checkout written on its machine, as its host made it. The same id again is the same write. */
-  writeFile: (id: string) => route("PUT", `/hosted/threads/${encodeURIComponent(id)}/files`, fileWriteOutcome),
+  // The server waits up to 90 s for the machine (its file-writes.ts FILE_WRITE_WAIT_MS), which may first wake.
+  writeFile: (id: string) => ({ ...route("PUT", `/hosted/threads/${encodeURIComponent(id)}/files`, fileWriteOutcome), waitMs: 100_000 }),
   /** A tool call's interactive app, opened against the thread's live agent process; then its view's reads, calls and close. */
   mcpAppOpen: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/mcp-apps`, z.unknown()),
   mcpAppRead: (id: string, viewId: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/mcp-apps/${encodeURIComponent(viewId)}/read`, z.unknown()),
-  mcpAppCall: (id: string, viewId: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/mcp-apps/${encodeURIComponent(viewId)}/call`, z.unknown()),
+  // An app's action may wait on its approval, which the server holds up to 5 minutes (HOSTED_ASK_HOLD_SECONDS).
+  mcpAppCall: (id: string, viewId: string) => ({ ...route("POST", `/hosted/threads/${encodeURIComponent(id)}/mcp-apps/${encodeURIComponent(viewId)}/call`, z.unknown()), waitMs: 330_000 }),
   mcpAppClose: (id: string, viewId: string) => route("DELETE", `/hosted/threads/${encodeURIComponent(id)}/mcp-apps/${encodeURIComponent(viewId)}`, null),
   /** One tool call's whole output, as the server kept it; null output for a call that never ended. */
   toolOutput: (id: string, toolCallId: string) => route("GET", `/hosted/threads/${encodeURIComponent(id)}/tool-calls/${encodeURIComponent(toolCallId)}/output`, z.object({ output: z.unknown() })),

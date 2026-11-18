@@ -146,6 +146,16 @@ describe("the session", () => {
     expect(made.state).toMatchObject({ signedIn: true, email: EMAIL });
   });
 
+  it("waits as long as a route says its server may take, and the session's own time for any other", async () => {
+    const { session: made } = session();
+    await signedIn(made);
+    const deadlines = vi.spyOn(AbortSignal, "timeout");
+    await made.request(ROUTES.billing);
+    // A write waits on the thread's machine, which the server gives 90 s and may first wake.
+    await made.request(ROUTES.writeFile("thread-1"), { id: "00000000-0000-4000-8000-000000000001", path: "NOTE.md", text: "one", expected: { kind: "absent" } }).catch(() => undefined);
+    expect(deadlines.mock.calls.map(([ms]) => ms)).toEqual([30_000, 100_000]);
+  });
+
   it("rejects a reply that does not parse as unreadable", async () => {
     const { session: made } = session({
       fetch: async (input, init) => (new URL(String(input)).pathname === "/billing" ? new Response(JSON.stringify({ pro: "yes" }), { status: 200 }) : fetch(input, init)),

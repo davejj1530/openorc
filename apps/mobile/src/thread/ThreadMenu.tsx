@@ -5,7 +5,7 @@ import { Link, Stack } from "expo-router";
 import { useMemo, type ReactElement } from "react";
 import { useSubthreads } from "./subthreads";
 import { threadMenu, type ThreadAction } from "./thread-actions";
-import { useServed } from "./served";
+import { useHeldReason } from "./served";
 import { useShares } from "../connection/use-shares";
 import { THREAD_FILES } from "../files/thread-files";
 
@@ -53,7 +53,8 @@ function toolbarItems(actions: ThreadAction[], run: Run): ReactElement[] {
       <Stack.Toolbar.MenuAction
         key={action.label}
         icon={action.icon}
-        subtitle={action.kind === "screen" ? action.subtitle : undefined}
+        subtitle={action.kind === "screen" ? (action.held ?? action.subtitle) : undefined}
+        disabled={action.kind === "screen" && Boolean(action.held)}
         destructive={action.kind === "delete"}
         onPress={() => run(action)}
       >
@@ -85,7 +86,7 @@ export function useThreadHeaderMenu(thread: ThreadSummary | null, now: Date, run
   const preview = usePreviewPanel(actionable);
   const subthreads = useSubthreads(actionable).subthreads.length;
   const compact = canCompact && thread?.activity !== "running";
-  const startsUnder = useServed(thread, "personSubthreads");
+  const startsUnder = useHeldReason(thread, "personSubthreads");
   const files = useShares(THREAD_FILES) === true;
   return useMemo(
     () => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, subthreads, compact, startsUnder, files }), run),

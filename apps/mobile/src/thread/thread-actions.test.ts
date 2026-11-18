@@ -46,11 +46,16 @@ describe("a thread's menu on the phone", () => {
     expect(outline(threadMenu(thread("t-settings"), "row", wednesday)).flat()).not.toContain("Files");
   });
 
-  it("starts one under a cloud thread from its header once its server serves it, never from its row", () => {
+  it("starts one under a cloud thread from its header once its server serves it, held in its reason where it does not, never from its row", () => {
     const cloud = { ...thread("t-plan"), owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 0 } };
     const panels = { uncommitted: null, preview: null };
+    const item = (startsUnder: string | null) =>
+      threadMenu(cloud, "header", wednesday, { ...panels, startsUnder })
+        .flat()
+        .find((action) => action.label === "New Subthread");
+    expect(item(null)).toEqual({ kind: "screen", label: "New Subthread", icon: "square.and.pencil", pathname: "/new-subthread" });
+    expect(item("Creating a subthread isn't available in this cloud thread yet.")).toMatchObject({ held: "Creating a subthread isn't available in this cloud thread yet." });
     expect(outline(threadMenu(cloud, "header", wednesday, panels)).flat()).not.toContain("New Subthread");
-    expect(outline(threadMenu(cloud, "header", wednesday, { ...panels, startsUnder: true })).flat()).toContain("New Subthread");
     expect(outline(threadMenu(cloud, "row", wednesday)).flat()).not.toContain("New Subthread");
   });
 

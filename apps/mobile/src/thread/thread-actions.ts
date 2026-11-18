@@ -22,7 +22,7 @@ export type ThreadAction =
   | { kind: "rename"; label: string; icon: Symbol }
   | { kind: "open"; label: string; icon: Symbol; url: string }
   | { kind: "parent"; label: string; icon: Symbol; threadId: string }
-  | { kind: "screen"; label: string; icon: Symbol; subtitle?: string; pathname: ThreadScreenPath }
+  | { kind: "screen"; label: string; icon: Symbol; subtitle?: string; pathname: ThreadScreenPath; held?: string }
   | { kind: "delete"; label: string; icon: Symbol }
   | { kind: "compact"; label: string; icon: Symbol };
 
@@ -50,8 +50,11 @@ export interface ThreadPanels {
   subthreads?: number;
   /** The thread's place compacts it, and no turn runs: the header offers Compact Context. */
   compact?: boolean;
-  /** A cloud thread's server starts a thread under it: the header offers New Subthread. */
-  startsUnder?: boolean;
+  /**
+   * Whether a cloud thread's server starts a thread under it now, as the header asked it: null when it does, else its
+   * reason, which holds New Subthread. A row's menu asks nothing, so it offers none for a cloud thread.
+   */
+  startsUnder?: string | null;
   /** The Mac reads the thread's files for a phone: the header offers Files beside Changes. */
   files?: boolean;
 }
@@ -115,8 +118,11 @@ export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, p
  * only its header has asked.
  */
 function startUnder(thread: ThreadSummary, panels: ThreadPanels = NO_PANELS): ThreadAction[] {
-  if (thread.teamInstanceId || thread.orclingId || (placeOf(thread).elsewhere && !panels.startsUnder)) return [];
-  return [{ kind: "screen", label: "New Subthread", icon: "square.and.pencil", pathname: "/new-subthread" }];
+  if (thread.teamInstanceId || thread.orclingId) return [];
+  const item = { kind: "screen", label: "New Subthread", icon: "square.and.pencil", pathname: "/new-subthread" } as const;
+  if (!placeOf(thread).elsewhere) return [item];
+  if (panels.startsUnder === undefined) return [];
+  return [panels.startsUnder === null ? item : { ...item, held: panels.startsUnder }];
 }
 
 /** A thread's family in its header: a new subthread, the thread it came from, and the subthreads it has. */

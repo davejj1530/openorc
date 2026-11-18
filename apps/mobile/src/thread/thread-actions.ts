@@ -9,7 +9,7 @@ export type OrganizePatch = Pick<RpcParams<"threads.update">["patch"], "pinned" 
 type Symbol = NonNullable<ComponentProps<typeof Link.MenuAction>["icon"]>;
 
 /** The screens a thread's menu opens over the thread: the desktop's side panel tools a phone has. */
-export type ThreadScreenPath = "/changes" | "/cloud-changes" | "/preview" | "/subthreads" | "/new-subthread";
+export type ThreadScreenPath = "/changes" | "/cloud-changes" | "/files" | "/preview" | "/subthreads" | "/new-subthread";
 
 /**
  * One item of a thread's menu: a change to save, a snooze (its time counted when it is chosen, as a row keeps its menu
@@ -52,6 +52,8 @@ export interface ThreadPanels {
   compact?: boolean;
   /** A cloud thread's server starts a thread under it: the header offers New Subthread. */
   startsUnder?: boolean;
+  /** The Mac reads the thread's files for a phone: the header offers Files beside Changes. */
+  files?: boolean;
 }
 
 const NO_PANELS: ThreadPanels = { uncommitted: null, preview: null };
@@ -82,7 +84,11 @@ export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, p
   if (isSubagentThread(thread)) return thread.parentThreadId ? [[{ kind: "parent", label: "Open parent", icon: "arrow.turn.up.left", threadId: thread.parentThreadId }]] : [];
   const team = Boolean(thread.teamInstanceId);
   const rename: ThreadAction = { kind: "rename", label: "Rename…", icon: "pencil" };
-  const screens: ThreadAction[] = [...(panels.uncommitted === null ? [] : [changes(panels.uncommitted, placeOf(thread).elsewhere)]), ...(panels.preview ? [preview(panels.preview.page)] : [])];
+  const screens: ThreadAction[] = [
+    ...(panels.uncommitted === null ? [] : [changes(panels.uncommitted, placeOf(thread).elsewhere)]),
+    ...(panels.files && !thread.orclingId ? [{ kind: "screen", label: panelToolLabels.file, icon: "folder", pathname: "/files" } as const] : []),
+    ...(panels.preview ? [preview(panels.preview.page)] : []),
+  ];
   const organize: ThreadAction[] = [
     thread.pinnedAt ? { kind: "patch", label: "Unpin", icon: "pin.slash", patch: { pinned: false } } : { kind: "patch", label: "Pin", icon: "pin", patch: { pinned: true } },
     ...(team ? [] : [snooze(thread, now)]),

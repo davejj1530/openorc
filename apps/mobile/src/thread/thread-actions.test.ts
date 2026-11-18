@@ -38,6 +38,14 @@ describe("a thread's menu on the phone", () => {
     }
   });
 
+  it("offers Files beside Changes once the Mac reads a thread's files, never for an Orcling's conversation or from a row", () => {
+    const panels = { uncommitted: 2, preview: null, files: true };
+    expect(outline(threadMenu(thread("t-settings"), "header", wednesday, panels))[0]).toEqual(["Changes", "Files", "Rename…"]);
+    expect(outline(threadMenu(thread("t-settings"), "header", wednesday, { ...panels, files: false })).flat()).not.toContain("Files");
+    expect(outline(threadMenu({ ...thread("t-settings"), orclingId: "orc-1" }, "header", wednesday, panels)).flat()).not.toContain("Files");
+    expect(outline(threadMenu(thread("t-settings"), "row", wednesday)).flat()).not.toContain("Files");
+  });
+
   it("starts one under a cloud thread from its header once its server serves it, never from its row", () => {
     const cloud = { ...thread("t-plan"), owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 0 } };
     const panels = { uncommitted: null, preview: null };

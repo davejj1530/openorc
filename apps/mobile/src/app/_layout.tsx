@@ -61,6 +61,8 @@ export default function RootLayout() {
             <Stack.Screen name="subthreads" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="changes" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="cloud-changes" dangerouslySingular={onePerPanel} options={pushed} />
+            <Stack.Screen name="files" options={pushed} />
+            <Stack.Screen name="file" options={pushed} />
             <Stack.Screen name="chat/[id]" dangerouslySingular={onePerThread} options={pushed} />
             <Stack.Screen name="preview" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="diff" options={pushed} />

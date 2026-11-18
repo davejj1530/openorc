@@ -13,6 +13,9 @@ const KEPT: ReadonlySet<string> = new Set<RpcMethod | DeviceMethod>([
   "app.settings.get",
   "tasks.board",
   "providers.limits",
+  // A thread's folders as last listed, with when, for while the Mac is out of reach; never a file's text.
+  "files.list",
+  "threads.cloudCopy",
   "agents.models",
   "agents.availability",
   "cloudModels.catalog",

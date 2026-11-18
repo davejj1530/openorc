@@ -6,6 +6,8 @@ import { useMemo, type ReactElement } from "react";
 import { useSubthreads } from "./subthreads";
 import { threadMenu, type ThreadAction } from "./thread-actions";
 import { useServed } from "./served";
+import { useShares } from "../connection/use-shares";
+import { THREAD_FILES } from "../files/thread-files";
 
 type Run = (action: ThreadAction) => void;
 
@@ -84,8 +86,9 @@ export function useThreadHeaderMenu(thread: ThreadSummary | null, now: Date, run
   const subthreads = useSubthreads(actionable).subthreads.length;
   const compact = canCompact && thread?.activity !== "running";
   const startsUnder = useServed(thread, "personSubthreads");
+  const files = useShares(THREAD_FILES) === true;
   return useMemo(
-    () => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, subthreads, compact, startsUnder }), run),
-    [thread, run, now, uncommitted, preview, subthreads, compact, startsUnder],
+    () => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, subthreads, compact, startsUnder, files }), run),
+    [thread, run, now, uncommitted, preview, subthreads, compact, startsUnder, files],
   );
 }

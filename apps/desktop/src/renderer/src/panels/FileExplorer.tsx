@@ -13,6 +13,8 @@ import { bestResult, FileSearchResults, firstResult } from "./FileSearch";
 interface ExplorerProps {
   scope: FileScope;
   directory: string;
+  /** What the folder is called while its listing comes, when `directory` doesn't say: a project with no folder here. */
+  name?: string;
   selected?: string;
 }
 
@@ -150,7 +152,7 @@ function useExplorerSearch(scope: FileScope, beside: boolean): [FilesTool, (chan
   return beside ? [own, (change) => setOwn((current) => ({ ...current, ...change }))] : shared;
 }
 
-export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps) {
+export function FileExplorer({ scope, directory, name, selected = "" }: ExplorerProps) {
   const key = filesKey(scope);
   const listing = useRpc("files.list", { scope, path: "" });
   const root = listing.data?.root ?? directory;
@@ -162,7 +164,7 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
   const [search, update] = useExplorerSearch(scope, Boolean(selected));
   const input = useRef<HTMLInputElement>(null);
   const results = useRef<HTMLDivElement>(null);
-  const rootName = listing.data?.name ?? root.split(/[\\/]/).filter(Boolean).at(-1) ?? "Workspace";
+  const rootName = listing.data?.name ?? root.split(/[\\/]/).filter(Boolean).at(-1) ?? name ?? "Workspace";
   useFilesFocus(input, !selected);
   useEffect(() => {
     if (path) useFileExplorer.getState().reveal(key, path);

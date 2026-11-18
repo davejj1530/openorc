@@ -114,22 +114,16 @@ it("reads a cloud thread's files from a copy of its work, read-only, and any oth
   await expect(folders.of({ kind: "project", id: projectId })).resolves.toMatchObject({ root: folder, kind: "checkout" });
 });
 
-it("has a machine resting with newer work leave with a save first, and shows that save", async () => {
-  const { folders, asked } = machine({ current: false });
-  expect(await fix((await folders.of({ kind: "thread", id: ID })).root)).toBe("second");
-  expect(asked.asks).toBe(1);
-});
-
-it("keeps the last save while the machine refuses to leave, as with a turn running, and asks again only after a while", async () => {
-  const { folders, asked, later } = machine({ current: false, refuse: true });
+it("never asks the machine anything on a read, as when a turn runs there: the last save stands, and is read again after a while", async () => {
+  const { folders, asked, later } = machine({ current: false });
   expect(await fix((await folders.of({ kind: "thread", id: ID })).root)).toBe("first");
   const reads = asked.reads;
   // A listing's many reads read the copy as it is.
   await folders.of({ kind: "thread", id: ID });
-  expect([asked.reads, asked.asks]).toEqual([reads, 1]);
+  expect(asked.reads).toBe(reads);
   later(31_000);
   await folders.of({ kind: "thread", id: ID });
-  expect(asked.asks).toBe(2);
+  expect([asked.reads, asked.asks]).toEqual([reads + 1, 0]);
 });
 
 it("never ends what runs on the machine for a read, and Refresh names it and asks only once the person says so", async () => {

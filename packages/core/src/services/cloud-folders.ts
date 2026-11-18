@@ -1,9 +1,9 @@
 /**
  * A cloud thread's files as this Mac's file browser reads them: the reading copy of the thread's newest work save
- * (CloudCopies), read-only here. A copy not looked at for a while is first brought up to its machine: one that rests
- * with newer work is asked to leave with a save, which the copy waits for, but only when leaving ends nothing running
- * there (a terminal, a background command, delegated work). Otherwise, and while a turn runs, the copy stays the last
- * save; how old it is is the copy's own `asOf`, never passed off as live. Refresh asks the person before it ends anything.
+ * (CloudCopies). A read never asks anything of the machine and never waits on it: the copy is the last save, made again
+ * when a newer save is there, and how old it is is the copy's own `asOf`, never passed off as live. Only the person's
+ * Refresh has the machine leave with its newer work, and asks them first when that would end something running there.
+ * (Asking on every read raced a turn starting: the machine left beneath it, and the turn was carried on as if lost.)
  */
 import { randomUUID } from "node:crypto";
 import { realpath } from "node:fs/promises";
@@ -96,10 +96,11 @@ export class CloudFolders {
     return { copy: await this.bringUp(threadId, work, !work.current) };
   }
 
-  /** A read's copy: leaving would end what runs there, so then the last save stands, and only Refresh asks. */
+  /** A read's copy: the last save, made again only when a newer one is there. */
   private async read(threadId: string): Promise<CloudCopy> {
-    const work = await this.work(threadId);
-    return this.bringUp(threadId, work, !work.current && !work.ends.length);
+    const copy = await this.copies.ensure(threadId);
+    this.checked.set(threadId, this.now());
+    return copy;
   }
 
   private async work(threadId: string) {

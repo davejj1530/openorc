@@ -68,6 +68,8 @@ function account() {
     /** Each time the thread's machine was asked to leave with a save, which ends what runs there. */
     asked: [] as true[],
     arrived: [] as { space: string; id: string; projectId: string }[],
+    /** The title each arrival was made with. */
+    titles: [] as string[],
     history: [] as ArrivalLine[],
     session: null as null | { query: { agent: string; sessionId: string; cliVersion: string; thread?: string }; packed: Uint8Array },
     /** Every conversation sent, the moving thread's and its subthreads', in order. */
@@ -130,7 +132,11 @@ function account() {
     },
     moves: {
       movesFamilies: async () => cloud.movesFamilies,
-      arrive: async (space: string, input: { id: string; projectId: string }) => (sent.arrived.push({ space, id: input.id, projectId: input.projectId }), { id: input.id }),
+      arrive: async (space: string, input: { id: string; projectId: string; title?: string }) => (
+        sent.arrived.push({ space, id: input.id, projectId: input.projectId }),
+        sent.titles.push(input.title ?? ""),
+        { id: input.id }
+      ),
       history: async (_space: string, _id: string, lines: () => AsyncIterable<ArrivalLine>) => {
         if (fail.history) throw fail.history;
         for await (const line of lines()) sent.history.push(line);
@@ -404,6 +410,8 @@ describe("a thread moving from this Mac to OpenOrc Cloud", () => {
     const { thread } = await macThread();
     const landing = startedUnder(thread.id, "Landing copy");
     const nested = startedUnder(landing.id, "Check the links", { byAgent: true, archivedAt: Date.parse("2026-11-18T09:00:00.000Z") });
+    // A title longer than the server takes arrives cut to its length, rather than refusing the whole move.
+    threads.update(db, thread.id, { title: `Fix the login ${"x".repeat(300)}` });
     // The landing subthread's own conversation with its agent, beside the thread's.
     const landingSession = "5c1d7a2e-3b4f-4c6d-8e9f-0a1b2c3d4e5f" as SessionId;
     runs.update(db, `run-${landing.id}`, { externalSessionId: landingSession });
@@ -421,6 +429,8 @@ describe("a thread moving from this Mac to OpenOrc Cloud", () => {
       ["subthread", nested.id],
       ["turn", nested.id],
     ]);
+    expect(sent.arrived).toEqual([{ space: "personal", id: thread.id, projectId: "cloud-app" }]);
+    expect(sent.titles[0]).toHaveLength(200);
     expect(sent.history[1]).toMatchObject({ parentId: thread.id, title: "Landing copy", startedByAgent: false, archivedAt: null, settings: { agent: "claude" } });
     expect(sent.history[3]).toMatchObject({ parentId: landing.id, startedByAgent: true, archivedAt: "2026-11-18T09:00:00.000Z" });
     expect(sent.sessions).toEqual([

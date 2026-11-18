@@ -48,6 +48,9 @@ const NOT_IN_CLOUD = "Add this project to OpenOrc Cloud in Settings first.";
 const SIGN_IN = "Sign in to OpenOrc to move this thread.";
 const SUBTHREAD_ALONE = "A subthread moves with the thread it was started under.";
 const OWN_FOLDER = "A subthread of this thread works in a folder of its own, so it can't move to OpenOrc Cloud.";
+/** The longest title an arrival takes for a thread, its subthreads and helpers, as the server does. */
+const ARRIVAL_TITLE = 200;
+const arrivalTitle = (title: string) => title.slice(0, ARRIVAL_TITLE);
 /** A thread started under a cloud thread, as this Mac last heard it. */
 type FamilyRow = ReturnType<NonNullable<Hosted["threads"]["family"]>>[number];
 /** The most threads started under a thread, at any depth, that move with it, as the server takes them. */
@@ -242,7 +245,7 @@ export class CloudMoves {
       }
       const upload = packed && packed.refusal === null ? packed : null;
       this.step(move, { phase: "sending", step: "history" });
-      await hosted.moves.arrive(space, { id: thread.id, projectId: cloud.id, title: thread.title, settings: this.settingsOf(thread) });
+      await hosted.moves.arrive(space, { id: thread.id, projectId: cloud.id, title: arrivalTitle(thread.title), settings: this.settingsOf(thread) });
       made = true;
       await hosted.moves.history(space, thread.id, () => this.historyOf(thread, family));
       this.step(move, { step: "conversation" });
@@ -302,7 +305,7 @@ export class CloudMoves {
         kind: "subthread",
         id: member.id,
         parentId: member.parentThreadId!,
-        title: member.title,
+        title: arrivalTitle(member.title),
         settings: this.settingsOf(member),
         createdAt: new Date(member.createdAt).toISOString(),
         startedByAgent: member.startedByAgent ?? false,
@@ -366,7 +369,7 @@ export class CloudMoves {
     return {
       kind: "child",
       id: child.threadId,
-      title: row.title,
+      title: arrivalTitle(row.title),
       settings: this.settingsOf(row),
       nativeId: child.nativeId,
       parentSessionId,

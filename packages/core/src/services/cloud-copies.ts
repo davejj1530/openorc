@@ -7,14 +7,19 @@
  * large, so laying them over a save could show files that never were. Someone who wants it newer asks the machine for a
  * save and passes `after` (the save they had); a write the person made lands at once (`applyWrite`) until the next save
  * catches up.
+ *
+ * A save holds only its commits beyond the thread's start. The start comes from the project's folder here, or, for a
+ * project with no folder here, from its GitHub repository into a store of OpenOrc's own (`cloud-starts`), with this
+ * computer's own sign-in to it.
  */
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { projects, type Db } from "@openorc/db";
-import { makeReadingCopy } from "@openorc/git";
+import { makeReadingCopy, StartUnreachable, type ReadingStart, type StartMissing } from "@openorc/git";
 import type { Hosted } from "@openorc/hosted";
-import type { CloudCopy, ComputerNames } from "@openorc/protocol";
+import type { CloudCopy, ComputerNames, Project } from "@openorc/protocol";
 
 export interface CloudCopiesDeps {
   db: Db;
@@ -31,6 +36,17 @@ export interface CloudCopiesDeps {
 const NEWER_MS = 60_000;
 /** Where a copy keeps what it was made from, inside its own git folder, out of its files. */
 const MADE_FROM = path.join(".git", "openorc-reading-copy.json");
+
+/** Why there is no copy to read, in the person's words; `retry` when trying again can bring one. */
+export class CloudCopyUnavailable extends Error {
+  constructor(
+    message: string,
+    readonly retry: boolean,
+  ) {
+    super(message);
+    this.name = "CloudCopyUnavailable";
+  }
+}
 
 export class CloudCopies {
   private readonly making = new Map<string, Promise<CloudCopy>>();
@@ -76,6 +92,13 @@ export class CloudCopies {
     this.deps.invalidate(["files", "workspace-diff"]);
   }
 
+  /** The thread's project as this computer knows it: its own, else the server's, which has no folder here. */
+  projectOf(threadId: string): Project | null {
+    const projectId = this.deps.hosted()?.threads.summary?.(threadId).projectId;
+    if (!projectId) return null;
+    return projects.get(this.deps.db, projectId) ?? this.deps.hosted()?.threads.project(projectId) ?? null;
+  }
+
   /** Lets the thread's copy go: the thread is gone, or this computer may no longer read it. */
   async forget(threadId: string): Promise<void> {
     await this.making.get(threadId)?.catch(() => undefined);
@@ -90,9 +113,9 @@ export class CloudCopies {
     const folder = this.folderOf(threadId);
     const made = await this.madeFrom(folder);
     if (made && made.savedAt === save.savedAt && made.head === save.head) return made;
-    const summary = hosted.threads.summary?.(threadId);
-    const project = summary ? projects.get(this.deps.db, summary.projectId) : null;
+    const project = this.projectOf(threadId);
     if (!project) throw new Error(`This project isn't on ${this.deps.here.thisComputer}.`);
+    const start = this.startOf(project);
     await mkdir(path.dirname(folder), { recursive: true });
     const temp = await mkdtemp(path.join(os.tmpdir(), "openorc-copy-"));
     try {
@@ -103,7 +126,9 @@ export class CloudCopies {
         bundle = path.join(temp, "work.bundle");
         await writeFile(bundle, Buffer.from(await response.arrayBuffer()));
       }
-      await makeReadingCopy(project.rootPath, folder, save, bundle);
+      await makeReadingCopy(start, folder, save, bundle).catch((error: unknown) => {
+        throw error instanceof StartUnreachable ? this.unreachable(project, error.reason) : error;
+      });
     } finally {
       await rm(temp, { recursive: true, force: true });
     }
@@ -113,13 +138,29 @@ export class CloudCopies {
     return copy;
   }
 
+  /** Where the thread's start is: the project's folder here, else its GitHub repository; a folder elsewhere has none. */
+  private startOf(project: Project): ReadingStart {
+    if (project.rootPath) return { folder: project.rootPath };
+    if (!project.gitRemote) throw new CloudCopyUnavailable(`This project's folder isn't on ${this.deps.here.thisComputer}, and it has no GitHub repository to read its files from.`, false);
+    const store = createHash("sha256").update(project.gitRemote).digest("hex").slice(0, 16);
+    return { store: path.join(this.deps.dataDir, "cloud-starts", `${store}.git`), remote: project.gitRemote };
+  }
+
+  /** A start the project's repository didn't give, said once: only a repository out of reach may come by trying again. */
+  private unreachable(project: Project, reason: StartMissing): CloudCopyUnavailable {
+    const repository = project.gitRemote?.replace(/^https:\/\/github\.com\//, "") ?? project.name;
+    if (reason === "offline") return new CloudCopyUnavailable(`GitHub can't be reached, so the files this thread started from can't be fetched.`, true);
+    if (reason === "access") return new CloudCopyUnavailable(`Your GitHub sign-in on ${this.deps.here.thisComputer} can't read ${repository}, where this thread's files start from.`, false);
+    return new CloudCopyUnavailable(`${repository} no longer has the commit this thread started from.`, false);
+  }
+
   /** The thread's newest save; with `after`, the first one newer than that, waited for a while. */
   private async newestSave(hosted: Hosted, space: string, threadId: string, after: string | undefined) {
     const until = this.now() + NEWER_MS;
     for (;;) {
       const { save } = await hosted.macProjects.workSave(space, threadId);
       if (save && (!after || Date.parse(save.savedAt) > Date.parse(after))) return save;
-      if (!after) throw new Error("This thread has no saved work yet.");
+      if (!after) throw new CloudCopyUnavailable("This thread hasn't saved its work yet. Refresh has it save.", false);
       if (this.now() > until) throw new Error("The thread didn't leave its cloud machine in time. Try again.");
       await new Promise((resolve) => setTimeout(resolve, 1_000));
     }

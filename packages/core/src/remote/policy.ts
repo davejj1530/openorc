@@ -326,7 +326,7 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   // The CLI's own words stay on the Mac.
   "providers.usage": (usage) => ({ ...usage, message: null }),
   // The folder by the name the person knows it by, never the Mac's path to it.
-  "files.list": ({ root, name, entries }) => ({ root: "", name: name ?? path.basename(root), entries }),
+  "files.list": ({ root, name, entries, unavailable }) => ({ root: "", name: name ?? path.basename(root), entries, ...(unavailable ? { unavailable } : {}) }),
   "files.search": same,
   "files.read": phoneFileRead,
   // When the copy was saved, never where it lies on the Mac.

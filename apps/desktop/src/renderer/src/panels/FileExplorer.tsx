@@ -75,19 +75,23 @@ function DirectoryChildren({ path, level, tree }: { path: "" | FolderPath; level
         Loading…
       </p>
     );
-  if (listing.error)
+  // A folder whose files can't be read here says why once, with Retry only where trying again can help.
+  const failed = listing.error ? { message: listing.error.message, retry: true } : listing.data?.unavailable;
+  if (failed)
     return (
       <div role="alert" className="file-tree-notice">
-        <span>{listing.error.message}</span>
-        <button
-          className="underline ml-2"
-          onClick={(event) => {
-            event.stopPropagation();
-            void listing.refetch();
-          }}
-        >
-          Retry
-        </button>
+        <span>{failed.message}</span>
+        {failed.retry && (
+          <button
+            className="underline ml-2"
+            onClick={(event) => {
+              event.stopPropagation();
+              void listing.refetch();
+            }}
+          >
+            Retry
+          </button>
+        )}
       </div>
     );
   const entries = listing.data?.entries;
@@ -176,7 +180,7 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
   };
   return (
     <section aria-label="File explorer" className="file-explorer">
-      <FileExplorerToolbar scope={scope} listed={Boolean(listing.data)} />
+      <FileExplorerToolbar scope={scope} listed={Boolean(listing.data && !listing.data.unavailable)} />
       <div className="file-explorer-body">
         <div className="file-explorer-filter">
           <Search size={16} />

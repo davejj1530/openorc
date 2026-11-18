@@ -1,11 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Db, projects } from "@openorc/db";
 import type { Hosted } from "@openorc/hosted";
-import { computerNames, HOSTED_REASONS } from "@openorc/protocol";
+import { computerNames, HOSTED_REASONS, type Project } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { CloudFolders } from "./cloud-folders.js";
 
@@ -44,7 +46,7 @@ afterEach(async () => {
 
 /** A save of the thread's work in the cloud with `text` in FIX.md: its commit, and its bundle beyond the base. */
 function cloudSave(text: string, savedAt: string) {
-  const cloud = path.join(root, `cloud-${savedAt.replace(/\W/g, "")}`);
+  const cloud = path.join(root, `cloud-${savedAt.replace(/\W/g, "")}-${randomUUID()}`);
   git(root, "clone", "-q", folder, cloud);
   const base = git(cloud, "rev-parse", "HEAD");
   git(cloud, "checkout", "-q", "-b", "openorc/fix");
@@ -60,8 +62,8 @@ function cloudSave(text: string, savedAt: string) {
  * The thread's machine as the server tells of it: its saves, whether the newest is current, and how it answers an ask
  * to leave with a save (`refuse` as a running turn or a reader who may not refuses it).
  */
-function machine(options: { current: boolean; refuse?: boolean; ends?: string[]; writes?: boolean }) {
-  const saves = [cloudSave("first", "2026-11-18T10:00:00.000Z")];
+function machine(options: { current: boolean; refuse?: boolean; ends?: string[]; writes?: boolean; project?: Project; unsaved?: boolean }) {
+  const saves = options.unsaved ? [] : [cloudSave("first", "2026-11-18T10:00:00.000Z")];
   let current = options.current;
   const asked = { reads: 0, asks: 0 };
   const written: { path: string; text: string | null }[] = [];
@@ -69,7 +71,9 @@ function machine(options: { current: boolean; refuse?: boolean; ends?: string[];
     threads: {
       holds: ({ thread }: { thread: string }) => thread === ID,
       row: () => ({ id: ID, space: "personal" }),
-      summary: () => ({ id: ID, projectId }),
+      summary: () => ({ id: ID, projectId: options.project?.id ?? projectId }),
+      // The server's own project, which this computer has no folder for.
+      project: (id: string) => (id === options.project?.id ? options.project : null),
       call: async () => ({ version: 1, features: options.writes ? { fileWrite: { available: true } } : {} }),
       written,
       // A method of its place, as the hosted package's is: called off its object it has no place to write through.
@@ -86,7 +90,7 @@ function machine(options: { current: boolean; refuse?: boolean; ends?: string[];
     macProjects: {
       workSave: async () => {
         asked.reads += 1;
-        return { save: saves.at(-1)!.save, current, working: false, ends: current ? [] : (options.ends ?? []) };
+        return { save: saves.at(-1)?.save ?? null, current, working: false, ends: current ? [] : (options.ends ?? []) };
       },
       bundle: async () => new Response(await readFile(saves.at(-1)!.bundle)),
       ask: async () => {
@@ -148,4 +152,45 @@ it("writes a cloud thread's file on its machine once its server writes them, and
   expect(saved).toMatchObject({ kind: "saved", path: "FIX.md", absolutePath: path.join(folder.root, "FIX.md") });
   expect(written).toEqual([expect.objectContaining({ path: "FIX.md", text: "mine" })]);
   expect(await fix(folder.root)).toBe("mine");
+});
+
+/** The server's project on `remote`, a GitHub repository this computer has no folder of. */
+const serverProject = (gitRemote: string | null): Project => ({
+  id: "cloud-project:hub",
+  name: "Spring launch",
+  rootPath: "",
+  gitRemote,
+  defaultBranch: null,
+  settings: { setupScript: null, worktreeInclude: [], branchPrefix: "", detectedConfigs: [], claudeAccounts: null },
+  createdAt: 0,
+  updatedAt: 0,
+});
+
+it("reads a thread whose project has no folder here from its start, fetched from the project's repository, named as the project", async () => {
+  git(folder, "config", "uploadpack.allowReachableSHA1InWant", "true");
+  const { folders } = machine({ current: true, project: serverProject(`file://${folder}`) });
+  const cloud = await folders.of({ kind: "thread", id: ID });
+  expect(cloud).toMatchObject({ kind: "cloud", name: "Spring launch", project: { id: "cloud-project:hub" } });
+  expect(cloud.unavailable).toBeUndefined();
+  expect(await fix(cloud.root)).toBe("first");
+  expect(await readFile(path.join(cloud.root, "README.md"), "utf8")).toBe("# app\n");
+});
+
+it("says once why a thread's files can't be read here, with Retry only where trying again can help", async () => {
+  const closed = createServer();
+  await new Promise<void>((resolve) => closed.listen(0, "127.0.0.1", resolve));
+  const port = (closed.address() as AddressInfo).port;
+  await new Promise((resolve) => closed.close(resolve));
+  const offline = machine({ current: true, project: serverProject(`http://127.0.0.1:${port}/team/launch.git`) });
+  expect((await offline.folders.of({ kind: "thread", id: ID })).unavailable).toEqual({ message: "GitHub can't be reached, so the files this thread started from can't be fetched.", retry: true });
+
+  const elsewhere = machine({ current: true, project: serverProject(null) });
+  expect((await elsewhere.folders.of({ kind: "thread", id: ID })).unavailable).toEqual({
+    message: `This project's folder isn't on ${computerNames(process.platform).thisComputer}, and it has no GitHub repository to read its files from.`,
+    retry: false,
+  });
+
+  const unsaved = machine({ current: false, unsaved: true });
+  expect((await unsaved.folders.of({ kind: "thread", id: ID })).unavailable).toEqual({ message: "This thread hasn't saved its work yet. Refresh has it save.", retry: false });
+  expect(unsaved.asked.asks).toBe(0);
 });

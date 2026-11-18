@@ -11,7 +11,7 @@ export { diffStat, patchSinceTree, switchFiles, treeHash } from "./snapshot.js";
 export { applyWork, packWork, type AppliedWork, type PackedWork, type WorkSnapshot } from "./work-bundle.js";
 export { MAC_FILE_BYTES, MAC_WORK_BYTES, packMacWork, type MacWorkPack, type MacWorkPlan, type MacWorkQuery } from "./mac-start.js";
 export { BringRefused, bringIntoFolder, macHistory, NOT_THAT_FOLDER, packMacHistory, type MacHistory, type MacHistoryPack } from "./mac-history.js";
-export { makeReadingCopy, START_NOT_HERE } from "./reading-copy.js";
+export { makeReadingCopy, START_NOT_HERE, StartUnreachable, type ReadingStart, type StartMissing } from "./reading-copy.js";
 export * as workspaceTransfer from "./workspace-transfer.js";
 export type { TreeDeltaEntry, WorkspaceMergeResult, WorkspaceTreeEntry, WorkspaceTreeSnapshot } from "./workspace-transfer.js";
 export * as worktree from "./worktree.js";

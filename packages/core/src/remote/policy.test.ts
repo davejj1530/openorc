@@ -33,6 +33,13 @@ describe("phone policy", () => {
     expect(reply).toEqual({ ...copy, folder: "" });
   });
 
+  it("tells a phone why a cloud thread's folder can't be read, by its project's name and never the Mac's path", () => {
+    const unavailable = { message: "GitHub can't be reached, so the files this thread started from can't be fetched.", retry: true };
+    const listing = { root: "/Users/someone/Library/OpenOrc/cloud-copies/cloud-thread", name: "Shop", entries: [], unavailable };
+    const reply = remoteReply("files.list", listing, { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) });
+    expect(reply).toEqual({ root: "", name: "Shop", entries: [], unavailable });
+  });
+
   it("reads OpenOrc Cloud's agent sign-in for a phone, never a read of the Mac's own CLIs, and without the CLI's words", () => {
     expect(admitRemoteRequest("providers.usage", { provider: "claude", cloud: true }, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("providers.usage", { provider: "claude" }, context)).toMatchObject({ ok: false });

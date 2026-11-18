@@ -8,9 +8,8 @@
 import { randomUUID } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import path from "node:path";
-import { projects } from "@openorc/db";
 import { FileVersion, HOSTED_REASONS, type CloudCopy, type FileExpectation, type FileScope, type FileWriteResult, type FolderPath } from "@openorc/protocol";
-import { CloudCopies, type CloudCopiesDeps } from "./cloud-copies.js";
+import { CloudCopies, CloudCopyUnavailable, type CloudCopiesDeps } from "./cloud-copies.js";
 import { conversationFolder, type ConversationFolder } from "./conversation-folder.js";
 
 /** How long a copy is read as it is before its machine is asked again, so a listing's many reads ask once. */
@@ -41,15 +40,19 @@ export class CloudFolders {
     return Boolean(this.deps.hosted()?.threads.holds({ thread: threadId }));
   }
 
-  /** The thread's copy as a conversation's folder, brought up to its machine when it was not lately. */
+  /**
+   * The thread's copy as a conversation's folder, read again when it was not lately, named as its project. With no copy
+   * to read, as for a project whose start can't be had here, the folder says why instead.
+   */
   async folder(threadId: string): Promise<ConversationFolder> {
+    const project = this.copies.projectOf(threadId);
+    if (!project) throw new Error(`This thread's project isn't on ${this.deps.here.thisComputer}.`);
+    const name = project.rootPath ? path.basename(project.rootPath) : project.name;
     const recent = this.now() - (this.checked.get(threadId) ?? -Infinity) < CHECK_MS;
-    const folder = recent ? this.copies.folderOf(threadId) : (await this.read(threadId)).folder;
-    const summary = this.deps.hosted()?.threads.summary?.(threadId);
-    const project = summary ? projects.get(this.deps.db, summary.projectId) : null;
-    if (!project) throw new Error("This thread's project isn't on this computer.");
+    const read = recent ? this.copies.folderOf(threadId) : await this.read(threadId).then((copy) => copy.folder, unavailable);
+    if (typeof read !== "string") return { root: this.copies.folderOf(threadId), kind: "cloud", project, readOnly: HOSTED_REASONS.fileWrite, name, unavailable: read };
     const readOnly = (await this.writes(threadId)) ? null : HOSTED_REASONS.fileWrite;
-    return { root: await realpath(folder), kind: "cloud", project, readOnly, name: path.basename(project.rootPath) };
+    return { root: await realpath(read), kind: "cloud", project, readOnly, name };
   }
 
   /**
@@ -121,4 +124,10 @@ export class CloudFolders {
   private now(): number {
     return (this.deps.now ?? Date.now)();
   }
+}
+
+/** A copy that can't be had, as the folder's reason; any other failure stays one. */
+function unavailable(error: unknown): { message: string; retry: boolean } {
+  if (error instanceof CloudCopyUnavailable) return { message: error.message, retry: error.retry };
+  throw error;
 }

@@ -41,6 +41,8 @@ export interface FileDirectory {
   /** What the person calls the folder when the last part of `root` is not it, as a cloud thread's copy, its project's. */
   name?: string;
   entries: FileEntry[];
+  /** Why the folder's files can't be read here, in place of its entries; `retry` when trying again can help. */
+  unavailable?: { message: string; retry: boolean };
 }
 
 /** Git's own files, under a `.git` segment in any case. They open read-only and are never written. */

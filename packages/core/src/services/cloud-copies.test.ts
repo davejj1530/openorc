@@ -62,6 +62,8 @@ function account(saves: ReturnType<typeof cloudSave>[], here = true) {
       holds: ({ thread }: { thread: string }) => thread === ID,
       row: () => ({ id: ID, space: "personal" }),
       summary: () => ({ id: ID, projectId: project.id }),
+      // The server's own projects: none this computer has no folder of.
+      project: () => null,
     },
     macProjects: {
       workSave: async () => {
@@ -135,7 +137,7 @@ describe("a cloud thread's code read on this computer", () => {
 
   it("says why when the thread has no save yet", async () => {
     const { hosted } = account([]);
-    await expect(copies(hosted).ensure(ID)).rejects.toThrow("This thread has no saved work yet.");
+    await expect(copies(hosted).ensure(ID)).rejects.toThrow("This thread hasn't saved its work yet.");
   });
 
   it("says why when the thread's project isn't on this computer", async () => {

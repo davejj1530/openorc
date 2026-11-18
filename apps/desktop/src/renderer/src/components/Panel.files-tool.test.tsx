@@ -44,6 +44,8 @@ let disk: ReturnType<typeof fakeFileDisk>;
 const searches: RpcParams<"files.search">[] = [];
 const finds: RpcParams<"files.find">[] = [];
 const explains: RpcParams<"code.explain">[] = [];
+/** The core's listing instead of the fake disk's, as for a cloud thread's folder it can't read. */
+let answerList: ((path: string) => RpcResults["files.list"]) | null = null;
 
 /** The core's find over the fake disk: lines holding the text in either case, grouped by file. */
 function findOnDisk({ query }: RpcParams<"files.find">): FindResult {
@@ -65,7 +67,7 @@ beforeEach(() => {
   useDrafts.setState({ keys: new Set(), ready: true, loaded: new Map(), failed: false });
   vi.stubGlobal("openorc", { browser: { setContext: vi.fn(), onReveal: () => () => {}, close: vi.fn(), navigate: vi.fn() } });
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => {
-    if (method === "files.list") return disk.list((params as RpcParams<"files.list">).path) as RpcResults[M];
+    if (method === "files.list") return (answerList ?? disk.list)((params as RpcParams<"files.list">).path) as RpcResults[M];
     if (method === "files.search") {
       const search = params as RpcParams<"files.search">;
       searches.push(search);
@@ -97,6 +99,7 @@ afterEach(() => {
   explains.length = 0;
   answerFind = findOnDisk;
   answerSearch = null;
+  answerList = null;
   queryClient.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -610,4 +613,22 @@ it("shows ignored entries dimmed, beside the rest", async () => {
   expect((await row(".github")).classList.contains("file-tree-ignored")).toBe(false);
   fireEvent.click(await screen.findByRole("treeitem", { name: ".env" }));
   expect(await screen.findByRole("treeitem", { name: ".env", selected: true })).toBeTruthy();
+});
+
+it("says once why a folder's files can't be read here, with Retry only where trying again can help", async () => {
+  const unavailable = { message: "Your GitHub sign-in on this Mac can't read team/shop, where this thread's files start from.", retry: false };
+  answerList = () => ({ root: "/copies/thread", name: "Shop", entries: [], unavailable });
+  render(<Window />);
+  press("p");
+  const tree = await screen.findByRole("tree", { name: "Project files" });
+  expect((await within(tree).findByRole("alert")).textContent).toBe(unavailable.message);
+  expect(within(tree).queryByRole("button", { name: "Retry" })).toBeNull();
+  expect(within(tree).getByRole("treeitem", { name: "Shop" })).toBeTruthy();
+
+  answerList = () => ({ root: "/copies/thread", name: "Shop", entries: [], unavailable: { message: "GitHub can't be reached, so the files this thread started from can't be fetched.", retry: true } });
+  await act(() => queryClient.invalidateQueries({ queryKey: ["files.list"] }));
+  const retry = await within(tree).findByRole("button", { name: "Retry" });
+  answerList = null;
+  fireEvent.click(retry);
+  expect(await within(tree).findByRole("treeitem", { name: "src" })).toBeTruthy();
 });

@@ -19,7 +19,11 @@ export function createFilesHandlers({
   files,
   folders,
 }: Dependencies): Pick<Handlers, "files.list" | "files.search" | "files.read" | "files.write" | "files.find" | "files.format" | "editor.query"> {
-  const folderOf = (scope: FileScope) => folders().of(scope);
+  const folderOf = async (scope: FileScope) => {
+    const folder = await folders().of(scope);
+    if (folder.unavailable) throw new Error(folder.unavailable.message);
+    return folder;
+  };
   return {
     "editor.query": async ({ scope, expectedRoot, ...input }) => {
       const folder = await folderOf(scope);
@@ -27,8 +31,10 @@ export function createFilesHandlers({
       return files.intelligence.query(folder, input);
     },
     "files.list": async ({ scope, path }) => {
-      const folder = await folderOf(scope);
-      return { ...(await listDirectory(folder.root, path)), ...(folder.name ? { name: folder.name } : {}) };
+      const folder = await folders().of(scope);
+      const named = folder.name ? { name: folder.name } : {};
+      if (folder.unavailable) return { root: folder.root, ...named, entries: [], unavailable: folder.unavailable };
+      return { ...(await listDirectory(folder.root, path)), ...named };
     },
     "files.search": async ({ scope, query, limit }) => files.search(await folderOf(scope), query, limit),
     "files.read": async ({ scope, path }) => files.read(await folderOf(scope), path, { outside: true }),

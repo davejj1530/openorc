@@ -15,7 +15,7 @@ afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
 
-async function install({ checksum, brokenStream = false, cannotWrite = false }: { checksum?: string; brokenStream?: boolean; cannotWrite?: boolean } = {}) {
+async function install({ checksum, brokenStream = false, cannotWrite = false, slowOpen = false }: { checksum?: string; brokenStream?: boolean; cannotWrite?: boolean; slowOpen?: boolean } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "openorc-prebuilt-test-"));
   directories.push(directory);
   const dest = path.join(directory, "agent");
@@ -23,6 +23,7 @@ async function install({ checksum, brokenStream = false, cannotWrite = false }: 
   const content = Buffer.from("new binary");
   const errors: string[] = [];
   const calls: { url: string; signal: AbortSignal }[] = [];
+  const opens: Promise<void>[] = [];
   const execute = runInNewContext(PREBUILT_INSTALL, {
     require(name: string) {
       if (name === "node:child_process") return { execFileSync: () => "glibc" };
@@ -33,6 +34,12 @@ async function install({ checksum, brokenStream = false, cannotWrite = false }: 
             throw new Error("Disk unavailable");
           },
         };
+      // Opening the file outlasts the download, as it can on macOS: the file appears after the download has failed.
+      if (name === "node:fs" && slowOpen) {
+        const open = (file: string, flags: string, mode: number, done: (error: Error | null, fd: number) => void) =>
+          opens.push(new Promise((resolve) => setTimeout(() => fs.open(file, flags, mode, (error, fd) => resolve(done(error, fd))), 30)));
+        return { ...fs, createWriteStream: (file: string, options: object) => fs.createWriteStream(file, { ...options, fs: { open, write: fs.write, close: fs.close } }) };
+      }
       return require(name);
     },
     process: {
@@ -60,6 +67,7 @@ async function install({ checksum, brokenStream = false, cannotWrite = false }: 
     },
   }) as Promise<void>;
   await execute.catch(() => undefined);
+  await Promise.all(opens);
   return { directory, dest, errors, calls };
 }
 
@@ -76,6 +84,7 @@ it("replaces the binary only after a complete, verified download", async () => {
 it.each([
   [{ checksum: "0".repeat(64) }, "checksum"],
   [{ brokenStream: true }, "Connection lost"],
+  [{ brokenStream: true, slowOpen: true }, "Connection lost"],
   [{ cannotWrite: true }, "Disk unavailable"],
 ] as const)("keeps the installed binary and removes partial downloads after a failure: %j", async (options, message) => {
   const result = await install(options);

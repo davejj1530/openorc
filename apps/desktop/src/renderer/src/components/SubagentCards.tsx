@@ -145,7 +145,7 @@ function LaneDetail({ card }: { card: SubagentCard }) {
           <dt>Asked</dt>
           <dd>
             <div className={cn("subagent-detail-text prose-chat", long && !whole && "subagent-detail-folded")} data-tone="brief">
-              <ThreadRichText>{brief}</ThreadRichText>
+              <ThreadRichText codePaths>{brief}</ThreadRichText>
             </div>
             {long ? (
               <TextButton tone="muted" className="subagent-detail-more" aria-expanded={whole} onClick={() => setWhole(!whole)}>
@@ -160,7 +160,7 @@ function LaneDetail({ card }: { card: SubagentCard }) {
           <dt>Reported</dt>
           <dd>
             <div className="subagent-detail-text prose-chat">
-              <ThreadRichText>{card.result}</ThreadRichText>
+              <ThreadRichText codePaths>{card.result}</ThreadRichText>
             </div>
           </dd>
         </>

@@ -13,8 +13,11 @@ vi.mock("../components/ui", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../components/ui")>()),
   Tooltip: ({ label, children }: { label: string; children: ReactNode }) => <span data-tooltip={label}>{children}</span>,
 }));
-afterEach(() => {
+const unfinished = (mutation: { state: { status: string } }) => mutation.state.status === "idle" || mutation.state.status === "pending";
+afterEach(async () => {
   cleanup();
+  // Leaving a screen that watched a payment asks the core to stop; that call finishes before the next test counts calls.
+  await waitFor(() => expect(queryClient.getMutationCache().getAll().filter(unfinished)).toEqual([]));
   queryClient.clear();
   vi.resetAllMocks();
 });

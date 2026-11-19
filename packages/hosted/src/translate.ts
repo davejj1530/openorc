@@ -7,7 +7,10 @@ import {
   isHostedRefusal,
   PRO_PERIODS,
   sendBlockWords,
+  SIGN_IN_WAYS,
   type AccountSignIn,
+  type HostedAgent,
+  type SignInWay,
   type QueuedMessage,
   type AccountPlan,
   type AccountReach,
@@ -61,9 +64,14 @@ export function toSignIns(rows: readonly WireSignIn[], ended: readonly { key: st
   return rows.flatMap((row) => {
     if (!isHostedAgent(row.agent)) return [];
     const key = accountKey(row);
-    const account = row.id === undefined ? {} : { id: row.id, name: row.name ?? row.label, isDefault: row.isDefault ?? false };
+    const account = row.id === undefined ? {} : { id: row.id, name: row.name ?? row.label, isDefault: row.isDefault ?? false, way: wayOf(row.agent, row.kind) };
     return [{ agent: row.agent, provider: row.provider, label: row.label, ended: ended.some((each) => each.key === key && each.checkedAt === row.checkedAt), ...account }];
   });
+}
+
+/** The way an account signs in again: a key for a key, else its agent's way for a subscription. */
+function wayOf(agent: HostedAgent, kind: WireSignIn["kind"]): SignInWay {
+  return kind === "api_key" ? "key" : (SIGN_IN_WAYS[agent].find((way) => way !== "key") ?? "key");
 }
 
 /** What an ended mark names: the account, where the server keeps several, else the agent's (and provider's) one sign-in. */

@@ -340,6 +340,16 @@ describe("an agent sign-in on OpenOrc Cloud", () => {
     expect(system.info).not.toHaveBeenCalled();
   });
 
+  it("reads the account asked for, where the person keeps several", async () => {
+    const { service } = cloudService([
+      { agent: "claude", accountId: "personal", readAt: at - 120_000, reading: { status: "ok", usage: account, plan: "Max" } },
+      { agent: "claude", accountId: "work", readAt: at - 60_000, reading: { status: "ok", usage: account, plan: "Pro" } },
+    ]);
+    expect(await service.cloud("claude", "work")).toMatchObject({ plan: "Pro", refreshedAt: at - 60_000 });
+    expect(await service.cloud("claude", "personal")).toMatchObject({ plan: "Max", refreshedAt: at - 120_000 });
+    expect(await service.cloud("claude", "gone")).toMatchObject({ status: "unavailable", windows: [] });
+  });
+
   it("reports nothing for an agent with no cloud reading, rather than a guess", async () => {
     const report = await cloudService([]).service.cloud("claude");
     expect(report).toMatchObject({ status: "unavailable", windows: [], refreshedAt: null, message: null });

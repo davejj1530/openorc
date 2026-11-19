@@ -48,8 +48,8 @@ export function createSystemHandlers({
     "agents.updates.install": ({ ids }) => agentUpdates.install(ids),
     "agents.updates.cancel": () => agentUpdates.cancel(),
     "agents.updates.configure": (patch) => agentUpdates.configure(patch),
-    "providers.usage": ({ provider, claudeAccountId, maxAgeMs, fxModel, cloud }) => {
-      if (cloud) return providerUsage.cloud(provider);
+    "providers.usage": ({ provider, claudeAccountId, maxAgeMs, fxModel, cloud, cloudAccountId }) => {
+      if (cloud) return providerUsage.cloud(provider, cloudAccountId);
       return maxAgeMs ? providerUsage.recent(provider, claudeAccountId, maxAgeMs, fxModel) : providerUsage.read(provider, claudeAccountId, fxModel);
     },
     "providers.limits": async () => (await planLimits()).filter((row) => !enabledHarnesses || enabledHarnesses().includes(row.provider)),

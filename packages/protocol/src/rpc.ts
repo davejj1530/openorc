@@ -159,6 +159,8 @@ export const rpcParams = {
      * Never a read of this Mac's CLI, whose sign-in it is not.
      */
     cloud: z.literal(true).optional(),
+    /** With `cloud`, the account of the person's on OpenOrc Cloud whose reading it is; none, the agent's first. */
+    cloudAccountId: z.string().min(1).max(200).optional(),
     /** A report this young, from any reader, answers at once instead of asking the CLI again; none means a live read. */
     maxAgeMs: z
       .number()

@@ -7,14 +7,14 @@ import { Failure, TokenField } from "./settings-secret-field";
 import { Field, SettingRow, Status } from "./settings-shared";
 
 /** What starts each way, as its button says it. */
-const WAY_LABELS: Record<SignInWay, (agent: HostedAgent) => string> = {
+export const WAY_LABELS: Record<SignInWay, (agent: HostedAgent) => string> = {
   token: () => "Sign in with Claude",
   code: () => "Sign in with ChatGPT",
   key: (agent) => (agent === "opencode" ? "Add a key" : "Use an API key"),
 };
 
 /** What the person does while a way waits on them. */
-const WAITING: Record<"token" | "code", string> = {
+export const WAITING: Record<"token" | "code", string> = {
   token: "Sign in to Claude in the browser that opened.",
   code: "Enter this code on OpenAI's page.",
 };
@@ -113,7 +113,7 @@ function Ways({ agent, ways, ended, busy, onStart }: { agent: HostedAgent; ways:
 }
 
 /** A way that waits on the person: the browser, or a code to enter on the vendor's page. */
-function Waiting({ work, busy, onCancel }: { work: Extract<SignInWork, { state: "waiting" }>; busy: boolean; onCancel: () => void }) {
+export function Waiting({ work, busy, onCancel }: { work: Extract<SignInWork, { state: "waiting" }>; busy: boolean; onCancel: () => void }) {
   return (
     <>
       {work.way === "code" ? (
@@ -175,7 +175,7 @@ function KeyField({ agent, taken, busy, onSave }: { agent: HostedAgent; taken: s
 }
 
 /** The Claude account of this Mac that makes the token, offered when there is more than one; the default first. */
-function useClaudeAccountChoice(): { accounts: { id: string; name: string }[]; chosen: string | null; choose: (id: string) => void } {
+export function useClaudeAccountChoice(): { accounts: { id: string; name: string }[]; chosen: string | null; choose: (id: string) => void } {
   const list = useRpc("claude.accounts.list", {});
   const [chosen, choose] = useState<string | null>(null);
   const accounts = (list.data?.accounts ?? []).filter((account) => account.enabled).map(({ id, name }) => ({ id, name }));

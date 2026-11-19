@@ -148,7 +148,7 @@ function UsageTable({ current }: { current: UsageAccount }) {
 }
 
 /** The time a table's resets count from, moved on every half minute. */
-function useNow(): number {
+export function useNow(): number {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);

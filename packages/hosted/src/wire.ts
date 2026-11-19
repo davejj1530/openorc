@@ -84,6 +84,7 @@ export const wireSignIn = z.object({
   provider: z.string(),
   label: z.string(),
   checkedAt: iso.nullable(),
+  kind: z.enum(["subscription", "api_key"]).optional(),
   id: z.string().optional(),
   name: z.string().optional(),
   isDefault: z.boolean().optional(),

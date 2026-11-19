@@ -269,6 +269,8 @@ export interface ProviderUsageReaders {
 /** One reading of an agent sign-in on OpenOrc Cloud: the CLI's own answer, in its reader's shape, and when. */
 export interface CloudUsageReading {
   agent: string;
+  /** The account of the person's it was read on, where the server keeps several per agent. */
+  accountId?: string;
   readAt: number;
   reading: unknown;
 }
@@ -514,9 +516,9 @@ export class ProviderUsageService {
   /**
    * The person's agent sign-in on OpenOrc Cloud, shaped from the cloud CLI's last answer as a reading here is, with
    * when it was read. With no reading, as for someone who ran no cloud turn, it reports nothing rather than a guess.
-   * Never a read of this Mac's CLI: the sign-in is not here.
+   * Never a read of this Mac's CLI: the sign-in is not here. `accountId`: the account's reading, where there are several.
    */
-  async cloud(provider: ProviderUsage["provider"]): Promise<ProviderUsage> {
+  async cloud(provider: ProviderUsage["provider"], accountId?: string): Promise<ProviderUsage> {
     const at = this.now();
     const result: ProviderUsage = {
       provider,
@@ -532,7 +534,7 @@ export class ProviderUsageService {
       accountUrl: provider === "anthropic-api" ? "" : harnessCatalog[provider].accountUsageUrl,
       localRuns: null,
     };
-    const found = (await this.cloudReadings()).find((each) => each.agent === provider);
+    const found = (await this.cloudReadings()).find((each) => each.agent === provider && (accountId === undefined || each.accountId === accountId));
     if (!found) return result;
     if (provider === "claude") withClaudeAnswer(result, found.reading as ClaudeUsageResult, found.readAt);
     if (provider === "codex" && withCodexAnswer(result, found.reading as CodexAccountReport, found.readAt)) {

@@ -1,5 +1,6 @@
-import { HOSTED_AGENTS, type AccountStatus } from "@openorc/protocol";
+import { HOSTED_AGENTS, type AccountStatus, type HostedAgent } from "@openorc/protocol";
 import { useRpc } from "../lib/client";
+import { AgentAccounts } from "./settings-cloud-openorc-accounts";
 import { GithubRow } from "./settings-cloud-openorc-projects";
 import { AgentSignInRow } from "./settings-cloud-openorc-sign-ins";
 import { Section } from "./settings-shared";
@@ -11,13 +12,31 @@ function proAccount(account: AccountStatus | undefined): ProAccount | null {
   return account?.state === "signed-in" && account.plan.pro ? account : null;
 }
 
-/** OpenOrc Cloud for a Pro person: each agent's sign-in there with the ways to sign it in, and their GitHub. The server's answers are the state. */
+/**
+ * OpenOrc Cloud for a Pro person: each agent's accounts there, or on a server that keeps one per agent its one
+ * sign-in, with the ways to sign in, and their GitHub. The server's answers are the state.
+ */
 export function OpenOrcCloudSection({ active }: { active: boolean }) {
   const account = proAccount(useRpc("account.status", {}, { enabled: active }).data);
   if (!account) return null;
+  const { signIns, signingIn } = account;
+  const rowsOf = (agent: HostedAgent) => signIns?.filter((row) => row.agent === agent) ?? [];
+  if (signIns && account.agentAccounts)
+    return (
+      <Section title="OpenOrc Cloud" flush>
+        <div className="flex flex-col gap-3">
+          {HOSTED_AGENTS.map((agent) => (
+            <AgentAccounts key={agent} agent={agent} rows={rowsOf(agent)} work={signingIn[agent]} />
+          ))}
+          <div className="settings-group">
+            <GithubRow account={account} />
+          </div>
+        </div>
+      </Section>
+    );
   return (
     <Section title="OpenOrc Cloud">
-      {account.signIns ? HOSTED_AGENTS.map((agent) => <AgentSignInRow key={agent} agent={agent} rows={account.signIns!.filter((row) => row.agent === agent)} work={account.signingIn[agent]} />) : null}
+      {signIns ? HOSTED_AGENTS.map((agent) => <AgentSignInRow key={agent} agent={agent} rows={rowsOf(agent)} work={signingIn[agent]} />) : null}
       <GithubRow account={account} />
     </Section>
   );

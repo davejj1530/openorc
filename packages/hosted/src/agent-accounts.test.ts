@@ -65,6 +65,8 @@ it("adds each Claude sign-in as a new account, the first the default, named by i
     { name: "API key", label: "API key", isDefault: false },
     { name: "API key 2", label: "API key", isDefault: false },
   ]);
+  // Each signs in again the way it was made.
+  expect(status(hosted).signIns!.map((row) => row.way)).toEqual(["token", "token", "key", "key"]);
 });
 
 it("signs an account in again in place, keeping its name and default, and says which account a sign-in under way is for", async () => {

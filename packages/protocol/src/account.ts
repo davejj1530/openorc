@@ -54,6 +54,8 @@ export interface AccountSignIn {
   id?: string;
   name?: string;
   isDefault?: boolean;
+  /** How the account signs in again: the way it was made, a subscription's or a key. Only where accounts are kept. */
+  way?: SignInWay;
 }
 
 /**

@@ -172,7 +172,7 @@ function ModelControls({ shown, settings, state }: { shown: AgentKind | null; se
   if (shown && settings?.choice?.agent !== shown) return null;
   return (
     <>
-      {state.efforts.length ? <EffortControl settings={settings} state={state} /> : null}
+      {state.efforts.length > 1 ? <EffortControl settings={settings} state={state} /> : null}
       <FastModeControl settings={settings} state={state} />
     </>
   );

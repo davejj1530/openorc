@@ -206,6 +206,8 @@ it("offers all eight agents as named icon tabs and keeps model controls scoped t
     expect(tab.textContent).toBe("");
   }
   expect(screen.getByRole("switch", { name: "Fast mode" })).toBeTruthy();
+  // Opus offers one effort: nothing to choose, so no effort row, as the desktop's picker has it.
+  expect(screen.queryByText("Effort")).toBeNull();
   fireEvent.click(screen.getByRole("tab", { name: "fx" }));
   expect(nativeProps.get(screen.getByRole("tab", { name: "fx" }))?.accessibilityState).toEqual({ selected: true });
   expect(nativeProps.get(screen.getByLabelText("Search models"))?.placeholder).toBe("Search fx models");

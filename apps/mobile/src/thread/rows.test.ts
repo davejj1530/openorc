@@ -560,6 +560,21 @@ describe("transcriptRows", () => {
     expect(unsentRows(transcriptRows(run.blocks, activity(run), "r", emptyRowMemo()))).toEqual([]);
   });
 
+  it("draws a cloud message's start steps as work while it waits on its machine, a failed one with the server's words", () => {
+    const { frame } = runStore();
+    const step = (part: string, label: string, status: "running" | "success" | "error", text?: string): Draft =>
+      ({ type: "activity.updated", activityId: `start:m1:${part}`, label, status, ...(text ? { text } : {}) }) as Draft;
+    let run = frame(step("machine", "Starting the machine", "running"));
+    let rows = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
+    expect(rows.filter((row) => row.kind === "work")).toHaveLength(1);
+    run = frame(step("machine", "Starting the machine", "success"), step("code", "Getting your code", "error", "The saved work couldn't be restored."));
+    rows = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
+    const work = rows.find((row) => row.kind === "work");
+    expect(work && work.kind === "work" ? workEntries(work.work).map((entry) => entry.kind) : []).not.toHaveLength(0);
+    expect(JSON.stringify(work)).toContain("Getting your code");
+    expect(JSON.stringify(work)).toContain("The saved work couldn't be restored.");
+  });
+
   it("tells a cloud turn that went on with another account at its usage limit by the one line its sender reads, never as failed", () => {
     const { frame } = runStore();
     const moved = "Moved to the Claude account Main after Work reached its usage limit. Continue where you left off.";

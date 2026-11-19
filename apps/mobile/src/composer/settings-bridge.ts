@@ -5,9 +5,9 @@ import type { ProjectChoice } from "../projects";
 type ConversationSettings = ReturnType<ClientState["useConversationSettings"]>;
 
 /**
- * What the model sheet reads and changes: a composer's model and Claude account, or an Orcling's. `claudeAccount` is
- * there for a new thread, for an open Claude thread, which can go on with another account between turns, and for an
- * Orcling, which runs on its own.
+ * What the model sheet reads and changes: a composer's model and account, or an Orcling's. `claudeAccount` is there for
+ * a new thread, for an open Claude thread, which can go on with another account between turns, and for an Orcling,
+ * which runs on its own; `cloudAccount` for a thread on OpenOrc Cloud.
  */
 export type ModelSettings = Pick<ConversationSettings, "choice" | "selectModel"> & {
   /** An existing thread's account, used for its model capabilities without offering an account change. */
@@ -20,7 +20,26 @@ export type ModelSettings = Pick<ConversationSettings, "choice" | "selectModel">
   claudeAccount?: { chosen: string | undefined; select: (id: string) => void; held?: string | null; failed?: string | null; projectId?: string };
   /** A turn that runs on OpenOrc Cloud: its models are the cloud's own, where its server lists them. */
   cloud?: boolean;
+  /**
+   * On OpenOrc Cloud, which of the person's accounts the turn runs on: `accountId` the one chosen, none for their
+   * default. `threadId` names an open thread, whose server must say it keeps several accounts.
+   */
+  cloudAccount?: { accountId: string | null | undefined; select: (id: string) => void; held?: string | null; failed?: string | null; threadId?: string };
 };
+
+/**
+ * The accounts the model sheet offers, the Mac's Claude accounts or the person's on OpenOrc Cloud, in the section of
+ * the agent whose they are: each with why it cannot run, the one in use, and how a choice is made.
+ */
+export interface AccountChoice {
+  label: string;
+  section: string;
+  accounts: readonly { id: string; name: string; unavailable: string | null }[];
+  id: string;
+  select: (id: string) => void;
+  held: string | null;
+  failed: string | null;
+}
 
 /**
  * What the model, mode, account and project sheets read and change: an open thread's settings, or a new thread's

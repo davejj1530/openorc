@@ -1,7 +1,7 @@
 import { offeredAccount, projectAccountChoice } from "@openorc/client";
 import { DEFAULT_CLAUDE_ACCOUNT, placeOf, type ClaudeAccountConnection, type ThreadSummary } from "@openorc/protocol";
 import { useRpc, useRpcMutation } from "../client";
-import type { ComposerSettings, ModelSettings } from "./settings-bridge";
+import type { AccountChoice, ComposerSettings, ModelSettings } from "./settings-bridge";
 
 /**
  * A composer's Claude account choice: the Mac's accounts, or the ones its project uses when it uses only some (from
@@ -9,7 +9,7 @@ import type { ComposerSettings, ModelSettings } from "./settings-bridge";
  * (the chosen one, else the project's default). A thread already on an account its project stopped using keeps it
  * listed. Null with a single account, until the Mac lists them, and where the account cannot change.
  */
-export function useClaudeAccountChoice(settings: ModelSettings | undefined) {
+export function useClaudeAccountChoice(settings: ModelSettings | undefined): AccountChoice | null {
   const list = useRpc("claude.accounts.list", {}, { enabled: Boolean(settings?.claudeAccount) });
   const projects = useRpc("projects.list", {}, { enabled: Boolean(settings?.claudeAccount?.projectId) });
   if (!settings?.claudeAccount || !list.data || list.data.accounts.length < 2) return null;
@@ -21,7 +21,15 @@ export function useClaudeAccountChoice(settings: ModelSettings | undefined) {
   const id = chosen ?? choice.defaultId;
   const current = list.data.accounts.find((account) => account.id === id);
   const accounts = current && !choice.accounts.includes(current) ? [...choice.accounts, current] : choice.accounts;
-  return { accounts, id, current, select, held, failed };
+  return {
+    label: "Claude account",
+    section: "claude",
+    accounts: accounts.map((account) => ({ id: account.id, name: account.name, unavailable: claudeAccountUnavailable(account) })),
+    id,
+    select,
+    held,
+    failed,
+  };
 }
 
 /** A new thread's chosen account, unless its project uses only some accounts and not that one: then the Mac starts it on the project's default. */

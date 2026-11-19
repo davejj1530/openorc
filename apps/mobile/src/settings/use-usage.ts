@@ -1,8 +1,9 @@
 import { tagsFor } from "@openorc/client";
-import type { PlanLimits, RpcParams } from "@openorc/protocol";
+import type { AccountStatus, PlanLimits, RpcParams } from "@openorc/protocol";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { link, queryClient, useLinkState, useRpcs } from "../client";
+import { link, queryClient, useLinkState, useRpc, useRpcs } from "../client";
+import { useOwnCloud } from "../cloud/use-own-cloud";
 
 /** The plan limits as Settings shows them. */
 export interface Usage {
@@ -83,20 +84,47 @@ const CLOUD_USAGE: readonly RpcParams<"providers.usage">[] = [
   { provider: "codex", cloud: true },
 ];
 
+/** One usage read of OpenOrc Cloud's and the card it makes: the account's name after the cloud's, as the desktop names it. */
+interface CloudRead {
+  id: string;
+  params: RpcParams<"providers.usage">;
+  name: string;
+}
+
+/**
+ * What Settings reads of the person's usage on OpenOrc Cloud: where the server keeps several accounts per agent, each
+ * Claude and Codex account by its name; else each agent's one sign-in. The accounts come from the phone's own session.
+ */
+export function cloudReads(status: AccountStatus | undefined): readonly CloudRead[] {
+  if (status?.state !== "signed-in" || !status.agentAccounts || !status.signIns) return CLOUD_USAGE.map((params) => ({ id: `cloud:${params.provider}`, params, name: "OpenOrc Cloud" }));
+  return status.signIns.flatMap((row) => {
+    if ((row.agent !== "claude" && row.agent !== "codex") || row.id === undefined) return [];
+    return [{ id: `cloud:${row.agent}:${row.id}`, params: { provider: row.agent, cloud: true, cloudAccountId: row.id }, name: `OpenOrc Cloud · ${row.name ?? row.label}` }];
+  });
+}
+
 /**
  * The person's agent sign-ins on OpenOrc Cloud, as the Mac last heard them after one of their cloud turns, each as an
- * account card named OpenOrc Cloud beside its agent's mark, as the desktop names it. None for an agent with no
- * reading, or from a Mac that does not answer them.
+ * account card named OpenOrc Cloud beside its agent's mark, and where they keep several accounts, each account's by
+ * its name, as the desktop names them. None for an account with no reading, or from a Mac that does not answer them.
  */
 export function useCloudLimits(live: boolean): readonly PlanLimits[] {
-  const reads = useRpcs("providers.usage", CLOUD_USAGE, { enabled: live, staleTime: 60_000 });
-  return reads.flatMap(({ data }) => {
-    if (!data || (data.provider !== "claude" && data.provider !== "codex") || (!data.windows.length && !data.credits.length)) return [];
+  const own = useOwnCloud();
+  const status = useRpc("account.status", {}, { enabled: own });
+  const asked = cloudReads(own ? status.data : undefined);
+  const reads = useRpcs(
+    "providers.usage",
+    asked.map((read) => read.params),
+    { enabled: live, staleTime: 60_000 },
+  );
+  return reads.flatMap(({ data }, index) => {
+    const read = asked[index];
+    if (!read || !data || (data.provider !== "claude" && data.provider !== "codex") || (!data.windows.length && !data.credits.length)) return [];
     return [
       {
-        id: `cloud:${data.provider}`,
+        id: read.id,
         provider: data.provider,
-        name: "OpenOrc Cloud",
+        name: read.name,
         plan: data.plan,
         status: data.status,
         windows: data.windows,

@@ -120,12 +120,13 @@ it("lists the Mac's last rows after a relaunch with the Mac asleep, from the ans
   expect(list.map((row) => row.id).sort()).toEqual([cloudThread, "mac-thread"].sort());
 });
 
-it("answers the spaces and the person from its own session, as the Mac shaped them for a phone", async () => {
+it("answers the spaces, the person and their cloud accounts from its own session, as the Mac shaped them for a phone", async () => {
   const { connection, mac } = await routed();
   await vi.waitFor(async () => expect(await connection.call("spaces.status", {})).toMatchObject({ state: "ready" }));
   const status = await connection.call("spaces.status", {});
   expect(status).toMatchObject({ apiOrigin: "", invitations: [], create: { allowed: false } });
   expect(await connection.call("account.person" as RpcMethod, {} as never)).toMatchObject({ name: expect.any(String) });
+  expect(await connection.call("account.status", {})).toMatchObject({ state: "signed-in" });
   expect(mac.at.asked).toEqual([]);
 });
 

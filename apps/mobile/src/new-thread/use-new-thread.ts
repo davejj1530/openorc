@@ -57,7 +57,10 @@ export function useNewThread(project: ProjectChoice) {
       change({ mode: next.mode });
       permission.select(next.permissionMode);
     },
-    claudeAccount: { chosen: claudeAccountId, select: (claudeAccountId) => change({ claudeAccountId }), projectId },
+    // On OpenOrc Cloud the person's cloud accounts take the place of the Mac's Claude accounts.
+    ...(project.cloud
+      ? { cloudAccount: { accountId: draft.cloudAccountId, select: (cloudAccountId: string) => change({ cloudAccountId }), held: starting ? "Starting the thread…" : null } }
+      : { claudeAccount: { chosen: claudeAccountId, select: (claudeAccountId: string) => change({ claudeAccountId }), projectId } }),
     cloud: Boolean(project.cloud),
   };
   // A Mac project waits for the Mac: Start is held with why, rather than sent to fail.

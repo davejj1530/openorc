@@ -1,31 +1,29 @@
 import { Button, Host, Menu, Picker, RNHostView, Text as MenuText } from "@expo/ui/swift-ui";
 import { accessibilityLabel, accessibilityValue, disabled, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
-import type { ClaudeAccountConnection } from "@openorc/protocol";
 import { View } from "react-native";
 import { ChevronsUpDown } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { useMode } from "../ui/mode";
 import { Text } from "../ui/Text";
-import { claudeAccountUnavailable, type useClaudeAccountChoice } from "./claude-account";
-
-type Choice = NonNullable<ReturnType<typeof useClaudeAccountChoice>>;
+import type { AccountChoice } from "./settings-bridge";
 
 /**
- * Which of the Mac's Claude accounts a thread runs on, as a native menu with a check on the current one. An account
- * the Mac cannot run follows, dimmed with why: kept out of the picker, whose check would otherwise move to it. While
- * the choice is held, as during an open thread's turn, the menu stays shut and says why.
+ * Which account a thread runs on, as a native menu with a check on the current one: the Mac's Claude accounts, or on
+ * OpenOrc Cloud the person's accounts for the thread's agent. An account that cannot run follows, dimmed with why:
+ * kept out of the picker, whose check would otherwise move to it. While the choice is held, as during an open
+ * thread's turn, the menu stays shut and says why.
  */
-export function ClaudeAccountMenu({ choice }: { choice: Choice }) {
+export function AccountMenu({ choice }: { choice: AccountChoice }) {
   const mode = useMode();
-  const name = choice.current?.name ?? "";
-  const unavailable = (account: ClaudeAccountConnection) => (account.id === choice.id ? null : claudeAccountUnavailable(account));
+  const name = choice.accounts.find((account) => account.id === choice.id)?.name ?? "";
+  const unavailable = (account: AccountChoice["accounts"][number]) => (account.id === choice.id ? null : account.unavailable);
   return (
     <View className="gap-2">
-      <Text className="text-sm text-ink-4">Claude account</Text>
+      <Text className="text-sm text-ink-4">{choice.label}</Text>
       <Host matchContents={{ vertical: true }} colorScheme={mode}>
         <Menu
-          modifiers={[accessibilityLabel("Claude account"), accessibilityValue(name), disabled(Boolean(choice.held))]}
+          modifiers={[accessibilityLabel(choice.label), accessibilityValue(name), disabled(Boolean(choice.held))]}
           label={
             <RNHostView matchContents={{ vertical: true }}>
               <View pointerEvents="none" className="min-h-touch flex-row items-center gap-2 rounded-full bg-surface-2 pl-4 pr-3.5">

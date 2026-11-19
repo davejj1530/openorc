@@ -19,8 +19,8 @@ export type MacLine = Pick<CoreConnection, "call" | "onPush" | "setFrameInterest
 /**
  * The phone's one connection for its client state, as the Mac's place router makes one for its windows: while the
  * phone holds a session of OpenOrc Cloud of its own, the cloud answers for the threads it holds and adds its rows to the
- * lists, and the Mac, over the link, answers everything else, its own threads among them. The spaces, their projects and
- * who the person is come from the phone's own session. With no session of its own, every call goes to the Mac, as before.
+ * lists, and the Mac, over the link, answers everything else, its own threads among them. The spaces, their projects,
+ * who the person is and their cloud accounts come from the phone's own session. With no session of its own, every call goes to the Mac, as before.
  */
 export class RoutedConnection implements CoreConnection {
   readonly delivery = "interest";
@@ -81,6 +81,8 @@ export class RoutedConnection implements CoreConnection {
         return Promise.resolve(phoneStatus(hosted.spaces.status()));
       case "spaces.projects":
         return hosted.spaces.projects((params as RpcParams<"spaces.projects">).spaceId);
+      case "account.status":
+        return Promise.resolve(hosted.account.status());
       case "account.person": {
         const status = hosted.account.status();
         return Promise.resolve(status.state === "signed-in" ? { name: status.name ?? null, image: status.image ?? null } : null);

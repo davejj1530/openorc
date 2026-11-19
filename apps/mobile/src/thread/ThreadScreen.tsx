@@ -8,6 +8,7 @@ import { Pressable, View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
 import { client, useLinkState, useRpc } from "../client";
 import { useThreadClaudeAccount } from "../composer/claude-account";
+import { useThreadCloudAccount } from "../composer/cloud-account";
 import { Composer } from "../composer/Composer";
 import { useShareSettings } from "../composer/settings-bridge";
 import { useOwnCloud } from "../cloud/use-own-cloud";
@@ -199,6 +200,7 @@ export function ThreadScreen() {
     ...client.useConversationSettings({ thread, activeRun }),
     claudeAccountId: thread?.claudeAccountId ?? undefined,
     claudeAccount: useThreadClaudeAccount(thread),
+    cloudAccount: useThreadCloudAccount(thread),
     cloud: thread !== null && placeOf(thread).elsewhere,
   };
   useShareSettings(id, settings);

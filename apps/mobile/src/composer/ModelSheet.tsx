@@ -11,7 +11,8 @@ import { ListPressable } from "../ui/ListPressable";
 import { useColors } from "../ui/mode";
 import { Text } from "../ui/Text";
 import { useClaudeAccountChoice, useComposerModels } from "./claude-account";
-import { ClaudeAccountMenu } from "./ClaudeAccountMenu";
+import { useCloudAccountChoice } from "./cloud-account";
+import { AccountMenu } from "./AccountMenu";
 import { AgentTabs } from "./AgentTabs";
 import { sheetList, type SheetList, type SheetModel } from "./model-sheet-list";
 import { recentModels, rememberModel } from "./recent-models";
@@ -178,8 +179,8 @@ function ModelControls({ shown, settings, state }: { shown: AgentKind | null; se
 }
 
 /**
- * The models a composer can run, their effort and Fast mode, and on a Claude thread the account it runs on, once the
- * Mac has more than one. One agent's models show at a time. An agent with many, as OpenCode and Oh My Pi have, opens
+ * The models a composer can run, their effort and Fast mode, and the account it runs on: on a Claude thread the Mac's,
+ * once it has more than one; on OpenOrc Cloud the person's for the agent, where the server keeps several. One agent's models show at a time. An agent with many, as OpenCode and Oh My Pi have, opens
  * on a short list of the current, recent and default models and a row per provider; a search looks through them all.
  */
 export function ModelSheet() {
@@ -187,7 +188,8 @@ export function ModelSheet() {
   const insets = useSafeAreaInsets();
   const settings = useSharedModelSettings(composerId);
   const models = useComposerModels(settings);
-  const account = useClaudeAccountChoice(settings);
+  const claudeAccount = useClaudeAccountChoice(settings);
+  const account = useCloudAccountChoice(settings) ?? claudeAccount;
   const catalog = pickerCatalog(models.data ?? []);
   const choice = settings?.choice ?? null;
   const current = catalogModel(models.data, choice);
@@ -233,7 +235,7 @@ export function ModelSheet() {
             </Text>
           ) : null}
         </View>
-        {account && shown === "claude" ? <ClaudeAccountMenu choice={account} /> : null}
+        {account && shown === account.section ? <AccountMenu choice={account} /> : null}
         {agents.length > 1 && shown ? (
           <AgentTabs
             agents={agents}

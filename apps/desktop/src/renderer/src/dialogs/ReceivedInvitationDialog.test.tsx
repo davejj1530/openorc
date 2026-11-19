@@ -151,11 +151,14 @@ it("updates the inviter's face and name in an already open detail", async () => 
   show();
   fireEvent.click(screen.getByText("Birch Studio"));
   await screen.findByRole("dialog");
+  // The first status read must have landed, or its older answer replaces the newer one set below.
+  await waitFor(() => expect(queryClient.isFetching({ queryKey: ["spaces.status"] })).toBe(0));
   const image = "data:image/webp;base64,UklGRg==";
   await act(async () => {
     queryClient.setQueryData(["spaces.status", {}], { ...status, invitations: [{ ...invitation, inviter: { ...invitation.inviter, name: "Alex Lee", image } }] });
   });
-  expect(screen.getByText("Alex Lee invited you.")).toBeTruthy();
+  // The cache tells the screen on a later tick, so the new name is waited for.
+  expect(await screen.findByText("Alex Lee invited you.")).toBeTruthy();
   expect(document.querySelector(".organization-received-person img")?.getAttribute("src")).toBe(image);
 });
 

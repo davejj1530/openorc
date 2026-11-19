@@ -396,6 +396,23 @@ describe("NewThread", () => {
     expect(screen.getByTestId("agents-offered").textContent).toBe("claude, codex, opencode, no fast mode");
   });
 
+  it("shows a cloud start as the thread it becomes until the server holds it, and gives the composer back when it fails", async () => {
+    account = openOrcCloud("added");
+    saveModelDraft("p1", "Add a health check");
+    let fail: (error: Error) => void = () => {};
+    start.mockImplementation(() => new Promise((_resolve, reject) => (fail = reject)));
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "OpenOrc Cloud 1 h" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("Starting the thread")).toBeTruthy();
+    expect(screen.getAllByText("Add a health check").length).toBeGreaterThan(0);
+    await act(async () => fail(new Error("OpenOrc Cloud can't be reached.")));
+    await waitFor(() => expect(screen.queryByText("Starting the thread")).toBeNull());
+    expect(await screen.findByText("OpenOrc Cloud can't be reached.")).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Message" }).textContent).toContain("Add a health check");
+  });
+
   it("offers OpenOrc Cloud with its own agents and models on a Mac with no agent installed, and starts there", async () => {
     account = openOrcCloud("added");
     system = { ...system, harnesses: system.harnesses.map((row) => ({ ...row, state: "not_found" as const, path: null })) };

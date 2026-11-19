@@ -24,6 +24,7 @@ import { cloudRunChoice, useCloudModels } from "../lib/cloud-run-choice";
 import { useCloudStartReady } from "../lib/use-cloud-start-ready";
 import { useMounted } from "../lib/use-mounted";
 import { cloudPicker } from "../lib/use-thread-accounts";
+import { NewThreadStage, useCloudStart } from "./new-thread-starting";
 import { usePublishComposerAccount } from "../lib/composer-account";
 import { useDefaultHarness } from "../lib/default-harness";
 import { focusedProject, useLayout } from "../lib/layout";
@@ -166,6 +167,7 @@ function NewThreadProject({
   const { permission, select: setPermission, error: permissionError, ready: permissionReady } = usePermissionSelection();
   const start = useRpcMutation("threads.start");
   const mounted = useMounted();
+  const cloudStart = useCloudStart();
   const changeDraft = (patch: Partial<NewThreadDraft>) => {
     const next = { ...draft, ...patch };
     setStorageError(writeNewThreadDraft(next) ? null : "This draft could not be saved on your device. Keep this task open while you work.");
@@ -235,7 +237,8 @@ function NewThreadProject({
     const { generation, key } = spaceNavigation.getState();
     if (disabledReason) throw new Error(disabledReason);
     if (!choice || !selected || target.kind === "unavailable") throw new Error("Choose a project and execution target first.");
-    const threadId = await startNewThread({
+    // On OpenOrc Cloud the thread is the server's to make: until it is, the start shows as the thread it becomes.
+    const starting = startNewThread({
       draft: { ...runDraft, claudeAccountId, ...(cloudAccounts && { cloudAccountId: cloudAccounts.current }) },
       project: selected,
       isWorkspace,
@@ -246,6 +249,7 @@ function NewThreadProject({
       files,
       launch: (params) => startSpaceThread(macStart.macWork ? { ...params, macWork: macStart.macWork } : params, start.mutateAsync, spaceId, key),
     });
+    const threadId = await cloudStart.run(onCloud, { text, attachments }, starting);
     if (mounted.current && spaceNavigation.getState().generation === generation && useRouter.getState().route.view === "newthread") openThread(threadId);
   };
 
@@ -274,59 +278,61 @@ function NewThreadProject({
               </div>
             ) : (
               <>
-                <NewThreadMark />
-                <NewThreadQuestion projectId={projectId} projects={projects} disabled={start.isPending} onProject={onProject} />
-                <div className="relative">
-                  {macStart.line ? <div className="mb-2">{macStart.line}</div> : null}
-                  <Composer
-                    draftKey={files.draftKey}
-                    hostedFiles={files.hostedFiles}
-                    autoFocus
-                    value={draft.prompt}
-                    onChange={(prompt) => changeDraft({ prompt })}
-                    onSubmit={submit}
-                    onReady={cloudStartReady}
-                    placeholder="Ask OpenOrc to build, fix bugs, explore"
-                    size="lg"
-                    presentation="new-thread"
-                    model={choice}
-                    onModel={chooseModel}
-                    modelControl={
-                      <NewThreadModelControl
-                        choice={target.kind === "unavailable" ? null : choice}
-                        choose={chooseModel}
-                        orclings={pickerOrclings}
-                        accounts={pickerAccounts}
-                        onCloud={onCloud}
-                        disabled={start.isPending}
-                      />
-                    }
-                    mode={draft.mode}
-                    onMode={(mode) => changeDraft({ mode })}
-                    permission={permission}
-                    onPermission={setPermission}
-                    settingsDisabled={start.isPending}
-                    location={location}
-                    fileSearch={isWorkspace || !projectId ? undefined : { kind: "project", id: projectId }}
-                    {...suggestions}
-                    busy={start.isPending}
-                    disabledReason={disabledReason}
-                    error={start.error?.message ?? permissionError ?? storageError}
-                  >
-                    <NewThreadOptions
-                      local={!cloudOnly}
-                      projectId={projectId}
-                      mode={workspaceMode}
-                      hosted={hosted}
+                <NewThreadStage start={cloudStart.start}>
+                  <NewThreadMark />
+                  <NewThreadQuestion projectId={projectId} projects={projects} disabled={start.isPending} onProject={onProject} />
+                  <div className="relative">
+                    {macStart.line ? <div className="mb-2">{macStart.line}</div> : null}
+                    <Composer
+                      draftKey={files.draftKey}
+                      hostedFiles={files.hostedFiles}
+                      autoFocus
+                      value={draft.prompt}
+                      onChange={(prompt) => changeDraft({ prompt })}
+                      onSubmit={submit}
+                      onReady={cloudStartReady}
+                      placeholder="Ask OpenOrc to build, fix bugs, explore"
+                      size="lg"
+                      presentation="new-thread"
+                      model={choice}
+                      onModel={chooseModel}
+                      modelControl={
+                        <NewThreadModelControl
+                          choice={target.kind === "unavailable" ? null : choice}
+                          choose={chooseModel}
+                          orclings={pickerOrclings}
+                          accounts={pickerAccounts}
+                          onCloud={onCloud}
+                          disabled={start.isPending}
+                        />
+                      }
+                      mode={draft.mode}
+                      onMode={(mode) => changeDraft({ mode })}
+                      permission={permission}
+                      onPermission={setPermission}
+                      settingsDisabled={start.isPending}
                       location={location}
-                      blocked={branchingReason(git.state, "Worktrees")}
-                      disabled={start.isPending}
-                      onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
-                      onMode={(workspace) => changeDraft({ workspace })}
-                    />
-                  </Composer>
-                </div>
-                <NewThreadIssue issue={targetIssue ?? projectIssue} retry={retry} />
+                      fileSearch={isWorkspace || !projectId ? undefined : { kind: "project", id: projectId }}
+                      {...suggestions}
+                      busy={start.isPending}
+                      disabledReason={disabledReason}
+                      error={start.error?.message ?? permissionError ?? storageError}
+                    >
+                      <NewThreadOptions
+                        local={!cloudOnly}
+                        projectId={projectId}
+                        mode={workspaceMode}
+                        hosted={hosted}
+                        location={location}
+                        blocked={branchingReason(git.state, "Worktrees")}
+                        disabled={start.isPending}
+                        onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
+                        onMode={(workspace) => changeDraft({ workspace })}
+                      />
+                    </Composer>
+                  </div>
+                  <NewThreadIssue issue={targetIssue ?? projectIssue} retry={retry} />
+                </NewThreadStage>
               </>
             )}
           </div>

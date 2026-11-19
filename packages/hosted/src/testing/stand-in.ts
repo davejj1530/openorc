@@ -130,6 +130,8 @@ export interface StandIn {
   ask(threadId: string, request: { kind: string; toolName?: string; input: unknown; detail: string }): string;
   /** The thread's running turn ends: an open ask parks, and the first waiting message is taken or refused. */
   endTurn(threadId: string, status?: "success" | "cancelled" | "limited"): void;
+  /** A step of the start a message made: the machine, the code, the agent; running, done, or failed in `text`'s words. */
+  startStep(threadId: string, messageId: string, step: "machine" | "code" | "agent", status: "running" | "success" | "error", text?: string): void;
   /** A thread that does not go on past its sender's usage limit: the line everyone reads, naming the sender by first name. */
   heldAtLimit(threadId: string, first: string): void;
   /** Every ready ask stored, in order. */
@@ -589,6 +591,7 @@ function threadsFace(
   | "append"
   | "switchedAtLimit"
   | "heldAtLimit"
+  | "startStep"
   | "set"
   | "stoppedCommands"
   | "ask"
@@ -607,6 +610,7 @@ function threadsFace(
     append: (threadId, events, options) => hosted.append(threadId, events, options),
     switchedAtLimit: (threadId, sender, accounts) => hosted.switchedAtLimit(threadId, sender.toLowerCase(), accounts),
     heldAtLimit: (threadId, first) => hosted.heldAtLimit(threadId, first),
+    startStep: (threadId, messageId, step, status, text) => hosted.startStep(threadId, messageId, step, status, text),
     set: (threadId, facts) => hosted.set(threadId, facts),
     stoppedCommands: (threadId) => hosted.stoppedCommands(threadId),
     ask: (threadId, request) => hosted.ask(threadId, request),

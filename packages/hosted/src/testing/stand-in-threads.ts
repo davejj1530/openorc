@@ -28,7 +28,7 @@
  *   a waiting message the host refuses when its turn comes stays in `waiting` as refused
  */
 import { randomUUID } from "node:crypto";
-import { titleFromPrompt } from "@openorc/protocol";
+import { harnessShortName, titleFromPrompt } from "@openorc/protocol";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 import { attachedPath, StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInCollaboration } from "./stand-in-collaboration.js";
@@ -644,6 +644,18 @@ export class StandInThreads {
    * the same one has reset: a line only the sender reads, in the Mac's words naming the accounts, and the thread's next
    * turns on that account, as the sender's continuation names it.
    */
+  /**
+   * A step of a start, as the server writes it while the message that started it waits on a machine: the machine, the
+   * thread's code, then its agent, each running and then done, or failed with the server's words. Its id names the
+   * message, so a later start's steps are rows of their own.
+   */
+  startStep(threadId: string, messageId: string, step: "machine" | "code" | "agent", status: "running" | "success" | "error", text?: string): void {
+    const thread = this.#threads.get(threadId)!;
+    const labels = { machine: "Starting the machine", code: "Getting your code", agent: `Starting ${harnessShortName(thread.agent)}` };
+    const event = { type: "activity.updated", ts: Date.now(), activityId: `start:${messageId}:${step}`, label: labels[step], status, ...(text !== undefined && { text }) };
+    this.append(threadId, [event], { turnId: null });
+  }
+
   /**
    * As the server does when a thread does not go on past its sender's usage limit at the first look (the switch off, or
    * no other account free): the line everyone in it reads, after the limited turn.

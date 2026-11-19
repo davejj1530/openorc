@@ -1,30 +1,53 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Block } from "@openorc/client";
+import { isHostedAgent } from "@openorc/protocol";
 import { WorkTranscript } from "../components/Transcript";
+import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
+import { core } from "../lib/rpc";
 import { useMounted } from "../lib/use-mounted";
 
 /** A first message on its way to OpenOrc Cloud: what New thread shows from Send until the thread is there to open. */
 export interface CloudStart {
   text: string;
   attachments: string[];
+  agent: string;
   at: number;
 }
 
 /**
- * A cloud start as the thread it is becoming: the message as sent, and the start's step under it, until the server holds
- * the thread and it opens with its own steps. A start that fails gives the composer back with its words and the draft.
+ * A cloud start as the thread it is becoming: the message as sent, and the start's steps under it, until the server holds
+ * the thread and it opens with its own steps. Sending the person's skills is one, counted while it lasts. A start that
+ * fails gives the composer back with its words and the draft.
  */
 export function NewThreadStarting({ start }: { start: CloudStart }) {
+  const skills = useSkillsSending(start.agent);
   const blocks: Block[] = [
     { id: "start-message", kind: "message", role: "user", text: start.text, streaming: false, pending: true, at: start.at, ...(start.attachments.length ? { attachments: start.attachments } : {}) },
-    { id: "start-thread", kind: "activity", label: "Starting the thread", status: "running", text: "", at: start.at },
+    skills
+      ? { id: "start-skills", kind: "activity", label: "Sending your skills", status: "running", text: `${skills.sent} of ${skills.total}`, at: start.at }
+      : { id: "start-thread", kind: "activity", label: "Starting the thread", status: "running", text: "", at: start.at },
   ];
   return (
     <div className="new-thread-starting" aria-busy>
       <WorkTranscript runId="new-thread" blocks={blocks} live />
     </div>
   );
+}
+
+/** How many of the agent's skills have gone up to OpenOrc Cloud, read again as each goes; null when none are going. */
+function useSkillsSending(agent: string) {
+  const hosted = isHostedAgent(agent) ? agent : null;
+  const sending = useRpc("hostedSkills.sending", { agent: hosted ?? "claude" }, { enabled: hosted !== null, staleTime: 0 });
+  const refetch = sending.refetch;
+  useEffect(
+    () =>
+      core.onPush((event) => {
+        if (event.type === "invalidate" && event.keys.includes("hostedSkillsSending")) void refetch();
+      }),
+    [refetch],
+  );
+  return sending.data ?? null;
 }
 
 /**

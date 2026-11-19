@@ -36,7 +36,7 @@ export type { OrganizationSeatAdministration } from "./organization-seat-adminis
 import { TeamChat } from "./chat.js";
 import { Follower } from "./follow.js";
 import { Files } from "./files.js";
-import { Skills, type OwnSkills } from "./skills.js";
+import { Skills, type OwnSkills, type SkillsSending } from "./skills.js";
 import { ProjectEnvironment } from "./environment.js";
 import type { MacWorkUpload } from "./mac-start.js";
 export type { MacWorkUpload } from "./mac-start.js";
@@ -65,7 +65,15 @@ export type { CloudFileScope, CloudFileReference, FileDestination } from "./file
 export type { FileByteSource } from "./file-transfer.js";
 export type { UploadPlan, UploadedFile } from "./wire-files.js";
 export type { WireFilesSource, WireThreadFileNames, WireThreadFileRead, WireThreadFolder } from "./wire-thread-files.js";
-export type { OwnSkill, OwnSkills } from "./skills.js";
+export type { OwnSkill, OwnSkills, SkillsSending } from "./skills.js";
+
+/** The person's own skills going up to OpenOrc Cloud. */
+export interface HostedSkillSends {
+  /** The packs of the agent's set going up now, or null when none are. */
+  sending(agent: HostedAgent): SkillsSending | null;
+  /** This device's skills changed: their sets go up again ahead of any start. */
+  changed(): void;
+}
 export type { ArrivalLine, ArrivalSettings } from "./moves.js";
 export type { WireCloudModels } from "./wire-models.js";
 
@@ -327,6 +335,8 @@ export interface Hosted {
   readonly models: CloudModels;
   /** A cloud thread's files read from OpenOrc Cloud itself, for a phone whose Mac is out of reach. */
   readonly threadFiles: CloudThreadFiles;
+  /** The person's own skills as their cloud turns get them: how many of an agent's are going up now, and this device's changed. */
+  readonly skills: HostedSkillSends;
   /** Reads the stored session and the kept answers, and connects when signed in. Never rejects: no session is signed out. */
   start(): Promise<void>;
   /** The device woke or the network came back: connect now instead of at the next retry. */
@@ -378,7 +388,9 @@ export function createHosted(deps: HostedDeps): Hosted {
   const chat = new TeamChat({ session, spaces, push: deps.push });
   const tasks = new OnlineTasks({ session, spaces, push: deps.push, prepared: () => threads.refresh() });
   const files = new Files({ session, spaces, fetch: deps.fetch, push: deps.push });
-  const skills = new Skills({ session, own: deps.skills, now: deps.now });
+  // How many of the person's skills have gone up is read by the start that waits on them.
+  const skills = new Skills({ session, own: deps.skills, now: deps.now, changed: () => deps.push({ type: "invalidate", keys: ["hostedSkillsSending"] }) });
+  const skillsAhead = (changed?: boolean) => void skills.ahead(account.status(), () => spaces.catalog(), changed);
   // The account says which of this Mac's projects are on OpenOrc Cloud, from the projects the thread rows were read with.
   const cloud = {
     repos: () => threads.cloudRepos(),
@@ -399,6 +411,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     deviceName: deps.deviceName,
     projects: deps.projects,
     cloud,
+    changed: () => skillsAhead(),
   });
   // The follower reads a thread's log in the thread's space, which the rows know.
   const follower: Follower = new Follower({
@@ -420,6 +433,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     tasks,
     files,
     ...parityServices(session, deps, threads),
+    skills: { sending: (agent) => skills.sending(agent), changed: () => skillsAhead(true) },
     start: async () => {
       await account.start();
       threads.start();

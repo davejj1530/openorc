@@ -19,6 +19,7 @@ let branchError: boolean;
 let accounts: RpcResults["claude.accounts.list"] | undefined;
 let settings: Partial<RpcResults["app.settings.get"]>;
 let account: AccountStatus | undefined;
+let skillsSending: RpcResults["hostedSkills.sending"] | undefined;
 const mutated: [string, unknown][] = [];
 /** A project's git read held open by a test; any other project's is already in. */
 const gitReads: Record<string, Promise<unknown>> = {};
@@ -43,6 +44,7 @@ vi.mock("../lib/client", async (original) => ({
       "cloudModels.catalog": cloudModels,
       "app.settings.get": settings,
       "account.status": account,
+      "hostedSkills.sending": skillsSending,
       "orchestration.availability": { enabled: true, reason: null, maxHierarchyDepth: 3 },
     };
     return { data: data[method], isError: method === "projects.checkoutBranch" && branchError, isPending: false, isLoading: false, error: null, refetch: vi.fn() };
@@ -127,6 +129,7 @@ beforeEach(() => {
   mutated.length = 0;
   models = [{ id: "codex-model", label: "Codex", agent: "codex", isDefault: true, efforts: ["medium"], defaultEffort: "medium" }];
   cloudModels = null;
+  skillsSending = undefined;
   system = {
     dataDir: "/data",
     harnesses: harnessIds.map((id) => ({ id, state: id === "codex" ? "ready" : "sign_in", path: `/bin/${id}`, version: "1", revision: 1 })),
@@ -410,6 +413,24 @@ describe("NewThread", () => {
     await act(async () => fail(new Error("OpenOrc Cloud can't be reached.")));
     await waitFor(() => expect(screen.queryByText("Starting the thread")).toBeNull());
     expect(await screen.findByText("OpenOrc Cloud can't be reached.")).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Message" }).textContent).toContain("Add a health check");
+  });
+
+  it("counts the person's skills going up as the cloud start's step while they go", async () => {
+    account = openOrcCloud("added");
+    saveModelDraft("p1", "Add a health check");
+    skillsSending = { sent: 12, total: 59 };
+    let fail: (error: Error) => void = () => {};
+    start.mockImplementation(() => new Promise((_resolve, reject) => (fail = reject)));
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "OpenOrc Cloud 1 h" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("Sending your skills")).toBeTruthy();
+    expect(screen.getByText("12 of 59")).toBeTruthy();
+    expect(screen.queryByText("Starting the thread")).toBeNull();
+    await act(async () => fail(new Error("Couldn't send your skill notes. That skill didn't arrive whole. Send it again.")));
+    expect(await screen.findByText("Couldn't send your skill notes. That skill didn't arrive whole. Send it again.")).toBeTruthy();
     expect(screen.getByRole("textbox", { name: "Message" }).textContent).toContain("Add a health check");
   });
 

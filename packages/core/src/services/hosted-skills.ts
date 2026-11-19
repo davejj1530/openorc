@@ -10,6 +10,7 @@
  * cloud (`off`) is never read for it.
  */
 import { createHash } from "node:crypto";
+import { watch, type FSWatcher } from "node:fs";
 import { lstat, open, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { listSkills } from "@openorc/agents";
@@ -21,6 +22,8 @@ const LISTED_MS = 60_000;
 /** What a skill never needs in the cloud: this Mac's own marks, and folders its tools fill. */
 const LEFT_OUT = new Set([".DS_Store", ".git", "node_modules", "__pycache__", ".venv"]);
 const CHUNK_BYTES = 256 * 1024;
+/** How long a change in the skills' folders settles before the sets go up again. */
+const SETTLE_MS = 2_000;
 
 /** One file of a skill as it stood when it was listed. */
 type SkillFile = { rel: string; at: string; bytes: number; modified: number; runs: boolean };
@@ -109,6 +112,9 @@ export class HostedSkills {
   private readonly listing = new Map<HarnessId, Promise<AgentSkill[]>>();
   /** Each skill's digest by its folder, with what its files stood as when it was taken. */
   private readonly digests = new Map<string, { standing: string; digest: string }>();
+  /** The folders holding the listed skills, watched for a skill added, changed or removed. */
+  private readonly watched = new Map<string, FSWatcher>();
+  private settling: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly deps: {
@@ -122,6 +128,8 @@ export class HostedSkills {
       changed?: () => void;
       /** The agent's skills the person keeps from the cloud, by name. */
       off?: (agent: HarnessId) => readonly string[];
+      /** Told, once a change settles, when a skill in the folders of the listed ones was added, changed or removed. */
+      edited?: () => void;
     },
   ) {}
 
@@ -239,10 +247,46 @@ export class HostedSkills {
       .then((all) => {
         const skills = all.filter((skill) => skill.source === "user" && skill.enabled !== false);
         this.listed.set(agent, { at: this.deps.now?.() ?? Date.now(), skills });
+        this.watch(skills);
         return skills;
       })
       .finally(() => this.listing.delete(agent));
     this.listing.set(agent, asked);
     return asked;
+  }
+
+  /** Watches the folders the skills are in. One that can't be watched is read again at the next send. */
+  private watch(skills: readonly AgentSkill[]): void {
+    if (!this.deps.edited) return;
+    for (const root of new Set(skills.map((skill) => path.dirname(path.dirname(skill.path))))) {
+      if (this.watched.has(root)) continue;
+      try {
+        const watcher = watch(root, { recursive: true, persistent: false }, () => this.edit());
+        watcher.on("error", () => {
+          watcher.close();
+          this.watched.delete(root);
+        });
+        this.watched.set(root, watcher);
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  /** A skill changed: every listing is asked again, and `edited` is told once the folders are still. */
+  private edit(): void {
+    this.listed.clear();
+    if (this.settling) clearTimeout(this.settling);
+    this.settling = setTimeout(() => {
+      this.settling = null;
+      this.deps.edited?.();
+    }, SETTLE_MS);
+    this.settling.unref?.();
+  }
+
+  close(): void {
+    for (const watcher of this.watched.values()) watcher.close();
+    this.watched.clear();
+    if (this.settling) clearTimeout(this.settling);
   }
 }

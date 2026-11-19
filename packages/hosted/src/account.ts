@@ -65,8 +65,8 @@ type Heard = z.infer<typeof keptAnswers>;
  */
 const keepsAccounts = (signIns: readonly WireSignIn[] | null | undefined): boolean => Boolean(signIns?.some((row) => row.id !== undefined));
 
-/** `cloud`: the repositories the person's spaces have as projects, and a read of them again. */
-type AccountDeps = { session: Session; cloud: { repos(): ReadonlySet<string>; ids(): ReadonlySet<string>; reread(): Promise<void> } } & Pick<
+/** `cloud`: the repositories the person's spaces have as projects, and a read of them again. `changed`: told after the windows, when what `status()` answers changed. */
+type AccountDeps = { session: Session; cloud: { repos(): ReadonlySet<string>; ids(): ReadonlySet<string>; reread(): Promise<void> }; changed?: () => void } & Pick<
   HostedDeps,
   "kept" | "server" | "push" | "now" | "mintClaudeToken" | "browser" | "deviceName" | "projects"
 >;
@@ -434,6 +434,7 @@ export class Account implements HostedAccount {
     if (now === this.#announced) return;
     this.#announced = now;
     this.deps.push({ type: "invalidate", keys: ["account"] });
+    this.deps.changed?.();
   }
 }
 

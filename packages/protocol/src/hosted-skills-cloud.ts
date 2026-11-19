@@ -13,14 +13,22 @@ export type LeftOutSkill = { name: string | null; cause: string };
  */
 export type CloudSkill = { name: string; description: string; bytes: number | null; on: boolean; cause: string | null };
 
-/** Window-only: an agent's skills for the cloud, the person's choice of which go, and the ones its last set left out. */
+/** An agent's skills going up to OpenOrc Cloud now: how many have, of how many it lacked. */
+export type CloudSkillsSending = { sent: number; total: number };
+
+/**
+ * Window-only: an agent's skills for the cloud, the person's choice of which go, the ones its last set left out, and how
+ * many are going up now, for a start that waits on them.
+ */
 export const hostedSkillsCloudRpcParams = {
   "hostedSkills.leftOut": z.object({ agent: HarnessId }).strict(),
+  "hostedSkills.sending": z.object({ agent: HarnessId }).strict(),
   "hostedSkills.list": z.object({ agent: HarnessId }).strict(),
   "hostedSkills.choose": z.object({ agent: HarnessId, names: z.array(z.string().min(1)).max(1000), on: z.boolean() }).strict(),
 };
 export interface HostedSkillsCloudRpcResults {
   "hostedSkills.leftOut": LeftOutSkill[];
+  "hostedSkills.sending": CloudSkillsSending | null;
   "hostedSkills.list": CloudSkill[];
   "hostedSkills.choose": CloudSkill[];
 }

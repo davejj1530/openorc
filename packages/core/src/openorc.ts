@@ -394,6 +394,8 @@ export class OpenOrc {
       // What a set leaves out is said in the composer; it is read again when it changes.
       changed: () => this.options.transport.push({ type: "invalidate", keys: ["hostedSkillsLeftOut"] }),
       off: (agent) => this.settings.get().cloudSkillsOff[agent] ?? [],
+      // A skill added, changed or removed goes up ahead of the next start.
+      edited: () => this.hosted?.skills.changed(),
     });
     this.hostedSkills = skills;
     return (agent) => skills.own(agent);
@@ -660,6 +662,7 @@ export class OpenOrc {
   async close(): Promise<void> {
     await this.hostedFiles.close();
     this.account?.close();
+    this.hostedSkills?.close();
     await this.remote.close(this.closingForUpdate ? "update" : "shutdown");
     await this.files.intelligence.close();
     this.threads.stopAccepting();
@@ -713,7 +716,11 @@ export class OpenOrc {
       createHostedHandlers(this.account, this.hostedFiles, this.db, new TeamChatOrclingCalls({ db: this.db, orclings: this.orclings, textGeneration: this.textGeneration, log: this.log }), () =>
         this.runs.modelCatalog(undefined, false, undefined, undefined, undefined, true),
       ),
-      createHostedSkillsCloudHandlers(() => this.hostedSkills, this.settings),
+      createHostedSkillsCloudHandlers(
+        () => this.hostedSkills,
+        this.settings,
+        () => this.hosted?.skills ?? null,
+      ),
       createCloudMovesHandlers(
         () => this.cloudMoves,
         () => this.cloudFolders,

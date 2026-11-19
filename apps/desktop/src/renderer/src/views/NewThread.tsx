@@ -249,7 +249,7 @@ function NewThreadProject({
       files,
       launch: (params) => startSpaceThread(macStart.macWork ? { ...params, macWork: macStart.macWork } : params, start.mutateAsync, spaceId, key),
     });
-    const threadId = await cloudStart.run(onCloud, { text, attachments }, starting);
+    const threadId = await cloudStart.run(onCloud, { text, attachments, agent: choice.agent }, starting);
     if (mounted.current && spaceNavigation.getState().generation === generation && useRouter.getState().route.view === "newthread") openThread(threadId);
   };
 

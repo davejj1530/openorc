@@ -75,11 +75,12 @@ it("sends this computer's own skills to the server before a message to a cloud t
   await call("runs.start", { threadId: hosted, agent: "claude", mode: "act", permissionMode: "trusted", prompt: "Go", messageId: `user-${crypto.randomUUID()}` });
 
   expect(stand.skills.set(EMAIL, "claude")).toEqual(["review", "ship"]);
-  const [review, ship] = stand.skills.sent.map((sent) => stand.skills.pack(EMAIL, sent.digest)!);
+  const packs = stand.skills.sent.map((sent) => stand.skills.pack(EMAIL, sent.digest)!);
+  const [review, ship] = ["review/", "ship/"].map((name) => packs.find((pack) => pack.toString().startsWith(name)));
   const skillFile = "---\nname: review\ndescription: Read the diff before answering.\n---\n\nRead the diff.\n";
   expect(review!.toString()).toBe(`review/SKILL.md\0-\0${skillFile.length}\0${skillFile}review/scripts/check.sh\0x\x0018\0#!/bin/sh\necho ok\n`);
   expect(ship!.toString()).toContain("ship/SKILL.md\0-\0");
-  expect(stand.skills.sent.map((sent) => sent.digest)).toEqual([review!, ship!].map((pack) => createHash("sha256").update(pack).digest("hex")));
+  expect(stand.skills.sent.map((sent) => sent.digest).sort()).toEqual([review!, ship!].map((pack) => createHash("sha256").update(pack).digest("hex")).sort());
   expect(stand.sent).toHaveLength(1);
 });
 

@@ -54,11 +54,16 @@ const review = skill("review", [
 ]);
 const ship = skill("ship");
 
-/** A signed-in host with one thread of the account's, heard, whose device has `own` skills. */
+/**
+ * A signed-in host with one thread of the account's, heard, whose device has `own` skills from once the sets that go
+ * ahead at sign-in went: they went with none, so what a send or a start brings is its own to bring.
+ */
 async function withThread(own: ((agent: string) => Promise<readonly OwnSkill[]>) | undefined, override: Parameters<typeof hostDeps>[2] = {}) {
   const project = stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
   const thread = stand.addThread(ADA, { projectId: project, title: "Retry the cloud start" });
-  const { deps, seen, browser } = hostDeps(stand, device, { ...(own && { skills: own }), ...override });
+  let armed = false;
+  const skills = own && ((agent: string) => (armed ? own(agent) : Promise.resolve([])));
+  const { deps, seen, browser } = hostDeps(stand, device, { ...(skills && { skills }), ...override });
   const hosted = createHosted(deps);
   hosts.push(hosted);
   await hosted.start();
@@ -68,6 +73,8 @@ async function withThread(own: ((agent: string) => Promise<readonly OwnSkill[]>)
     const status = hosted.account.status();
     expect(status.state === "signed-in" && status.signIns).toBeTruthy();
   });
+  if (own) await vi.waitFor(() => expect(wentAhead(seen.timeline)).toBe(true));
+  armed = true;
   const send = (text: string, settings: Record<string, unknown> = SETTINGS) =>
     hosted.threads.call("runs.start", { threadId: thread, ...SETTINGS, ...settings, prompt: text, messageId: crypto.randomUUID() });
   /** The requests made since the last call, by path, without the reads a send makes after it. */
@@ -80,20 +87,19 @@ async function withThread(own: ((agent: string) => Promise<readonly OwnSkill[]>)
   return { hosted, thread, project, run: hostedRunId(thread), seen, send, asked };
 }
 
+/** The sets went ahead at sign-in: the server was asked whether it serves skills, and where it does, told each signed-in agent's set. */
+const wentAhead = (timeline: readonly string[]) =>
+  stand.threadFiles.capabilities?.["skills"]?.available
+    ? ["claude", "codex"].every((agent) => stand.skills.asked.some((asked) => asked.agent === agent))
+    : timeline.includes("request /hosted/capabilities");
+
 describe("a person's own skills, sent before their cloud turn", () => {
   it("sends the set, then the packs the server lacks, then the set again, and only then the message", async () => {
     stand.threadFiles.capabilities = ON;
     const { send, asked, thread } = await withThread(async () => [review, ship]);
     asked();
     await send("Look at the diff");
-    expect(asked()).toEqual([
-      "/hosted/capabilities",
-      "/hosted/skills/claude",
-      `/hosted/skill-packs/${review.digest}`,
-      `/hosted/skill-packs/${ship.digest}`,
-      "/hosted/skills/claude",
-      `/hosted/threads/${thread}/messages`,
-    ]);
+    expect(asked()).toEqual(["/hosted/skills/claude", `/hosted/skill-packs/${review.digest}`, `/hosted/skill-packs/${ship.digest}`, "/hosted/skills/claude", `/hosted/threads/${thread}/messages`]);
     expect(stand.skills.set(ADA, "claude")).toEqual(["review", "ship"]);
     expect(stand.skills.pack(ADA, review.digest)?.equals(review.bytes)).toBe(true);
     expect(stand.skills.pack(ADA, ship.digest)?.equals(ship.bytes)).toBe(true);
@@ -129,16 +135,17 @@ describe("a person's own skills, sent before their cloud turn", () => {
     await send("With Codex", { agent: "codex", model: null });
     expect(wanted).toEqual(["codex"]);
     expect(stand.skills.set(ADA, "codex")).toEqual(["ship"]);
-    expect(stand.skills.set(ADA, "claude")).toBeNull();
+    expect(stand.skills.set(ADA, "claude")).toEqual([]);
   });
 
   it("sends nothing to a server that has no capabilities, and asks it once", async () => {
     const own = vi.fn(async () => [review]);
-    const { send, asked, thread } = await withThread(own);
+    const { send, asked, thread, seen } = await withThread(own);
     asked();
     await send("First");
     await send("Second");
-    expect(asked()).toEqual(["/hosted/capabilities", `/hosted/threads/${thread}/messages`, `/hosted/threads/${thread}/messages`]);
+    expect(asked()).toEqual([`/hosted/threads/${thread}/messages`, `/hosted/threads/${thread}/messages`]);
+    expect(seen.timeline.filter((line) => line === "request /hosted/capabilities")).toHaveLength(1);
     expect(own).not.toHaveBeenCalled();
     expect(stand.skills.asked).toEqual([]);
   });
@@ -151,7 +158,7 @@ describe("a person's own skills, sent before their cloud turn", () => {
     asked();
     await send("First");
     await send("Second");
-    expect(asked()).toEqual(["/hosted/capabilities", `/hosted/threads/${thread}/messages`, `/hosted/threads/${thread}/messages`]);
+    expect(asked()).toEqual([`/hosted/threads/${thread}/messages`, `/hosted/threads/${thread}/messages`]);
     expect(own).not.toHaveBeenCalled();
     stand.threadFiles.capabilities = ON;
     now += 61_000;
@@ -187,9 +194,9 @@ describe("a person's own skills, sent before their cloud turn", () => {
     let own: OwnSkill[] = [review, broken];
     const { send, asked, thread } = await withThread(async () => own);
     asked();
-    await expect(send("Look at the diff")).rejects.toThrow("notes has no SKILL.md, so it isn't a skill.");
+    await expect(send("Look at the diff")).rejects.toThrow("Couldn't send your skill notes. notes has no SKILL.md, so it isn't a skill.");
     expect(stand.sent).toEqual([]);
-    expect(stand.skills.set(ADA, "claude")).toBeNull();
+    expect(stand.skills.set(ADA, "claude")).toEqual([]);
     asked();
     own = [review, skill("notes")];
     await send("Look at the diff");
@@ -241,7 +248,7 @@ describe("a person's own skills, sent before their cloud turn", () => {
     });
     asked();
     await hosted.threads.call("threads.ready", { id: thread });
-    expect(asked()).toEqual(["/hosted/capabilities", "/hosted/skills/claude", `/hosted/skill-packs/${review.digest}`, "/hosted/skills/claude", `/hosted/threads/${thread}/ready`]);
+    expect(asked()).toEqual(["/hosted/skills/claude", `/hosted/skill-packs/${review.digest}`, "/hosted/skills/claude", `/hosted/threads/${thread}/ready`]);
     expect(stand.readies).toHaveLength(1);
     fails = true;
     const later = await withThread(async () => {
@@ -256,7 +263,7 @@ describe("a person's own skills, sent before their cloud turn", () => {
     const { hosted, asked } = await withThread(async () => [review]);
     asked();
     await hosted.threads.call("threads.start", { projectId: "mac-openorc", ...SETTINGS, prompt: "Start here" });
-    expect(asked()).toEqual(["/hosted/capabilities", "/hosted/skills/claude", `/hosted/skill-packs/${review.digest}`, "/hosted/skills/claude"]);
+    expect(asked()).toEqual(["/hosted/skills/claude", `/hosted/skill-packs/${review.digest}`, "/hosted/skills/claude"]);
     expect(stand.started).toHaveLength(1);
     expect(stand.skills.set(ADA, "claude")).toEqual(["review"]);
   });
@@ -264,16 +271,84 @@ describe("a person's own skills, sent before their cloud turn", () => {
   it("starts no thread when the skills could not be sent", async () => {
     stand.threadFiles.capabilities = ON;
     const { hosted } = await withThread(async () => [skill("notes", [{ path: "README.md", text: "No skill file." }])]);
-    await expect(hosted.threads.call("threads.start", { projectId: "mac-openorc", ...SETTINGS, prompt: "Start here" })).rejects.toThrow("notes has no SKILL.md, so it isn't a skill.");
+    await expect(hosted.threads.call("threads.start", { projectId: "mac-openorc", ...SETTINGS, prompt: "Start here" })).rejects.toThrow(
+      "Couldn't send your skill notes. notes has no SKILL.md, so it isn't a skill.",
+    );
     expect(stand.started).toEqual([]);
   });
 
   it("sends one set when two messages go at once", async () => {
     stand.threadFiles.capabilities = ON;
     const { send } = await withThread(async () => [review]);
+    const before = stand.skills.asked.length;
     await Promise.all([send("First"), send("Second")]);
     expect(stand.skills.sent).toHaveLength(1);
-    expect(stand.skills.asked).toHaveLength(2);
+    expect(stand.skills.asked.length - before).toBe(2);
     expect(stand.sent).toHaveLength(2);
+  });
+
+  it("sends the packs the server lacks six at a time, saying how many have gone, and none once they are kept", async () => {
+    stand.threadFiles.capabilities = ON;
+    const many = Array.from({ length: 20 }, (_, at) => skill(`skill-${String(at).padStart(2, "0")}`));
+    const held: (() => void)[] = [];
+    let going = 0;
+    let most = 0;
+    const { hosted, send, seen } = await withThread(async () => many, {
+      fetch: async (input, init) => {
+        if (!new URL(String(input)).pathname.startsWith("/hosted/skill-packs/")) return fetch(input, init);
+        most = Math.max(most, ++going);
+        await new Promise<void>((go) => held.push(go));
+        try {
+          return await fetch(input, init);
+        } finally {
+          going--;
+        }
+      },
+    });
+    const sent = send("Use them all");
+    await vi.waitFor(() => expect(held).toHaveLength(6));
+    expect(hosted.skills.sending("claude")).toEqual({ sent: 0, total: 20 });
+    held.splice(0).forEach((go) => go());
+    await vi.waitFor(() => expect(hosted.skills.sending("claude")).toEqual({ sent: 6, total: 20 }));
+    const pump = setInterval(() => held.splice(0).forEach((go) => go()), 5);
+    await sent.finally(() => clearInterval(pump));
+    expect(most).toBe(6);
+    expect(stand.skills.set(ADA, "claude")).toHaveLength(20);
+    expect(hosted.skills.sending("claude")).toBeNull();
+    expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["hostedSkillsSending"] });
+  });
+});
+
+describe("a person's own skills, sent ahead of their first cloud thread", () => {
+  async function signedIn(own: (agent: string) => Promise<readonly OwnSkill[]>) {
+    stand.addProject(ADA, { name: "openorc", fullName: "acme/openorc" });
+    const { deps, seen, browser } = hostDeps(stand, device, { skills: own });
+    const hosted = createHosted(deps);
+    hosts.push(hosted);
+    await hosted.start();
+    await signInAs(hosted, browser, ADA);
+    return { hosted, seen };
+  }
+
+  it("sends each signed-in agent's set once the person is signed in, so a first thread has none to send", async () => {
+    stand.threadFiles.capabilities = ON;
+    const { hosted, seen } = await signedIn(async (agent) => (agent === "codex" ? [ship] : [review]));
+    await vi.waitFor(() => expect([stand.skills.set(ADA, "claude"), stand.skills.set(ADA, "codex")]).toEqual([["review"], ["ship"]]));
+    expect(stand.skills.set(ADA, "opencode")).toBeNull();
+    const from = seen.timeline.length;
+    await hosted.threads.call("threads.start", { projectId: "mac-openorc", ...SETTINGS, prompt: "Start here" });
+    expect(seen.timeline.slice(from).filter((line) => line.includes("skill"))).toEqual([]);
+    expect(stand.started).toHaveLength(1);
+  });
+
+  it("sends a set again when this device's skills change, before any start asks", async () => {
+    stand.threadFiles.capabilities = ON;
+    let own: OwnSkill[] = [review];
+    const { hosted } = await signedIn(async () => own);
+    await vi.waitFor(() => expect(stand.skills.set(ADA, "claude")).toEqual(["review"]));
+    own = [review, ship];
+    hosted.skills.changed();
+    await vi.waitFor(() => expect(stand.skills.set(ADA, "claude")).toEqual(["review", "ship"]));
+    expect(stand.skills.sent.map((sent) => sent.digest)).toEqual([review.digest, ship.digest]);
   });
 });

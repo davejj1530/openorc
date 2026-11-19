@@ -559,6 +559,21 @@ describe("transcriptRows", () => {
     run = frame({ type: "approval.resolved", approvalId: "q", decision: "allow", answers: { runner: ["Vitest"] } });
     expect(unsentRows(transcriptRows(run.blocks, activity(run), "r", emptyRowMemo()))).toEqual([]);
   });
+
+  it("tells a cloud turn that went on with another account at its usage limit by the one line its sender reads, never as failed", () => {
+    const { frame } = runStore();
+    const moved = "Moved to the Claude account Main after Work reached its usage limit. Continue where you left off.";
+    const run = frame(
+      { type: "turn.started", turnId: "t1" },
+      { type: "message.completed", messageId: "ask-1", role: "user", text: "Fix the export" },
+      { type: "activity.updated", activityId: "limit", label: "Claude AI usage limit reached", status: "error", recovery: { kind: "usage", provider: "claude" } },
+      { type: "turn.completed", turnId: "t1", status: "cancelled", limited: true, durationMs: 400 },
+      { type: "message.completed", messageId: "moved", role: "system", text: moved },
+    );
+    const rows = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
+    expect(outline(rows).filter((key) => key !== "presence")).toEqual(["prompt:ask-1", "notice:moved"]);
+    expect(rows.some((row) => row.kind === "work")).toBe(false);
+  });
 });
 
 describe("withWaitingApprovals", () => {

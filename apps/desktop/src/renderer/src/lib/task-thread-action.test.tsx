@@ -1,9 +1,9 @@
 import { cleanup, renderHook } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useCloudThreadSettings } from "./task-thread-action";
 
 const reads = vi.hoisted(() => ({
-  permission: { permission: "trusted" as string, ready: true },
+  permission: { permission: "trusted", ready: true },
   models: [
     { id: "gpt-6-sol", label: "GPT-6 Sol", agent: "codex", isDefault: true, efforts: ["medium"], defaultEffort: "medium" },
     { id: "claude-sonnet-5", label: "Sonnet 5", agent: "claude", isDefault: true, efforts: ["medium"], defaultEffort: "medium" },
@@ -15,6 +15,9 @@ vi.mock("./client", async (original) => ({
   usePermissionSelection: () => reads.permission,
 }));
 vi.mock("./default-harness", () => ({ useDefaultHarness: () => "claude" }));
+beforeEach(() => {
+  reads.permission = { permission: "trusted", ready: true };
+});
 afterEach(cleanup);
 
 it("opens a task's new thread with the person's own permission, as their other cloud threads start", () => {

@@ -57,6 +57,7 @@ vi.mock("expo-router", () => ({
   useNavigation: () => ({ isFocused: () => true }),
 }));
 vi.mock("./attachments", () => ({ pickImages: vi.fn(), attachImage: vi.fn() }));
+vi.mock("../thread/Markdown", () => ({ Markdown: ({ text }: { text: string }) => <div>{text}</div> }));
 
 const personal = { id: "personal-me", kind: "personal" as const };
 

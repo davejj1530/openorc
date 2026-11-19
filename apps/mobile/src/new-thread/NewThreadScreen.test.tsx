@@ -48,6 +48,7 @@ vi.mock("expo-router", () => ({
   useNavigation: () => ({ isFocused: () => mac.focused }),
 }));
 vi.mock("../composer/attachments", () => ({ pickImages: vi.fn(), attachImage: vi.fn() }));
+vi.mock("../thread/Markdown", () => ({ Markdown: ({ text }: { text: string }) => <div>{text}</div> }));
 
 beforeEach(() => {
   mac.phone!.saved.clear();
@@ -297,4 +298,45 @@ it("holds Start in a Mac folder while the Mac is out of reach and says why on a 
   await waitFor(() => expect(button("Start").disabled).toBe(false));
   await act(async () => fireEvent.click(button("Start")));
   expect(mac.start.mock.calls[0]![0]).toMatchObject({ projectId: "cloud-project:h-notes", hosted: true });
+});
+
+it("shows a cloud start as the thread it is becoming, the message and Starting the thread, and gives the draft and the error back when it fails", async () => {
+  const personal = { id: "personal-me", kind: "personal" as const };
+  mac.reads["spaces.status"] = {
+    state: "ready",
+    userId: "me",
+    apiOrigin: "",
+    personalSpaceId: personal.id,
+    spaces: [personal],
+    create: { allowed: false, reason: null },
+    invitations: [],
+    reach: "live",
+    heardAt: 1,
+    error: null,
+  };
+  mac.reads["spaces.projects"] = [
+    { key: "openorc", name: "openorc", repo: null, localProjectId: "openorc", hostedProjectId: null, connected: true },
+    { key: "cloud-project:h-notes", name: "notes-app", repo: "riley/notes-app", localProjectId: null, hostedProjectId: "h-notes", connected: true },
+  ];
+  onTestFinished(() => {
+    delete mac.reads["spaces.status"];
+    delete mac.reads["spaces.projects"];
+    act(() => mac.phone!.cloud.hold(false));
+  });
+  act(() => mac.phone!.cloud.hold(true));
+  await openAndWrite("Fix the build");
+  await chooseProject("notes-app");
+  act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)("Search the attachments"));
+  let refuse: (error: Error) => void = () => undefined;
+  mac.start.mockReturnValue(new Promise((_, reject) => (refuse = reject)));
+  await waitFor(() => expect(button("Start").disabled).toBe(false));
+  await act(async () => fireEvent.click(button("Start")));
+  expect(screen.getByText("Search the attachments")).toBeTruthy();
+  expect(screen.getByText("Starting the thread")).toBeTruthy();
+  expect(screen.queryByLabelText("Message")).toBeNull();
+  await act(async () => refuse(new Error("You have no cloud hours left.")));
+  expect(await screen.findByText("You have no cloud hours left.")).toBeTruthy();
+  expect(screen.queryByText("Starting the thread")).toBeNull();
+  expect(screen.getByLabelText("Message").textContent).toBe("Search the attachments");
+  expect(router.replace).not.toHaveBeenCalled();
 });

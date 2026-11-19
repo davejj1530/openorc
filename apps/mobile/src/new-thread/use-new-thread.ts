@@ -13,6 +13,7 @@ import { failureMessage } from "../failure";
 import { haptic } from "../ui/haptics";
 import { useSheetDraft, useSheetPermission } from "./drafts";
 import type { ProjectChoice } from "../projects";
+import type { CloudStart } from "./NewThreadStarting";
 import { startBlocker, unstarted, type SheetDraft } from "./new-thread-state";
 import { projectReach, useMacReach } from "./project-reach";
 
@@ -31,6 +32,8 @@ export function useNewThread(project: ProjectChoice) {
   const start = useRpcMutation("threads.start");
   // From the tap until the Mac answers, which includes reading the project's git first.
   const [starting, setStarting] = useState(false);
+  // A cloud start's message, shown where the thread will be until the server holds it.
+  const [cloudStart, setCloudStart] = useState<CloudStart | null>(null);
   // A second tap can land before the first start renders, so the start in flight is held here as well.
   const inFlight = useRef(false);
   const field = useEmptiedPrompt();
@@ -63,17 +66,7 @@ export function useNewThread(project: ProjectChoice) {
   // A Mac project waits for the Mac: Start is held with why, rather than sent to fail.
   const reach = projectReach(project, useMacReach());
   const blocker = startBlocker(draft, { permissionReady: permission.ready }) ?? reach;
-  const controls = composerControls({
-    text: draft.prompt,
-    attachments: draft.images.length,
-    uploading,
-    sending: starting,
-    disabledReason: blocker,
-    working: false,
-    steerable: false,
-    stoppable: false,
-    stopping: false,
-  });
+  const controls = startControls(draft, uploading, starting, blocker);
   const dim = useDimReason(controls.canSend ? null : blocker);
 
   /** Starts the thread and resolves with its id, or with null when nothing could go or the Mac refused. */
@@ -87,6 +80,7 @@ export function useNewThread(project: ProjectChoice) {
     setDraft((current) => ({ ...current, prompt: "", images: [] }));
     field.emptied();
     setError(null);
+    if (project.cloud) setCloudStart({ text: sent.prompt, attachments: sent.attachments, at: Date.now() });
     try {
       const { thread } = await start.mutateAsync(await startInput(project, { ...draft, claudeAccountId }, { permissionMode: permission.permission, ...sent }, appSettings?.defaultWorkspaceMode));
       haptic.confirm();
@@ -99,6 +93,7 @@ export function useNewThread(project: ProjectChoice) {
     } finally {
       inFlight.current = false;
       setStarting(false);
+      setCloudStart(null);
     }
   };
 
@@ -113,6 +108,7 @@ export function useNewThread(project: ProjectChoice) {
     settings,
     controls,
     starting,
+    cloudStart,
     error: failure?.projectId === projectId ? failure.message : null,
     /** Why Start is dim, once a tap on it asked. */
     dimReason: dim.shown,
@@ -120,6 +116,21 @@ export function useNewThread(project: ProjectChoice) {
     explainDim: dim.ask,
     submit,
   };
+}
+
+/** Start's state, as a thread's composer works out its send: what is written, the uploads, a start under way, what holds it. */
+function startControls(draft: SheetDraft, uploading: number, starting: boolean, blocker: string | null) {
+  return composerControls({
+    text: draft.prompt,
+    attachments: draft.images.length,
+    uploading,
+    sending: starting,
+    disabledReason: blocker,
+    working: false,
+    steerable: false,
+    stoppable: false,
+    stopping: false,
+  });
 }
 
 /**

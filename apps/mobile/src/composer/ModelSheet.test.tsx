@@ -60,6 +60,7 @@ vi.mock("expo-router", () => ({
   useNavigation: () => ({ isFocused: () => true }),
 }));
 vi.mock("./attachments", () => ({ pickImages: vi.fn(), attachImage: vi.fn() }));
+vi.mock("../thread/Markdown", () => ({ Markdown: ({ text }: { text: string }) => <div>{text}</div> }));
 
 function macState({ harness = "claude", accounts }: { harness?: "claude" | "codex"; accounts: ClaudeAccountConnection[] }) {
   mac.reads["projects.list"] = [{ id: "openorc", name: "openorc", defaultBranch: "main" }];

@@ -15,6 +15,7 @@ import { Text } from "../ui/Text";
 import { rememberedProject, rememberProject } from "./drafts";
 import { openingProject } from "./new-thread-state";
 import { NewThreadPickers } from "./NewThreadPickers";
+import { NewThreadStarting } from "./NewThreadStarting";
 import { useNewThread } from "./use-new-thread";
 
 /** The new thread's picker sheets find its choices under this id. */
@@ -43,6 +44,8 @@ function NewThreadForm({ project, choices, onProject }: FormProps) {
     if (!threadId || !navigation.isFocused()) return;
     router.replace({ pathname: "/thread/[id]", params: { id: threadId } });
   };
+  // A cloud start shows as the thread it is becoming until the server holds it; a failure brings the composer back.
+  if (form.cloudStart) return <NewThreadStarting start={form.cloudStart} />;
   return (
     <View className="flex-1 justify-end bg-bg">
       <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
@@ -101,7 +104,8 @@ function useProjectChoices(): { choices: ProjectChoice[]; known: boolean; space:
 /**
  * Starts a thread from the phone: the project (in Personal, Workspace first; the one it was opened for chosen), then
  * the desktop's composer with its defaults, all held above the keyboard as on a thread. Each project keeps its own
- * draft, so switching projects switches drafts. Start swaps this screen for the new thread, streaming.
+ * draft, so switching projects switches drafts. Start swaps this screen for the new thread, streaming; on OpenOrc Cloud
+ * the message and the start's step show first, until the server holds the thread.
  */
 export function NewThreadScreen() {
   const { projectId: opened } = useLocalSearchParams<{ projectId?: string }>();

@@ -47,12 +47,16 @@ export function useCloudStart(): { start: CloudStart | null; run: <T>(cloud: boo
   };
 }
 
-/** New thread's landing, kept but hidden while a cloud start shows in its place, so a failed start gives it back as it was. */
+/**
+ * New thread's landing, kept but hidden while a cloud start shows in its place, so a failed start gives it back as it was.
+ * Its wrapper takes no box of its own: the mark, the question and the composer stay the column's own children, with its
+ * gap and their own alignment.
+ */
 export function NewThreadStage({ start, children }: { start: CloudStart | null; children: ReactNode }) {
   return (
     <>
       {start ? <NewThreadStarting start={start} /> : null}
-      <div className={cn(start && "hidden")}>{children}</div>
+      <div className={cn("contents", start && "hidden")}>{children}</div>
     </>
   );
 }

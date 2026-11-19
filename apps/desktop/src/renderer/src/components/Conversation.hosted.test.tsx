@@ -180,6 +180,20 @@ it.each([
   expect(useRouter.getState().route).toMatchObject({ view: "settings", section });
 });
 
+it("offers a cloud thread the person's cloud accounts in its composer, the one it runs on chosen, where the server keeps several", async () => {
+  queries.set("hosted.capabilities", { version: 1, features: { agentAccounts: { available: true } } });
+  const accounts: AccountStatus = {
+    ...pro,
+    agentAccounts: true,
+    signIns: [
+      { agent: "claude", provider: "anthropic", label: "Claude Max", ended: false, id: "personal", name: "Personal", isDefault: true, way: "token" },
+      { agent: "claude", provider: "anthropic", label: "Claude Max", ended: false, id: "work", name: "Work", isDefault: false, way: "token" },
+    ],
+  };
+  await open({ cloudAccountId: "work" }, accounts);
+  expect(composer.props!.accounts).toMatchObject({ cloud: true, section: "claude", current: "work", accounts: [{ id: "personal" }, { id: "work" }] });
+});
+
 it("lets a message into a running turn go whatever the hours, since the turn's starter pays", async () => {
   await open({ activity: "running" }, { ...pro, plan: { pro: false }, hours: null });
   expect(composer.props!.disabledReason).toBeNull();

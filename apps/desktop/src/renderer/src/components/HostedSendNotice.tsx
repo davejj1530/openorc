@@ -35,12 +35,11 @@ const FILES = "Files can't be sent to OpenOrc Cloud yet.";
 
 /** What a cloud thread's composer leaves out: what OpenOrc Cloud does not take yet, absent or disabled with its reason. */
 export interface CloudComposerLimits {
-  accounts?: undefined;
   attachmentsDisabledReason: string;
   modelLimits: typeof CLOUD_MODEL_LIMITS;
 }
 
-const CLOUD_LIMITS: CloudComposerLimits = { accounts: undefined, attachmentsDisabledReason: FILES, modelLimits: CLOUD_MODEL_LIMITS };
+const CLOUD_LIMITS: CloudComposerLimits = { attachmentsDisabledReason: FILES, modelLimits: CLOUD_MODEL_LIMITS };
 
 /**
  * What an OpenOrc Cloud thread adds to its conversation, and nothing for any other thread:

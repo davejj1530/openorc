@@ -187,3 +187,9 @@ it("makes only a teammate's composer read-only, including while its place is out
   expect(threadReadOnlyReason({ owner: { ...teammate.owner, reach: "offline" } })).toBe(threadReadOnlyReason(teammate));
   expect([threadReadOnlyReason(own), threadReadOnlyReason(null), threadReadOnlyReason({}), threadReadOnlyReason({ owner: { ...own.owner, reach: "offline" } })]).toEqual([null, null, null, null]);
 });
+
+it("offers OpenOrc Cloud to a new thread with no agent chosen yet, as on a Mac with none, still held by what the place itself lacks", () => {
+  expect(hostedStart(pro, { projectId: "mac-notes", agent: null, model: null })).toEqual({ shown: true, blocked: null });
+  expect(hostedStart({ ...pro, plan: { pro: false }, hours: null }, { projectId: "mac-notes", agent: null, model: null }).blocked?.words).toBe("OpenOrc Cloud needs Pro.");
+  expect(hostedStart(pro, { projectId: "mac-unknown", agent: null, model: null }).blocked?.words).toBe("This project has no GitHub repository.");
+});

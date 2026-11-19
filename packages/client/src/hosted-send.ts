@@ -127,16 +127,18 @@ function sendStartBlock(why: SendBlockWhy, agent: string): StartBlock {
  * Whether a new thread's place menu offers OpenOrc Cloud, and why it cannot be chosen now. Offered to a person signed
  * in, or one whose session the server ended, and never to someone with no account. Blocked in the order the server
  * would refuse it: reach, plan and hours; then the project (no GitHub repository, one GitHub doesn't let OpenOrc read,
- * one not added yet); then the agent (one OpenOrc Cloud doesn't run, one not signed in there).
+ * one not added yet); then the agent (one OpenOrc Cloud doesn't run, one not signed in there). With no agent chosen yet,
+ * as on a Mac with none of its own, the place is judged without one: the cloud's own agents and models are offered there.
  */
-export function hostedStart(account: AccountStatus | undefined, input: { projectId: string; agent: string; model: string | null }): { shown: boolean; blocked: StartBlock | null } {
+export function hostedStart(account: AccountStatus | undefined, input: { projectId: string; agent: string | null; model: string | null }): { shown: boolean; blocked: StartBlock | null } {
   if (account?.state === "signed-out")
     return account.ended ? { shown: true, blocked: { words: "Your OpenOrc session ended.", fix: { label: "Sign in", section: "account" } } } : { shown: false, blocked: null };
   if (account?.state !== "signed-in") return { shown: false, blocked: null };
-  const why = hostedSendBlock(account, input, false);
-  if (why && BEFORE_PROJECT.includes(why)) return { shown: true, blocked: sendStartBlock(why, input.agent) };
+  const why = hostedSendBlock(account, { agent: input.agent ?? "", model: input.model }, false);
+  if (why && BEFORE_PROJECT.includes(why)) return { shown: true, blocked: sendStartBlock(why, input.agent ?? "") };
   const project = projectBlock(account, input.projectId);
   if (project) return { shown: true, blocked: project };
+  if (input.agent === null) return { shown: true, blocked: null };
   if (!isHostedAgent(input.agent)) return { shown: true, blocked: { words: RUNS, fix: null, reason: `Not with ${harnessShortName(input.agent)}` } };
   return { shown: true, blocked: why ? sendStartBlock(why, input.agent) : null };
 }

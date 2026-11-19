@@ -396,6 +396,21 @@ describe("NewThread", () => {
     expect(screen.getByTestId("agents-offered").textContent).toBe("claude, codex, opencode, no fast mode");
   });
 
+  it("offers OpenOrc Cloud with its own agents and models on a Mac with no agent installed, and starts there", async () => {
+    account = openOrcCloud("added");
+    system = { ...system, harnesses: system.harnesses.map((row) => ({ ...row, state: "not_found" as const, path: null })) };
+    models = [];
+    cloudModels = { models: [{ id: "", label: "Codex default", agent: "codex", isDefault: true, efforts: [], defaultEffort: null }], providers: [] };
+    writeNewThreadDraft({ ...readNewThreadDraft("p1"), prompt: "Add a health check" });
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
+    const cloud = await screen.findByRole("menuitem", { name: "OpenOrc Cloud 1 h" });
+    expect(cloud.getAttribute("aria-disabled")).toBeNull();
+    fireEvent.click(cloud);
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", hosted: true, agent: "codex", prompt: "Add a health check" })));
+  });
+
   it("starts a thread on OpenOrc Cloud for a project there, with no folder on this Mac", async () => {
     account = openOrcCloud("added");
     saveModelDraft("p1", "Add a health check");

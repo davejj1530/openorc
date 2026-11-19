@@ -25,12 +25,19 @@ interface EffortSettings {
   fast: boolean;
   fastBlocked: boolean;
   fastHint: string;
-  loading: boolean;
   failed: boolean;
 }
 
 /** The model browser's effort footer, below the model list. */
-export function BrowserEffortFooter({
+export function BrowserEffortFooter({ value, current, onChange, disabled, efforts, index, effort, defaultEffort, fast, fastBlocked, fastHint, failed }: EffortSettings & { effort: string | null }) {
+  const choosing = efforts.length > 1 && value !== null;
+  const note = choosing ? null : effortNote(current, failed);
+  // No effort row when there is nothing to choose and nothing wrong to say.
+  if (!choosing && !note && !(fast && fastBlocked)) return null;
+  return <EffortFooter {...{ value, current, onChange, disabled, efforts, index, effort, defaultEffort, fast, fastBlocked, fastHint, failed }} choosing={choosing} note={note} />;
+}
+
+function EffortFooter({
   value,
   current,
   onChange,
@@ -42,9 +49,9 @@ export function BrowserEffortFooter({
   fast,
   fastBlocked,
   fastHint,
-  loading,
-  failed,
-}: EffortSettings & { effort: string | null }) {
+  choosing,
+  note,
+}: EffortSettings & { effort: string | null; choosing: boolean; note: string | null }) {
   return (
     <div className="model-picker-footer">
       <div className="model-picker-effort-heading">
@@ -63,7 +70,7 @@ export function BrowserEffortFooter({
           <RotateCcw size={14} />
         </button>
       </div>
-      {efforts.length > 1 && value ? (
+      {choosing && value ? (
         <EffortControl
           key={`${value.agent}:${value.model}`}
           agent={value.agent}
@@ -76,9 +83,8 @@ export function BrowserEffortFooter({
             if (selected && selected !== value.effort) onChange({ ...value, effort: selected });
           }}
         />
-      ) : (
-        <p className="model-picker-effort-empty">{effortAvailability(current, Boolean(value), loading, failed)}</p>
-      )}
+      ) : null}
+      {note ? <p className="model-picker-effort-empty">{note}</p> : null}
       {effortHint(effort) ? <p className="model-picker-effort-hint">{effortHint(effort)}</p> : null}
       {fast && fastBlocked ? (
         <p className="model-picker-effort-hint">
@@ -105,7 +111,6 @@ export function ComposerEffortPanel({
   fastBlocked,
   fastHint,
   hint,
-  loading,
   failed,
   children,
 }: EffortSettings & { label: string; fastAvailable: boolean; hint: string | null; children: ReactNode }) {
@@ -166,7 +171,7 @@ export function ComposerEffortPanel({
           }}
         />
       ) : (
-        <p className="text-xs text-ink-3 text-center mt-3">{effortAvailability(current, Boolean(value), loading, failed)}</p>
+        <EffortNote note={effortNote(current, failed)} />
       )}
       {hint ? <p className="composer-effort-hint">{hint}</p> : null}
       {fastShown ? (
@@ -179,12 +184,17 @@ export function ComposerEffortPanel({
   );
 }
 
-export function effortAvailability(model: ModelOption | undefined, selected: boolean, loading: boolean, failed: boolean): string {
+/**
+ * Why the chosen model's effort can't be set, when something is wrong: the model can't run, or the models didn't load.
+ * None for a model that simply offers nothing to choose, which shows no effort row.
+ */
+export function effortNote(model: ModelOption | undefined, failed: boolean): string | null {
   if (model?.unavailable) return model.unavailable;
-  if (loading) return "Loading effort options…";
-  if (failed) return "Could not load effort options. Try Refresh models.";
-  if (!model) return selected ? "Effort options are unavailable for the selected model. Try Refresh models." : "Choose a model to adjust its effort.";
-  return model.efforts.length === 1 ? "This connection offers one effort option for this model." : "This connection does not advertise adjustable effort options for this model.";
+  return failed ? "Could not load effort options. Try Refresh models." : null;
+}
+
+function EffortNote({ note }: { note: string | null }) {
+  return note ? <p className="text-xs text-ink-3 text-center mt-3">{note}</p> : null;
 }
 
 type EffortControlProps = { efforts: string[]; value: number; fast: boolean; onChange: (index: number) => void; disabled?: boolean };

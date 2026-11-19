@@ -135,7 +135,7 @@ describe("ModelPicker", () => {
     expect((fast as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("describes absent effort options without claiming the model has a fixed level", async () => {
+  it("shows no effort row for a model with no effort to choose", async () => {
     mocks.call.mockImplementation(async (method) => (method === "agents.modelCatalog" ? { models, providers: [] } : info));
     render(
       <QueryClientProvider client={new QueryClient()}>
@@ -143,8 +143,9 @@ describe("ModelPicker", () => {
       </QueryClientProvider>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Big" }));
-    expect(await screen.findByText("This connection does not advertise adjustable effort options for this model.")).toBeTruthy();
-    expect(screen.queryByText(/fixed effort/)).toBeNull();
+    await screen.findByRole("button", { name: "Big" });
+    expect(screen.queryByText("Reasoning effort")).toBeNull();
+    expect(screen.queryByText(/effort options/)).toBeNull();
   });
 
   it("offers ultracode as the last Claude stop and explains it beneath the slider", async () => {

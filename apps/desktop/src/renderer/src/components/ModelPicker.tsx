@@ -366,7 +366,6 @@ function ModelBrowser({
             fast={fast}
             fastBlocked={fastBlocked}
             fastHint={fastHint}
-            loading={models.isPending}
             failed={models.isError}
           />
         ) : null}
@@ -544,7 +543,6 @@ export function ComposerModelPicker({ value, onChange, onSelectModel, orclings, 
                 fastBlocked={fastBlocked}
                 fastHint={fastHint}
                 hint={hint}
-                loading={models.isPending}
                 failed={models.isError}
               >
                 {modelSelector}

@@ -710,7 +710,9 @@ export class OpenOrc {
       createSlackHandlers({ slack: this.slack, invalidate }),
       createCloudHandlers(),
       createClaudeAccountHandlers(this.claudeAccounts),
-      createHostedHandlers(this.account, this.hostedFiles, this.db, new TeamChatOrclingCalls({ db: this.db, orclings: this.orclings, textGeneration: this.textGeneration, log: this.log })),
+      createHostedHandlers(this.account, this.hostedFiles, this.db, new TeamChatOrclingCalls({ db: this.db, orclings: this.orclings, textGeneration: this.textGeneration, log: this.log }), () =>
+        this.runs.modelCatalog(undefined, false, undefined, undefined, undefined, true),
+      ),
       createHostedSkillsCloudHandlers(() => this.hostedSkills, this.settings),
       createCloudMovesHandlers(
         () => this.cloudMoves,

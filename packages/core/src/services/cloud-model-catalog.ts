@@ -1,7 +1,8 @@
 /**
  * The models OpenOrc Cloud runs for the person, from its machines' own agent CLIs: each listing mapped by the very code
- * that maps the same CLI's listing on this Mac. An agent the cloud has not read yet offers its CLI's default alone,
- * never this Mac's list or a written one.
+ * that maps the same CLI's listing on this Mac. An agent the cloud has not read yet offers this Mac's own listing of it,
+ * read from this Mac's CLI, as the person's sign-in there is most often the one they gave the cloud; with none, its
+ * CLI's default alone. Never a written list. The cloud's own listing replaces this Mac's once it has one.
  */
 import type { AcpModel, ClaudeCatalog, CodexModel } from "@openorc/agents";
 import type { WireCloudModels } from "@openorc/hosted";
@@ -29,10 +30,17 @@ const cliDefault = (agent: HostedAgent): ModelOption => ({
   fastMode: { supported: false, reason: "Fast mode isn't offered until OpenOrc Cloud has read this agent's models." },
 });
 
-export function cloudModelCatalog(answer: WireCloudModels): ModelCatalog {
+/** This Mac's listing of an agent, when its CLI here was read (now or before), not a written one; else none. */
+function macListing(mac: ModelCatalog | null, agent: HostedAgent): { models: ModelOption[]; provider: ModelCatalogProvider } | null {
+  const read = mac?.providers.find((provider) => provider.agent === agent && (provider.status === "ready" || provider.status === "stale"));
+  const models = mac?.models.filter((model) => model.agent === agent) ?? [];
+  return read && models.length ? { models, provider: { agent, status: "ready", refreshedAt: read.refreshedAt, message: null } } : null;
+}
+
+export function cloudModelCatalog(answer: WireCloudModels, mac: ModelCatalog | null): ModelCatalog {
   const entries = HOSTED_AGENTS.map((agent): { models: ModelOption[]; provider: ModelCatalogProvider } => {
     const entry = answer.agents.find((one) => one.agent === agent);
-    if (!entry) return { models: [cliDefault(agent)], provider: { agent, status: "fallback", refreshedAt: null, message: null } };
+    if (!entry) return macListing(mac, agent) ?? { models: [cliDefault(agent)], provider: { agent, status: "fallback", refreshedAt: null, message: null } };
     const { models, message } = optionsOf(entry);
     return { models, provider: { agent, status: "ready", refreshedAt: Date.parse(entry.readAt), message: message ?? null } };
   });

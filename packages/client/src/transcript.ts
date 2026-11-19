@@ -81,6 +81,8 @@ export type Block = { at?: number; turnKey?: string; runId?: string; seq?: numbe
       text: string;
       tone: "muted" | "ok" | "bad";
       notice?: boolean;
+      /** The way on from a limit the thread could not go past: the agent's own, carried to the server's line that says so. */
+      recovery?: ActivityRecovery;
       boundary?: "turn" | "session";
       durationMs?: number;
       /**
@@ -114,6 +116,8 @@ export interface RunTranscript {
   subagentCompletion?: { turn: number; boundaryId: string; resultId?: string };
   /** Which turn of this process each block belongs to. A warm session's transcript holds several turns. */
   turnOf: Map<string, number>;
+  /** The way on from the usage limit the last turn stopped at, for the server's line if it says the thread held there. */
+  limitRecovery?: ActivityRecovery;
   pendingApprovals: number;
   /** The agent's stderr. Kept off the transcript; the ledger has it all. */
   stderr: string[];
@@ -170,13 +174,15 @@ function closeActive(run: RunTranscript, ts: number, status: ActivityStatus): vo
 
 /**
  * A turn that stopped at its usage limit loses the agent's own word of it, the failed step with its way to usage: the
- * server's line says it once, the move to another account or what the person can do.
+ * server's line says it once, the move to another account or, when the thread held there, that it did, with the way on.
  */
 function dropLimitRecovery(run: RunTranscript): void {
   const turn = run.turnsCompleted;
-  const gone = run.blocks.filter((block) => block.kind === "activity" && block.recovery?.kind === "usage" && run.turnOf.get(block.id) === turn);
+  const gone = run.blocks.filter((block): block is Extract<Block, { kind: "activity" }> => block.kind === "activity" && block.recovery?.kind === "usage" && run.turnOf.get(block.id) === turn);
   if (!gone.length) return;
-  run.blocks = run.blocks.filter((block) => !gone.includes(block));
+  run.limitRecovery = gone[0]!.recovery;
+  const ids = new Set(gone.map((block) => block.id));
+  run.blocks = run.blocks.filter((block) => !ids.has(block.id));
   run.blockIndex = new Map(run.blocks.map((block, index) => [block.id, index]));
   for (const block of gone) run.turnOf.delete(block.id);
 }
@@ -337,6 +343,7 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
   "turn.started": (run) => {
     run.turnOpen = true;
     delete run.subagentCompletion;
+    delete run.limitRecovery;
   },
   "turn.completed": (run, ev) => {
     run.turnOpen = false;
@@ -376,7 +383,8 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
     if (ev.fatal) {
       closeActive(run, ev.ts, "error");
       endSession(run);
-      upsert(run, { id: `err-${ev.ts}-${run.blocks.length}`, kind: "status", boundary: "session", outcome: "error", tone: "bad", text: ev.message });
+      const recovery = run.limitRecovery;
+      upsert(run, { id: `err-${ev.ts}-${run.blocks.length}`, kind: "status", boundary: "session", outcome: "error", tone: "bad", text: ev.message, ...(recovery && { recovery }) });
     } else {
       run.stderr.push(ev.message);
       if (run.stderr.length > 500) run.stderr.shift();

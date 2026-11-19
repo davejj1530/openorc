@@ -23,3 +23,12 @@ it("keeps the failed step and its way to usage for a turn that failed at a limit
   expect(run.blocks.find((block) => block.kind === "activity")).toMatchObject({ status: "error", recovery: { kind: "usage" } });
   expect(run.blocks.find((block) => block.kind === "status" && block.boundary === "turn")).toMatchObject({ outcome: "error" });
 });
+
+it("gives the line saying a thread held at its limit the agent's way on, and nothing after the next turn starts", () => {
+  const run = emptyRun(runId);
+  const held: AgentEvent = { type: "error", runId, ts: 4, message: "Ana's turn hit a usage limit.", fatal: true };
+  applyEvents(run, [{ type: "turn.started", runId, ts: 1, turnId: "t1" } as AgentEvent, limitStep, turnEnd({ status: "cancelled", limited: true }), held]);
+  expect(run.blocks.find((block) => block.kind === "status" && block.text === "Ana's turn hit a usage limit.")).toMatchObject({ tone: "bad", recovery: { kind: "usage", provider: "claude" } });
+  applyEvents(run, [{ type: "turn.started", runId, ts: 5, turnId: "t2" } as AgentEvent, { ...held, ts: 6, message: "Something else went wrong." }]);
+  expect(run.blocks.find((block) => block.kind === "status" && block.text === "Something else went wrong.")).not.toHaveProperty("recovery");
+});

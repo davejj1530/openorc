@@ -667,7 +667,15 @@ export const BlockView = memo(function BlockView({
     case "status":
       if (block.notice) return <div className="text-sm text-ink-4">{block.text}</div>;
       // "turn error" and "session error" restate the error card above them.
-      return block.tone === "bad" && !/^(turn|session) /.test(block.text) ? <TranscriptErrorCard text={block.text} /> : null;
+      if (block.tone !== "bad" || /^(turn|session) /.test(block.text)) return null;
+      return block.recovery ? (
+        <div>
+          <TranscriptErrorCard text={block.text} />
+          <Recovery recovery={block.recovery} />
+        </div>
+      ) : (
+        <TranscriptErrorCard text={block.text} />
+      );
   }
 });
 

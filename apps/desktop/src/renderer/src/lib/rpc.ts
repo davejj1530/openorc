@@ -35,26 +35,31 @@ class CoreClient implements CoreConnection {
   private readonly terminalListeners = new Set<Listener<HostedTerminalPush>>();
   private readonly mediaListeners = new Set<Listener<MessagePort>>();
   private media: MessagePort | null = null;
+  private listening = false;
   ready: { mcpPort: number } | null = null;
   /** What the core is doing before it is ready, when that takes a while. */
   startup: string | null = null;
 
+  /** Asks the preload for a port. However often it is asked, one window listener takes the port that arrives. */
   connect(): void {
-    window.addEventListener("message", (e) => {
-      if (e.source !== window || e.data !== "openorc:port" || e.ports.length === 0) return;
-      const port = e.ports[0] as MessagePort;
-      this.port = port;
-      port.onmessage = (m: MessageEvent<CorePush>) => this.receive(m.data);
-      port.start();
-      for (const q of this.queued.splice(0)) port.postMessage({ type: "rpc", ...q });
-      const media = e.ports[1];
-      if (media) {
-        this.media = media;
-        emit(this.mediaListeners, media);
-      }
-    });
+    if (!this.listening) window.addEventListener("message", this.takePort);
+    this.listening = true;
     window.openorc.connectBridge();
   }
+
+  private readonly takePort = (e: MessageEvent) => {
+    if (e.source !== window || e.data !== "openorc:port" || e.ports.length === 0) return;
+    const port = e.ports[0] as MessagePort;
+    this.port = port;
+    port.onmessage = (m: MessageEvent<CorePush>) => this.receive(m.data);
+    port.start();
+    for (const q of this.queued.splice(0)) port.postMessage({ type: "rpc", ...q });
+    const media = e.ports[1];
+    if (media) {
+      this.media = media;
+      emit(this.mediaListeners, media);
+    }
+  };
 
   /** The port device streams travel on, beside the RPC port. A listener hears the current one and every later one. */
   onMediaPort(fn: Listener<MessagePort>): () => void {

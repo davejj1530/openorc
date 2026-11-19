@@ -344,6 +344,15 @@ export const WorkRow = memo(function WorkRow({ row }: { row: WorkRowProps }) {
   const keepOpen = useCallback(() => setOpen(true), [setOpen]);
   const now = row.now && row.now !== "reply" ? [row.now] : [];
   const headline = row.live && row.now !== "reply" ? liveHeadline(entries, now) : null;
+  // Nothing done yet to sum up, as while a turn's only step still runs: the step shows, under no empty summary line.
+  if (row.live && !receipt.length)
+    return (
+      <View className="py-3.5">
+        <WorkChoice.Provider value={keepOpen}>
+          <StepsCard entries={entries} headline={headline} live={row.live} runId={row.runId} />
+        </WorkChoice.Provider>
+      </View>
+    );
   return (
     <View>
       <TranscriptPressable

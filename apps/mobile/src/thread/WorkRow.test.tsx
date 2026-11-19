@@ -165,3 +165,15 @@ it("counts the same two work steps when child cards are displayed separately", (
   expect(screen.getByText("2 steps")).toBeTruthy();
   expect(screen.queryByText("4 steps")).toBeNull();
 });
+
+it("shows a turn's only step while it runs under no empty summary line, as a cloud start's first step", () => {
+  workRow(...finishedTurn);
+  const row = workRow(
+    { type: "turn.started", turnId: "t3" },
+    { type: "message.completed", messageId: "ask-3", role: "user", text: "Pin notes" },
+    { type: "activity.updated", activityId: "start:ask-3:machine", label: "Starting the machine", status: "running" },
+  );
+  render(<WorkRow row={row} />);
+  expect(screen.getByText("Starting the machine")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Work" })).toBeNull();
+});

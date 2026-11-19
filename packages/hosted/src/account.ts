@@ -26,7 +26,7 @@ import {
 import { z } from "zod";
 import type { HostedAccount, HostedDeps } from "./index.js";
 import { OutOfReach, Refused, type Session, type SessionChange } from "./session.js";
-import { githubRepoOf, signInKey, toImage, toOffers, toPlan, toSandbox, toSignIns } from "./translate.js";
+import { accountKey, githubRepoOf, signInKey, toImage, toOffers, toPlan, toSandbox, toSignIns } from "./translate.js";
 import { BrowserSignInTrip } from "./browser-sign-in.js";
 import { GithubConnect } from "./github.js";
 import { Paying } from "./paying.js";
@@ -34,7 +34,7 @@ import { SignIns } from "./signins.js";
 import { AccountCache } from "./account-cache.js";
 import { accountSeatFacts } from "./organization-access-wire.js";
 import { wireGithubStatus } from "./wire-github.js";
-import { ROUTES, SOCKET, wireBilling, wireGithubRepository, wireHostedSettings, wireSignIn, wireTopics } from "./wire.js";
+import { ROUTES, SOCKET, wireBilling, wireGithubRepository, wireHostedSettings, wireSignIn, wireTopics, type WireSignIn } from "./wire.js";
 
 const keptAnswers = z.object({
   userId: z.string().nullable().default(null),
@@ -43,7 +43,7 @@ const keptAnswers = z.object({
   person: z.object({ name: z.string(), image: z.string().nullable() }).nullable().default(null),
   sandbox: wireHostedSettings.nullable().default(null),
   signIns: z.array(wireSignIn).nullable().default(null),
-  /** Sign-ins the server refused a turn on as signed out, by agent and provider, with the `checkedAt` it had then. */
+  /** Sign-ins the server refused a turn on as signed out, by account (`accountKey`), with the `checkedAt` it had then. */
   ended: z.array(z.object({ key: z.string(), checkedAt: z.string().nullable() })).default([]),
   github: z
     .object({
@@ -57,6 +57,12 @@ const keptAnswers = z.object({
     .default(null),
 });
 type Heard = z.infer<typeof keptAnswers>;
+
+/**
+ * Whether the server keeps several accounts per agent (`features.agentAccounts`): such a server names the account of
+ * every sign-in, an older one none. With none heard yet the two act alike, the first sign-in becoming the default.
+ */
+const keepsAccounts = (signIns: readonly WireSignIn[] | null | undefined): boolean => Boolean(signIns?.some((row) => row.id !== undefined));
 
 /** `cloud`: the repositories the person's spaces have as projects, and a read of them again. */
 type AccountDeps = { session: Session; cloud: { repos(): ReadonlySet<string>; ids(): ReadonlySet<string>; reread(): Promise<void> } } & Pick<
@@ -79,7 +85,14 @@ export class Account implements HostedAccount {
   constructor(private readonly deps: AccountDeps) {
     this.#cache = new AccountCache({ kept: deps.kept, part: "account", server: deps.server, schema: keptAnswers });
     this.#signingIn = new BrowserSignInTrip({ session: deps.session, browser: deps.browser, deviceName: deps.deviceName, changed: () => this.#announce() });
-    this.#signIns = new SignIns({ session: deps.session, mintClaudeToken: deps.mintClaudeToken, now: deps.now, changed: () => this.#announce(), landed: () => this.#refresh() });
+    this.#signIns = new SignIns({
+      session: deps.session,
+      mintClaudeToken: deps.mintClaudeToken,
+      now: deps.now,
+      accounts: () => keepsAccounts(this.#heard?.signIns),
+      changed: () => this.#announce(),
+      landed: () => this.#refresh(),
+    });
     this.#github = new GithubConnect({ session: deps.session, browser: deps.browser, changed: () => this.#announce(), landed: () => this.#landed() });
     this.#paying = new Paying({
       session: deps.session,
@@ -133,6 +146,7 @@ export class Account implements HostedAccount {
       ...accountSeatFacts(heard?.billing),
       sandbox: heard?.sandbox ? toSandbox(heard.sandbox) : null,
       signIns: heard?.signIns ? toSignIns(heard.signIns, heard.ended) : null,
+      agentAccounts: keepsAccounts(heard?.signIns),
       signingIn: this.#signIns.work,
       github: heard?.github ? { ...heard.github, repositories: heard.github.repositories.map((repository) => repository.fullName) } : null,
       connectingGithub: this.#github.work,
@@ -229,11 +243,11 @@ export class Account implements HostedAccount {
    * The person's agent sign-ins' usage on OpenOrc Cloud, as each agent's CLI there last answered after one of their
    * turns, with when. None while signed out, and none from a server that keeps no reading.
    */
-  async agentUsage(): Promise<{ agent: string; readAt: number; reading: unknown }[]> {
+  async agentUsage(): Promise<{ agent: string; accountId?: string; readAt: number; reading: unknown }[]> {
     if (!this.deps.session.state.signedIn) return [];
     try {
       const { agents } = await this.deps.session.request(ROUTES.agentUsage);
-      return agents.map(({ agent, readAt, reading }) => ({ agent, readAt: Date.parse(readAt), reading }));
+      return agents.map(({ agent, accountId, readAt, reading }) => ({ agent, ...(accountId && { accountId }), readAt: Date.parse(readAt), reading }));
     } catch (error) {
       if (error instanceof Refused && error.status === 404) return [];
       throw error;
@@ -255,8 +269,12 @@ export class Account implements HostedAccount {
     this.#signIns.cancel(agent);
   }
 
-  removeSignIn({ agent, provider }: RpcParams<"account.signIns.remove">): Promise<void> {
-    return this.#signIns.remove(agent, provider);
+  removeSignIn(input: RpcParams<"account.signIns.remove">): Promise<void> {
+    return this.#signIns.remove(input);
+  }
+
+  updateSignIn(input: RpcParams<"account.signIns.update">): Promise<void> {
+    return this.#signIns.update(input);
   }
 
   connectGithub(input: RpcParams<"account.github.connect"> = {}): Promise<void> {
@@ -303,14 +321,21 @@ export class Account implements HostedAccount {
    * The server refused a turn: read the account again, so the card above the composer says why. A sign-in it found
    * signed out is marked ended until it is set again, which the list alone cannot tell.
    */
-  refused(refusal: HostedRefusal, settings: { agent: string; model: string | null }): void {
+  refused(refusal: HostedRefusal, settings: { agent: string; model: string | null; accountId?: string | null }): void {
     const email = this.#signedInAs();
-    if (email && refusal === "signed_out" && this.#heard) {
-      const key = signInKey(settings.agent, settings.agent === "opencode" ? openCodeProvider(settings.model) : null);
-      const row = this.#heard.signIns?.find((each) => signInKey(each.agent, each.agent === "opencode" ? each.provider : null) === key);
-      this.#hear(email, { ended: [...this.#heard.ended.filter((each) => each.key !== key), { key, checkedAt: row?.checkedAt ?? null }] });
+    const row = this.#heard && this.#turnAccount(this.#heard.signIns ?? [], settings);
+    if (email && refusal === "signed_out" && this.#heard && row) {
+      const key = accountKey(row);
+      this.#hear(email, { ended: [...this.#heard.ended.filter((each) => each.key !== key), { key, checkedAt: row.checkedAt }] });
     }
     void this.#refresh();
+  }
+
+  /** The sign-in a turn with these settings ran on: the account it names when it is the person's, else the agent's (and provider's) default. */
+  #turnAccount(rows: readonly WireSignIn[], settings: { agent: string; model: string | null; accountId?: string | null }): WireSignIn | undefined {
+    const key = signInKey(settings.agent, settings.agent === "opencode" ? openCodeProvider(settings.model) : null);
+    const ofAgent = rows.filter((each) => signInKey(each.agent, each.agent === "opencode" ? each.provider : null) === key);
+    return ofAgent.find((each) => each.id !== undefined && each.id === settings.accountId) ?? ofAgent.find((each) => each.isDefault !== false);
   }
 
   #changed(change: SessionChange): void {

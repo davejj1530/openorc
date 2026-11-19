@@ -41,13 +41,19 @@ export const isHostedAgent = (agent: string): agent is HostedAgent => (HOSTED_AG
 
 /**
  * One of the person's agent sign-ins on OpenOrc Cloud, never its secret. `provider` names an OpenCode key's provider
- * (and Anthropic or OpenAI for the others). `ended`: the server refused a turn on it as signed out since it was last set.
+ * (and Anthropic or OpenAI for the others); `label` is its plan, or "API key". `ended`: the server refused a turn on it
+ * as signed out since it was last set. A server that keeps several accounts per agent (`agentAccounts`) gives each its
+ * `id`, the `name` its owner calls it and whether it is the agent's default, which a thread naming no account runs on;
+ * an older server keeps one per agent and sends none of them.
  */
 export interface AccountSignIn {
   agent: HostedAgent;
   provider: string;
   label: string;
   ended: boolean;
+  id?: string;
+  name?: string;
+  isDefault?: boolean;
 }
 
 /**
@@ -58,8 +64,13 @@ export interface AccountSignIn {
 export type SignInWay = "token" | "code" | "key";
 export const SIGN_IN_WAYS: Record<HostedAgent, readonly SignInWay[]> = { claude: ["token", "key"], codex: ["code", "key"], opencode: ["key"] };
 
-/** A sign-in under way for an agent, or the last one that failed, with its words. Never a secret. */
-export type SignInWork = { state: "waiting"; way: "token" } | { state: "waiting"; way: "code"; userCode: string; verificationUrl: string; expiresAt: number } | { state: "failed"; error: string };
+/**
+ * A sign-in under way for an agent, or the last one that failed, with its words. Never a secret. `accountId`: the
+ * account it signs in again; without it, a new one.
+ */
+export type SignInWork = { accountId?: string } & (
+  { state: "waiting"; way: "token" } | { state: "waiting"; way: "code"; userCode: string; verificationUrl: string; expiresAt: number } | { state: "failed"; error: string }
+);
 
 /**
  * The person's GitHub as OpenOrc Cloud knows it, for their own space: whether the server has a GitHub app at all, the
@@ -161,6 +172,8 @@ export type AccountStatus =
       sandbox: AccountSandbox | null;
       /** The person's agent sign-ins on OpenOrc Cloud; null until the server first answers. */
       signIns: AccountSignIn[] | null;
+      /** The server keeps several accounts per agent (`features.agentAccounts`); absent or false, one sign-in per agent as before. */
+      agentAccounts?: boolean;
       /** By agent: a sign-in being made, or the last that failed. */
       signingIn: Partial<Record<HostedAgent, SignInWork>>;
       /** Null until the server first answers. */
@@ -178,14 +191,22 @@ const Agent = z.enum(HOSTED_AGENTS);
 /** An OpenCode provider as OpenCode names it, as the server takes it. */
 const Provider = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/, "Name the provider as OpenCode does, such as anthropic or openrouter.");
 
+/** What a person calls one of their cloud accounts, as the server takes it. */
+const AccountName = z.string().trim().min(1, "Give the account a name.").max(40, "Keep the name under 40 characters.");
+/**
+ * Where a sign-in lands, with several accounts per agent: `accountId` signs that account in again; without it, a new
+ * account, called `name` or, without one, its plan. An older server keeps one per agent and takes neither.
+ */
+const Landing = { accountId: z.string().min(1).max(200).optional(), name: AccountName.optional() };
+
 /** One call per way; the union is the only place a way's inputs are written down. The secret goes to the server and is kept nowhere here. */
 const ConnectSignIn = z.discriminatedUnion("way", [
   /** Runs `claude setup-token` as this Claude account of the Mac's, its default when none is named. */
-  z.object({ way: z.literal("token"), agent: z.literal("claude"), claudeAccountId: z.string().min(1).max(100).optional() }).strict(),
+  z.object({ way: z.literal("token"), agent: z.literal("claude"), claudeAccountId: z.string().min(1).max(100).optional(), ...Landing }).strict(),
   /** Asks the server for a device code, which `account.status` then carries until it connects or runs out. */
-  z.object({ way: z.literal("code"), agent: z.literal("codex") }).strict(),
+  z.object({ way: z.literal("code"), agent: z.literal("codex"), ...Landing }).strict(),
   /** `provider` for OpenCode alone. */
-  z.object({ way: z.literal("key"), agent: Agent, provider: Provider.optional(), key: z.string().trim().min(1).max(8192) }).strict(),
+  z.object({ way: z.literal("key"), agent: Agent, provider: Provider.optional(), key: z.string().trim().min(1).max(8192), ...Landing }).strict(),
 ]);
 
 const DeletionOrganization = z.object({ id: z.string(), name: z.string(), image: z.string().nullable() });
@@ -224,7 +245,13 @@ export const accountRpcParams = {
   "account.signIns.connect": ConnectSignIn,
   /** Calls off a token being made or a code being waited on. */
   "account.signIns.cancel": z.object({ agent: Agent }).strict(),
-  "account.signIns.remove": z.object({ agent: Agent, provider: Provider.optional() }).strict(),
+  /** With several accounts per agent, `accountId` removes that account; otherwise the agent's (and provider's) one sign-in. */
+  "account.signIns.remove": z.object({ agent: Agent, provider: Provider.optional(), accountId: z.string().min(1).max(200).optional() }).strict(),
+  /** Renames one of the person's cloud accounts, or makes it its agent's default. */
+  "account.signIns.update": z
+    .object({ accountId: z.string().min(1).max(200), name: AccountName.optional(), isDefault: z.literal(true).optional() })
+    .strict()
+    .refine((input) => input.name !== undefined || input.isDefault !== undefined, "Say what changes."),
   /** Links the person's GitHub account and installs OpenOrc's GitHub app, through as many browser trips as GitHub asks for. */
   "account.github.connect": GithubConnectChoice,
   "account.github.cancel": z.object({}).strict(),

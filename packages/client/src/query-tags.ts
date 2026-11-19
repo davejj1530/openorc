@@ -231,6 +231,7 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "account.signIns.connect": ["account"],
   "account.signIns.cancel": ["account"],
   "account.signIns.remove": ["account"],
+  "account.signIns.update": ["account"],
   "account.github.connect": ["account"],
   "account.github.cancel": ["account"],
   "account.github.disconnect": ["account"],

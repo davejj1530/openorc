@@ -160,7 +160,7 @@ export interface HostedAccount {
   /** Forgets the session and the kept answers first, then tells the server, so a server out of reach still signs out here. */
   signOut(): Promise<void>;
   /** The person's agent sign-ins' usage on OpenOrc Cloud, as each CLI there last answered after one of their turns. */
-  agentUsage(): Promise<{ agent: string; readAt: number; reading: unknown }[]>;
+  agentUsage(): Promise<{ agent: string; accountId?: string; readAt: number; reading: unknown }[]>;
   /**
    * As the signed-in person, grants another of their devices, such as their phone, a session of its own: the server
    * answers a one-time code for the challenge of a verifier only that device holds, which it trades with
@@ -194,6 +194,8 @@ export interface HostedAccount {
   connectSignIn(input: RpcParams<"account.signIns.connect">): Promise<void>;
   cancelSignIn(agent: HostedAgent): void;
   removeSignIn(input: RpcParams<"account.signIns.remove">): Promise<void>;
+  /** Renames one of the person's cloud accounts, or makes it its agent's default; refused in the server's words. */
+  updateSignIn(input: RpcParams<"account.signIns.update">): Promise<void>;
   /** Connects the person's GitHub through as many browser trips as it takes; resolves once the first page is open, the rest shows in `status().connectingGithub`. */
   connectGithub(input?: RpcParams<"account.github.connect">): Promise<void>;
   cancelGithub(): void;

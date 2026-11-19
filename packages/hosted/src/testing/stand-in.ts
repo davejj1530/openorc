@@ -122,6 +122,8 @@ export interface StandIn {
   approveDevice(email: string): void;
   /** Every sign-in secret the server was handed, in order. */
   signInSecrets: { agent: string; secret: string }[];
+  /** Accounts a turn runs on now, which the server refuses to remove (409). */
+  busyAccounts: Set<string>;
   /** The agent asks before it acts, or asks a question, in a thread. Answers the ask's id, its `approvalId`. */
   ask(threadId: string, request: { kind: string; toolName?: string; input: unknown; detail: string }): string;
   /** The thread's running turn ends: an open ask parks, and the first waiting message is taken or refused. */
@@ -165,6 +167,10 @@ export interface StandInSignIn {
   ended?: boolean;
   /** When the vendor last took it; it changes each time the sign-in is set. */
   checkedAt?: string;
+  /** The account, given one when none is set; listed behind the `agentAccounts` capability with its name and default. */
+  id?: string;
+  name?: string;
+  isDefault?: boolean;
 }
 
 export type { StandInBilling, StandInOffers };
@@ -288,10 +294,6 @@ function accounts(options: StandInOptions) {
       const person = people.get(who) ?? { name: nameFromEmail(who), image: null };
       return { status: 200, body: { session: { activeOrganizationId: `personal-${who}` }, user: { id: `user-${who}`, email: who, emailVerified: true, ...person } } };
     },
-    "GET /agent-sign-ins": (_body, token) => {
-      const who = holder(token);
-      return who ? { status: 200, body: signInRows(signIns.get(who) ?? []) } : unauthorized();
-    },
     "GET /settings/hosted": (_body, token) => {
       const who = holder(token);
       return who ? { status: 200, body: hostedSettings(who) } : unauthorized();
@@ -321,7 +323,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const spaces = new StandInSpaces();
   const person = (email: string) => people.get(email) ?? { name: nameFromEmail(email), image: null };
   const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn, spaces, person);
-  const signInWrites = new StandInSignIns(signIns);
+  const signInWrites = new StandInSignIns(signIns, () => hosted.files.capabilities?.["agentAccounts"]?.available === true);
   const tell = tellOf(peers, sockets);
   const tasks = new StandInTasks({ spaces, person, tell, threads: hosted });
   const seats = new StandInSeats({ spaces, tell, now: options.now ?? Date.now, origin: () => `http://127.0.0.1:${port}` });
@@ -418,11 +420,12 @@ function appSignInsFace(appSignIns: StandInAppSignIns): Pick<StandIn, "signInPag
 }
 
 /** The stand-in's face for the person's agent sign-ins on the server: set, approved on the vendor's page, and the secrets it was handed. */
-function agentSignInsFace(signIns: Map<string, StandInSignIn[]>, writes: StandInSignIns): Pick<StandIn, "setSignIns" | "approveDevice" | "signInSecrets"> {
+function agentSignInsFace(signIns: Map<string, StandInSignIn[]>, writes: StandInSignIns): Pick<StandIn, "setSignIns" | "approveDevice" | "signInSecrets" | "busyAccounts"> {
   return {
     setSignIns: (email, rows) => void signIns.set(email.toLowerCase(), rows),
     approveDevice: (email) => writes.approveDevice(email.toLowerCase()),
     signInSecrets: writes.secrets,
+    busyAccounts: writes.busy,
   };
 }
 
@@ -553,18 +556,6 @@ function turnRule(billing: Map<string, StandInBilling>, signIns: Map<string, Sta
     if (!row) return "no_sign_in";
     return row.ended ? "signed_out" : null;
   };
-}
-
-/** GET /agent-sign-ins: the person's sign-ins as the real server lists them, never a secret. */
-function signInRows(rows: readonly StandInSignIn[]) {
-  return rows.map((row) => ({
-    agent: row.agent,
-    kind: "subscription",
-    provider: row.provider ?? (row.agent === "codex" ? "openai" : "anthropic"),
-    label: row.label ?? "Subscription",
-    checkedAt: row.checkedAt ?? new Date(0).toISOString(),
-    expiresAt: null,
-  }));
 }
 
 type PersonRoute = (method: string, path: string, who: string, body: Record<string, unknown>) => Reply | null;

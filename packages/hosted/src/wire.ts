@@ -78,7 +78,16 @@ export const wireHostedSettings = z.object({
 export type WireHostedSettings = z.infer<typeof wireHostedSettings>;
 
 /** One of the person's agent sign-ins, never its secret. `checkedAt` changes whenever the sign-in is set again. */
-export const wireSignIn = z.object({ agent: z.string(), provider: z.string(), label: z.string(), checkedAt: iso.nullable() });
+/** One sign-in; a server that keeps several accounts per agent also names its account, what its owner calls it and whether it is the default. */
+export const wireSignIn = z.object({
+  agent: z.string(),
+  provider: z.string(),
+  label: z.string(),
+  checkedAt: iso.nullable(),
+  id: z.string().optional(),
+  name: z.string().optional(),
+  isDefault: z.boolean().optional(),
+});
 export type WireSignIn = z.infer<typeof wireSignIn>;
 
 /** A Codex device code the server started with OpenAI: the person enters `userCode` on `verificationUrl`. */
@@ -286,6 +295,16 @@ export const ROUTES = {
   removeSignIn: (agent: "claude" | "codex" | "opencode", provider?: string) =>
     route("DELETE", `/agent-sign-ins/${agent === "opencode" ? `opencode/${encodeURIComponent(provider ?? "")}` : agent}`, null),
   startDevice: route("POST", "/agent-sign-ins/codex/device/start", wireDeviceStart),
+  /** A new account for an agent, once its vendor takes the sign-in; never a replacement. */
+  addAccount: (agent: "claude" | "codex" | "opencode", provider?: string) =>
+    route("POST", `/agent-sign-ins/accounts/${agent === "opencode" ? `opencode/${encodeURIComponent(provider ?? "")}` : agent}`, wireSignIn),
+  /** A Codex device code for a new account, or for `accountId` to sign that one in again. */
+  startAccountDevice: route("POST", "/agent-sign-ins/accounts/codex/device/start", wireDeviceStart),
+  /** The same account signed in again, its name and default kept. */
+  signAccountInAgain: (id: string) => route("PUT", `/agent-sign-ins/accounts/${encodeURIComponent(id)}/sign-in`, wireSignIn),
+  updateAccount: (id: string) => route("PATCH", `/agent-sign-ins/accounts/${encodeURIComponent(id)}`, wireSignIn),
+  /** 409 in words while a turn runs on it; 404 for an account that isn't the person's. */
+  removeAccount: (id: string) => route("DELETE", `/agent-sign-ins/accounts/${encodeURIComponent(id)}`, null),
   finishDevice: route("POST", "/agent-sign-ins/codex/device/finish", wireDeviceFinish),
   spaces: route("GET", "/api/auth/organization/list", z.array(wireSpace)),
   projects: route("GET", "/projects", z.array(wireProject)),
@@ -326,7 +345,8 @@ export const ROUTES = {
   answer: (askId: string) => route("POST", `/hosted/asks/${encodeURIComponent(askId)}/answer`, wireAnswered),
   stopCommand: (id: string, commandId: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/commands/${encodeURIComponent(commandId)}/stop`, null),
   /** The person's agent sign-ins' usage on OpenOrc Cloud, as each CLI there last answered after their turns. */
-  agentUsage: route("GET", "/hosted/usage", z.object({ agents: z.array(z.object({ agent: z.string(), readAt: z.iso.datetime(), reading: z.unknown() })) })),
+  /** Each sign-in's last usage reading; a server that keeps several accounts per agent names the account of each. */
+  agentUsage: route("GET", "/hosted/usage", z.object({ agents: z.array(z.object({ agent: z.string(), accountId: z.string().optional(), readAt: z.iso.datetime(), reading: z.unknown() })) })),
   /** The person's cloud threads' messages and notes in the space that hold the words, newest first. */
   search: (q: string, limit: number) =>
     route(

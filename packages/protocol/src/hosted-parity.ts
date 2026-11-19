@@ -72,6 +72,8 @@ export const HostedCapabilities = z.object({
     projectEnvironment: availability,
     /** Personal projects from a folder of this Mac with no remote. */
     macProjects: availability,
+    /** Several accounts per person and agent: the account list, a thread's account and the account routes. */
+    agentAccounts: availability,
   }),
 });
 export type HostedCapabilities = z.infer<typeof HostedCapabilities>;

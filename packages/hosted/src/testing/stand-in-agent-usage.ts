@@ -1,5 +1,5 @@
 type Reply = { status: number; body: unknown };
-type Reading = { agent: string; readAt: string; reading: unknown };
+type Reading = { agent: string; accountId?: string; readAt: string; reading: unknown };
 
 /** The server's readings of each person's agent sign-ins on OpenOrc Cloud (its agent-usage.ts), as a test sets them. */
 export class StandInAgentUsage {

@@ -20,6 +20,7 @@ export function createAccountHandlers(
   | "account.signIns.connect"
   | "account.signIns.cancel"
   | "account.signIns.remove"
+  | "account.signIns.update"
   | "account.github.connect"
   | "account.github.cancel"
   | "account.github.disconnect"
@@ -45,6 +46,7 @@ export function createAccountHandlers(
     "account.signIns.connect": (input) => after((a) => a.connectSignIn(input)),
     "account.signIns.cancel": ({ agent }) => after(async (a) => a.cancelSignIn(agent)),
     "account.signIns.remove": (input) => after((a) => a.removeSignIn(input)),
+    "account.signIns.update": (input) => after((a) => a.updateSignIn(input)),
     "account.github.connect": (input) => after((a) => a.connectGithub(input)),
     "account.github.cancel": () => after(async (a) => a.cancelGithub()),
     "account.github.disconnect": () => after((a) => a.disconnectGithub()),

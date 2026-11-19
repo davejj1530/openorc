@@ -60,10 +60,15 @@ export const signInKey = (agent: string, provider: string | null): string => (pr
 export function toSignIns(rows: readonly WireSignIn[], ended: readonly { key: string; checkedAt: string | null }[]): AccountSignIn[] {
   return rows.flatMap((row) => {
     if (!isHostedAgent(row.agent)) return [];
-    const key = signInKey(row.agent, row.agent === "opencode" ? row.provider : null);
-    return [{ agent: row.agent, provider: row.provider, label: row.label, ended: ended.some((each) => each.key === key && each.checkedAt === row.checkedAt) }];
+    const key = accountKey(row);
+    const account = row.id === undefined ? {} : { id: row.id, name: row.name ?? row.label, isDefault: row.isDefault ?? false };
+    return [{ agent: row.agent, provider: row.provider, label: row.label, ended: ended.some((each) => each.key === key && each.checkedAt === row.checkedAt), ...account }];
   });
 }
+
+/** What an ended mark names: the account, where the server keeps several, else the agent's (and provider's) one sign-in. */
+export const accountKey = (row: Pick<WireSignIn, "agent" | "provider" | "id">): string =>
+  row.id === undefined ? signInKey(row.agent, row.agent === "opencode" ? row.provider : null) : `account:${row.id}`;
 
 /** A picture a window can draw: only an image held in a data URL, since a window loads nothing from the network. */
 export function toImage(image: string | null | undefined): string | null {

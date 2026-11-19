@@ -21,11 +21,22 @@ const emptyWords: Record<PlanLimits["status"], string> = {
   error: "Couldn’t read usage",
 };
 
-/** One limit: its ring, its label and the share left on one line, and when it resets under them. Only the share warns. */
-function LimitRow({ window, now, outdated }: { window: AllowanceWindow; now: number; outdated: boolean }) {
-  const stale = outdated || allowanceState(window, now).stale;
+/** Under a limit: when it resets; for a reading of OpenOrc Cloud's, when it was taken; out of date, that with why. */
+function resetWords(window: AllowanceWindow, now: number, stale: boolean, turnRead: boolean): string {
+  const reported = time.format(window.observedAt);
+  if (stale) return `Out of date · reported ${reported}`;
+  return turnRead ? `Reported ${reported}` : usageResetLabel(window.resetsAt, now);
+}
+
+/**
+ * One limit: its ring, its label and the share left on one line, and when it resets under them. Only the share warns.
+ * A reading of OpenOrc Cloud's (`turnRead`) comes only from a turn on the account, so it says when it was taken and is
+ * never out of date by age, as the desktop's Settings shows it.
+ */
+function LimitRow({ window, now, outdated, turnRead }: { window: AllowanceWindow; now: number; outdated: boolean; turnRead: boolean }) {
+  const stale = outdated || (!turnRead && allowanceState(window, now).stale);
   const left = percentLeft(window);
-  const reset = stale ? `Out of date · reported ${time.format(window.observedAt)}` : usageResetLabel(window.resetsAt, now);
+  const reset = resetWords(window, now, stale, turnRead);
   const value = left === null ? "Not reported" : `${Math.round(left)}% left`;
   return (
     <View accessible accessibilityLabel={[window.label, value, reset].filter(Boolean).join(", ")} className={rowClass}>
@@ -41,7 +52,7 @@ function LimitRow({ window, now, outdated }: { window: AllowanceWindow; now: num
 }
 
 /** One account: its harness mark, name and plan, then a row per limit, or why there are none. `dim` fades the rows, not the card. */
-function AccountCard({ limits, now, dim }: { limits: PlanLimits; now: number; dim: boolean }) {
+function AccountCard({ limits, now, dim, turnRead }: { limits: PlanLimits; now: number; dim: boolean; turnRead: boolean }) {
   return (
     <Card>
       <View className={cn(dim && "opacity-50")}>
@@ -59,7 +70,7 @@ function AccountCard({ limits, now, dim }: { limits: PlanLimits; now: number; di
           limits.windows.map((window) => (
             <Fragment key={window.id}>
               <Divider />
-              <LimitRow window={window} now={now} outdated={limits.status === "error" || limits.status === "disconnected"} />
+              <LimitRow window={window} now={now} outdated={limits.status === "error" || limits.status === "disconnected"} turnRead={turnRead} />
             </Fragment>
           ))
         )}
@@ -110,14 +121,15 @@ function noCardsWords({ state, live, hostName }: Pick<Usage, "state" | "live" | 
  */
 export function UsageSection() {
   const { accounts: mac, state, live, readAt, now, hostName, retry } = useUsage();
-  const accounts = [...mac, ...useCloudLimits(live)];
+  const cloud = useCloudLimits(live);
+  const accounts = [...mac.map((limits) => ({ limits, turnRead: false })), ...cloud.map((limits) => ({ limits, turnRead: true }))];
   const none = state === "failed" && live ? <ReadFailed retry={retry} /> : <NoCards words={noCardsWords({ state, live, hostName })} reading={state === "loading" && live} />;
   return (
     <Section title="Usage" note={live || readAt === null ? null : `Last read at ${time.format(readAt)}`}>
       {accounts.length > 0 ? (
         <View className="gap-3">
-          {accounts.map((limits) => (
-            <AccountCard key={limits.id} limits={limits} now={now} dim={!live} />
+          {accounts.map(({ limits, turnRead }) => (
+            <AccountCard key={limits.id} limits={limits} now={now} dim={!live} turnRead={turnRead} />
           ))}
         </View>
       ) : (

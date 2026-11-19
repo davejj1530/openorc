@@ -522,8 +522,8 @@ export class StandInThreads {
     return { status: 200, body: { answered: true } };
   }
 
-  #settings(thread: Thread): { agent: string; model: string | null } {
-    return { agent: thread.agent, model: thread.settings.model };
+  #settings(thread: Thread): { agent: string; model: string | null; accountId?: string | null } {
+    return { agent: thread.agent, model: thread.settings.model, ...(thread.settings.accountId !== undefined && { accountId: thread.settings.accountId }) };
   }
 
   /** The agent asks before it acts, or asks a question: the thread waits on the person. Answers the ask's id. */

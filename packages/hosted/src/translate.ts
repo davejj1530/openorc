@@ -210,6 +210,7 @@ export function toSummary(row: WireThread, context: RowContext): ThreadSummary {
     fastMode: false,
     mode: row.settings.mode,
     permissionMode: row.settings.permissionMode,
+    ...(row.settings.accountId !== undefined && { cloudAccountId: row.settings.accountId }),
     workspaceMode: "worktree",
     branch: row.branch,
     worktreePath: null,

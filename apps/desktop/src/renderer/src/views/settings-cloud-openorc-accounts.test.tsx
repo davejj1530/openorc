@@ -70,17 +70,20 @@ it("lists each account with its plan, the default marked, and the limits its age
   expect(core.call).toHaveBeenCalledWith("providers.usage", { provider: "claude", cloud: true, cloudAccountId: "work" });
 });
 
-it("adds an account under the name typed, made by the Claude account of this Mac chosen", async () => {
+it("adds an account signed in from the Mac account chosen, under its name unless another is typed", async () => {
   mac.accounts = [
     { id: "claude-cli", name: "Personal", enabled: true },
-    { id: "work-mac", name: "Work", enabled: true },
+    { id: "q6", name: "q6 main", enabled: true },
   ];
   show("claude", [claude("personal", "Personal", { isDefault: true })]);
   fireEvent.click(screen.getByLabelText("Add Claude Code account"));
-  fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Client" } });
-  fireEvent.change(await screen.findByRole("combobox", { name: "Claude account" }), { target: { value: "work-mac" } });
+  fireEvent.change(await screen.findByRole("combobox", { name: "Sign in from" }), { target: { value: "q6" } });
+  expect(screen.getByLabelText("Name")).toHaveProperty("placeholder", "q6 main");
   fireEvent.click(screen.getByRole("button", { name: "Sign in with Claude" }));
-  await called("account.signIns.connect", { way: "token", agent: "claude", name: "Client", claudeAccountId: "work-mac" });
+  await called("account.signIns.connect", { way: "token", agent: "claude", name: "q6 main", claudeAccountId: "q6" });
+  fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Client" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in with Claude" }));
+  await called("account.signIns.connect", { way: "token", agent: "claude", name: "Client", claudeAccountId: "q6" });
 });
 
 it("offers the ways to add the first account at once, and a key for OpenCode with its provider", async () => {

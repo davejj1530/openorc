@@ -23,7 +23,7 @@ export interface Stored {
 }
 
 /** Whether a person may start a turn with these settings, as billing and their sign-ins say; the refusal when not. */
-export type Admit = (who: string, settings: { agent: string; model: string | null }) => string | null;
+export type Admit = (who: string, settings: { agent: string; model: string | null; accountId?: string | null }) => string | null;
 
 export interface Message {
   id: string;
@@ -75,7 +75,8 @@ export interface Thread {
   agent: string;
   status: string;
   views: Map<string, View>;
-  settings: { model: string | null; effort: string | null; mode: string; permissionMode: string };
+  /** `accountId`: which of its sender's accounts the next turn runs on, as a message or a change of settings named it. */
+  settings: { model: string | null; effort: string | null; mode: string; permissionMode: string; accountId?: string | null };
   backgroundCommands: { id: string; description: string }[];
   stopped: string[];
   events: Stored[];

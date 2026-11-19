@@ -204,11 +204,11 @@ export class Threads implements HostedThreads {
    */
   async update(threadId: string, patch: RpcParams<"threads.update">["patch"]): Promise<ThreadSummary> {
     const row = this.row(threadId);
-    const { draft, title, agent, model, effort, mode, permissionMode, fastMode, pinned, archived, snoozedUntil, seen, done: _settled, ...rest } = patch;
+    const { draft, title, agent, model, effort, mode, permissionMode, cloudAccountId, fastMode, pinned, archived, snoozedUntil, seen, done: _settled, ...rest } = patch;
     if (fastMode) throw new Refused(HOSTED_REASONS.speed);
     if (Object.values(rest).some((value) => value !== undefined)) throw new Refused(NOT_YET.refused);
     if (agent && !isHostedAgent(agent)) throw new Refused(`${harnessShortName(agent)} doesn't run on OpenOrc Cloud.`);
-    const settings = defined({ agent, model, effort, mode, permissionMode });
+    const settings = defined({ agent, model, effort, mode, permissionMode, accountId: cloudAccountId });
     if (title !== undefined || Object.keys(settings).length)
       this.#hearRow(await this.on(threadId).request(ROUTES.update(threadId), { ...(title !== undefined && { title }), ...(Object.keys(settings).length && { settings }) }));
     const mine = defined({ pinned, archived, snoozedUntil: snoozedUntil === undefined ? undefined : isoOf(snoozedUntil), seenSeq: seen === undefined ? undefined : seenUpTo(row, seen) });

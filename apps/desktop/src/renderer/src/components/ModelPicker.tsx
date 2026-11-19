@@ -171,7 +171,7 @@ function ModelBrowser({
   onChange: (choice: ModelChoice) => void;
   onSelectModel?: (choice: ModelChoice) => void;
   orclings?: OrclingPickerChoices;
-  /** The Claude accounts to offer above Claude's models, with what each has left. */
+  /** The accounts to offer above their agent's models, with what each has left. */
   accounts?: PickerAccounts | undefined;
   showEffort: boolean;
   showFast: boolean;
@@ -475,7 +475,7 @@ interface ComposerModelPickerProps {
   onChange: (choice: ModelChoice) => void;
   onSelectModel?: (choice: ModelChoice) => void;
   orclings?: OrclingPickerChoices;
-  /** The Claude accounts the conversation can run on; the picker shows them with their usage and switches between them. */
+  /** The accounts the conversation can run on; the picker shows them with their usage and switches between them. */
   accounts?: PickerAccounts | undefined;
   modelSelector?: ReactNode;
   disabled?: boolean;

@@ -1,4 +1,4 @@
-import { ExecutableAgent, type RpcParams } from "@openorc/protocol";
+import { CLOUD_ACCOUNT_ONLY, ExecutableAgent, type RpcParams } from "@openorc/protocol";
 import { ImportService } from "../services/imports.js";
 import type { OrclingService } from "../services/orclings.js";
 import { ThreadService } from "../services/threads.js";
@@ -83,7 +83,10 @@ export function createThreadLaunchHandlers({
         title,
       });
     },
-    "threads.update": ({ id, patch }) => threadService.update(id, orclings.threadPatch(id, patch)),
+    "threads.update": ({ id, patch: { cloudAccountId, ...patch } }) => {
+      if (cloudAccountId !== undefined) throw new Error(CLOUD_ACCOUNT_ONLY);
+      return threadService.update(id, orclings.threadPatch(id, patch));
+    },
     "threads.switchClaudeAccount": ({ id, claudeAccountId }) => threadService.switchClaudeAccount(id, claudeAccountId),
     "threads.import": ({ projectId, sessions }) => imports.import(projectId, sessions),
   };

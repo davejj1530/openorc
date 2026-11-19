@@ -1,12 +1,15 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import { percentLeft, sessionWindow, weeklyWindow, type ClaudeAccountConnection, type ProviderUsage, type RpcParams } from "@openorc/protocol";
 import { ensureRpc, useRpcs } from "../lib/client";
-import { openProject, useRouter } from "../lib/router";
+import { openProject, useRouter, type SettingsSection } from "../lib/router";
 import { Check } from "./icons";
 import { useHostedControlReason } from "./HostedConversationBoundary";
 import { HostedControlReason } from "./HostedControlReason";
 
-/** The Claude accounts a picker offers: its choices, the one in use, and how a choice is made. */
+/**
+ * The accounts a picker offers: its choices, the one in use, and how a choice is made. This Mac's Claude accounts, or
+ * on OpenOrc Cloud the person's accounts for the thread's agent, in that agent's section.
+ */
 export interface PickerAccounts {
   accounts: readonly Pick<ClaudeAccountConnection, "id" | "name" | "status">[];
   current: string;
@@ -21,6 +24,14 @@ export interface PickerAccounts {
   outside?: string | undefined;
   /** The project, when it uses only some accounts, so its accounts are a click away. */
   project?: { id: string; name: string } | undefined;
+  /** The person's accounts on OpenOrc Cloud, the only ones a cloud conversation offers; this Mac's when absent. */
+  cloud?: true | undefined;
+  /** The picker section the accounts head, the agent's whose they are; Claude's when none. */
+  section?: string | undefined;
+  /** How an account's usage is read; this Mac's Claude account's when none. */
+  usage?: ((id: string) => RpcParams<"providers.usage">) | undefined;
+  /** Where Manage accounts goes; Settings > Connections when none. */
+  manage?: SettingsSection | undefined;
 }
 
 /** A report this young answers at once from what any reader last fetched; only older ones ask the CLI again. */
@@ -41,7 +52,8 @@ const readable = (accounts: PickerAccounts["accounts"]) => accounts.filter((acco
 /** Starts each account's usage read as the pointer or focus reaches the picker's trigger, so its rows fill as they show. */
 export function warmAccountUsage(accounts: PickerAccounts | undefined) {
   const warm = () => {
-    for (const account of readable(accounts?.accounts ?? [])) void ensureRpc("providers.usage", usageParams(account.id)).catch(() => undefined);
+    const usage = accounts?.usage ?? usageParams;
+    for (const account of readable(accounts?.accounts ?? [])) void ensureRpc("providers.usage", usage(account.id)).catch(() => undefined);
   };
   return { onPointerEnter: warm, onFocus: warm };
 }
@@ -60,8 +72,10 @@ function usageWords(usage: ProviderUsage | undefined, loading: boolean): { text:
 }
 
 /**
- * The Claude accounts at the top of the picker's Claude section: each with what it has left, read for every account at
- * once and filled in as each answers, the one in use checked. Choosing one moves the conversation or the new thread to it.
+ * The accounts at the top of their agent's section of the picker, this Mac's Claude accounts or a cloud thread's: each
+ * with what it has left, read for every account at once and filled in as each answers, the one in use checked.
+ * Choosing one moves the conversation or the new thread to it. A cloud thread on a server that keeps one sign-in per
+ * agent holds the row with its reason.
  */
 export function PickerAccountRows({
   section,
@@ -70,7 +84,7 @@ export function PickerAccountRows({
   disabled,
   moveRowFocus,
 }: {
-  /** The picker's section: the accounts show in Claude's, above its models, while no search is narrowing them. */
+  /** The picker's section: the accounts show in their agent's, above its models, while no search is narrowing them. */
   section: string | null;
   searching: boolean;
   accounts: PickerAccounts | undefined;
@@ -78,7 +92,10 @@ export function PickerAccountRows({
   moveRowFocus: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }) {
   const cloudReason = useHostedControlReason("claudeAccount");
-  if (cloudReason && section === "claude" && !searching)
+  if (searching) return null;
+  const offered = cloudReason && !accounts?.cloud ? undefined : accounts;
+  if (offered && section === (offered.section ?? "claude")) return <AccountRows accounts={offered} disabled={disabled} moveRowFocus={moveRowFocus} />;
+  if (cloudReason && !offered && section === "claude")
     return (
       <HostedControlReason label="Claude account" reason={cloudReason}>
         <button type="button" aria-label="Claude account" className="model-picker-row" disabled>
@@ -86,15 +103,14 @@ export function PickerAccountRows({
         </button>
       </HostedControlReason>
     );
-  if (section !== "claude" || searching || !accounts) return null;
-  return <AccountRows accounts={accounts} disabled={disabled} moveRowFocus={moveRowFocus} />;
+  return null;
 }
 
 function AccountRows({ accounts, disabled, moveRowFocus }: { accounts: PickerAccounts; disabled?: boolean | undefined; moveRowFocus: (event: KeyboardEvent<HTMLButtonElement>) => void }) {
   const ready = readable(accounts.accounts);
   const reads = useRpcs(
     "providers.usage",
-    ready.map((account) => usageParams(account.id)),
+    ready.map((account) => (accounts.usage ?? usageParams)(account.id)),
     { staleTime: 60_000 },
   );
   const usageOf = (id: string) => reads[ready.findIndex((account) => account.id === id)];
@@ -102,7 +118,7 @@ function AccountRows({ accounts, disabled, moveRowFocus }: { accounts: PickerAcc
   clearError.current = accounts.clearError;
   useEffect(() => () => clearError.current?.(), []);
   return (
-    <div className="model-picker-group" role="group" aria-label="Claude account">
+    <div className="model-picker-group" role="group" aria-label={(accounts.section ?? "claude") === "claude" ? "Claude account" : "Account"}>
       <div className="model-picker-group-label">Account</div>
       {accounts.blocked ? (
         <p role="status" className="model-picker-message">
@@ -143,7 +159,7 @@ function AccountRows({ accounts, disabled, moveRowFocus }: { accounts: PickerAcc
           {accounts.project.name}’s accounts
         </button>
       ) : null}
-      <button type="button" className="model-picker-text-action" onClick={() => useRouter.getState().navigate({ view: "settings", section: "connections" })}>
+      <button type="button" className="model-picker-text-action" onClick={() => useRouter.getState().navigate({ view: "settings", section: accounts.manage ?? "connections" })}>
         Manage accounts
       </button>
     </div>

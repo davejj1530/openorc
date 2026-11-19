@@ -306,18 +306,36 @@ export const sendBlockWords = (why: SendBlockWhy, agent: string): string => SEND
  * (signed out, or the sign-ins not heard yet), and for a message into a running turn, which runs on that turn's starter.
  * The server stays the judge: a send this lets through can still be refused, and the account is then read again.
  */
-export function hostedSendBlock(account: AccountStatus | undefined, settings: { agent: string; model: string | null }, steering: boolean): SendBlockWhy | null {
+export function hostedSendBlock(account: AccountStatus | undefined, settings: TurnAccountSettings, steering: boolean): SendBlockWhy | null {
   if (account?.state !== "signed-in") return null;
   if (account.reach !== "live") return "offline";
   if (steering) return null;
   const paying = payBlock(account);
   if (paying) return paying;
   if (!account.signIns || !isHostedAgent(settings.agent)) return null;
-  const provider = settings.agent === "opencode" ? openCodeProvider(settings.model) : null;
-  if (settings.agent === "opencode" && !provider) return null;
-  const signIn = account.signIns.find((row) => row.agent === settings.agent && (provider === null || row.provider === provider));
+  if (settings.agent === "opencode" && !openCodeProvider(settings.model)) return null;
+  const signIn = turnSignIn(account.signIns, settings);
   if (!signIn) return "no_sign_in";
   return signIn.ended ? "signed_out" : null;
+}
+
+/** What a cloud turn runs with, as far as whose sign-in it takes: its agent, its model (OpenCode's names the provider) and the account it names. */
+export interface TurnAccountSettings {
+  agent: string;
+  model: string | null;
+  accountId?: string | null;
+}
+
+/**
+ * The sign-in a cloud turn with these settings runs on: the account it names when that is the person's own, else the
+ * agent's (for OpenCode, the provider's) default. A server that keeps one sign-in per agent marks none default, so it
+ * is that one. None for an OpenCode model that names no provider.
+ */
+export function turnSignIn<T extends { agent: string; provider: string; id?: string; isDefault?: boolean }>(rows: readonly T[], settings: TurnAccountSettings): T | undefined {
+  const provider = settings.agent === "opencode" ? openCodeProvider(settings.model) : null;
+  if (settings.agent === "opencode" && !provider) return undefined;
+  const ofAgent = rows.filter((row) => row.agent === settings.agent && (provider === null || row.provider === provider));
+  return ofAgent.find((row) => row.id !== undefined && row.id === settings.accountId) ?? ofAgent.find((row) => row.isDefault !== false);
 }
 
 /** What only paying fixes, in the server's order: not Pro, then no hours left, as this month's or as unpaid. */

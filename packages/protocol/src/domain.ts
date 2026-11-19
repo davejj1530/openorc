@@ -118,6 +118,11 @@ export type PrState = z.infer<typeof PrState>;
 
 export const Thread = z.object({
   claudeAccountId: z.string().nullable().optional(),
+  /**
+   * On OpenOrc Cloud, the account its next turns run on, as its settings name it: one of the person's own, or anyone's
+   * in a shared thread, where an account not the person's runs on their default. Null or absent: the default.
+   */
+  cloudAccountId: z.string().nullable().optional(),
   id: z.string(),
   /** Execution folder for Workspace conversations, independent of their home. */
   workingDirectory: z.string().nullable().optional(),

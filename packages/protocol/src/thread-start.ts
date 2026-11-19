@@ -5,6 +5,9 @@ import { AgentKind } from "./events.js";
 import { ExecutionTarget } from "./execution-target.js";
 import { SpaceId } from "./spaces.js";
 
+/** Why a thread of this Mac's is refused a cloud account, to start on or to change to. */
+export const CLOUD_ACCOUNT_ONLY = "Only a thread on OpenOrc Cloud runs on a cloud account.";
+
 /** Why a start that names its thread's id is refused: that thread exists. */
 export const THREAD_EXISTS = "That conversation already exists.";
 
@@ -14,6 +17,8 @@ export const ThreadStartParams = z
     /** The thread's id, when its starter chooses it. A phone's start with one is refused, and so is one naming a thread that exists. */
     id: z.string().uuid().optional(),
     claudeAccountId: ClaudeAccountId.optional(),
+    /** On OpenOrc Cloud, which of the person's accounts the thread runs on; none, their default. */
+    cloudAccountId: z.string().min(1).max(200).optional(),
     projectId: z.string(),
     spaceId: SpaceId.optional(),
     /**
@@ -47,13 +52,21 @@ export const ThreadStartParams = z
     if (input.parentThreadId && [input.id, input.workingDirectory, input.workspaceMode, input.baseRef].some((value) => value !== undefined)) {
       ctx.addIssue({ code: "custom", message: "A thread started under another works in its folder.", path: ["parentThreadId"] });
     }
-    if (input.hosted && [input.id, input.workingDirectory, input.workspaceMode, input.baseRef, input.parentThreadId].some((value) => value !== undefined)) {
-      ctx.addIssue({ code: "custom", message: "A thread on OpenOrc Cloud works in its own sandbox there.", path: ["hosted"] });
-    }
-    if (input.hosted && input.executionTarget && input.executionTarget.kind !== "model") ctx.addIssue({ code: "custom", message: "OpenOrc Cloud runs one model.", path: ["hosted"] });
+    for (const issue of cloudIssues(input)) ctx.addIssue({ code: "custom", ...issue });
     if (input.parentThreadId && input.executionTarget?.kind === "orcling") ctx.addIssue({ code: "custom", message: "An Orcling starts its own threads.", path: ["parentThreadId"] });
     if (!input.executionTarget && !input.agent) ctx.addIssue({ code: "custom", message: "Choose a model or an Orcling.", path: ["executionTarget"] });
     if (input.executionTarget && [input.agent, input.model, input.effort, input.fastMode].some((value) => value !== undefined)) {
       ctx.addIssue({ code: "custom", message: "Supply an execution target or legacy model settings, not both.", path: ["executionTarget"] });
     }
   });
+
+/** What a start says that only a start on OpenOrc Cloud may say, or that one there may not. */
+function cloudIssues(input: { [key: string]: unknown; hosted?: true; cloudAccountId?: string; executionTarget?: { kind: string } }): { message: string; path: string[] }[] {
+  const issues: { message: string; path: string[] }[] = [];
+  if (input.hosted && ["id", "workingDirectory", "workspaceMode", "baseRef", "parentThreadId"].some((key) => input[key] !== undefined)) {
+    issues.push({ message: "A thread on OpenOrc Cloud works in its own sandbox there.", path: ["hosted"] });
+  }
+  if (input.cloudAccountId && !input.hosted) issues.push({ message: CLOUD_ACCOUNT_ONLY, path: ["cloudAccountId"] });
+  if (input.hosted && input.executionTarget && input.executionTarget.kind !== "model") issues.push({ message: "OpenOrc Cloud runs one model.", path: ["hosted"] });
+  return issues;
+}

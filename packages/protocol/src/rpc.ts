@@ -12,6 +12,7 @@ import { hostedParityRpcParams, type HostedParityRpcResults } from "./hosted-par
 import { threadCollaborationRpcParams, type ThreadCollaborationRpcResults } from "./thread-collaboration.js";
 import { cloudRemoteRpcParams, type CloudRemoteRpcResults } from "./cloud-remote.js";
 import { UsageHistoryParams } from "./usage-history.js";
+import { ThreadUpdateParams } from "./thread-update.js";
 import { ProjectActivityParams } from "./project-activity.js";
 import type { AgentUpdates } from "./agent-updates.js";
 import { accountRpcParams, type AccountRpcResults } from "./account.js";
@@ -197,29 +198,7 @@ export const rpcParams = {
       .max(120),
   }),
   "threads.start": ThreadStartParams,
-  "threads.update": z.object({
-    id: z.string(),
-    /** Through a surviving task of a deleted conversation, only mode, permissions and the draft can change. */
-    patch: z.object({
-      executionTarget: z.never().optional(),
-      title: z.string().optional(),
-      mode: RunMode.optional(),
-      permissionMode: PermissionPreset.optional(),
-      model: z.string().nullable().optional(),
-      effort: z.string().nullable().optional(),
-      fastMode: z.boolean().optional(),
-      agent: AgentKind.optional(),
-      archived: z.boolean().optional(),
-      pinned: z.boolean().optional(),
-      done: z.boolean().optional(),
-      /** Epoch milliseconds as a safe integer (zod's int): SQLite stores larger ones that node:sqlite then cannot read back. */
-      snoozedUntil: z.number().int().nonnegative().nullable().optional(),
-      /** True marks the thread read; false marks it unread. */
-      seen: z.boolean().optional(),
-      draft: z.string().nullable().optional(),
-      prUrl: z.string().nullable().optional(),
-    }),
-  }),
+  "threads.update": ThreadUpdateParams,
   /** The conversation goes on with another Claude account from its next message, which resumes its session there. */
   "threads.switchClaudeAccount": z.object({ id: z.string(), claudeAccountId: ClaudeAccountId }),
   "threads.delete": z.object({ id: z.string(), requestKey: z.string().min(1).max(200).optional() }),

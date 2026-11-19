@@ -17,6 +17,7 @@ import {
   type OnlineTaskSendContext,
   type QueuedMessage,
   type RpcParams,
+  type TurnAccountSettings,
 } from "@openorc/protocol";
 import { Refused, type Requests } from "./session.js";
 import { refusalWords, toQueued, wireMessageId } from "./translate.js";
@@ -38,7 +39,7 @@ export interface Calls {
   refresh(): Promise<void>;
   account(): AccountStatus;
   /** The server refused a turn for this reason: the account is read again, and a dead sign-in remembered. */
-  refused(refusal: HostedRefusal, settings: { agent: string; model: string | null }): void;
+  refused(refusal: HostedRefusal, settings: TurnAccountSettings): void;
   /** Makes the person's own skills for `agent` the server's (skills.ts). It rejects in words when they could not be sent. */
   bring(threadId: string, agent: string): Promise<void>;
   now(): number;
@@ -55,7 +56,11 @@ const threadOf = (runId: string): string => {
 };
 
 /** The settings a turn would run with: the thread's, with what this message asks instead. */
-const turnSettings = (row: WireThread, asked: TurnSettings | undefined) => ({ agent: asked?.agent ?? row.settings.agent, model: asked?.model !== undefined ? asked.model : row.settings.model });
+const turnSettings = (row: WireThread, asked: TurnSettings | undefined) => ({
+  agent: asked?.agent ?? row.settings.agent,
+  model: asked?.model !== undefined ? asked.model : row.settings.model,
+  accountId: asked?.accountId !== undefined ? asked.accountId : row.settings.accountId,
+});
 
 /**
  * One message to the thread, under the window's id when it names one, so the bubble it shows is the stored message and
@@ -98,7 +103,7 @@ async function post(
 }
 
 /** A refusal: the account is read again, and the write fails with the words the card above the composer shows. */
-export function refuse(calls: Calls, refusal: string, settings: { agent: string; model: string | null }): never {
+export function refuse(calls: Calls, refusal: string, settings: TurnAccountSettings): never {
   if (isHostedRefusal(refusal)) calls.refused(refusal, settings);
   throw new Refused(refusalWords(refusal, settings.agent));
 }

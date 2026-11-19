@@ -23,6 +23,7 @@ import { CLOUD_MODEL_LIMITS } from "../lib/cloud-model-limits";
 import { cloudRunChoice, useCloudModels } from "../lib/cloud-run-choice";
 import { useCloudStartReady } from "../lib/use-cloud-start-ready";
 import { useMounted } from "../lib/use-mounted";
+import { cloudPicker } from "../lib/use-thread-accounts";
 import { usePublishComposerAccount } from "../lib/composer-account";
 import { useDefaultHarness } from "../lib/default-harness";
 import { focusedProject, useLayout } from "../lib/layout";
@@ -115,8 +116,8 @@ function useNewThreadAccount(projects: Project[] | undefined, projectId: string,
 }
 
 /** A new thread's Claude accounts for its model picker: the ones its project uses, the chosen one checked. An Orcling brings its own. */
-function newThreadAccounts(choices: ClaudeAccounts | undefined, current: string, starting: boolean, choose: (id: string) => void): PickerAccounts | undefined {
-  return choices ? { accounts: choices.accounts, current, choose, blocked: starting ? "Starting the thread…" : undefined } : undefined;
+function newThreadAccounts(choices: ClaudeAccounts | undefined, current: string, blocked: string | undefined, choose: (id: string) => void): PickerAccounts | undefined {
+  return choices ? { accounts: choices.accounts, current, choose, blocked } : undefined;
 }
 
 /** The Orclings the model picker offers, the one chosen marked. */
@@ -177,6 +178,7 @@ function NewThreadProject({
   // cloud-only project has no folder on this Mac, so it offers none of this Mac's, as a cloud thread's composer does.
   const suggestions = useComposerSuggestions(projectScope(macFolder || isWorkspace ? projectId : null, draft.workingDirectory), picked?.agent, executionMode(draft.mode, permission), claudeAccountId);
   const hosted = useNewThreadHosted(target, projectId);
+  const account = useRpc("account.status", {}).data;
   const workspaceMode = cloudOnly
     ? "hosted"
     : newThreadWorkspaceMode({
@@ -209,8 +211,12 @@ function NewThreadProject({
     system: { data: info.data, failed: info.isError },
   });
   const usesClaude = choice?.agent === "claude";
-  // On OpenOrc Cloud, whatever folder it starts from, this Mac's Claude accounts and Orclings never hold the thread.
-  const pickerAccounts = orcling || onCloud ? undefined : newThreadAccounts(accountChoices, claudeAccountId, start.isPending, (id) => changeDraft({ claudeAccountId: id }));
+  // On OpenOrc Cloud, whatever folder it starts from, the person's cloud accounts take the place of this Mac's Claude accounts.
+  const starting = start.isPending ? "Starting the thread…" : undefined;
+  const cloudAccounts =
+    onCloud && choice ? cloudPicker(account, { agent: choice.agent, model: choice.model, accountId: draft.cloudAccountId }, (id) => changeDraft({ cloudAccountId: id }), starting) : undefined;
+  const macAccounts = orcling ? undefined : newThreadAccounts(accountChoices, claudeAccountId, starting, (id) => changeDraft({ claudeAccountId: id }));
+  const pickerAccounts = onCloud ? cloudAccounts : macAccounts;
   const localReason = usesClaude && !accounts.data ? (accounts.error?.message ?? "Loading Claude accounts…") : targetDisabledReason;
   // A cloud start from this Mac's folder carries its work, said on the line above Start before anything leaves.
   const macStart = useMacStart(cloudOnly ? null : projectId, spaceId ?? undefined, onCloud);
@@ -230,7 +236,7 @@ function NewThreadProject({
     if (disabledReason) throw new Error(disabledReason);
     if (!choice || !selected || target.kind === "unavailable") throw new Error("Choose a project and execution target first.");
     const threadId = await startNewThread({
-      draft: { ...runDraft, claudeAccountId },
+      draft: { ...runDraft, claudeAccountId, ...(cloudAccounts && { cloudAccountId: cloudAccounts.current }) },
       project: selected,
       isWorkspace,
       workspaceMode,

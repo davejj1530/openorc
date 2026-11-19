@@ -544,7 +544,10 @@ function inProcessSocket(
   };
 }
 
-/** The server's admission to start a turn: hours first, then a sign-in for the agent, and for OpenCode the provider its model names. */
+/**
+ * The server's admission to start a turn: hours first, then a sign-in for the agent, and for OpenCode the provider its
+ * model names: the account the settings name when it is the person's, else the default.
+ */
 function turnRule(billing: Map<string, StandInBilling>, signIns: Map<string, StandInSignIn[]>): Admit {
   return (who, settings) => {
     const state = billing.get(who) ?? { pro: false };
@@ -552,7 +555,8 @@ function turnRule(billing: Map<string, StandInBilling>, signIns: Map<string, Sta
     if (leftSeconds(state) <= 0) return state.monthlyLeftSeconds === null ? "awaiting_payment" : "no_hours";
     const provider = settings.agent === "opencode" ? (settings.model?.split("/")[0] ?? null) : null;
     if (settings.agent === "opencode" && !settings.model?.includes("/")) return null;
-    const row = (signIns.get(who) ?? []).find((each) => each.agent === settings.agent && (provider === null || each.provider === provider));
+    const ofAgent = (signIns.get(who) ?? []).filter((each) => each.agent === settings.agent && (provider === null || each.provider === provider));
+    const row = ofAgent.find((each) => each.id !== undefined && each.id === settings.accountId) ?? ofAgent.find((each) => each.isDefault !== false);
     if (!row) return "no_sign_in";
     return row.ended ? "signed_out" : null;
   };

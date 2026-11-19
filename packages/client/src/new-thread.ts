@@ -29,6 +29,8 @@ export type NewThreadPlace = WorkspaceMode | "hosted";
 
 export interface NewThreadDraft {
   claudeAccountId?: string;
+  /** On OpenOrc Cloud, which of the person's accounts the thread starts on; none, their default. */
+  cloudAccountId?: string;
   projectId: string;
   workingDirectory?: string;
   prompt: string;
@@ -44,6 +46,7 @@ export function decodeNewThreadDraft(projectId: string, value: unknown, legacyPr
   const raw = object(value) ? value : {};
   return {
     ...(typeof raw.claudeAccountId === "string" && raw.claudeAccountId.length <= 100 ? { claudeAccountId: raw.claudeAccountId } : {}),
+    ...(typeof raw.cloudAccountId === "string" && raw.cloudAccountId.length > 0 && raw.cloudAccountId.length <= 200 ? { cloudAccountId: raw.cloudAccountId } : {}),
     projectId,
     ...(typeof raw.workingDirectory === "string" && raw.workingDirectory.length <= 4096 ? { workingDirectory: raw.workingDirectory } : {}),
     prompt: typeof raw.prompt === "string" ? raw.prompt : legacyPrompt,
@@ -129,6 +132,7 @@ export function newThreadStartInput(
     prompt: input.prompt || "See the attached image.",
     ...startTarget(draft.target, choice),
     ...(draft.claudeAccountId ? { claudeAccountId: draft.claudeAccountId } : {}),
+    ...(place === "hosted" && draft.cloudAccountId ? { cloudAccountId: draft.cloudAccountId } : {}),
   };
 }
 

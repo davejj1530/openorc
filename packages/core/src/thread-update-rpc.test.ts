@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { orclings, settings, threads } from "@openorc/db";
-import { defaultOrclingLook, WORKSPACE_ID, type RpcParams, type Thread } from "@openorc/protocol";
+import { CLOUD_ACCOUNT_ONLY, defaultOrclingLook, WORKSPACE_ID, type RpcParams, type Thread } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
 import { rpcClient } from "./rpc-test-client.js";
 
@@ -32,6 +32,10 @@ it.each([
   await expect(call("threads.update", { id: thread.id, patch: { snoozedUntil } })).rejects.toThrow();
   expect(await call("threads.get", { id: thread.id })).toMatchObject({ snoozedUntil: null });
   expect(await call("threads.list", { filter: "all" })).toEqual([expect.objectContaining({ id: thread.id, snoozedUntil: null })]);
+});
+
+it("refuses a cloud account for a thread of this Mac's, which runs on a Claude account", async () => {
+  await expect(call("threads.update", { id: thread.id, patch: { cloudAccountId: "work" } })).rejects.toThrow(CLOUD_ACCOUNT_ONLY);
 });
 
 it("snoozes a thread until a time the list reads back, and wakes it", async () => {

@@ -120,7 +120,7 @@ export interface ComposerProps {
   onModel: (choice: ModelChoice) => void;
   /** A saved identity can supply its model controls in the toolbar. */
   modelControl?: ReactNode;
-  /** The Claude accounts the conversation can run on, offered in the model picker with their usage. */
+  /** The accounts the conversation can run on, this Mac's Claude accounts or a cloud thread's, offered in the model picker with their usage. */
   accounts?: PickerAccounts | undefined;
   /** Where the conversation runs takes only these agents, and Fast only when `fast`; on OpenOrc Cloud, its models (`cloud`). */
   modelLimits?: ModelLimits | undefined;

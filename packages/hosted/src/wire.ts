@@ -126,7 +126,15 @@ export const wireThread = z.object({
   title: z.string(),
   baseBranch: z.string(),
   branch: z.string(),
-  settings: z.object({ agent: AgentKind, model: z.string().nullable(), effort: z.string().nullable(), mode: RunMode, permissionMode: PermissionPreset }),
+  settings: z.object({
+    agent: AgentKind,
+    model: z.string().nullable(),
+    effort: z.string().nullable(),
+    mode: RunMode,
+    permissionMode: PermissionPreset,
+    /** Which of its sender's accounts the next turn runs on; absent from a server before accounts. */
+    accountId: z.string().nullable().optional(),
+  }),
   status: z.string(),
   head: seq,
   /** The live turn; null between turns, also while an ask waits after its turn ended. */

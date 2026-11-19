@@ -11,7 +11,7 @@
  * `status()` is computed from these and the session each time it is asked. Nothing stores an AccountStatus.
  */
 import {
-  openCodeProvider,
+  turnSignIn,
   type AccountDeletion,
   type AccountProject,
   type BillingOffers,
@@ -22,11 +22,12 @@ import {
   type PushRegistration,
   type PushSenderState,
   type RpcParams,
+  type TurnAccountSettings,
 } from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedAccount, HostedDeps } from "./index.js";
 import { OutOfReach, Refused, type Session, type SessionChange } from "./session.js";
-import { accountKey, githubRepoOf, signInKey, toImage, toOffers, toPlan, toSandbox, toSignIns } from "./translate.js";
+import { accountKey, githubRepoOf, toImage, toOffers, toPlan, toSandbox, toSignIns } from "./translate.js";
 import { BrowserSignInTrip } from "./browser-sign-in.js";
 import { GithubConnect } from "./github.js";
 import { Paying } from "./paying.js";
@@ -321,21 +322,14 @@ export class Account implements HostedAccount {
    * The server refused a turn: read the account again, so the card above the composer says why. A sign-in it found
    * signed out is marked ended until it is set again, which the list alone cannot tell.
    */
-  refused(refusal: HostedRefusal, settings: { agent: string; model: string | null; accountId?: string | null }): void {
+  refused(refusal: HostedRefusal, settings: TurnAccountSettings): void {
     const email = this.#signedInAs();
-    const row = this.#heard && this.#turnAccount(this.#heard.signIns ?? [], settings);
+    const row = this.#heard && turnSignIn(this.#heard.signIns ?? [], settings);
     if (email && refusal === "signed_out" && this.#heard && row) {
       const key = accountKey(row);
       this.#hear(email, { ended: [...this.#heard.ended.filter((each) => each.key !== key), { key, checkedAt: row.checkedAt }] });
     }
     void this.#refresh();
-  }
-
-  /** The sign-in a turn with these settings ran on: the account it names when it is the person's, else the agent's (and provider's) default. */
-  #turnAccount(rows: readonly WireSignIn[], settings: { agent: string; model: string | null; accountId?: string | null }): WireSignIn | undefined {
-    const key = signInKey(settings.agent, settings.agent === "opencode" ? openCodeProvider(settings.model) : null);
-    const ofAgent = rows.filter((each) => signInKey(each.agent, each.agent === "opencode" ? each.provider : null) === key);
-    return ofAgent.find((each) => each.id !== undefined && each.id === settings.accountId) ?? ofAgent.find((each) => each.isDefault !== false);
   }
 
   #changed(change: SessionChange): void {

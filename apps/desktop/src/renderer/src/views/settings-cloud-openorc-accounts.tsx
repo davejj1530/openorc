@@ -29,6 +29,7 @@ import { COMMON, ProviderChoice, TYPED, useProviders } from "./settings-cloud-op
 import { useClaudeAccountChoice, Waiting, WAITING, WAY_LABELS } from "./settings-cloud-openorc-sign-ins";
 import { Status } from "./settings-shared";
 import "./settings-claude-accounts.css";
+import "./settings-cloud-openorc-accounts.css";
 
 /** The agents whose CLIs report their limits after a cloud turn. */
 const LIMITED = new Set<HostedAgent>(["claude", "codex"]);
@@ -85,7 +86,7 @@ function CloudAccountRow({ row, work }: { row: Account; work: SignInWork | undef
   const waiting = work?.state === "waiting" ? work : null;
   const failure = work?.state === "failed" ? work.error : [connect, cancel, update, remove].find((mutation) => mutation.error)?.error?.message;
   return (
-    <div className="settings-account-row" role="group" aria-label={name}>
+    <div className="settings-account-row settings-cloud-account" data-waiting={waiting ? "" : undefined} role="group" aria-label={name}>
       <AccountSummary row={row} name={name} waiting={waiting} />
       <div className="settings-account-actions">
         {waiting ? (
@@ -319,13 +320,24 @@ function AddForm({ agent, failure }: { agent: HostedAgent; failure: string | nul
   const [keyed, setKeyed] = useState(keyOnly);
   const busy = connect.isPending;
   const landing = name.trim() ? { name: name.trim() } : {};
+  // A token made as one of several Mac accounts names the new account after it, unless the person names it.
+  const signsFrom =
+    !keyed && ways.includes("token") && claude.accounts.length > 1
+      ? claude.accounts
+          .find((account) => account.id === claude.chosen)
+          ?.name.slice(0, 40)
+          .trim()
+      : undefined;
+  const tokenLanding = name.trim() || !signsFrom ? landing : { name: signsFrom };
   const done = () => {
     setName("");
     setKeyed(keyOnly);
   };
   const start = (way: SignInWay) => {
     if (way === "key") return setKeyed(true);
-    connect.mutate(way === "token" ? { way, agent: "claude", ...landing, ...(claude.chosen && { claudeAccountId: claude.chosen }) } : { way: "code", agent: "codex", ...landing }, { onSuccess: done });
+    connect.mutate(way === "token" ? { way, agent: "claude", ...tokenLanding, ...(claude.chosen && { claudeAccountId: claude.chosen }) } : { way: "code", agent: "codex", ...landing }, {
+      onSuccess: done,
+    });
   };
   const [lead, ...rest] = ways;
   const error = failure ?? connect.error?.message;
@@ -333,7 +345,7 @@ function AddForm({ agent, failure }: { agent: HostedAgent; failure: string | nul
     <div className="settings-account-form">
       <label className="settings-account-label">
         Name
-        <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={40} placeholder="Work, Personal, Client…" disabled={busy} />
+        <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={40} placeholder={signsFrom || "Work, Personal, Client…"} disabled={busy} />
       </label>
       {keyed ? (
         <>
@@ -414,12 +426,12 @@ function KeyFields({ agent, provider: named, busy, onSave }: { agent: HostedAgen
   );
 }
 
-/** Which of this Mac's Claude accounts makes a cloud account's token, asked only when the Mac has more than one. */
+/** Which of this Mac's Claude accounts signs a cloud account in, by its name, asked only when the Mac has more than one. */
 function ClaudeAccountField({ choice, busy }: { choice: ReturnType<typeof useClaudeAccountChoice>; busy: boolean }) {
   if (choice.accounts.length < 2) return null;
   return (
     <label className="settings-account-label">
-      Claude account
+      Sign in from
       <Select value={choice.chosen ?? ""} disabled={busy} onChange={(event) => choice.choose(event.target.value)}>
         {choice.accounts.map((account) => (
           <option key={account.id} value={account.id}>

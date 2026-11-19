@@ -124,6 +124,30 @@ it("does not read or offer another local Claude account for a cloud turn", async
   ).toEqual([]);
 });
 
+it("offers a cloud turn the person's cloud accounts in its agent's section, with each one's cloud usage", async () => {
+  const choose = vi.fn();
+  vi.mocked(core.call).mockImplementation((async (method: string) =>
+    method === "providers.usage"
+      ? { status: "available", windows: [{ id: "seven_day", label: "Weekly", usedPercent: 40, remainingPercent: 60 }], credits: [] }
+      : { version: 1, features: served }) as never);
+  const accounts = {
+    cloud: true as const,
+    section: "codex",
+    current: "pro",
+    accounts: [
+      { id: "pro", name: "ChatGPT Pro", status: "ready" as const },
+      { id: "team", name: "Team", status: "ready" as const },
+    ],
+    choose,
+    usage: (id: string) => ({ provider: "codex" as const, cloud: true as const, cloudAccountId: id }),
+  };
+  mount(<PickerAccountRows section="codex" searching={false} accounts={accounts} moveRowFocus={() => {}} />);
+  fireEvent.click(await screen.findByRole("button", { name: /Team/ }));
+  expect(choose).toHaveBeenCalledWith("team");
+  expect(await screen.findAllByText("60% wk")).toHaveLength(2);
+  expect(vi.mocked(core.call)).toHaveBeenCalledWith("providers.usage", { provider: "codex", cloud: true, cloudAccountId: "team" });
+});
+
 const base: ComposerProps = {
   value: "",
   onChange: vi.fn(),

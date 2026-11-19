@@ -302,6 +302,7 @@ export { answeredName, answeredOf, teamChatCallLine } from "./team-chat-replies.
 export { createTeamChat, teamChatList, type TeamChatDeps, type TeamChatLease, type TeamChatListRow, type TeamChatStore } from "./team-chat-store.js";
 export * from "./seat-words.js";
 export * from "./hosted-capabilities.js";
+export { cloudAccountChoices, type CloudAccountChoice } from "./cloud-accounts.js";
 export { onlineTaskKey, onlineTaskTags, readOnlineTaskPages, type OnlineTaskScope } from "./online-tasks.js";
 export * from "./thread-collaboration.js";
 export * from "./note-draft.js";

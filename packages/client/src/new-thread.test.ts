@@ -433,3 +433,11 @@ describe("where a new thread works in a folder that cannot branch yet", () => {
     expect(newThreadWorkspaceMode({ canBranch: true, canHosted: false, chosen: "hosted", preferred: undefined })).toBe("worktree");
   });
 });
+
+describe("a new thread's cloud account", () => {
+  it("goes with a start on OpenOrc Cloud and never with one on this Mac", () => {
+    const draft = decodeNewThreadDraft("p-repo", { prompt: "Work up there", cloudAccountId: "work", target: { kind: "model", choice: { agent: "claude", model: "sonnet", effort: "low" } } });
+    expect(newThreadStartInput(draft, { workspaceMode: "hosted", permissionMode: "trusted", prompt: "Work up there" })).toMatchObject({ hosted: true, cloudAccountId: "work" });
+    expect(newThreadStartInput(draft, { workspaceMode: "worktree", permissionMode: "trusted", prompt: "Work up there" })).not.toHaveProperty("cloudAccountId");
+  });
+});

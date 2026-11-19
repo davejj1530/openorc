@@ -1,6 +1,17 @@
 import { Popover } from "@base-ui/react/popover";
-import { DEFAULT_CLAUDE_ACCOUNT, harnessCatalog, isHarnessId, type HarnessId, percentLeft, sessionWindow, weeklyWindow, type AllowanceWindow, type ProviderUsage } from "@openorc/protocol";
-import { allowanceState, conversationCost, creditBalanceLabel, formatCost, formatUsageTime, usageResetLabel } from "@openorc/client";
+import {
+  DEFAULT_CLAUDE_ACCOUNT,
+  harnessCatalog,
+  isHarnessId,
+  type HarnessId,
+  percentLeft,
+  sessionWindow,
+  weeklyWindow,
+  type AllowanceWindow,
+  type ProviderUsage,
+  type ThreadSummary,
+} from "@openorc/protocol";
+import { allowanceState, cloudAccountChoices, conversationCost, creditBalanceLabel, formatCost, formatUsageTime, usageResetLabel } from "@openorc/client";
 import { useEffect, useState, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/client";
@@ -306,27 +317,31 @@ const PLACE = { side: "top", align: "start", sideOffset: 8 } as const;
 export function AccountUsage() {
   const place = useOpenThreadPlace();
   if (place === "reading") return null;
-  return place === "mac" ? <LocalAccountUsage /> : <CloudAccountUsage agent={place.cloud} />;
+  return place === "mac" ? <LocalAccountUsage /> : <CloudAccountUsage agent={place.cloud} thread={place.thread} />;
 }
 
 /** Where the open thread runs: this Mac, off a thread too, or OpenOrc Cloud with the agent its turns run. */
-function useOpenThreadPlace(): "reading" | "mac" | { cloud: HarnessId } {
+function useOpenThreadPlace(): "reading" | "mac" | { cloud: HarnessId; thread: ThreadSummary } {
   const threadId = useRouter((state) => (state.route.view === "thread" ? state.route.threadId : null));
   const thread = useRpc("threads.get", { id: threadId ?? "" }, { enabled: Boolean(threadId) }).data;
   if (!threadId) return "mac";
   if (thread?.id !== threadId) return "reading";
-  return thread.owner?.brain === "hosted" && isHarnessId(thread.agent) ? { cloud: thread.agent } : "mac";
+  return thread.owner?.brain === "hosted" && isHarnessId(thread.agent) ? { cloud: thread.agent, thread } : "mac";
 }
 
 /**
  * The cloud thread's agent sign-in on OpenOrc Cloud, as the agent's CLI there last read it after one of the person's
- * turns. A reading grows out of date as a reading here does; with none, nothing is shown.
+ * turns: where the person keeps several accounts, the one the thread runs on for them. A reading grows out of date as
+ * a reading here does; with none, nothing is shown.
  */
-function CloudAccountUsage({ agent }: { agent: HarnessId }) {
-  const usage = useRpc("providers.usage", { provider: agent, cloud: true }, { staleTime: USAGE_MAX_AGE_MS });
+function CloudAccountUsage({ agent, thread }: { agent: HarnessId; thread: ThreadSummary }) {
+  const status = useRpc("account.status", {}).data;
+  const chosen = cloudAccountChoices(status, { agent, model: thread.model, accountId: thread.cloudAccountId });
+  const named = chosen?.accounts.find((each) => each.id === chosen.current);
+  const usage = useRpc("providers.usage", { provider: agent, cloud: true, ...(named && { cloudAccountId: named.id }) }, { staleTime: USAGE_MAX_AGE_MS });
   const now = useNow();
-  // The agent is in the row's logo; its name says where the sign-in is.
-  const account: UsageAccount = { provider: agent, name: "OpenOrc Cloud" };
+  // The agent is in the row's logo; its name says where the sign-in is, and which account where there are several.
+  const account: UsageAccount = { provider: agent, name: named ? `OpenOrc Cloud · ${named.name}` : "OpenOrc Cloud" };
   const mark = accountMark(account, usage.data, null);
   if (!mark || !usage.data) return null;
   const report: UsageAccountReport = { ...account, id: agent, plan: usage.data.plan, windows: usage.data.windows, credits: usage.data.credits, context: usage.data.context, status: usage.data.status };

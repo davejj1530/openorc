@@ -16,7 +16,7 @@ import { AccountMenu } from "./AccountMenu";
 import { AgentTabs } from "./AgentTabs";
 import { sheetList, type SheetList, type SheetModel } from "./model-sheet-list";
 import { recentModels, rememberModel } from "./recent-models";
-import { useSharedModelSettings, type ModelSettings } from "./settings-bridge";
+import { useSharedModelSettings, type AccountChoice, type ModelSettings } from "./settings-bridge";
 
 function FastModeControl({ settings, state }: { settings: ModelSettings | undefined; state: ReturnType<typeof pickerSettings> }) {
   const colors = useColors();
@@ -178,6 +178,32 @@ function ModelControls({ shown, settings, state }: { shown: AgentKind | null; se
   );
 }
 
+/** The field that searches the shown agent's models. */
+function ModelSearch({ query, onQuery, agent }: { query: string; onQuery: (query: string) => void; agent: AgentKind | null }) {
+  return (
+    <View className="h-touch flex-row items-center gap-2 rounded-full bg-surface px-4">
+      <Search size={16} className="text-ink-4" />
+      <TextInput
+        value={query}
+        onChangeText={onQuery}
+        autoCapitalize="none"
+        autoCorrect={false}
+        clearButtonMode="while-editing"
+        placeholder={agent ? `Search ${harnessShortName(agent)} models` : "Search models"}
+        placeholderTextColorClassName="accent-ink-4"
+        accessibilityLabel="Search models"
+        className="flex-1 p-0 font-sans text-md text-ink"
+      />
+    </View>
+  );
+}
+
+/** The accounts the sheet offers: the person's on OpenOrc Cloud for a cloud turn, else the Mac's Claude accounts. */
+function useAccountChoice(settings: ModelSettings | undefined): AccountChoice | null {
+  const claude = useClaudeAccountChoice(settings);
+  return useCloudAccountChoice(settings) ?? claude;
+}
+
 /**
  * The models a composer can run, their effort and Fast mode, and the account it runs on: on a Claude thread the Mac's,
  * once it has more than one; on OpenOrc Cloud the person's for the agent, where the server keeps several. One agent's models show at a time. An agent with many, as OpenCode and Oh My Pi have, opens
@@ -188,8 +214,7 @@ export function ModelSheet() {
   const insets = useSafeAreaInsets();
   const settings = useSharedModelSettings(composerId);
   const models = useComposerModels(settings);
-  const claudeAccount = useClaudeAccountChoice(settings);
-  const account = useCloudAccountChoice(settings) ?? claudeAccount;
+  const account = useAccountChoice(settings);
   const catalog = pickerCatalog(models.data ?? []);
   const choice = settings?.choice ?? null;
   const current = catalogModel(models.data, choice);
@@ -246,20 +271,7 @@ export function ModelSheet() {
             }}
           />
         ) : null}
-        <View className="h-touch flex-row items-center gap-2 rounded-full bg-surface px-4">
-          <Search size={16} className="text-ink-4" />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-            placeholder={shown ? `Search ${harnessShortName(shown)} models` : "Search models"}
-            placeholderTextColorClassName="accent-ink-4"
-            accessibilityLabel="Search models"
-            className="flex-1 p-0 font-sans text-md text-ink"
-          />
-        </View>
+        <ModelSearch query={query} onQuery={setQuery} agent={shown} />
       </View>
       <View className="gap-5 px-5">
         <ModelStatus loading={models.isLoading} error={failure} empty={!shown && !current} />

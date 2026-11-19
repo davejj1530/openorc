@@ -57,10 +57,7 @@ export function useNewThread(project: ProjectChoice) {
       change({ mode: next.mode });
       permission.select(next.permissionMode);
     },
-    // On OpenOrc Cloud the person's cloud accounts take the place of the Mac's Claude accounts.
-    ...(project.cloud
-      ? { cloudAccount: { accountId: draft.cloudAccountId, select: (cloudAccountId: string) => change({ cloudAccountId }), held: starting ? "Starting the thread…" : null } }
-      : { claudeAccount: { chosen: claudeAccountId, select: (claudeAccountId: string) => change({ claudeAccountId }), projectId } }),
+    ...draftAccounts(project, draft, claudeAccountId, change, starting),
     cloud: Boolean(project.cloud),
   };
   // A Mac project waits for the Mac: Start is held with why, rather than sent to fail.
@@ -123,6 +120,21 @@ export function useNewThread(project: ProjectChoice) {
     explainDim: dim.ask,
     submit,
   };
+}
+
+/**
+ * The accounts a new thread offers: on OpenOrc Cloud the person's cloud accounts, which take the place of the Mac's
+ * Claude accounts; else the Mac's, as its project uses them. Held while the thread starts.
+ */
+function draftAccounts(
+  project: ProjectChoice,
+  draft: SheetDraft,
+  claudeAccountId: string | undefined,
+  change: (patch: Partial<SheetDraft>) => void,
+  starting: boolean,
+): Pick<ComposerSettings, "claudeAccount" | "cloudAccount"> {
+  if (project.cloud) return { cloudAccount: { accountId: draft.cloudAccountId, select: (cloudAccountId) => change({ cloudAccountId }), held: starting ? "Starting the thread…" : null } };
+  return { claudeAccount: { chosen: claudeAccountId, select: (id) => change({ claudeAccountId: id }), projectId: project.id } };
 }
 
 /** The desktop's first choice, made from the same reads once they are in and kept with the draft. Returns the Mac's settings. */

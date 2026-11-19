@@ -17,6 +17,7 @@ export function createAccountHandlers(
   | "account.signOut"
   | "account.profile.update"
   | "account.setSandbox"
+  | "account.setSwitchAtLimit"
   | "account.signIns.connect"
   | "account.signIns.cancel"
   | "account.signIns.remove"
@@ -43,6 +44,7 @@ export function createAccountHandlers(
     "account.signOut": () => after((a) => a.signOut()),
     "account.profile.update": (input) => after((a) => a.updateProfile(input)),
     "account.setSandbox": ({ service }) => after((a) => a.setSandbox(service)),
+    "account.setSwitchAtLimit": ({ switchAccountsAtLimit }) => after((a) => a.setSwitchAtLimit(switchAccountsAtLimit)),
     "account.signIns.connect": (input) => after((a) => a.connectSignIn(input)),
     "account.signIns.cancel": ({ agent }) => after(async (a) => a.cancelSignIn(agent)),
     "account.signIns.remove": (input) => after((a) => a.removeSignIn(input)),

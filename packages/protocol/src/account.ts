@@ -176,6 +176,11 @@ export type AccountStatus =
       signIns: AccountSignIn[] | null;
       /** The server keeps several accounts per agent (`features.agentAccounts`); absent or false, one sign-in per agent as before. */
       agentAccounts?: boolean;
+      /**
+       * A cloud turn that ends at its account's usage limit goes on with another of the person's accounts, as this Mac's
+       * Claude accounts do; on unless they turn it off. Absent from a server before accounts.
+       */
+      switchAccountsAtLimit?: boolean;
       /** By agent: a sign-in being made, or the last that failed. */
       signingIn: Partial<Record<HostedAgent, SignInWork>>;
       /** Null until the server first answers. */
@@ -244,6 +249,8 @@ export const accountRpcParams = {
     .refine((input) => input.name !== undefined || input.image !== undefined, "Say what to change."),
   /** Chooses the sandbox service the person's cloud threads run on; null goes back to the server's own choice. */
   "account.setSandbox": z.object({ service: z.string().min(1).max(64).nullable() }).strict(),
+  /** Whether the person's cloud turns go on with another of their accounts at a usage limit. */
+  "account.setSwitchAtLimit": z.object({ switchAccountsAtLimit: z.boolean() }).strict(),
   "account.signIns.connect": ConnectSignIn,
   /** Calls off a token being made or a code being waited on. */
   "account.signIns.cancel": z.object({ agent: Agent }).strict(),

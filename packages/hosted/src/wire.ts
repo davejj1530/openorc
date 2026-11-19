@@ -74,6 +74,7 @@ export const wireHostedSettings = z.object({
   service: z.string().nullable(),
   served: z.array(z.object({ service: z.string(), name: z.string() })),
   defaultService: z.string(),
+  switchAccountsAtLimit: z.boolean().optional(),
 });
 export type WireHostedSettings = z.infer<typeof wireHostedSettings>;
 

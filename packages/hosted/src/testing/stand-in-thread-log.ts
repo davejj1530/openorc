@@ -31,7 +31,8 @@ export const toolOutputOf = (thread: Thread, toolCallId: string) => ({
  * server that doesn't read the newest turns (`newestTurns` false) answers an ask for them as one with no bound: the
  * newest events, with no `fromTurn`.
  */
-export function pageOf(thread: Thread, query: URLSearchParams, newestTurns: boolean) {
+export function pageOf(thread: Thread, query: URLSearchParams, newestTurns: boolean, who: string) {
+  const readable = (stored: Stored) => stored.privateTo === undefined || stored.privateTo === who;
   const limit = Number(query.get("limit") ?? 500);
   const ends = turnEnds(thread);
   const lastTurns = newestTurns && query.has("lastTurns") ? Number(query.get("lastTurns")) : null;
@@ -39,12 +40,12 @@ export function pageOf(thread: Thread, query: URLSearchParams, newestTurns: bool
   const fromTurn = query.has("fromTurn") ? Math.min(Number(query.get("fromTurn")), ends.length) : fromLast;
   if (query.has("before") || (!newestTurns && query.has("lastTurns"))) {
     const before = query.has("before") ? Number(query.get("before")) : headOf(thread) + 1;
-    const events = thread.events.filter((stored) => stored.seq < before).slice(-limit);
+    const events = thread.events.filter((stored) => stored.seq < before && readable(stored)).slice(-limit);
     return { events: events.map((stored) => wire(thread, stored)), head: headOf(thread) };
   }
   const after = fromTurn === undefined ? Number(query.get("after") ?? 0) : (ends[fromTurn - 1] ?? 0);
   const events = thread.events
-    .filter((stored) => stored.seq > after)
+    .filter((stored) => stored.seq > after && readable(stored))
     .slice(0, limit)
     .map((stored) => wire(thread, stored));
   return { events, head: headOf(thread), ...(fromTurn !== undefined && { fromTurn }) };

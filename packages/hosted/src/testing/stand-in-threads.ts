@@ -38,7 +38,7 @@ import { familyFull, parentOf, placeOwn, placeShared, startTurn } from "./stand-
 import { StandInCompactions } from "./stand-in-compactions.js";
 import { StandInForks } from "./stand-in-forks.js";
 import { heldWith, sentSettings } from "./stand-in-message-fields.js";
-import type { Admit, Message, StandInThreadSeed, Thread, View } from "./stand-in-thread-types.js";
+import type { Admit, Message, StandInThreadSeed, Stored, Thread, View } from "./stand-in-thread-types.js";
 import type { StandInPeer } from "./stand-in-peer.js";
 
 type Reply = { status: number; body: unknown };
@@ -71,6 +71,11 @@ export class StandInThreads {
   readonly started: { space: string; body: Record<string, unknown> }[] = [];
   /** Capabilities, files on messages and the files unit's rules. */
   readonly files = new StandInThreadFiles();
+
+  /** Whether the server keeps several accounts per person and agent, as its `agentAccounts` capability says. */
+  keepsAccounts(): boolean {
+    return this.files.capabilities?.["agentAccounts"]?.available === true;
+  }
   /** Who writes, sends and waits in a thread, and the server's capability for it. */
   readonly collaboration: StandInCollaboration;
   /** Who reads a thread, as its terminals' watchers are found (stand-in-terminals.ts). */
@@ -170,7 +175,7 @@ export class StandInThreads {
     if (!match) return null;
     const thread = this.#readable(as, decodeURIComponent(match[1]!));
     if (!thread) return missing();
-    if (method === "GET" && match[2] === "/events") return { status: 200, body: pageOf(thread, query, this.log.newestTurns) };
+    if (method === "GET" && match[2] === "/events") return { status: 200, body: pageOf(thread, query, this.log.newestTurns, as.who) };
     if (match[4]) return { status: 200, body: toolOutputOf(thread, decodeURIComponent(match[4])) };
     if (method === "POST" && match[2] === "/fork") return this.forks.take(thread, as.who, body);
     if (!match[2]) return this.#one(method, thread, as.who, body);
@@ -614,13 +619,35 @@ export class StandInThreads {
    * Stores events in the thread's log, as an agent's host or a person's message does, and sends them to its watchers
    * unless `quiet`, as a frame lost on the way would be. `by` marks a person's own.
    */
-  append(threadId: string, events: Record<string, unknown>[], options: { by?: string; quiet?: boolean; turnId?: string } = {}): void {
+  append(threadId: string, events: Record<string, unknown>[], options: { by?: string; quiet?: boolean; turnId?: string | null; privateTo?: string } = {}): void {
     const thread = this.#threads.get(threadId)!;
     const first = headOf(thread) + 1;
-    const stored = events.map((event, index) => ({ seq: first + index, turnId: options.turnId ?? thread.turnId, by: options.by ?? null, event: { runId: randomUUID(), ...event } }));
+    const stored: Stored[] = events.map((event, index) => ({
+      seq: first + index,
+      turnId: options.turnId === undefined ? thread.turnId : options.turnId,
+      by: options.by ?? null,
+      event: { runId: randomUUID(), ...event },
+      ...(options.privateTo !== undefined && { privateTo: options.privateTo }),
+    }));
     thread.events.push(...stored);
-    if (!options.quiet) this.#tellRoom(thread, "hosted:events", { threadId, events: stored.map((each) => wire(thread, each)), lastAgentSeq: lastAgentSeq(thread) });
+    const only = options.privateTo === undefined ? undefined : [options.privateTo];
+    if (!options.quiet) this.#tellRoom(thread, "hosted:events", { threadId, events: stored.map((each) => wire(thread, each)), lastAgentSeq: lastAgentSeq(thread) }, only);
     this.#changed(thread);
+  }
+
+  /**
+   * As the server does when a turn ended at its account's usage limit and another of its sender's accounts is free, or
+   * the same one has reset: a line only the sender reads, in the Mac's words naming the accounts, and the thread's next
+   * turns on that account, as the sender's continuation names it.
+   */
+  switchedAtLimit(threadId: string, sender: string, accounts: { agent: "Claude" | "Codex"; from: string; to: string; toId: string }): void {
+    const thread = this.#threads.get(threadId)!;
+    const text =
+      accounts.from === accounts.to
+        ? `The usage limit of the ${accounts.agent} account ${accounts.from} has reset. Continue where you left off.`
+        : `Moved to the ${accounts.agent} account ${accounts.to} after ${accounts.from} reached its usage limit. Continue where you left off.`;
+    thread.settings = { ...thread.settings, accountId: accounts.toId };
+    this.append(threadId, [{ type: "message.completed", ts: Date.now(), messageId: randomUUID(), role: "system", text }], { turnId: null, privateTo: sender });
   }
 
   /** Changes what a row says; `seenSeq` is its starter's own. */
@@ -708,7 +735,10 @@ export class StandInThreads {
     for (const peer of this.peers()) if (only.includes(peer.who() ?? "")) peer.send("changed", { organizationId: thread.space, topics: ["threads"] });
   }
 
-  #tellRoom(thread: Thread, event: string, body: unknown): void {
-    for (const peer of this.peers()) if (peer.watched.has(thread.id) && this.#reads(peer.who() ?? "", thread)) peer.send(event, body);
+  #tellRoom(thread: Thread, event: string, body: unknown, only?: readonly string[]): void {
+    for (const peer of this.peers()) {
+      const who = peer.who() ?? "";
+      if (peer.watched.has(thread.id) && this.#reads(who, thread) && (!only || only.includes(who))) peer.send(event, body);
+    }
   }
 }

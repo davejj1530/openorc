@@ -146,6 +146,7 @@ export class Account implements HostedAccount {
       hours,
       ...accountSeatFacts(heard?.billing),
       sandbox: heard?.sandbox ? toSandbox(heard.sandbox) : null,
+      ...(heard?.sandbox?.switchAccountsAtLimit !== undefined && { switchAccountsAtLimit: heard.sandbox.switchAccountsAtLimit }),
       signIns: heard?.signIns ? toSignIns(heard.signIns, heard.ended) : null,
       agentAccounts: keepsAccounts(heard?.signIns),
       signingIn: this.#signIns.work,
@@ -259,6 +260,13 @@ export class Account implements HostedAccount {
   async setSandbox(service: string | null): Promise<void> {
     const email = this.#signedInAs();
     const settings = await this.deps.session.request(ROUTES.setHostedSettings, { service });
+    if (email && this.#signedInAs() === email) this.#hear(email, { sandbox: settings });
+  }
+
+  /** Whether the person's cloud turns go on with another of their accounts at a usage limit. */
+  async setSwitchAtLimit(switchAccountsAtLimit: boolean): Promise<void> {
+    const email = this.#signedInAs();
+    const settings = await this.deps.session.request(ROUTES.setHostedSettings, { switchAccountsAtLimit });
     if (email && this.#signedInAs() === email) this.#hear(email, { sandbox: settings });
   }
 

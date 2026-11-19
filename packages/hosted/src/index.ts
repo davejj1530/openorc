@@ -190,6 +190,7 @@ export interface HostedAccount {
   deleteAccount(input: RpcParams<"account.delete">): Promise<void>;
   /** Chooses the sandbox service the person's cloud threads run on; null leaves it to the server. */
   setSandbox(service: string | null): Promise<void>;
+  setSwitchAtLimit(switchAccountsAtLimit: boolean): Promise<void>;
   /** Signs an agent in on OpenOrc Cloud, one of its ways; what goes on after this resolves shows in `status().signingIn`. */
   connectSignIn(input: RpcParams<"account.signIns.connect">): Promise<void>;
   cancelSignIn(agent: HostedAgent): void;

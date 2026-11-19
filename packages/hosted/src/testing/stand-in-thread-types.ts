@@ -20,6 +20,8 @@ export interface Stored {
   turnId: string | null;
   by: string | null;
   event: Record<string, unknown>;
+  /** The one person who reads it, for a line about their own account; everyone in the thread when absent. */
+  privateTo?: string;
 }
 
 /** Whether a person may start a turn with these settings, as billing and their sign-ins say; the refusal when not. */

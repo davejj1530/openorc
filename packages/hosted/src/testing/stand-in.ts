@@ -111,7 +111,9 @@ export interface StandIn {
   /** A thread the person started, in its project's space. Answers its id. */
   addThread(email: string, seed: StandInThreadSeed): string;
   /** Stores events in a thread's log, in its running turn or `turnId`'s, and sends them to its watchers, unless `quiet` (a frame lost on the way). */
-  append(threadId: string, events: Record<string, unknown>[], options?: { by?: string; quiet?: boolean; turnId?: string }): void;
+  append(threadId: string, events: Record<string, unknown>[], options?: { by?: string; quiet?: boolean; turnId?: string | null; privateTo?: string }): void;
+  /** A turn ended at its account's usage limit and goes on with another of its sender's accounts, or the same one reset: a line only the sender reads, and the thread on that account. */
+  switchedAtLimit(threadId: string, sender: string, accounts: { agent: "Claude" | "Codex"; from: string; to: string; toId: string }): void;
   /** Changes what a thread's row says, and tells its reader. */
   set(threadId: string, facts: { status?: "idle" | "working" | "needs_answer"; seenSeq?: number; backgroundCommands?: { id: string; description: string }[] }): void;
   /** The background commands a person asked to stop in a thread, in order. */
@@ -218,7 +220,8 @@ function nameFromEmail(email: string): string {
 }
 
 /** The server's sign-in and billing rules, held in memory: codes by address, sessions by id, billing by address. */
-function accounts(options: StandInOptions) {
+/** `keepsAccounts`: the server's `agentAccounts` capability, which a person's settings then name their switch at a limit behind. */
+function accounts(options: StandInOptions, keepsAccounts: () => boolean) {
   const secret = randomBytes(32);
   const codes = new Map<string, { code: string; at: number; tries: number }>();
   const sessions = new Map<string, string>();
@@ -228,11 +231,6 @@ function accounts(options: StandInOptions) {
   const signIns = new Map<string, StandInSignIn[]>();
   const services = options.services ?? ["local"];
   const admit = turnRule(billing, signIns);
-  const hostedSettings = (email: string) => ({
-    service: sandboxes.get(email) ?? null,
-    served: services.map((service) => ({ service, name: SERVICE_NAMES[service] ?? service })),
-    defaultService: services[0]!,
-  });
   const sign = (id: string) => createHmac("sha256", secret).update(id).digest("base64url");
   /** The address a signed token's session is for, or null for a bare id, a forged one or an ended session. */
   const holder = (token: string | null | undefined): string | null => {
@@ -294,19 +292,8 @@ function accounts(options: StandInOptions) {
       const person = people.get(who) ?? { name: nameFromEmail(who), image: null };
       return { status: 200, body: { session: { activeOrganizationId: `personal-${who}` }, user: { id: `user-${who}`, email: who, emailVerified: true, ...person } } };
     },
-    "GET /settings/hosted": (_body, token) => {
-      const who = holder(token);
-      return who ? { status: 200, body: hostedSettings(who) } : unauthorized();
-    },
-    "PATCH /settings/hosted": (body, token) => {
-      const who = holder(token);
-      if (!who) return unauthorized();
-      const service = body["service"] === null ? null : String(body["service"] ?? "");
-      if (service && !services.includes(service)) return { status: 400, body: { message: `This server doesn't run threads on ${SERVICE_NAMES[service] ?? service}.`, statusCode: 400 } };
-      sandboxes.set(who, service);
-      return { status: 200, body: hostedSettings(who) };
-    },
   };
+  Object.assign(routes, hostedSettingsRoutes({ holder, sandboxes, services, keepsAccounts }));
   Object.assign(routes, accountDeletionRoutes({ holder, checkCode, routes, sessions, billing, people, signIns }));
   // The sign-in page mails the code as the apps ask for it, and the person reads it.
   const mail = (who: string): Reply & { code?: string } => ({ ...routes["POST /api/auth/email-otp/send-verification-otp"]!({ email: who, type: "sign-in" }, null), code: codes.get(who)?.code });
@@ -314,7 +301,7 @@ function accounts(options: StandInOptions) {
 }
 
 export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
-  const { codes, sessions, billing, people, sandboxes, signIns, admit: admitTurn, holder, caller, routes, checkCode, session, mail } = accounts(options);
+  const { codes, sessions, billing, people, sandboxes, signIns, admit: admitTurn, holder, caller, routes, checkCode, session, mail } = accounts(options, () => hosted.keepsAccounts());
   const appSignIns = new StandInAppSignIns({ web: () => `http://127.0.0.1:${port}`, session, checkCode, mail });
   const requests: StandIn["requests"] = [];
   const connections = new Set<Socket>();
@@ -323,7 +310,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const spaces = new StandInSpaces();
   const person = (email: string) => people.get(email) ?? { name: nameFromEmail(email), image: null };
   const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn, spaces, person);
-  const signInWrites = new StandInSignIns(signIns, () => hosted.files.capabilities?.["agentAccounts"]?.available === true);
+  const signInWrites = new StandInSignIns(signIns, () => hosted.keepsAccounts());
   const tell = tellOf(peers, sockets);
   const tasks = new StandInTasks({ spaces, person, tell, threads: hosted });
   const seats = new StandInSeats({ spaces, tell, now: options.now ?? Date.now, origin: () => `http://127.0.0.1:${port}` });
@@ -596,11 +583,26 @@ function threadsFace(
   hosted: StandInThreads,
 ): Pick<
   StandIn,
-  "addThread" | "append" | "set" | "stoppedCommands" | "ask" | "endTurn" | "readies" | "compactions" | "sent" | "answered" | "started" | "threadFiles" | "threadCollaboration" | "threadLog"
+  | "addThread"
+  | "append"
+  | "switchedAtLimit"
+  | "set"
+  | "stoppedCommands"
+  | "ask"
+  | "endTurn"
+  | "readies"
+  | "compactions"
+  | "sent"
+  | "answered"
+  | "started"
+  | "threadFiles"
+  | "threadCollaboration"
+  | "threadLog"
 > {
   return {
     addThread: (email, seed) => hosted.addThread(email.toLowerCase(), seed),
     append: (threadId, events, options) => hosted.append(threadId, events, options),
+    switchedAtLimit: (threadId, sender, accounts) => hosted.switchedAtLimit(threadId, sender.toLowerCase(), accounts),
     set: (threadId, facts) => hosted.set(threadId, facts),
     stoppedCommands: (threadId) => hosted.stoppedCommands(threadId),
     ask: (threadId, request) => hosted.ask(threadId, request),
@@ -646,6 +648,47 @@ function codeRefused(status: number, code: keyof typeof CODE_REFUSALS): Reply {
 
 function notFound(method: string, path: string): Reply {
   return { status: 404, body: { message: `Cannot ${method} ${path}`, error: "Not Found", statusCode: 404 } };
+}
+
+/**
+ * The person's own settings for their cloud threads: the sandbox service they chose, and behind `agentAccounts`
+ * whether a turn at its account's usage limit goes on with another of theirs, on unless they turn it off. An update
+ * changes what it names and keeps the rest.
+ */
+function hostedSettingsRoutes(of: {
+  holder: (token: string | null) => string | null;
+  sandboxes: Map<string, string | null>;
+  services: string[];
+  keepsAccounts: () => boolean;
+}): Record<string, (body: Record<string, unknown>, token: string | null) => Reply> {
+  const { holder, sandboxes, services, keepsAccounts } = of;
+  /** Whose cloud turns do not go on with another account at a usage limit; everyone else's do. */
+  const switching = new Map<string, boolean>();
+  const settings = (email: string) => ({
+    service: sandboxes.get(email) ?? null,
+    served: services.map((service) => ({ service, name: SERVICE_NAMES[service] ?? service })),
+    defaultService: services[0]!,
+    ...(keepsAccounts() && { switchAccountsAtLimit: switching.get(email) ?? true }),
+  });
+  return {
+    "GET /settings/hosted": (_body, token) => {
+      const who = holder(token);
+      return who ? { status: 200, body: settings(who) } : unauthorized();
+    },
+    "PATCH /settings/hosted": (body, token) => {
+      const who = holder(token);
+      if (!who) return unauthorized();
+      const switches = keepsAccounts() && typeof body["switchAccountsAtLimit"] === "boolean";
+      if (!("service" in body) && !switches) return { status: 400, body: { message: "Say what changes.", statusCode: 400 } };
+      if ("service" in body) {
+        const service = body["service"] === null ? null : String(body["service"] ?? "");
+        if (service && !services.includes(service)) return { status: 400, body: { message: `This server doesn't run threads on ${SERVICE_NAMES[service] ?? service}.`, statusCode: 400 } };
+        sandboxes.set(who, service);
+      }
+      if (switches) switching.set(who, body["switchAccountsAtLimit"] === true);
+      return { status: 200, body: settings(who) };
+    },
+  };
 }
 
 function unauthorized(): Reply {

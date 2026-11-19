@@ -72,9 +72,24 @@ const emptyWords: Record<UsageAccountReport["status"], string> = {
   error: "Couldn’t read usage",
 };
 
+/** The time a reading of OpenOrc Cloud's was taken, as its cell states it. */
+const reportedAt = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+
+/**
+ * Whether a limit's reading is out of date: this Mac's once it is older than its rule allows. A reading of OpenOrc
+ * Cloud's (`turnRead`) comes only from a turn on its account, so it is never out of date by age, only when the last
+ * read of it failed or the account is signed out.
+ */
+function outOfDate(window: AllowanceWindow, now: number, turnRead: TurnRead): boolean {
+  return turnRead ? turnRead.failed : allowanceState(window, now).stale;
+}
+
+/** A reading of OpenOrc Cloud's, taken on the account's turns, and whether its last read failed or found it signed out. */
+type TurnRead = { failed: boolean } | null;
+
 /** Amber for an exhausted or out-of-date limit, and for one nearly used up. */
-function limitTone(window: AllowanceWindow, shown: number, now: number): "warn" | "low" | undefined {
-  if (window.exhausted || allowanceState(window, now).stale) return "warn";
+function limitTone(window: AllowanceWindow, shown: number, stale: boolean): "warn" | "low" | undefined {
+  if (window.exhausted || stale) return "warn";
   return shown <= 10 ? "low" : undefined;
 }
 
@@ -83,14 +98,16 @@ function noteWords(failed: boolean, answered: boolean): string {
   return answered ? "No limits reported" : "Reading usage";
 }
 
-function resetWords(window: AllowanceWindow, now: number): string {
-  if (allowanceState(window, now).stale) return "Out of date";
+/** Under a limit: out of date, when a reading of OpenOrc Cloud's was taken, or when it resets. */
+function resetWords(window: AllowanceWindow, now: number, stale: boolean, turnRead: TurnRead): string {
+  if (stale) return "Out of date";
+  if (turnRead) return `Reported ${reportedAt.format(window.observedAt)}`;
   if (window.resetsAt === null) return "";
   return usageResetLabel(window.resetsAt, now).replace(/^Resets /, "");
 }
 
-/** One limit in the table: a ring and the share left, with when it resets under them. */
-function LimitCell({ window, now }: { window: AllowanceWindow | null; now: number }) {
+/** One limit in the table: a ring and the share left, with when it resets, or for OpenOrc Cloud when it was read, under them. */
+function LimitCell({ window, now, turnRead }: { window: AllowanceWindow | null; now: number; turnRead: TurnRead }) {
   const left = window ? percentLeft(window) : null;
   if (!window || left === null)
     return (
@@ -99,8 +116,9 @@ function LimitCell({ window, now }: { window: AllowanceWindow | null; now: numbe
       </td>
     );
   const shown = Math.round(left);
-  const reset = resetWords(window, now);
-  const tone = limitTone(window, shown, now);
+  const stale = outOfDate(window, now, turnRead);
+  const reset = resetWords(window, now, stale, turnRead);
+  const tone = limitTone(window, shown, stale);
   return (
     <td className="usage-table-cell" data-tone={tone} data-tip={window.resetsAt === null ? undefined : formatUsageTime(window.resetsAt)}>
       <span className="usage-table-limit">
@@ -111,6 +129,9 @@ function LimitCell({ window, now }: { window: AllowanceWindow | null; now: numbe
     </td>
   );
 }
+
+/** A row's reading of OpenOrc Cloud's, failed when its last read did or found the account signed out; none for this Mac's. */
+const readOf = (account: Pick<UsageAccountReport, "status">, turnRead: boolean): TurnRead => (turnRead ? { failed: account.status === "error" || account.status === "disconnected" } : null);
 
 /** Separate model pools get their own row, so one pool never stands in for the others. */
 function usageRows(accounts: UsageAccountReport[]) {
@@ -168,8 +189,8 @@ export function useNow(): number {
   return now;
 }
 
-/** Accounts' 5-hour and weekly limits, a row for each pool, with the current account's marked. */
-function LimitsTable({ accounts, currentId, now }: { accounts: UsageAccountReport[]; currentId: string; now: number }) {
+/** Accounts' 5-hour and weekly limits, a row for each pool, with the current account's marked. `turnRead`: OpenOrc Cloud's readings. */
+function LimitsTable({ accounts, currentId, now, turnRead = false }: { accounts: UsageAccountReport[]; currentId: string; now: number; turnRead?: boolean }) {
   return (
     <table className="usage-table">
       <thead>
@@ -193,8 +214,8 @@ function LimitsTable({ accounts, currentId, now }: { accounts: UsageAccountRepor
             </th>
             {account.windows.length ? (
               <>
-                <LimitCell window={sessionWindow(account.windows)} now={now} />
-                <LimitCell window={weeklyWindow(account.windows)} now={now} />
+                <LimitCell window={sessionWindow(account.windows)} now={now} turnRead={readOf(account, turnRead)} />
+                <LimitCell window={weeklyWindow(account.windows)} now={now} turnRead={readOf(account, turnRead)} />
               </>
             ) : (
               <td className="usage-table-cell" data-empty colSpan={2}>
@@ -221,13 +242,14 @@ function FxAccountUsage({ account, now }: { account: UsageAccountReport; now: nu
       </div>
       {account.windows.map((window) => {
         const left = percentLeft(window);
+        const stale = outOfDate(window, now, null);
         return (
           <div className="usage-cost-row" key={window.id}>
             <span className="usage-table-name">
               <span>{window.label}</span>
-              <span className="usage-table-plan">{resetWords(window, now)}</span>
+              <span className="usage-table-plan">{resetWords(window, now, stale, null)}</span>
             </span>
-            <span className="usage-table-limit" data-tone={left === null ? undefined : limitTone(window, left, now)}>
+            <span className="usage-table-limit" data-tone={left === null ? undefined : limitTone(window, left, stale)}>
               <AmountShare fraction={(left ?? 0) / 100} size={USAGE_ICON} />
               <span className="usage-cost-value tabular">{left === null ? "Not reported" : `${Math.round(left)}% left`}</span>
             </span>
@@ -357,7 +379,7 @@ function CloudAccountUsage({ agent, thread }: { agent: HarnessId; thread: Thread
         <Popover.Positioner {...PLACE} collisionPadding={8} className="z-50">
           <Popover.Popup ref={floatingGround} className="floating-popover account-usage-popup" aria-label="Usage">
             <div className="usage-table-wrap">
-              <LimitsTable accounts={[report]} currentId={report.id} now={now} />
+              <LimitsTable accounts={[report]} currentId={report.id} now={now} turnRead />
             </div>
           </Popover.Popup>
         </Popover.Positioner>

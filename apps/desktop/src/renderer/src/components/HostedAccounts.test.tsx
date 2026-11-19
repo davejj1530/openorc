@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { ThreadSummary } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -178,4 +178,24 @@ it("reads the usage of the account a cloud thread runs on, by its name", async (
   render(<AccountUsage />, { wrapper });
   expect(await screen.findByRole("button", { name: "OpenOrc Cloud · ChatGPT Pro: 70% left this week" })).toBeTruthy();
   expect(host.asked).toContainEqual({ provider: "codex", cloud: true, cloudAccountId: "pro" });
+});
+
+it("says when an old cloud reading was taken, in plain colours, since a cloud account is read only on its turns", async () => {
+  const observedAt = Date.now() - 2 * 3_600_000;
+  host.cloud = {
+    status: "available",
+    windows: [
+      { id: "five_hour", label: "5-hour window", usedPercent: 40, remainingPercent: 60, resetsAt: null, observedAt, exhausted: false },
+      { id: "seven_day", label: "Weekly", usedPercent: 81, remainingPercent: 19, resetsAt: null, observedAt, exhausted: false },
+    ],
+    credits: [],
+    plan: "Max",
+    context: "OpenOrc Cloud",
+  };
+  render(<AccountUsage />, { wrapper });
+  fireEvent.click(await screen.findByRole("button", { name: "OpenOrc Cloud: 19% left this week" }));
+  const reported = `Reported ${new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(observedAt)}`;
+  expect(await screen.findAllByText(reported)).toHaveLength(2);
+  expect(screen.queryByText("Out of date")).toBeNull();
+  expect(document.querySelector('.usage-table-cell[data-tone="warn"]')).toBeNull();
 });

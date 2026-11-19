@@ -1,4 +1,4 @@
-import { hostedSendBlock, type AccountStatus } from "@openorc/protocol";
+import { hostedRunId, hostedSendBlock, type AccountStatus, type AgentEvent } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createHosted, type Hosted } from "./index.js";
 import { CLOUD_PROJECT } from "./translate.js";
@@ -90,4 +90,26 @@ it("marks the account a refused turn named as signed out, and holds the next sen
   expect(hostedSendBlock(status(hosted), { agent: "claude", model: "opus" }, false)).toBeNull();
   // A teammate's account is not the person's: their turn runs on their own default.
   expect(hostedSendBlock(status(hosted), { agent: "claude", model: "opus", accountId: "someone-elses" }, false)).toBeNull();
+});
+
+it("shows its sender the line a thread writes when it goes on with another account at a limit, and runs on that account", async () => {
+  const { hosted, thread } = await withThread();
+  stand.switchedAtLimit(thread, ADA, { agent: "Claude", from: "Personal", to: "Work", toId: "work" });
+  const lines = async () =>
+    (await hosted.threads.call("events.page", { runId: hostedRunId(thread), turns: 10 })).events.flatMap((event: AgentEvent) =>
+      event.type === "message.completed" && event.role === "system" ? [event.text] : [],
+    );
+  await vi.waitFor(async () => expect(await lines()).toEqual(["Moved to the Claude account Work after Personal reached its usage limit. Continue where you left off."]));
+  await vi.waitFor(async () => expect((await row(hosted, thread)).cloudAccountId).toBe("work"));
+});
+
+it("goes on with another account at a limit unless the person turns it off, and says nothing of it on a server without accounts", async () => {
+  const { hosted } = await withThread();
+  await vi.waitFor(() => expect(status(hosted).switchAccountsAtLimit).toBe(true));
+  await hosted.account.setSwitchAtLimit(false);
+  expect(status(hosted).switchAccountsAtLimit).toBe(false);
+  expect(status(hosted).sandbox).toMatchObject({ chosen: null });
+  stand.threadFiles.capabilities = null;
+  await hosted.account.setSandbox(null);
+  expect(status(hosted).switchAccountsAtLimit).toBeUndefined();
 });

@@ -1,9 +1,10 @@
 import { HOSTED_AGENTS, type AccountStatus, type HostedAgent } from "@openorc/protocol";
-import { useRpc } from "../lib/client";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { AgentAccounts } from "./settings-cloud-openorc-accounts";
 import { GithubRow } from "./settings-cloud-openorc-projects";
 import { AgentSignInRow } from "./settings-cloud-openorc-sign-ins";
-import { Section } from "./settings-shared";
+import { Failure } from "./settings-secret-field";
+import { Section, Toggle } from "./settings-shared";
 
 type ProAccount = Extract<AccountStatus, { state: "signed-in" }>;
 
@@ -28,6 +29,7 @@ export function OpenOrcCloudSection({ active }: { active: boolean }) {
           {HOSTED_AGENTS.map((agent) => (
             <AgentAccounts key={agent} agent={agent} rows={rowsOf(agent)} work={signingIn[agent]} />
           ))}
+          {account.switchAccountsAtLimit !== undefined && HOSTED_AGENTS.some((agent) => rowsOf(agent).length > 1) ? <SwitchAtLimit on={account.switchAccountsAtLimit} /> : null}
           <div className="settings-group">
             <GithubRow account={account} />
           </div>
@@ -39,6 +41,25 @@ export function OpenOrcCloudSection({ active }: { active: boolean }) {
       {signIns ? HOSTED_AGENTS.map((agent) => <AgentSignInRow key={agent} agent={agent} rows={rowsOf(agent)} work={signingIn[agent]} />) : null}
       <GithubRow account={account} />
     </Section>
+  );
+}
+
+/**
+ * Whether a cloud turn that ends at its account's usage limit goes on with another of the person's accounts, as this
+ * Mac's Claude accounts do; offered once an agent has more than one.
+ */
+function SwitchAtLimit({ on }: { on: boolean }) {
+  const set = useRpcMutation("account.setSwitchAtLimit");
+  return (
+    <div className="settings-group">
+      <Toggle
+        label="Switch accounts at usage limits"
+        checked={set.variables && set.isPending ? set.variables.switchAccountsAtLimit : on}
+        disabled={set.isPending}
+        onChange={(next) => set.mutate({ switchAccountsAtLimit: next })}
+      />
+      <Failure error={set.error} />
+    </div>
   );
 }
 

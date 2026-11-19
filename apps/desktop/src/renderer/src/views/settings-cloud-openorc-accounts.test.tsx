@@ -176,3 +176,36 @@ it("keeps one sign-in per agent on a server without accounts", async () => {
   expect(await screen.findByText("Ready")).toBeTruthy();
   expect(screen.queryByText("Add account")).toBeNull();
 });
+
+it("offers to switch accounts at usage limits once an agent has two, and sends the change", async () => {
+  const status = {
+    state: "signed-in",
+    email: "ada@example.com",
+    name: "Ada",
+    image: null,
+    reach: "live",
+    plan: { pro: true, standing: "live", at: now + 86_400_000 },
+    hours: { leftSeconds: 3600, monthly: null, packsLeftSeconds: 3600 },
+    sandbox: null,
+    signIns: [claude("personal", "Personal", { isDefault: true }), claude("work", "Work")],
+    agentAccounts: true,
+    switchAccountsAtLimit: true,
+    signingIn: {},
+    github: null,
+    connectingGithub: null,
+    paying: null,
+    projects: [],
+    error: null,
+  } satisfies AccountStatus;
+  const answers: Record<string, unknown> = { "account.status": status, "claude.accounts.list": { accounts: mac.accounts, defaultId: "claude-cli" } };
+  vi.mocked(core.call).mockImplementation((async (method: string) => answers[method] ?? []) as never);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <OpenOrcCloudSection active />
+    </QueryClientProvider>,
+  );
+  const toggle = await screen.findByLabelText("Switch accounts at usage limits");
+  expect(toggle).toHaveProperty("checked", true);
+  fireEvent.click(toggle);
+  await called("account.setSwitchAtLimit", { switchAccountsAtLimit: false });
+});

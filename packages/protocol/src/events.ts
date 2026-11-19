@@ -272,6 +272,11 @@ export const AgentEvent = z.discriminatedUnion("type", [
     observationEnded: z.literal(true).optional(),
     /** A cloud turn ended waiting on an ask nobody answered in time; its answer starts the next turn. Written with status "cancelled". */
     parked: z.literal(true).optional(),
+    /**
+     * A cloud turn stopped at its sender's usage limit, not failed. Written with status "cancelled". What follows says the
+     * rest: the line only its sender reads when the thread goes on with another account, or the shared notice when it can't.
+     */
+    limited: z.literal(true).optional(),
     usage: Usage.optional(),
     durationMs: z.number().nonnegative(),
     /** For a turn that asked for Fast, whether the provider served it, with its code for why not. */

@@ -71,6 +71,8 @@ export class StandInThreads {
   readonly started: { space: string; body: Record<string, unknown> }[] = [];
   /** Capabilities, files on messages and the files unit's rules. */
   readonly files = new StandInThreadFiles();
+  /** The last turn that stopped at its sender's usage limit, which the line saying the thread held there follows. */
+  #limitedTurn: string | null = null;
 
   /** Whether the server keeps several accounts per person and agent, as its `agentAccounts` capability says. */
   keepsAccounts(): boolean {
@@ -545,7 +547,8 @@ export class StandInThreads {
    * The running turn ends, as its host ends it: an open ask parks and keeps the thread waiting on the person, and the
    * first message waiting for the turn is taken next if its sender may start one, else refused where it waits.
    */
-  endTurn(threadId: string, status: "success" | "cancelled" = "success"): void {
+  /** `limited`: the turn stopped at its sender's usage limit, logged as the server logs it, stopped and not failed. */
+  endTurn(threadId: string, status: "success" | "cancelled" | "limited" = "success"): void {
     const thread = this.#threads.get(threadId)!;
     thread.turn = null;
     thread.stopping = false;
@@ -555,6 +558,7 @@ export class StandInThreads {
     for (const ask of thread.asks) if (!ask.answered) ask.parked = true;
     thread.status = openAsk(thread) ? "needs_answer" : "idle";
     this.append(threadId, [turnEnd(agentTurn(thread.turnId ?? `turn-${threadId}`), status, parks)]);
+    if (status === "limited") this.#limitedTurn = thread.turnId;
     thread.turnId = null;
     for (const message of thread.messages) if (message.state === "pending" && !this.#reads(message.author, thread)) message.state = "cancelled";
     const next = thread.messages.find((message) => message.state === "pending" && !message.paused);
@@ -640,6 +644,14 @@ export class StandInThreads {
    * the same one has reset: a line only the sender reads, in the Mac's words naming the accounts, and the thread's next
    * turns on that account, as the sender's continuation names it.
    */
+  /**
+   * As the server does when a thread does not go on past its sender's usage limit at the first look (the switch off, or
+   * no other account free): the line everyone in it reads, after the limited turn.
+   */
+  heldAtLimit(threadId: string, first: string): void {
+    this.append(threadId, [{ type: "error", ts: Date.now(), message: `${first}'s turn hit a usage limit.`, fatal: true }], { turnId: this.#limitedTurn });
+  }
+
   switchedAtLimit(threadId: string, sender: string, accounts: { agent: "Claude" | "Codex"; from: string; to: string; toId: string }): void {
     const thread = this.#threads.get(threadId)!;
     const text =

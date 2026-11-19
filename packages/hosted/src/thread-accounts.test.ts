@@ -113,3 +113,21 @@ it("goes on with another account at a limit unless the person turns it off, and 
   await hosted.account.setSandbox(null);
   expect(status(hosted).switchAccountsAtLimit).toBeUndefined();
 });
+
+it("ends a turn at its usage limit as stopped, not failed, and says once how it went on: the move, or the shared line", async () => {
+  const { hosted, thread } = await withThread();
+  const ends = async () =>
+    (await hosted.threads.call("events.page", { runId: hostedRunId(thread), turns: 10 })).events.flatMap((event: AgentEvent) => {
+      if (event.type === "turn.completed") return [`end ${event.status}${event.limited ? " limited" : ""}`];
+      if (event.type === "error") return [`error ${event.message}`];
+      return event.type === "message.completed" && event.role === "system" ? [`line ${event.text}`] : [];
+    });
+  await hosted.threads.call("runs.start", { threadId: thread, ...SETTINGS, prompt: "Tighten the hero copy." });
+  stand.endTurn(thread, "limited");
+  stand.switchedAtLimit(thread, ADA, { agent: "Claude", from: "Work", to: "Personal", toId: "personal" });
+  await vi.waitFor(async () => expect(await ends()).toEqual(["end cancelled limited", "line Moved to the Claude account Personal after Work reached its usage limit. Continue where you left off."]));
+  await hosted.threads.call("runs.start", { threadId: thread, ...SETTINGS, prompt: "Once more." });
+  stand.endTurn(thread, "limited");
+  stand.heldAtLimit(thread, "Ada");
+  await vi.waitFor(async () => expect((await ends()).slice(-2)).toEqual(["end cancelled limited", "error Ada's turn hit a usage limit."]));
+});

@@ -4,15 +4,22 @@ import { cn } from "../lib/cn";
 import { useRpc } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { CodexResetDialog, useCodexReset } from "./CodexReset";
+import { useHostedConversation } from "./HostedConversationBoundary";
 
 type Provider = HarnessId;
 
 /**
  * Recovery where a limit surfaced. A reset the provider reports is one
- * confirmation away; anything else is handled in usage settings.
+ * confirmation away; anything else is handled in usage settings. In a cloud
+ * thread the account is one of the person's on OpenOrc Cloud, so the way on
+ * is its accounts there, never this Mac's usage or resets.
  */
 export function UsageRecovery({ provider, lead, className }: { provider: Provider; lead?: string; className?: string }) {
-  return <div className={cn("my-2 text-sm text-ink-2", className)}>{provider === "codex" ? <CodexRecovery lead={lead} /> : <RecoveryLine lead={lead} provider={provider} />}</div>;
+  const cloud = useHostedConversation()?.owner?.brain === "hosted";
+  let line = <RecoveryLine lead={lead} provider={provider} />;
+  if (cloud) line = <RecoveryLine lead={lead} provider={provider} cloud />;
+  else if (provider === "codex") line = <CodexRecovery lead={lead} />;
+  return <div className={cn("my-2 text-sm text-ink-2", className)}>{line}</div>;
 }
 
 function CodexRecovery({ lead }: { lead?: string }) {
@@ -62,12 +69,13 @@ function CodexResetOffer({ report, stale, lead }: { report: ProviderUsage; stale
   );
 }
 
-function RecoveryLine({ lead, provider, children }: { lead?: string; provider: Provider; children?: ReactNode }) {
+function RecoveryLine({ lead, provider, cloud = false, children }: { lead?: string; provider: Provider; cloud?: boolean; children?: ReactNode }) {
+  const open = () => useRouter.getState().navigate(cloud ? { view: "settings", section: "cloud" } : { view: "settings", section: "usage", provider });
   return (
     <p>
       {lead ? `${lead} ` : null}
       {children ? <>{children} · </> : null}
-      <button type="button" className="text-accent-ink hover:underline" onClick={() => useRouter.getState().navigate({ view: "settings", section: "usage", provider })}>
+      <button type="button" className="text-accent-ink hover:underline" onClick={open}>
         Manage usage
       </button>
     </p>

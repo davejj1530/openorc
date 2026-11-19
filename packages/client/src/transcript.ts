@@ -83,8 +83,11 @@ export type Block = { at?: number; turnKey?: string; runId?: string; seq?: numbe
       notice?: boolean;
       boundary?: "turn" | "session";
       durationMs?: number;
-      /** `parked`: a cloud turn that ended waiting on its ask, whose answer starts the next turn. */
-      outcome?: "success" | "error" | "cancelled" | "no_updates" | "parked";
+      /**
+       * `parked`: a cloud turn that ended waiting on its ask, whose answer starts the next turn. `limited`: a cloud turn
+       * that stopped at its sender's usage limit, which the server's own line tells of.
+       */
+      outcome?: "success" | "error" | "cancelled" | "no_updates" | "parked" | "limited";
     }
 );
 
@@ -163,6 +166,19 @@ function closeActive(run: RunTranscript, ts: number, status: ActivityStatus): vo
     }
   }
   run.pendingApprovals = waiting;
+}
+
+/**
+ * A turn that stopped at its usage limit loses the agent's own word of it, the failed step with its way to usage: the
+ * server's line says it once, the move to another account or what the person can do.
+ */
+function dropLimitRecovery(run: RunTranscript): void {
+  const turn = run.turnsCompleted;
+  const gone = run.blocks.filter((block) => block.kind === "activity" && block.recovery?.kind === "usage" && run.turnOf.get(block.id) === turn);
+  if (!gone.length) return;
+  run.blocks = run.blocks.filter((block) => !gone.includes(block));
+  run.blockIndex = new Map(run.blocks.map((block, index) => [block.id, index]));
+  for (const block of gone) run.turnOf.delete(block.id);
 }
 
 /** The process is gone, and any turn with it. */
@@ -338,7 +354,10 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
       ...(ev.observationEnded ? { tone: "muted", text: "Updates stopped" } : {}),
       // Parked on its ask, it ended without failing: the ask stays open, and the turn its answer starts is the next one.
       ...(ev.parked ? { outcome: "parked", tone: "muted", text: `turn parked in ${(ev.durationMs / 1000).toFixed(1)}s` } : {}),
+      // Stopped at a usage limit, it did not fail either: the server's line after it says whether the thread went on.
+      ...(ev.limited ? { outcome: "limited", tone: "muted", text: `turn stopped at a usage limit in ${(ev.durationMs / 1000).toFixed(1)}s` } : {}),
     });
+    if (ev.limited) dropLimitRecovery(run);
     run.turnsCompleted += 1;
   },
   "session.completed": (run, ev) => {

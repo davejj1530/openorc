@@ -52,10 +52,16 @@ export function pageOf(thread: Thread, query: URLSearchParams, newestTurns: bool
 }
 
 /** A turn's end as its host writes it: one that ended on an ask nobody answered parks, and its end says so. */
-export const turnEnd = (turnId: string, status: "success" | "cancelled", parks: boolean) => ({
+export const turnEnd = (turnId: string, status: "success" | "cancelled" | "limited", parks: boolean) => ({
   type: "turn.completed",
   ts: Date.now(),
   turnId,
-  ...(parks ? { status: "cancelled", parked: true } : { status }),
+  ...turnEndStatus(status, parks),
   durationMs: 1000,
 });
+
+/** A turn's end as the server writes it: parked on an ask, or stopped at a usage limit, both stopped and not failed. */
+function turnEndStatus(status: "success" | "cancelled" | "limited", parks: boolean) {
+  if (parks) return { status: "cancelled", parked: true };
+  return status === "limited" ? { status: "cancelled", limited: true } : { status };
+}

@@ -129,7 +129,9 @@ export interface StandIn {
   /** The agent asks before it acts, or asks a question, in a thread. Answers the ask's id, its `approvalId`. */
   ask(threadId: string, request: { kind: string; toolName?: string; input: unknown; detail: string }): string;
   /** The thread's running turn ends: an open ask parks, and the first waiting message is taken or refused. */
-  endTurn(threadId: string, status?: "success" | "cancelled"): void;
+  endTurn(threadId: string, status?: "success" | "cancelled" | "limited"): void;
+  /** A thread that does not go on past its sender's usage limit: the line everyone reads, naming the sender by first name. */
+  heldAtLimit(threadId: string, first: string): void;
   /** Every ready ask stored, in order. */
   readies: { threadId: string; settings: unknown }[];
   /** Every compaction asked, in order. */
@@ -586,6 +588,7 @@ function threadsFace(
   | "addThread"
   | "append"
   | "switchedAtLimit"
+  | "heldAtLimit"
   | "set"
   | "stoppedCommands"
   | "ask"
@@ -603,6 +606,7 @@ function threadsFace(
     addThread: (email, seed) => hosted.addThread(email.toLowerCase(), seed),
     append: (threadId, events, options) => hosted.append(threadId, events, options),
     switchedAtLimit: (threadId, sender, accounts) => hosted.switchedAtLimit(threadId, sender.toLowerCase(), accounts),
+    heldAtLimit: (threadId, first) => hosted.heldAtLimit(threadId, first),
     set: (threadId, facts) => hosted.set(threadId, facts),
     stoppedCommands: (threadId) => hosted.stoppedCommands(threadId),
     ask: (threadId, request) => hosted.ask(threadId, request),

@@ -191,11 +191,13 @@ it("says when an old cloud reading was taken, in plain colours, since a cloud ac
     credits: [],
     plan: "Max",
     context: "OpenOrc Cloud",
+    refreshedAt: observedAt,
   };
   render(<AccountUsage />, { wrapper });
   fireEvent.click(await screen.findByRole("button", { name: "OpenOrc Cloud: 19% left this week" }));
   const reported = `Reported ${new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(observedAt)}`;
-  expect(await screen.findAllByText(reported)).toHaveLength(2);
+  // Said once, under the account, as the reading is one.
+  expect(await screen.findAllByText(reported)).toHaveLength(1);
   expect(screen.queryByText("Out of date")).toBeNull();
   expect(document.querySelector('.usage-table-cell[data-tone="warn"]')).toBeNull();
 });

@@ -7,7 +7,7 @@ const presentation: Record<SettingsSection, { label: string; description?: strin
   usage: { label: "Usage", Icon: Signal },
   connections: { label: "Connections", description: "The agents and tools connected to OpenOrc.", Icon: Link2 },
   account: { label: "Account", Icon: CircleUser },
-  cloud: { label: "Cloud", description: "Where cloud threads run.", Icon: Cloud },
+  cloud: { label: "Cloud", Icon: Cloud },
   slack: { label: "Slack", description: "Bring requests from Slack to this computer.", Icon: MessageSquare },
   phone: { label: "Phone", description: "Your threads, from your phone.", Icon: Smartphone },
   skills: { label: "Skills", Icon: BookText },

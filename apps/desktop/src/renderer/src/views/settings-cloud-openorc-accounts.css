@@ -1,8 +1,7 @@
-/* A cloud account row: every row one height, three lines' worth, so rows with and without limits keep one rhythm, and
-   its actions sit on its name's line, beside it at every width while the actions are a menu and a button. */
+/* A cloud account row is as tall as what it says, and its actions sit on its name's line, beside it at every width
+   while they are a menu and a button. */
 .settings-account-row.settings-cloud-account {
   align-items: start;
-  min-height: 96px;
 }
 .settings-cloud-account > .settings-account-actions {
   margin-block: -4px;

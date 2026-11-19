@@ -98,15 +98,17 @@ function noteWords(failed: boolean, answered: boolean): string {
   return answered ? "No limits reported" : "Reading usage";
 }
 
-/** Under a limit: out of date, when a reading of OpenOrc Cloud's was taken, or when it resets. */
+/**
+ * Under a limit: out of date, or when it resets. A reading of OpenOrc Cloud's says when it was taken on its row, and a
+ * reset already passed says nothing, since only a turn reads it again.
+ */
 function resetWords(window: AllowanceWindow, now: number, stale: boolean, turnRead: TurnRead): string {
   if (stale) return "Out of date";
-  if (turnRead) return `Reported ${reportedAt.format(window.observedAt)}`;
-  if (window.resetsAt === null) return "";
+  if (window.resetsAt === null || (turnRead && window.resetsAt <= now)) return "";
   return usageResetLabel(window.resetsAt, now).replace(/^Resets /, "");
 }
 
-/** One limit in the table: a ring and the share left, with when it resets, or for OpenOrc Cloud when it was read, under them. */
+/** One limit in the table: a ring and the share left, with when it resets under them. */
 function LimitCell({ window, now, turnRead }: { window: AllowanceWindow | null; now: number; turnRead: TurnRead }) {
   const left = window ? percentLeft(window) : null;
   if (!window || left === null)
@@ -366,7 +368,18 @@ function CloudAccountUsage({ agent, thread }: { agent: HarnessId; thread: Thread
   const account: UsageAccount = { provider: agent, name: named ? `OpenOrc Cloud · ${named.name}` : "OpenOrc Cloud" };
   const mark = accountMark(account, usage.data, null);
   if (!mark || !usage.data) return null;
-  const report: UsageAccountReport = { ...account, id: agent, plan: usage.data.plan, windows: usage.data.windows, credits: usage.data.credits, context: usage.data.context, status: usage.data.status };
+  // In the table the logo says the agent and the row its account; under it, once, when the reading was taken.
+  const reported = usage.data.refreshedAt === null ? usage.data.plan : `Reported ${reportedAt.format(usage.data.refreshedAt)}`;
+  const report: UsageAccountReport = {
+    ...account,
+    name: named?.name ?? account.name,
+    id: agent,
+    plan: reported,
+    windows: usage.data.windows,
+    credits: usage.data.credits,
+    context: usage.data.context,
+    status: usage.data.status,
+  };
   return (
     <Popover.Root>
       <Tooltip label={mark.tooltip} side="top">

@@ -3,7 +3,10 @@ import { afterEach, expect, it, vi } from "vitest";
 import { useLayout } from "../lib/layout";
 import { ThreadMedia, ThreadRichText } from "./ThreadImages";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 it("shows a local image an agent puts in its reply inline", async () => {
   render(
@@ -56,7 +59,6 @@ it("opens a path the agent writes as inline code in the Files tool, at its line,
   expect(openFile).toHaveBeenCalledWith(expect.objectContaining({ path: "/repo/src/cart.ts", line: 42, scope: { kind: "thread", id: "t1" } }));
   expect(screen.getByText("useCart.getState()").closest("a")).toBeNull();
   expect(screen.getByText("src/never.ts").closest("a")).toBeNull();
-  openFile.mockRestore();
 });
 
 it("leaves a path in inline code as code where the conversation's files are elsewhere", async () => {
@@ -88,5 +90,4 @@ it("keeps a path in code that is already a link pointing where the link does", a
   expect(screen.getAllByRole("link")).toHaveLength(1);
   expect(openFile).toHaveBeenCalledTimes(1);
   expect(openFile).toHaveBeenCalledWith(expect.objectContaining({ path: "/repo/src/other.ts", line: 3 }));
-  openFile.mockRestore();
 });

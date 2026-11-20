@@ -84,6 +84,15 @@ function TerminalContent({ context, page }: { context: PanelContext; page: Extra
   return <TerminalPanel key={id} id={id} cwd={panelDirectory(context)} />;
 }
 
+/** The commits of the panel's source, or the one commit the page names. A commit and its list are pages of the same tab, so Back returns to the list. */
+function CommitsContent({ context, page, onNavigate }: ContentProps & { page: Extract<PanelPage, { kind: "tool" }> }) {
+  const commit = page.commit ?? null;
+  const open = (next: string | null) => onNavigate({ kind: "tool", tool: "commits", ...(next ? { commit: next } : {}) });
+  if (context.kind === "thread" && context.thread.owner?.brain === "hosted") return <HostedCommitsPanel key={context.thread.id} thread={context.thread} commit={commit} onOpen={open} />;
+  const source = commitSource(context);
+  return source ? <CommitsPanel source={source} commit={commit} onOpen={open} /> : null;
+}
+
 export function PanelContent({ context, page, onNavigate }: ContentProps) {
   const availability = useHostedCapabilities(context.kind === "thread" ? context.thread : null);
   const unavailable = hostedUnavailablePanel(context, page, availability.reason);
@@ -94,14 +103,8 @@ export function PanelContent({ context, page, onNavigate }: ContentProps) {
   switch (page.tool) {
     case "terminal":
       return <TerminalContent context={context} page={page} />;
-    case "commits": {
-      // A commit and the list it came from are pages of the same tab, so Back returns to the list.
-      const open = (commit: string | null) => onNavigate({ kind: "tool", tool: "commits", ...(commit ? { commit } : {}) });
-      if (context.kind === "thread" && context.thread.owner?.brain === "hosted")
-        return <HostedCommitsPanel key={context.thread.id} thread={context.thread} commit={page.commit ?? null} onOpen={open} />;
-      const source = commitSource(context);
-      return source ? <CommitsPanel source={source} commit={page.commit ?? null} onOpen={open} /> : null;
-    }
+    case "commits":
+      return <CommitsContent context={context} page={page} onNavigate={onNavigate} />;
     case "memory":
       return <MemoryPanel context={context} />;
     case "task":

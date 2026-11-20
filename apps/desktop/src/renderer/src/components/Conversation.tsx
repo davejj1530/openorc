@@ -105,10 +105,14 @@ function SwitchingNote({ agent }: { agent: string | null }) {
 
 /**
  * The checkout a conversation works in, read only where the project folder has git: the branch a local checkout
- * publishes, which the agent may switch mid-conversation, and its uncommitted changes.
+ * publishes, which the agent may switch mid-conversation, and its uncommitted changes. `commits` is set where the
+ * thread has commits to open, a project with git or the cloud, so a commit's id in a reply opens the commit.
  */
 function useCheckout(thread: ThreadSummary | null, project: Project) {
-  const git = useProjectGit(thread?.owner?.brain === "hosted" ? null : project.id);
+  const hosted = thread?.owner?.brain === "hosted";
+  const git = useProjectGit(hosted ? null : project.id);
+  const threadId = thread?.id;
+  const commits = useMemo(() => (threadId && (hosted || git.tracks) ? { threadId, hosted } : undefined), [threadId, hosted, git.tracks]);
   const checkout = useRpc(
     "git.threadPushState",
     { threadId: thread?.id ?? "" },
@@ -116,7 +120,7 @@ function useCheckout(thread: ThreadSummary | null, project: Project) {
   );
   const localChanges = useComposerChanges(thread && thread.owner?.brain !== "hosted" && git.tracks ? { kind: "thread", id: thread.id, projectName: project.name, thread } : null);
   const hostedChanges = useHostedComposerChanges(thread?.owner?.brain === "hosted" ? thread : null, project.name);
-  return { checkout, changes: hostedChanges ?? localChanges, git };
+  return { checkout, changes: hostedChanges ?? localChanges, git, commits };
 }
 
 /** The message the route opened this conversation at, such as a search result; only the focused conversation has one. */
@@ -214,7 +218,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const workspaceMode = conversationWorkspaceMode({ scope, firstTaskRun, selected: selectedWorkspace });
   const thread = scope.kind === "thread" ? scope.thread : null;
   const conversation = { kind: scope.kind, id: scope.kind === "thread" ? scope.thread.id : scope.task.id };
-  const { checkout, changes: composerChanges, git } = useCheckout(thread, project);
+  const { checkout, changes: composerChanges, git, commits } = useCheckout(thread, project);
   const accounts = useThreadAccounts(thread, project);
 
   const activeRun: Run | undefined = runs[runs.length - 1];
@@ -243,9 +247,6 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const fork = useRpcMutation("threads.fork");
   const forkThread = fork.mutate;
   const threadId = thread?.id;
-  const hosted = thread?.owner?.brain === "hosted";
-  // A commit's id in a reply opens the commit where the thread has commits: a project with git, or the cloud.
-  const commits = useMemo(() => (threadId && (hosted || git.tracks) ? { threadId, hosted } : undefined), [threadId, hosted, git.tracks]);
   const forkConversation = useCallback(() => {
     if (threadId) forkThread({ id: threadId }, { onSuccess: (t) => void (!("rejected" in t) && openThread(t.id)) });
   }, [threadId, forkThread]);

@@ -5,21 +5,29 @@ import { commandText } from "./work-chips.js";
 import { workObjects, type EditObject, type GitObject, type TestsObject, type WorkObject } from "./work-objects.js";
 import { objectOutcome } from "./work-outcomes.js";
 
+/** A way an agent proves its work. */
+export type CheckKind = "tests" | "typecheck" | "lint" | "build";
+
 /** The checks an agent runs to prove its work, most telling first when one command runs several. */
-const checks: [label: string, pattern: RegExp][] = [
+const checks: [label: CheckKind, pattern: RegExp][] = [
   ["tests", /\b(vitest|jest|pytest|mocha|go test|cargo test)\b|\b(npm|pnpm|yarn|bun)\b[^|;&\n]*\btest\b/],
   ["typecheck", /\b(tsc|typecheck|mypy|pyright)\b/],
   ["lint", /\b(eslint|ruff|clippy|golangci-lint)\b|\b(npm|pnpm|yarn|bun)\b[^|;&\n]*\blint\b/],
   ["build", /\b(cargo build|go build|vite build|astro build|next build)\b|\b(npm|pnpm|yarn|bun)\b[^|;&\n]*\bbuild\b/],
 ];
 
+/** The check a command runs, the most telling when it runs several; null for a command that checks nothing. */
+export function checkOf(command: string): CheckKind | null {
+  return checks.find(([, pattern]) => pattern.test(command))?.[0] ?? null;
+}
+
 /** A command that checks the work: tests, a typecheck, lint or a build. */
 export function isCheckCommand(command: string): boolean {
-  return checks.some(([, pattern]) => pattern.test(command));
+  return checkOf(command) !== null;
 }
 
 /** A pipe hands the exit code to its last command, so `pnpm test | tail` succeeds whatever the tests did. */
-function piped(command: string): boolean {
+export function piped(command: string): boolean {
   return /(^|[^|])\|([^|]|$)/.test(command.replace(/'[^']*'|"[^"]*"/g, ""));
 }
 
@@ -28,10 +36,10 @@ function lastCheck(blocks: Block[]): string | null {
   for (const block of [...blocks].reverse()) {
     if (block.kind !== "tool" || !block.done) continue;
     const command = commandText(block);
-    const check = command ? checks.find(([, pattern]) => pattern.test(command)) : undefined;
+    const check = command ? checkOf(command) : null;
     if (!check) continue;
-    if (piped(command)) return `${check[0]} ran`;
-    return `${check[0]} ${block.isError ? "failed" : "passed"}`;
+    if (piped(command)) return `${check} ran`;
+    return `${check} ${block.isError ? "failed" : "passed"}`;
   }
   return null;
 }
@@ -63,9 +71,10 @@ export interface TurnSize {
 /** How long the turn spent reasoning, summed over its thinking blocks; "Thinking" while one still runs. */
 function thoughtLabel(blocks: Block[]): string | null {
   const thoughts = blocks.filter((block): block is Extract<Block, { kind: "thinking" }> => block.kind === "thinking");
-  if (!thoughts.length) return null;
-  if (thoughts.some((block) => block.endedAt === null)) return "Thinking";
-  const ms = thoughts.reduce((sum, block) => sum + Math.max(0, (block.endedAt ?? block.startedAt) - block.startedAt), 0);
+  // A thought under way is the live line's to say; the receipt counts the ones that are over.
+  const done = thoughts.filter((block) => block.endedAt !== null);
+  if (!done.length) return null;
+  const ms = done.reduce((sum, block) => sum + Math.max(0, (block.endedAt ?? block.startedAt) - block.startedAt), 0);
   return `Thought ${workDuration(Math.max(1000, ms))}`;
 }
 

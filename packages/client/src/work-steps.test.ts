@@ -86,7 +86,8 @@ it("keeps Codex's reasoning titles from splitting the work into a phase per call
     thinking("r2", "**Capturing the hero**"),
     tool("b2", "openorc.browser", { action: "screenshot" }),
   ]);
-  expect(outline(narrated)).toEqual(["# Study the opening sequence", "  Used OpenOrc: [browser]"]);
+  // The browser's calls read as what each did, in the order they happened.
+  expect(outline(narrated)).toEqual(["# Study the opening sequence", "  Scrolled the page:", "  Took a screenshot:"]);
   expect(narrated[0]?.kind === "phase" && narrated[0].phase.thoughts.map((thought) => thought.title)).toEqual(["Scrolling 680 pixels", "Capturing the hero"]);
   expect(liveHeadline(narrated, [narration("n1", "I'll study the opening sequence."), thinking("r3", "**Comparing the frames**", true)])).toMatchObject({ entryId: "phase-n1" });
 });
@@ -188,6 +189,11 @@ it("names the one thing happening now, wherever it sits", () => {
   expect(head([tool("t1", "Read", { file_path: "a.ts" })])).toMatchObject({ label: "Reading a.ts", entryId: "phase-t1" });
   expect(head([activity("activity-request-3", "Waiting for Claude", "running")])).toMatchObject({ label: "Waiting for Claude", entryId: null });
   expect(head([])).toMatchObject({ label: "Working", entryId: null });
+  // A thought no step shows reads under the live line; one the agent titled is the step its title names, which shows its words.
+  expect(head([thinking("live", "Three places write a session.", true)])).toMatchObject({ thinking: "Three places write a session.", aside: "Three places write a session." });
+  const titled = head([thinking("live", "**Moving the writes**\n\nBoth callers pass the same values.", true)]);
+  expect(titled).toMatchObject({ thinking: "**Moving the writes**\n\nBoth callers pass the same values." });
+  expect(titled).not.toHaveProperty("aside");
   // A streaming reply below the work speaks for itself.
   expect(head([tool("t1", "Read", { file_path: "a.ts" })], [tool("t1", "Read", { file_path: "a.ts" }), narration("reply", "Done", true)])).toBeNull();
   // Once it has finished and the turn goes on, it names the step it announced; the work above it stays done.

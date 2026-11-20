@@ -209,7 +209,34 @@ export { formatBytes, formatTokens, relativeTime, shortSha, untilTime } from "./
 export { liveVerb, stateLabel, toolCallPresentation, type Tone, type ToolIconName } from "./tool-presentation.js";
 export { toolResult, toolResultDetails, type ToolResultMedia } from "./tool-result.js";
 export { languageFor, type ChangeStatus, type ChangedFile, type MatchGroup, type MatchLine, type TestTally } from "./tool-text.js";
-export { joinPath, toolInputView, toolOutputView, type CommandStep, type Field, type InputView, type OutputView } from "./tool-view.js";
+export {
+  actLines,
+  firstThought,
+  foundCount,
+  lineCall,
+  lineEnd,
+  lineFile,
+  lineMark,
+  lineOpens,
+  lineState,
+  lineWords,
+  objectVerb,
+  printedBy,
+  stepCounts,
+  stepLines,
+  stepRows,
+  stepThoughts,
+  stepTitle,
+  stepWaiting,
+  type ActLine,
+  type StepThoughts,
+  type LineMark,
+  type LineResult,
+  type LineWords,
+} from "./work-lines.js";
+export { foldsWords, fromThread, memoryAge, memoryKind, oneLine, ownToolLine, ownToolView, taskState, type MemoryRow, type OwnToolView, type TaskRow, type ThreadRow } from "./own-tools.js";
+export { testReport, type TestCaseFailure, type TestFile, type TestFrame } from "./test-report.js";
+export { fieldLabel, joinPath, toolInputView, toolOutputView, type CommandStep, type Field, type InputView, type OutputView } from "./tool-view.js";
 export { readStep, type StepReading } from "./command-steps.js";
 export { printedOutput, type FileRef, type PrintedLine, type PrintedOutput, type PrintedTone } from "./printed-output.js";
 export { subagentGroups, subagentStatusLabel, type SubagentCard } from "./transcript-subagents.js";
@@ -229,7 +256,25 @@ export {
 } from "./visualization-document.js";
 export { visualizationFromTool } from "./visualization.js";
 export { chipCalls, toolIntent, type WorkChip } from "./work-chips.js";
-export { isCheckCommand, receiptItems, type ReceiptItem, type TurnSize } from "./work-receipt.js";
+export { isCheckCommand, receiptItems, type CheckKind, type ReceiptItem, type TurnSize } from "./work-receipt.js";
+export {
+  markLine,
+  passageProofs,
+  proofLabel,
+  proofNames,
+  proofOf,
+  replyMarks,
+  turnEvidence,
+  type ChangesProof,
+  type CheckProof,
+  type FileProof,
+  type MissingProof,
+  type Proof,
+  type ProofLabel,
+  type ProofMark,
+  type ProofNames,
+  type TurnEvidence,
+} from "./turn-proof.js";
 export {
   blockDigest,
   objectState,
@@ -251,6 +296,9 @@ export {
   type WebObject,
   type WorkObject,
 } from "./work-objects.js";
+export { hitFiles, hitTerms, hitText, samePath, type HitFile, type HitText } from "./search-results.js";
+export { commandWords, outputLines, shortPath, type CommandWords, type OutputLine } from "./command-words.js";
+export { workTimeline, type StepMark, type Timeline, type TimelineLane, type TimelineStep } from "./work-timeline.js";
 export { objectOutcome, objectsTitle, phaseOutcome, type Outcome } from "./work-outcomes.js";
 export {
   chipTitle,
@@ -265,6 +313,9 @@ export {
   type WorkEntry,
   type WorkPhase,
   type WorkSection,
+  isRoutine,
+  standsAlone,
+  isSignal,
 } from "./work-steps.js";
 export { workDuration, workParts, workTiming, workTurns } from "./work-transcript.js";
 export { useChildThreadPages, cachedChildPage, cachedListPage } from "./thread-child-pages.js";

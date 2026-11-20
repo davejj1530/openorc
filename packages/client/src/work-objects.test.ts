@@ -303,6 +303,21 @@ describe("review findings", () => {
     expect(only(replay("rg -n via Bash"), "search").hits[0]?.path).toMatch(/Composer\.tsx$/);
   });
 
+  it("opens a one-file search's lines in the file as written, however deep it sits", () => {
+    const deep = call("d", { command: 'cd /repo && grep -nE "^export const" apps/api/scripts/phone-line/assistant.ts | cut -c1-150' }, '8:export const firstMessage = "Hi"');
+    expect(only([deep], "search").hits[0]).toMatchObject({ path: "/repo/apps/api/scripts/phone-line/assistant.ts", line: 8 });
+  });
+
+  it("gives a search no hits when another step of its call printed too", () => {
+    const mixed = call(
+      "x",
+      { command: 'git show origin/main:src/agents.ts | grep -n "^export"; grep -n "^export" src/assistant.ts' },
+      "26:export function vapiFailure() {\n8:export const firstMessage",
+    );
+    const search = workObjects([mixed]).find((object) => object.kind === "search");
+    expect(search?.kind === "search" && search.hits).toEqual([]);
+  });
+
   it("gives a call that ran several searches no hits rather than the same ones twice", () => {
     const searches = workObjects(replay("grep via shell")).filter((object) => object.kind === "search");
     expect(searches.length).toBeGreaterThan(1);

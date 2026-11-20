@@ -2,7 +2,9 @@ import { toolDigest, type GitPushed, type TestRun, type ToolDigest, type WebLink
 import { readCommand } from "./command-reader.js";
 import type { RunDomain } from "./run-labels.js";
 import { commandLine, shellSteps, unwrapShell } from "./shell.js";
+import { ownToolLine, ownToolView } from "./own-tools.js";
 import { toolCallPresentation } from "./tool-presentation.js";
+import { samePath } from "./search-results.js";
 import { joinPath } from "./tool-view.js";
 import type { Block } from "./transcript.js";
 import { callParts, changeKind, commandText, patchSections, type CallPart, type WorkChip } from "./work-chips.js";
@@ -43,6 +45,8 @@ export interface SearchObject extends Common {
   hits: SearchHit[];
   /** How many lines it found, when every printed line was one. */
   matches: number | null;
+  /** The hit files the turn went on to read or edit. */
+  opened: string[];
 }
 
 export interface EditLine {
@@ -131,6 +135,10 @@ export interface ToolObject extends Common {
   chip: WorkChip;
   /** "Used Figma", "Searched memory": the section the call went under. */
   section: string;
+  /** What one of OpenOrc's own tools was about, by name, once its answer says: the thread it read, the task it checked. */
+  named?: string;
+  /** What that answer came to, in a few words: "29 threads", "last 4 messages". */
+  came?: string;
 }
 
 type ToolBlock = Extract<Block, { kind: "tool" }>;
@@ -187,7 +195,8 @@ function hitLine(line: string, searched: string, folder: string | null): HitLine
   const match = MATCH.exec(line);
   if (match) return { hit: { path: joinPath(folder, match[1] ?? searched), line: Number(match[2]), text: match[3]!.trim() } };
   const word = line.trim();
-  if (FILE.test(word) && (/\.\w+$/.test(word) || !CONTEXT.test(word))) return { hit: { path: joinPath(folder, word), line: null, text: "" } };
+  // A bare number is a count or a size some other step printed, never a file.
+  if (FILE.test(word) && !/^\d+$/.test(word) && (/\.\w+$/.test(word) || !CONTEXT.test(word))) return { hit: { path: joinPath(folder, word), line: null, text: "" } };
   return CONTEXT.test(line) ? { skip: "context" } : null;
 }
 
@@ -226,10 +235,10 @@ function matchCount(digest: ToolDigest | null, chip: WorkChip, read: ReadHits): 
   return read.plain ? digest.lines - read.notes : null;
 }
 
-/** The file a one-file search looked in: the tool's path, or the scope the command reader found in a shell search. */
+/** The file a one-file search looked in: the tool's path, or the file a shell search named. */
 function searchedPath(block: ToolBlock): string {
-  const scope = readCommand(commandText(block)).find((action) => action.type === "search")?.scope;
-  return str(((block.input ?? {}) as Input)["path"]) || (scope?.replace(/^in /, "") ?? "");
+  const file = readCommand(commandText(block)).find((action) => action.type === "search")?.file;
+  return str(((block.input ?? {}) as Input)["path"]) || (file ?? "");
 }
 
 /** Where a search ran: the call's own folder, moved by any `cd` before the search. */
@@ -243,10 +252,29 @@ function searchFolder(block: ToolBlock): string | null {
 function searchObject(block: ToolBlock, part: CallPart, alone: boolean): SearchObject {
   const chip = plainChip(block, part);
   const digest = block.done ? blockDigest(block) : null;
-  // A call that ran several searches printed them together; whose lines are whose cannot be told apart.
+  // A call that did more than the one search printed it all together; whose lines are whose cannot be told apart.
   const read = digest && alone && !block.isError ? searchHits([...digest.head, ...digest.tail], searchedPath(block), searchFolder(block)) : { hits: [], notes: 0, plain: false };
   const matches = alone ? matchCount(block.isError ? null : digest, chip, read) : null;
-  return { kind: "search", id: `${block.id}:search`, state: objectState(block), blocks: [block], chip, hits: read.hits.slice(0, 6), matches };
+  return { kind: "search", id: `${block.id}:search`, state: objectState(block), blocks: [block], chip, hits: read.hits, matches, opened: [] };
+}
+
+const touched = new WeakMap<ToolBlock, string[]>();
+
+/** The files a call read or edited. */
+function touchedPaths(block: ToolBlock): string[] {
+  const known = touched.get(block);
+  if (known) return known;
+  const paths = callParts(block).flatMap((part) => (part.chip?.path && (part.section === "Read" || part.section === "Edited") ? [part.chip.path] : []));
+  touched.set(block, paths);
+  return paths;
+}
+
+/** The files a search found that the turn's later calls read or edited. */
+function openedAfter(search: SearchObject, turn: ToolBlock[]): string[] {
+  const at = turn.findIndex((block) => block.id === search.blocks[0]?.id);
+  const later = at < 0 ? [] : turn.slice(at + 1).flatMap(touchedPaths);
+  if (!later.length) return [];
+  return [...new Set(search.hits.map((hit) => hit.path))].filter((path) => later.some((other) => samePath(path, other)));
 }
 
 /* ------------------------------------------------------------------ Edits */
@@ -473,14 +501,25 @@ function fetchObject(block: ToolBlock, part: CallPart): FetchObject {
 function toolObject(block: ToolBlock, part: CallPart): ToolObject {
   const chip = plainChip(block, part);
   const asked = toolCallPresentation(block.name, block.input).object;
-  return { kind: "tool", id: block.id, state: objectState(block), blocks: [block], chip: chip.detail || !asked || asked === chip.label ? chip : { ...chip, detail: asked }, section: part.section };
+  const own = ownToolView(block);
+  const line = own ? ownToolLine(own) : {};
+  return {
+    kind: "tool",
+    id: block.id,
+    state: objectState(block),
+    blocks: [block],
+    chip: chip.detail || !asked || asked === chip.label ? chip : { ...chip, detail: asked },
+    section: part.section,
+    ...(line.name ? { named: line.name } : {}),
+    ...(line.result ? { came: line.result } : {}),
+  };
 }
 
 /** Which object each section of a call becomes. */
 const bySection: Record<string, (block: ToolBlock, part: CallPart, parts: CallPart[]) => WorkObject> = {
   Read: readObject,
   Listed: readObject,
-  Searched: (block, part, parts) => searchObject(block, part, parts.filter((other) => other.section === "Searched").length === 1),
+  Searched: (block, part, parts) => searchObject(block, part, parts.length === 1),
   Edited: editObject,
   Fetched: fetchObject,
   "Searched the web": webObject,
@@ -551,5 +590,5 @@ export function workObjects(blocks: Block[], turn: Block[] = blocks, live = true
     const at = earlier.findIndex((candidate) => candidate.id === block.id);
     objects.push(...callObjects(block, at < 0 ? [] : earlier.slice(0, at)));
   }
-  return mergeReads(objects);
+  return mergeReads(objects).map((object) => (object.kind === "search" && object.hits.length ? { ...object, opened: openedAfter(object, earlier) } : object));
 }

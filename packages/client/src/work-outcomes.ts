@@ -53,7 +53,11 @@ const outcomes: { [K in WorkObject["kind"]]: (object: Extract<WorkObject, { kind
   command: (command) => (command.state === "failed" ? { text: failedWords(command.chip), failed: true } : null),
   read: () => null,
   fetch: () => null,
-  tool: () => null,
+  // A line says that a tool failed, or what one of OpenOrc's own came to; any other answer is the tool's own to read.
+  tool: (tool) => {
+    if (tool.state === "failed") return { text: "Failed", failed: true };
+    return tool.came ? { text: tool.came, failed: false } : null;
+  },
 };
 
 export function objectOutcome(object: WorkObject): Outcome | null {

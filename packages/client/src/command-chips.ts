@@ -36,6 +36,7 @@ function codexActions(actions: CodexAction[]): Action[] {
           scope: text(action.path) ? `in ${text(action.path)}` : null,
           countable: false,
           folder: null,
+          file: text(action.path) || null,
         },
       ];
     if (action.type === "listFiles") return [same ?? { type: "listFiles", command, path: text(action.path) || ".", pattern: null }];
@@ -86,7 +87,7 @@ type Looked<Type> = Extract<CommandAction, { type: Type }>;
 function readPart(action: Looked<"read"> & { resolved?: boolean }, { block, intent }: RowContext): CallPart {
   const path = action.resolved ? action.path : joinPath(callFolder(block), action.path);
   const lines = readSpan(action.range);
-  const chip: Chip = { key: action.path, label: basename(action.path), title: intent ?? path, kind: "file", detail: folderOf(action.path), path, ...(lines ? { lines } : {}) };
+  const chip: Chip = { key: action.path, label: basename(action.path), title: intent ?? path, kind: "file", detail: folderOf(path), path, ...(lines ? { lines } : {}) };
   return { section: "Read", chip: action.range ? { ...chip, note: action.range } : chip };
 }
 

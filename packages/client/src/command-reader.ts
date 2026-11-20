@@ -2,7 +2,22 @@ import { pipeline, shellSteps, unwrapShell, type PipedCommand } from "./shell.js
 import { basename, commandLabel, isPreparation, names, said, unwrapWords, type RunLabel } from "./run-labels.js";
 import { joinPath } from "./tool-view.js";
 import { parseArgs } from "./command-args.js";
-import { countable, globsOf, inverted, matchesAll, recursive, RG_VALUED, scopeOf, SEARCHERS, searchArgs, searchQuery, searchScope, shortGlob, type SearchArgs } from "./command-search.js";
+import {
+  countable,
+  globsOf,
+  inverted,
+  matchesAll,
+  recursive,
+  RG_VALUED,
+  scopeOf,
+  SEARCHERS,
+  searchArgs,
+  searchedFile,
+  searchQuery,
+  searchScope,
+  shortGlob,
+  type SearchArgs,
+} from "./command-search.js";
 
 export { searchTerms, shortPath } from "./command-search.js";
 export type { RunLabel } from "./run-labels.js";
@@ -16,8 +31,11 @@ export type { RunLabel } from "./run-labels.js";
  */
 export type CommandAction =
   | { type: "read"; command: string; path: string; range: string | null }
-  /** `folder` is where a `cd` before it moved the search, which the paths it printed are relative to. */
-  | { type: "search"; command: string; query: string; scope: string | null; countable: boolean; folder: string | null }
+  /**
+   * `folder` is where a `cd` before it moved the search, which the paths it printed are relative to. `file` is the
+   * one file it looked in, as written, which its lines belong to when they print without a name.
+   */
+  | { type: "search"; command: string; query: string; scope: string | null; countable: boolean; folder: string | null; file: string | null }
   | { type: "listFiles"; command: string; path: string; pattern: string | null }
   | { type: "unknown"; command: string; run: RunLabel | null; preparation: boolean };
 
@@ -217,7 +235,15 @@ function ran(command: Command, run: RunLabel | null): CommandAction {
 
 /** A search's action: what it looked for, where, and whether its lines can be counted. */
 function search(command: Command, folder: string | null, parsed: SearchArgs = searchArgs(command.name, command.args)): SearchAction {
-  return { type: "search", command: command.text, query: searchQuery(parsed), scope: searchScope(parsed), countable: countable(parsed, command.rest, Boolean(command.output)), folder };
+  return {
+    type: "search",
+    command: command.text,
+    query: searchQuery(parsed),
+    scope: searchScope(parsed),
+    countable: countable(parsed, command.rest, Boolean(command.output)),
+    folder,
+    file: searchedFile(parsed),
+  };
 }
 
 /** A grep over a listing's names, as the names it kept: "names with “test”". */

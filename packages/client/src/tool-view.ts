@@ -12,6 +12,8 @@ type ToolBlock = Extract<Block, { kind: "tool" }>;
 
 export interface Field {
   key: string;
+  /** The key in words: "Task intent" for `task_intent`. */
+  label: string;
   value: string;
   /** An object or array, shown as formatted JSON rather than inline. */
   structured: boolean;
@@ -129,11 +131,22 @@ function searchFlags(input: Input): string[] {
   return flags;
 }
 
+/** A parameter's name in words: `task_intent` and `taskIntent` both read "Task intent". */
+export function fieldLabel(key: string): string {
+  const words = key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .toLowerCase()
+    .replace(/\b(url|uri|id|api|html|css|json|sql)\b/g, (short) => short.toUpperCase());
+  return words.replace(/^[a-z]/, (first) => first.toUpperCase());
+}
+
 function fields(input: Input): Field[] {
   return Object.entries(input).flatMap(([key, value]) => {
     if (value === undefined || value === null || value === "") return [];
     const structured = typeof value === "object";
-    return [{ key, value: structured ? JSON.stringify(value, null, 2) : String(value), structured }];
+    return [{ key, label: fieldLabel(key), value: structured ? JSON.stringify(value, null, 2) : String(value), structured }];
   });
 }
 
@@ -160,7 +173,10 @@ export function toolInputView(block: ToolBlock): InputView {
   if (!input) return { kind: "none" };
   const known = readView(name, input) ?? editView(name, input) ?? lookupView(name, input);
   if (known) return known;
-  const list = fields(input);
+  // The line already says what the browser or a device was asked to do; a page it opened is where it went.
+  const acted = /^(browser|device)$/.test(name);
+  if (acted && str(input, "url")) return { kind: "web", target: str(input, "url") };
+  const list = fields(acted ? Object.fromEntries(Object.entries(input).filter(([key]) => key !== "action")) : input);
   return list.length ? { kind: "fields", fields: list } : { kind: "none" };
 }
 
@@ -178,6 +194,10 @@ function lookupView(name: string, input: Input): InputView | null {
   if (/^(grep|glob|search)$/i.test(name)) return { kind: "search", pattern: str(input, "pattern", "query"), scope: str(input, "path") || null, flags: searchFlags(input) };
   if (/^(webfetch|fetch|websearch)$/i.test(name)) return { kind: "web", target: str(input, "url", "query") };
   if (/^(task|agent)$/i.test(name) && str(input, "prompt")) return { kind: "prompt", text: str(input, "prompt"), agent: str(input, "subagent_type") || null };
+  // A message reads as what it said, not as a field named "text".
+  const said = /(thread_send|send_message|team_say)$/.test(name) ? str(input, "text", "message") : "";
+  const brief = /thread_start$/.test(name) ? str(input, "prompt") : "";
+  if (said || brief) return { kind: "prompt", text: said || brief, agent: null };
   return null;
 }
 

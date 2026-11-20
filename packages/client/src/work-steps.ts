@@ -69,6 +69,14 @@ export function foldable(block: Block, taskCards: boolean): boolean {
   }
 }
 
+/**
+ * Whether a block inside a step draws as itself and so keeps a row of its own: a card, a picture a call drew, an
+ * agent it started, or anything that is not a call. Any other call is a line of the step like the rest.
+ */
+export function standsAlone(block: Block): boolean {
+  return block.kind !== "tool" || Boolean(block.subagent) || visualizationFromTool(block) !== null || toolShowsCard(block);
+}
+
 /** Still happening: a call without its result, reasoning or a reply still streaming, an activity still running. */
 export function isLive(block: Block): boolean {
   if (block.kind === "tool") return !block.done;
@@ -83,6 +91,11 @@ export function isLive(block: Block): boolean {
  */
 export function isSignal(block: Block): boolean {
   return block.kind === "activity" && block.status !== "error" && (block.id.startsWith("activity-request-") || /^Starting /.test(block.label));
+}
+
+/** A hook that ran clean, or the turn's own diff: routine, read with a step's calls and not as a row of its own. */
+export function isRoutine(block: Block): boolean {
+  return block.kind === "activity" && block.status === "success" && /^activity-(hook|diff)-/.test(block.id);
 }
 
 /** "**Inspecting the status row**\n\nI need to…": a titled section per bold heading, in Codex's summary format. */
@@ -273,7 +286,11 @@ class EntryBuilder {
   narration(block: Extract<Block, { kind: "message" }>) {
     const title = narrationTitle(block.text);
     const more = block.text.replace(/[*_`#>\s]/g, "").length > title.replace(/\s/g, "").length + 12;
+    // What the agent thought before saying this belongs to the step it announces.
+    const lead = readable(this.lead);
+    this.lead = [];
     this.start(openPhase(`phase-${block.id}`, title, "narration", block, { narration: more ? block : null }));
+    this.phase!.blocks.unshift(...lead);
   }
 
   action(block: Block) {
@@ -330,6 +347,15 @@ export interface LiveHeadline {
   since: number | undefined;
   /** The phase already showing this, when the work list has one. */
   entryId: string | null;
+  /** While a thought with words is under way: its latest whole sentence. */
+  thought?: string;
+  /** While a thought with words is under way: everything it has said so far. */
+  thinking?: string;
+  /**
+   * The words of that thought no step shows, for the live line to carry: all of a thought the agent did not title.
+   * One it titled is the steps its titles name, and each shows its words.
+   */
+  aside?: string;
 }
 
 const progressive: Record<string, string> = {
@@ -388,6 +414,26 @@ function holder(entries: WorkEntry[], current: Block): LiveHeadline | null {
  */
 export function liveHeadline(entries: WorkEntry[], turn: Block[]): LiveHeadline | null {
   const current = turn.findLast(isLive);
+  const headline = headlineOf(entries, turn, current);
+  const thinking = current?.kind === "thinking" ? current.text.trim() : "";
+  if (!headline || !thinking) return headline;
+  const thought = thoughtGist(thinking);
+  const aside = reasoningSections(thinking).length ? {} : { aside: thinking };
+  return { ...headline, thinking, ...aside, ...(thought ? { thought } : {}), since: current?.kind === "thinking" ? current.startedAt : headline.since };
+}
+
+/** What a thought under way is on: the latest sentence it finished. Null until it has one. */
+function thoughtGist(text: string): string | null {
+  const sentences = text
+    .replace(/\*\*/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(/(?<=[.!?])\s+/);
+  const whole = sentences.findLast((sentence) => /[.!?]$/.test(sentence));
+  return whole ? whole.replace(/\.$/, "") : null;
+}
+
+function headlineOf(entries: WorkEntry[], turn: Block[], current: Block | undefined): LiveHeadline | null {
   if (current?.kind === "message") return null;
   // A note that finished while the turn goes on, with nothing after it yet, names the step it announced; until that
   // step's first call, the work above it is done, not running again.

@@ -1,23 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { turnShowsSender, turnShowsVoice } from "./turn-voice.js";
 
-const opus = { agent: "claude", model: "Opus 5.5" };
+const claude = { agent: "claude" };
 
 describe("turnShowsVoice", () => {
-  it("names no turn of a thread that stays on one agent and model", () => {
-    expect(turnShowsVoice(opus, { ...opus })).toBe(false);
+  it("names no turn of a thread that stays on one agent, whatever model each turn ran on", () => {
+    expect(turnShowsVoice(claude, { ...claude })).toBe(false);
+    const [sonnet, opus] = [
+      { ...claude, model: "Sonnet 5.5" },
+      { ...claude, model: "Opus 5.5" },
+    ];
+    expect(turnShowsVoice(sonnet, opus)).toBe(false);
   });
 
-  it("names the turn where the model, the agent or the guest speaking changed", () => {
-    expect(turnShowsVoice({ ...opus, model: "Sonnet 5.5" }, opus)).toBe(true);
-    expect(turnShowsVoice({ agent: "codex", model: "Opus 5.5" }, opus)).toBe(true);
-    expect(turnShowsVoice({ ...opus, byline: "Rini" }, opus)).toBe(true);
-    expect(turnShowsVoice(opus, { ...opus, byline: "Rini" })).toBe(true);
+  it("names the turn where the agent or the guest speaking changed", () => {
+    expect(turnShowsVoice({ agent: "codex" }, claude)).toBe(true);
+    expect(turnShowsVoice({ ...claude, byline: "Rini" }, claude)).toBe(true);
+    expect(turnShowsVoice(claude, { ...claude, byline: "Rini" })).toBe(true);
   });
 
   it("names nothing it cannot compare", () => {
-    expect(turnShowsVoice(undefined, opus)).toBe(false);
-    expect(turnShowsVoice(opus, undefined)).toBe(false);
+    expect(turnShowsVoice(undefined, claude)).toBe(false);
+    expect(turnShowsVoice(claude, undefined)).toBe(false);
   });
 });
 

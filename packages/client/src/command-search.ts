@@ -85,6 +85,12 @@ export function searchScope(search: SearchArgs): string | null {
   return scopeOf(paths, [...globs, ...globsOf(search.args)]);
 }
 
+/** The one file a search looked in, as written, whose matches print without its name. Null when it looked in several places, by a glob or in a variable's path. */
+export function searchedFile(search: SearchArgs): string | null {
+  const [only, ...others] = search.operands;
+  return only && !others.length && !/[*?[{$]/.test(only) && !only.startsWith(":") ? only : null;
+}
+
 /** Whether every line the search printed is one match: no flag changes that, and nothing after it cuts or counts. */
 export function countable(search: SearchArgs, rest: PipedCommand[], redirected: boolean): boolean {
   return !UNCOUNTED.some((flag) => search.args.flags.has(flag)) && !redirected && rest.every(keepsMatches);

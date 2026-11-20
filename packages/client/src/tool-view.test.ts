@@ -173,9 +173,20 @@ it("shows what a call was asked in the shape of its kind", () => {
   expect(toolInputView(call("mcp__claude_ai_Mobbin__search_screens", { query: "onboarding", limit: 8, platform: null }))).toEqual({
     kind: "fields",
     fields: [
-      { key: "query", value: "onboarding", structured: false },
-      { key: "limit", value: "8", structured: false },
+      { key: "query", label: "Query", value: "onboarding", structured: false },
+      { key: "limit", label: "Limit", value: "8", structured: false },
     ],
   });
   expect(toolInputView(call("apply_patch", [{ path: "a.ts", kind: "update", diff: "@@ -1 +1 @@\n-a\n+b" }]))).toMatchObject({ kind: "patch" });
+});
+
+it("names a parameter in words, reads a message as what it said, and a page the browser opened as where it went", () => {
+  expect(toolInputView(call("mcp__mobbin__find_references", { task_intent: "Find references", outputFormat: "jpg", page_url: "x" }))).toMatchObject({
+    fields: [{ label: "Task intent" }, { label: "Output format" }, { label: "Page URL" }],
+  });
+  expect(toolInputView(call("openorc.thread_send", { id: "t1", text: "One question." }))).toEqual({ kind: "prompt", text: "One question.", agent: null });
+  expect(toolInputView(call("openorc.thread_start", { prompt: "Draw the icons", title: "Icons" }))).toEqual({ kind: "prompt", text: "Draw the icons", agent: null });
+  expect(toolInputView(call("openorc.browser", { action: "open", url: "http://localhost:4321/" }))).toEqual({ kind: "web", target: "http://localhost:4321/" });
+  // The line already says what the browser was asked to do.
+  expect(toolInputView(call("openorc.browser", { action: "screenshot" }))).toEqual({ kind: "none" });
 });

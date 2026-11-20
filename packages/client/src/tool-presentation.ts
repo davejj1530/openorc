@@ -29,7 +29,17 @@ const namedTools: [RegExp, (str: (key: string) => string, input: unknown) => Too
   [/^(grep|glob|search|rg|find|ls)$/i, (str) => ({ icon: "WorkSearch", verb: "Searched", object: str("pattern") || str("query") || str("path"), tone: "search" })],
   [/^(webfetch|fetch)$/i, (str) => ({ icon: "Globe", verb: "Fetched", object: str("url"), tone: "web" })],
   [/^websearch$/i, (str) => ({ icon: "Globe", verb: "Searched the web for", object: str("query"), tone: "web" })],
-  [/thread_send$|send_message$|team_say$/, (str) => ({ icon: "WorkMessage", verb: "Sent message", object: str("target") || str("recipient") || "", tone: "neutral" })],
+  [
+    /thread_send$|send_message$|team_say$/,
+    (str) => ({ icon: "WorkMessage", verb: "Sent message", object: str("target") || str("recipient") || firstLine(str("text") || str("message")), tone: "neutral" }),
+  ],
+  [/thread_list$/, () => ({ icon: "WorkMessage", verb: "Listed threads", object: "", tone: "neutral" })],
+  [/thread_read$/, () => ({ icon: "WorkMessage", verb: "Read thread", object: "", tone: "neutral" })],
+  [/thread_start$/, (str) => ({ icon: "WorkDelegate", verb: "Started thread", object: str("title") || firstLine(str("prompt")), tone: "task" })],
+  [/^browser$/, (str) => browsed(str("action"), str("url"))],
+  [/^device$/, (str) => ({ icon: "Hammer", verb: DEVICE[str("action")] ?? "Used a device", object: "", tone: "neutral" })],
+  [/^exitplanmode$/i, () => ({ icon: "Check", verb: "Proposed a plan", object: "", tone: "plan" })],
+  [/^enterplanmode$/i, () => ({ icon: "Check", verb: "Started planning", object: "", tone: "plan" })],
   [/task_start$/, (str) => ({ icon: "WorkDelegate", verb: "Started task", object: str("title") || str("id"), tone: "task" })],
   [/spawn_agent$/, (str) => ({ icon: "WorkDelegate", verb: "Delegated", object: str("title") || str("task_name"), tone: "task" })],
   [/task_create$/, (str) => ({ icon: "WorkDelegate", verb: "Created task", object: str("title"), tone: "task" })],
@@ -42,7 +52,41 @@ const namedTools: [RegExp, (str: (key: string) => string, input: unknown) => Too
   [/task_context$/, () => ({ icon: "FileText", verb: "Read the task brief", object: "", tone: "task" })],
   [/^(task|agent|subagent)$/i, (str) => ({ icon: "WorkDelegate", verb: "Delegated", object: str("description"), tone: "task" })],
   [/^todowrite$/i, () => ({ icon: "Check", verb: "Updated the plan", object: "", tone: "plan" })],
+  [/^toolsearch$/i, (str) => ({ icon: "Search", verb: "Looked up tools", object: lookedUpTools(str("query")), tone: "neutral" })],
+  [/^skill$/i, (str) => ({ icon: "FileText", verb: "Used skill", object: str("skill"), tone: "context" })],
 ];
+
+/** A message's first line, short enough for a row. */
+function firstLine(text: string): string {
+  const line = text.trim().split("\n")[0] ?? "";
+  return line.length > 80 ? `${line.slice(0, 79).trimEnd()}…` : line;
+}
+
+/** What each thing the browser was asked to do reads as; opening a page names the page. */
+const BROWSED: Record<string, string> = {
+  snapshot: "Read the page",
+  screenshot: "Took a screenshot",
+  click: "Clicked on the page",
+  fill: "Typed on the page",
+  press: "Pressed a key",
+  scroll: "Scrolled the page",
+};
+const DEVICE: Record<string, string> = { list: "Listed devices", open: "Opened a device", screenshot: "Took a device screenshot", close: "Closed the device" };
+
+function browsed(action: string, url: string): ToolPresentation {
+  if (action === "open") return { icon: "Globe", verb: "Opened", object: url.replace(/^https?:\/\//, "").replace(/\/$/, ""), tone: "web" };
+  return { icon: "Globe", verb: BROWSED[action] ?? "Used the browser", object: "", tone: "web" };
+}
+
+/** What a tool lookup asked for, in words: the tools it named without their server's prefix, or the query as typed. */
+function lookedUpTools(query: string): string {
+  const named = /^select:(.+)$/.exec(query.trim())?.[1];
+  if (!named) return query.replace(/^\+/, "").trim();
+  return named
+    .split(",")
+    .map((name) => (mcpCall(name.trim())?.tool ?? name.trim()).replace(/[_-]+/g, " "))
+    .join(", ");
+}
 
 /** Verb and object for a tool call, from the names Claude Code and Codex use. */
 export function toolCallPresentation(name: string, input: unknown): ToolPresentation {
@@ -52,8 +96,7 @@ export function toolCallPresentation(name: string, input: unknown): ToolPresenta
   const mcp = mcpCall(name);
   const n = mcp?.tool ?? name;
   const command = str("cmd") || str("command") || (Array.isArray(i["command"]) ? (i["command"] as string[]).join(" ") : "");
-  if (/^(shell|bash|exec|exec_command|run_command|execute)$/i.test(n) || command)
-    return { icon: "WorkCommand", verb: "Ran", object: command.replace(/^\/bin\/zsh -lc /, "").replace(/^'(.*)'$/, "$1"), tone: "run" };
+  if (/^(shell|bash|exec|exec_command|run_command|execute)$/i.test(n) || command) return { icon: "WorkCommand", verb: "Ran", object: unwrapped(command), tone: "run" };
   const named = namedTools.find(([pattern]) => pattern.test(n));
   if (named) return named[1](str, input);
   const object = str("description") || str("query") || str("path");
@@ -62,6 +105,13 @@ export function toolCallPresentation(name: string, input: unknown): ToolPresenta
     return { icon: "Hammer", verb: label, object, tone: "neutral", summary: `Used ${source}` };
   }
   return { icon: "Hammer", verb: n, object, tone: "neutral" };
+}
+
+/** A command without the shell Codex wraps it in: `/bin/zsh -lc '…'`, quoted either way. */
+function unwrapped(command: string): string {
+  const shell = /^\/bin\/(?:zsh|bash|sh) -lc /.exec(command);
+  const inner = shell ? command.slice(shell[0].length).replace(/^"([\s\S]*)"$/, (_, text: string) => text.replace(/\\(["$`\\])/g, "$1")) : command;
+  return inner.replace(/^'(.*)'$/, "$1");
 }
 
 type McpCall = { server: string; tool: string };
@@ -79,6 +129,12 @@ function mcpCall(name: string): McpCall | null {
     /^([^.]+)\.(.+)$/.exec(name) ??
     /^(openorc_[0-9a-f]{32})_(.+)$/.exec(name);
   return match ? { server: match[1]!, tool: match[2]! } : null;
+}
+
+/** The name of one of OpenOrc's own tools, whatever the agent calls its server; null for anyone else's tool. */
+export function ownToolName(name: string): string | null {
+  const call = mcpCall(name);
+  return call && /^openorc(?:_[0-9a-f]{32})?$/.test(call.server) ? call.tool : null;
 }
 
 /** "Codegraph: explore" for codegraph's `codegraph_explore`: the server as configured, minus Claude's claude.ai connector prefix, and the tool without a repeated server name. */

@@ -14,3 +14,23 @@ describe("MCP tool calls", () => {
     expect(toolCallPresentation("mcp__codegraph_explore", {})).toMatchObject({ verb: "Codegraph: explore", summary: "Used Codegraph" });
   });
 });
+
+describe("OpenOrc's own tools", () => {
+  it("says what the browser did, and where it went when it opened a page", () => {
+    expect(toolCallPresentation("openorc.browser", { action: "open", url: "https://kindui.dev/#agent-ui" })).toMatchObject({ icon: "Globe", verb: "Opened", object: "kindui.dev/#agent-ui" });
+    expect(toolCallPresentation(`mcp__${server}__browser`, { action: "screenshot" })).toMatchObject({ verb: "Took a screenshot", object: "" });
+    expect(toolCallPresentation("openorc.browser", { action: "snapshot" })).toMatchObject({ verb: "Read the page" });
+  });
+
+  it("names a message by how it starts, and the thread tools by what they do", () => {
+    expect(toolCallPresentation("openorc.thread_send", { id: "t1", text: "One question about the server half.\nAnswer when you pause." })).toMatchObject({
+      icon: "WorkMessage",
+      verb: "Sent message",
+      object: "One question about the server half.",
+    });
+    expect(toolCallPresentation("openorc.thread_list", {})).toMatchObject({ verb: "Listed threads", object: "" });
+    expect(toolCallPresentation("openorc.thread_read", { id: "t1" })).toMatchObject({ verb: "Read thread" });
+    expect(toolCallPresentation("openorc.thread_start", { prompt: "Draw the icons", title: "Icons" })).toMatchObject({ verb: "Started thread", object: "Icons" });
+    expect(toolCallPresentation("ExitPlanMode", {})).toMatchObject({ verb: "Proposed a plan" });
+  });
+});

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Block } from "./transcript.js";
 import { receiptItems, type TurnSize } from "./work-receipt.js";
-import { workEntries } from "./work-steps.js";
+import { isSignal, workEntries } from "./work-steps.js";
 import { workDuration, workParts, workTiming } from "./work-transcript.js";
 
 /** Where a turn stands, as its end says it: working with its clock, writing the reply, or done, failed or stopped. */
@@ -56,15 +56,15 @@ export function turnReply(after: Block[]): Extract<Block, { kind: "message" }> |
 export function useTurnModel(blocks: Block[], live: boolean, taskCards: boolean | undefined, ambient: boolean, pinned: string | undefined, size: TurnSize | null = null) {
   const timing = workTiming(blocks, live);
   const parts = useMemo(() => workParts(blocks, timing.live, taskCards, ambient), [blocks, timing.live, taskCards, ambient]);
-  const steps = useMemo(
-    () =>
-      workEntries(
-        parts.work.filter((block) => block.kind !== "tool" || !block.subagent),
-        taskCards ?? true,
-        pinned,
-      ).length,
-    [parts.work, taskCards, pinned],
-  );
+  const steps = useMemo(() => {
+    const entries = workEntries(
+      parts.work.filter((block) => block.kind !== "tool" || !block.subagent),
+      taskCards ?? true,
+      pinned,
+    );
+    // While the turn runs, a wait that is over is not a step it took.
+    return (timing.live ? entries.filter((entry) => entry.kind !== "blocks" || !entry.blocks.every(isSignal)) : entries).length;
+  }, [parts.work, taskCards, pinned, timing.live]);
   const now = useTicking(timing.live);
   const writing = parts.after.some((block) => block.kind === "message" && block.role === "assistant" && block.streaming);
   const status = turnStatus({ ...timing, writing }, now);

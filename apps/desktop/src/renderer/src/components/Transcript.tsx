@@ -24,7 +24,7 @@ import { cn } from "../lib/cn";
 import { QuestionCard } from "./QuestionCard";
 import { AgentPresence } from "./AgentPresence";
 import { toolIcons } from "./tool-icons";
-import { WorkNow, WorkSteps } from "./WorkSteps";
+import { CarriedWork, WorkNow, WorkSteps } from "./WorkSteps";
 import { TurnHead } from "./TurnHead";
 import { NoteList, useNotesAfter, useTopNotes } from "./ThreadNotes";
 import { TurnReceipt } from "./TurnReceipt";
@@ -378,7 +378,13 @@ type WorkTranscriptProps = ComponentProps<typeof TranscriptContents> & {
   /** A message to bring into view; the turn that holds it opens its work when the message is there. */
   reveal?: Reveal | undefined;
 };
-type WorkTurnProps = WorkTranscriptProps & { id?: string; /** The turn names its agent and model: they changed from the turn before. */ voiced?: boolean };
+type WorkTurnProps = WorkTranscriptProps & {
+  id?: string;
+  /** The turn names who speaks in it: that changed from the turn before. */
+  voiced?: boolean;
+  /** Calls an earlier turn started that are still running, which this turn's message waits behind. */
+  carried?: Block[];
+};
 
 /** The disclosure hierarchy stays consistent across turns and warm sessions. */
 /** An Orcling's own conversation reads as a chat with it; any other as turns of work. */
@@ -392,6 +398,8 @@ export function WorkTranscript({ blocks, live = false, onFork, reveal, ...props 
   const turns = useSteadyTurns(blocks);
   const voiced = useVoicedTurns(turns, props.runId, props.author);
   const topNotes = useTopNotes();
+  // A message sent while a call runs is read once that call ends: until then the newest turn has nothing of its own.
+  const carried = useMemo(() => (live ? turns.slice(0, -1).flatMap((turn) => turn.blocks.filter((block) => block.kind === "tool" && !block.done)) : []), [live, turns]);
   // A fork carries the whole conversation and the agent's latest session, so it is offered only at the latest message.
   const forkTurn = onFork ? turns.findLastIndex((turn) => turn.blocks.some((block) => block.kind === "message" && block.role === "user")) : -1;
   return (
@@ -407,6 +415,7 @@ export function WorkTranscript({ blocks, live = false, onFork, reveal, ...props 
           blocks={turn.blocks}
           voiced={voiced[index]}
           live={live && index === turns.length - 1}
+          carried={index === turns.length - 1 ? carried : undefined}
         />
       ))}
     </>
@@ -451,7 +460,7 @@ function useWorkOpen(showActivity: boolean, live: boolean, reveal: Reveal | unde
   return { open, visited, choose: (next: boolean) => setChoice({ mode: showActivity, open: next }) };
 }
 
-const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = false, author: named, trailing, showActivity = true, voiced = false, onFork, reveal, ...props }: WorkTurnProps) {
+const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = false, author: named, trailing, showActivity = true, voiced = false, carried, onFork, reveal, ...props }: WorkTurnProps) {
   props = { ...props, runId: blocks.find((b) => b.runId)?.runId ?? props.runId };
   const docked = useDockedAsks();
   const visible = useMemo(() => blocks.filter((block) => !docked(block)), [blocks, docked]);
@@ -472,14 +481,17 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
   // A finished turn with nothing to copy or fork leaves its time out rather than end on it alone.
   const end = spoke && (turn.status.kind !== "done" || turn.reply || onFork);
   const prompt = before.findLast((block) => block.kind === "message" && block.role === "user")?.id;
+  const renderBlocks = (items: Block[], details?: boolean) => <TranscriptContents {...props} blocks={items} groupTools={false} toolDetails={details} />;
   return (
     <div className="work-turn" data-turn={id}>
       <TranscriptContents {...props} onFork={done ? undefined : onFork} blocks={before} />
       <NoteList notes={notes.before} />
       {spoke ? <TurnHead runId={props.runId} named={named} voiced={voiced} live={turn.live} blocks={blocks} prompt={prompt} /> : null}
+      <CarriedWork showActivity={showActivity} live={turn.live} work={work} carried={carried} named={named} taskCards={props.taskCards} />
       {showActivity && work.length ? (
         <section className="work-section" aria-label={named ? `${named}’s work` : "Agent work"}>
-          <TurnReceipt items={turn.receipt} open={open} controls={contentId} onToggle={() => choose(!open)} />
+          {/* A turn that has only begun has nothing to fold yet: its row arrives with the first thing it can say. */}
+          {turn.receipt.length || !turn.live ? <TurnReceipt items={turn.receipt} open={open} controls={contentId} onToggle={() => choose(!open)} /> : null}
           {!open && turn.live ? <WorkNow blocks={work} turn={blocks} taskCards={props.taskCards} /> : null}
           <div
             id={contentId}
@@ -489,17 +501,7 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
               if ((event.target as HTMLElement).closest("button, summary")) choose(true);
             }}
           >
-            {open || visited ? (
-              <WorkSteps
-                blocks={work}
-                turn={blocks}
-                live={turn.live}
-                taskCards={props.taskCards}
-                pinned={props.replyAction?.blockId}
-                reveal={revealWork?.messageId}
-                renderBlocks={(items, details) => <TranscriptContents {...props} blocks={items} groupTools={false} toolDetails={details} />}
-              />
-            ) : null}
+            {open || visited ? <WorkSteps blocks={work} turn={blocks} live={turn.live} taskCards={props.taskCards} pinned={props.replyAction?.blockId} renderBlocks={renderBlocks} /> : null}
           </div>
         </section>
       ) : null}
@@ -584,7 +586,7 @@ export function TranscriptContents({
             className={cn("transcript-block", isCompact(item.block) && compact(items[i - 1]) ? "mt-0" : "mt-3")}
           >
             <BlockView block={item.block} runId={runId} onFork={onFork} taskCards={taskCards} toolDetails={toolDetails} actions={replyActions} />
-            {replyAction?.blockId === item.block.id ? replyAction.content : null}
+            {replyAction && replyAction.blockId === item.block.id ? replyAction.content : null}
             {trailing?.([item.block])}
           </div>
         );

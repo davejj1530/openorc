@@ -27,7 +27,7 @@ function view() {
 function show(output: unknown) {
   runs.applyFrame({ runId: base.runId, seq: 1, events: [start, completed(output)] });
   const result = render(view());
-  fireEvent.click(screen.getByRole("button", { name: /Mobbin: search screens/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Mobbin search screens/ }));
   return result;
 }
 beforeEach(() => {
@@ -43,8 +43,11 @@ it.each([["Codex MCP", { content: [text, image], structuredContent: { screens: [
     const thumbnail = screen.getByRole("img", { name: "Tool image 1" });
     expect(thumbnail.getAttribute("src")).toBe(`data:image/png;base64,${png}`);
     expect(container.textContent).not.toContain(png);
-    fireEvent.click(screen.getByText("Result text"));
-    expect(screen.getByText(text.text)).toBeTruthy();
+    // The words that came with the pictures are the raw call's to show.
+    expect(container.textContent).not.toContain("app_name");
+    fireEvent.click(screen.getByRole("button", { name: "Raw call" }));
+    expect(container.textContent).toContain("app_name");
+    expect(container.textContent).not.toContain(png);
     const opener = screen.getByRole("button", { name: "View image: Tool image 1" });
     opener.focus();
     fireEvent.click(opener);
@@ -72,9 +75,8 @@ it("restores image-only results from the ledger without requiring a live provide
   vi.mocked(core.call).mockResolvedValue({ events: JSON.parse(JSON.stringify([start, completed({ content: [image] })])), fromTurn: 0, live: false });
   await runs.hydrate(base.runId);
   render(view());
-  fireEvent.click(screen.getByRole("button", { name: /Mobbin: search screens/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Mobbin search screens/ }));
   expect(screen.getAllByRole("img")).toHaveLength(1);
-  expect(screen.queryByText("Result text")).toBeNull();
 });
 
 it("keeps plain output verbatim and replaces it with media on completion", () => {
@@ -110,11 +112,11 @@ it("keeps unknown and malformed blocks inspectable without crashing or dumping b
   });
   expect(screen.queryByRole("img")).toBeNull();
   expect(container.textContent).toContain("Image preview unavailable");
-  expect(container.textContent).toContain("42");
   expect(container.textContent).not.toContain("PHN2Zz4=");
   expect(container.textContent).not.toContain("QUJDRA==");
-  fireEvent.click(screen.getByText("Result data"));
+  fireEvent.click(screen.getByRole("button", { name: "Raw call" }));
   await waitFor(() => expect(container.textContent).toContain('"count": 4'));
+  expect(container.textContent).toContain("42");
   expect(container.textContent).not.toContain("PHN2Zz4=");
   expect(container.textContent).not.toContain("QUJDRA==");
 });

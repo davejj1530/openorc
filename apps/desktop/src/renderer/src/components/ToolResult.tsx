@@ -1,10 +1,8 @@
-import { memo, useMemo, useState } from "react";
-import { toolResult, toolResultDetails } from "@openorc/client";
+import { memo, useMemo } from "react";
+import { toolResult } from "@openorc/client";
 import { ThreadImage, ThreadLink } from "./ThreadImages";
 
-const textStyle = "px-3 py-2 whitespace-pre-wrap break-words text-ink-3 max-h-72 overflow-auto";
-
-/** Shared by all tool rows, including restored conversations. */
+/** The pictures and files a call gave back. Its words and data are the raw call's to show. */
 export const ToolResult = memo(function ToolResult({ output }: { output: unknown }) {
   const result = useMemo(() => toolResult(output), [output]);
   return (
@@ -32,29 +30,6 @@ export const ToolResult = memo(function ToolResult({ output }: { output: unknown
           )}
         </div>
       ) : null}
-      {result.text ? <ResultText text={result.text} hasMedia={result.media.length > 0} /> : null}
-      {result.details ? <ResultData output={output} /> : null}
     </div>
   );
 });
-
-function ResultText({ text, hasMedia }: { text: string; hasMedia: boolean }) {
-  if (!hasMedia) return <pre className={textStyle}>{text}</pre>;
-  return (
-    <details>
-      <summary className="px-3 py-2 text-ink-3">Result text</summary>
-      <pre className={textStyle}>{text}</pre>
-    </details>
-  );
-}
-
-function ResultData({ output }: { output: unknown }) {
-  const [open, setOpen] = useState(false);
-  const text = useMemo(() => (open ? toolResultDetails(output) : ""), [open, output]);
-  return (
-    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary className="px-3 py-2 text-ink-3">Result data</summary>
-      {open ? <pre className={textStyle}>{text}</pre> : null}
-    </details>
-  );
-}

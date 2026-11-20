@@ -140,8 +140,8 @@ it("forks a cloud thread once its server serves forks, and opens the fork", asyn
 
 it("reads an omitted cloud tool output when its row opens, as a Mac one's", async () => {
   vi.mocked(core.call).mockImplementation((async (method: string) => (method === "events.toolOutput" ? { output: "the whole cloud output" } : undefined)) as never);
-  mount(<ToolRow block={{ id: "tool-1", kind: "tool", name: "Read", input: { path: "example.ts" }, outputOmitted: true, done: true, runId: "hosted:example-thread" }} />);
-  fireEvent.click(screen.getByRole("button"));
+  mount(<ToolRow block={{ id: "tool-1", kind: "tool", name: "mobbin.search_screens", input: { query: "onboarding" }, outputOmitted: true, done: true, runId: "hosted:example-thread" }} />);
+  fireEvent.click(screen.getByRole("button", { name: /Mobbin search screens/ }));
   await vi.waitFor(() => expect(core.call).toHaveBeenCalledWith("events.toolOutput", { runId: "hosted:example-thread", toolCallId: "tool-1" }));
   expect(await screen.findByText(/the whole cloud output/)).toBeTruthy();
 });

@@ -6,9 +6,10 @@ import { useMessageAuthor, useTurnSender } from "../lib/thread-authors";
 import { TurnSender } from "./ThreadVoice";
 
 /**
- * A turn's head, only where it has something to say: the agent's mark, name and model where they changed from the
+ * A turn's head, only where it has something to say: the agent's mark and name where who speaks changed from the
  * turn before (`voiced`), and in a cloud thread others are in, who sent the turn where its prompt does not already
- * name them. `blocks`: the turn's, which name its sender; `prompt`: the message the turn answers.
+ * name them. It never names the model, which the composer shows. `blocks`: the turn's, which name its sender;
+ * `prompt`: the message the turn answers.
  */
 export function TurnHead({
   runId,
@@ -34,7 +35,6 @@ export function TurnHead({
     <div className="turn-head">
       {voiced && voice && isHarnessId(voice.agent) ? <HarnessLogo id={voice.agent} size={14} className="turn-head-mark" /> : null}
       {voiced ? <span className="turn-head-name">{author ?? (voice ? harnessShortName(voice.agent) : "Assistant")}</span> : null}
-      {voiced && voice?.model ? <span className="turn-head-model">{voice.model}</span> : null}
       {sent !== undefined ? <TurnSender person={sent} /> : null}
     </div>
   );

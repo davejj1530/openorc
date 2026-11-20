@@ -36,6 +36,12 @@ Object.assign(globalThis, {
 });
 /** The turn's receipt row, which opens and folds its work. */
 const receipt = () => document.querySelector<HTMLButtonElement>(".turn-receipt")!;
+/** Steps show their things as words without being asked; this opens any the reader folded. */
+const everything = () => document.querySelectorAll<HTMLElement>('button.work-name[aria-expanded="false"]').forEach((button) => fireEvent.click(button));
+/** The line of a thing a step did, by how it reads, and the piece it opens. */
+const lines = (name: RegExp) => screen.getAllByRole("button", { name }).filter((button) => button.classList.contains("work-act-head"));
+const line = (name: RegExp) => lines(name)[0]!;
+const piece = (row: HTMLElement) => row.closest<HTMLElement>(".work-act")!;
 const tool: Block = { id: "read", kind: "tool", name: "read_file", input: { path: "src/source.ts" }, output: "source contents", done: false, at: 1000 };
 const thought: Block = { id: "think", kind: "thinking", text: "Available reasoning summary", startedAt: 1100, endedAt: 1200 };
 const reply: Block = { id: "reply", kind: "message", role: "assistant", text: "The final answer.", streaming: false };
@@ -73,7 +79,7 @@ it("keeps the prompt and live status while an ask is docked, then adds the reply
   expect(container.querySelector(".turn-actions")?.textContent).toBe("Working");
 });
 
-it("names the agent and model only on a turn where they changed, the first turn against the thread's own", () => {
+it("names the agent only on a turn where it changed, the first turn against the thread's own, and never the model", () => {
   const turn = (runId: string, n: number): Block[] => [
     { id: `ask-${n}`, kind: "message", role: "user", text: `Ask ${n}`, streaming: false, runId },
     { id: `answer-${n}`, kind: "message", role: "assistant", text: `Answer ${n}`, streaming: false, runId },
@@ -81,7 +87,8 @@ it("names the agent and model only on a turn where they changed, the first turn 
   ];
   const opus = { agent: "claude", model: "Opus 5.5" };
   const sonnet = { agent: "claude", model: "Sonnet 5.5" };
-  const heads = (agent: typeof opus) => {
+  const codex = { agent: "codex", model: "GPT-6 Astra" };
+  const heads = (agent: typeof opus, last = sonnet) => {
     render(
       <ConversationVoice.Provider
         value={{
@@ -89,18 +96,22 @@ it("names the agent and model only on a turn where they changed, the first turn 
           runs: new Map([
             ["a", opus],
             ["b", sonnet],
+            ["c", last],
           ]),
           agent,
         }}
       >
-        <WorkTranscript runId="a" blocks={[...turn("a", 1), ...turn("b", 2), ...turn("b", 3)]} />
+        <WorkTranscript runId="a" blocks={[...turn("a", 1), ...turn("b", 2), ...turn("c", 3)]} />
       </ConversationVoice.Provider>,
     );
     return [...document.querySelectorAll(".work-turn")].map((each) => each.querySelector(".turn-head")?.textContent ?? null);
   };
-  expect(heads(sonnet)).toEqual(["ClaudeOpus 5.5", "ClaudeSonnet 5.5", null]);
+  // A switch of model alone names nothing: the composer says which model works.
+  expect(heads(sonnet)).toEqual([null, null, null]);
   cleanup();
-  expect(heads(opus)).toEqual([null, "ClaudeSonnet 5.5", null]);
+  expect(heads(opus, codex)).toEqual([null, null, "Codex"]);
+  cleanup();
+  expect(heads(codex)).toEqual(["Claude", null, null]);
 });
 
 it("ends a running turn with where it stands, in the row its actions take once it is done", () => {
@@ -179,20 +190,13 @@ it("names MCP tool calls by server and tool in each provider's naming", () => {
   ];
   render(<WorkTranscript runId="run" blocks={blocks} />);
   fireEvent.click(receipt());
-  fireEvent.click(screen.getByRole("button", { name: "Used Codegraph, used Mobbin" }));
-  // Each row reads the tool and what it was asked beside its server, and grows into its call with no second head.
-  for (const [name, server] of [
-    [/^explore who calls describe/, "Codegraph"],
-    [/^search screens onboarding/, "Mobbin"],
-    [/^get design context/, "Figma"],
-    [/^thread list/, "OpenOrc"],
-  ] as const) {
-    const chip = screen.getByRole("button", { name });
-    expect(chip.closest(".work-object")?.querySelector(".work-object-verb")?.textContent).toBe(server);
-    fireEvent.click(chip);
-    expect(chip.getAttribute("aria-pressed")).toBe("true");
-    expect(chip.closest(".work-call")?.querySelector(".tool-view")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: new RegExp(`^${server}: `) })).toBeNull();
+  everything();
+  // Each line says whose tool it is, the tool and what it was asked, and OpenOrc's own by what it did; pressing it opens the call itself under it.
+  for (const name of [/^Codegraph explore “who calls describe”/, /^Mobbin search screens “onboarding”/, /^Figma get design context/, /^Listed threads/]) {
+    const row = line(name);
+    fireEvent.click(row);
+    expect(row.getAttribute("aria-expanded")).toBe("true");
+    expect(piece(row).querySelector(".tool-view")).toBeTruthy();
   }
   expect(groupSummary([call("task", `${own}.task_create`, { title: "Ship it" })])).toBe("Created task");
 });
@@ -202,12 +206,14 @@ it("reads a described command as its description, with the command one click dee
   render(<WorkTranscript runId="run" blocks={[run, reply, end]} />);
   expect(receipt().getAttribute("aria-label")).toContain("tests passed");
   fireEvent.click(receipt());
-  fireEvent.click(screen.getByRole("button", { name: "Run the desktop tests" }));
-  // The command's card already reads the command and its last line, so it stays closed instead of repeating them.
-  expect(screen.getByRole("button", { name: /^Ran pnpm --filter desktop test/ }).getAttribute("aria-expanded")).toBe("false");
-  expect(screen.getByText("48 passed")).toBeTruthy();
+  // The line reads the description; pressing it shows the command as it ran and what it printed.
+  const row = line(/^Run the desktop tests/);
+  expect(row.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.click(row);
+  expect(piece(row).querySelector(".work-run-command")!.textContent).toContain("pnpm --filter desktop test");
+  expect(piece(row).querySelector(".work-screen")!.textContent).toContain("48 passed");
 });
-it("opens an edited file's chip to its diff, not the file", async () => {
+it("opens an edited file's line to the lines it changed, and no other file's", () => {
   const input = [
     { path: "src/a.ts", kind: "update", diff: "@@ -1 +1 @@\n-old a\n+new a" },
     { path: "src/b.ts", kind: "update", diff: "@@ -1 +1 @@\n-old b\n+new b" },
@@ -215,50 +221,58 @@ it("opens an edited file's chip to its diff, not the file", async () => {
   const patch: Block = { ...tool, id: "patch", name: "apply_patch", input, output: "Success", done: true };
   render(<WorkTranscript runId="run" blocks={[patch, reply, end]} />);
   fireEvent.click(receipt());
-  fireEvent.click(screen.getByRole("button", { name: "Edited 2 files" }));
-  const chip = document.querySelector<HTMLElement>('[data-tip="src/a.ts"]')!;
-  expect(chip.tagName).toBe("BUTTON");
-  fireEvent.click(chip);
-  expect(chip.getAttribute("aria-pressed")).toBe("true");
-  const diff = await screen.findByTestId("diff");
-  expect(diff.textContent).toContain("+new a");
-  expect(diff.textContent).not.toContain("new b");
+  const row = line(/^Edited a\.ts/);
+  fireEvent.click(row);
+  const lines = piece(row).querySelector(".work-edit-lines")!;
+  expect(lines.textContent).toContain("new a");
+  expect(lines.textContent).not.toContain("new b");
+});
+it.each(["Read", "Bash", "Write", "Grep", "ToolSearch", "Skill", "mcp__codegraph__codegraph_explore"])("draws a %s call that has started and not yet said what it is for", (name) => {
+  render(<WorkTranscript runId="run" blocks={[{ id: "call", kind: "tool", name, input: {}, done: false, at: Date.now() } as Block]} live />);
+  expect(document.querySelector(".work-act")!.textContent!.trim()).not.toBe("");
 });
 it("carries the live step on one line, open or folded", () => {
   const reasoning: Block = { id: "think-r", kind: "thinking", text: "**Running the desktop tests**\n\nThey cover the row.", startedAt: Date.now() - 4000, endedAt: Date.now() - 3000 };
   const running: Block = { ...tool, id: "cmd", name: "shell", input: { command: "pnpm test" }, at: Date.now() };
   render(<WorkTranscript runId="run" blocks={[reasoning, running]} live />);
-  expect(screen.getByRole("button", { name: /^Running the desktop tests/ }).getAttribute("aria-expanded")).toBe("true");
+  expect(document.querySelector('.work-line[data-state="running"]')!.textContent).toMatch(/^Running the desktop tests/);
   fireEvent.click(receipt());
   expect(screen.getByRole("status").textContent).toMatch(/^Running the desktop tests/);
 });
-it("preserves an inspected command when it fails and a retry arrives", () => {
+it("opens the command under way, and keeps a line the reader opened as a retry arrives", () => {
   const command: Block = { ...tool, name: "shell", input: { command: "pnpm test" } };
   const { rerender } = render(<WorkTranscript runId="run" blocks={[command]} live />);
-  // A test run under way is drawn as one; its row grows into the call itself, the row standing as its only head.
-  fireEvent.click(screen.getByRole("button", { name: "Run the tests" }));
-  expect(screen.getByRole("button", { name: "Run the tests" }).getAttribute("aria-pressed")).toBe("true");
-  expect(screen.getByText("pnpm test")).toBeTruthy();
-  expect(screen.queryByRole("button", { name: /command pnpm test/ })).toBeNull();
-  // It failed without a runner's counts, so it turns into a plain command and stays open as the retry starts.
+  // The command under way is open: its line, and under it the command as it runs.
+  const running = line(/^Run the tests/);
+  expect(running.getAttribute("aria-expanded")).toBe("true");
+  expect(piece(running).querySelector(".work-run-command")!.textContent).toContain("pnpm test");
+  // It failed without a runner's counts, so it reads as a plain command; the retry is the line under way now.
   const failed: Block = { ...command, done: true, isError: true, status: "error", output: "7 tests failed" };
   rerender(<WorkTranscript runId="run" blocks={[failed, { ...command, id: "retry" }]} live />);
-  expect(screen.getByRole("button", { pressed: true }).closest(".work-call")?.textContent).toContain("7 tests failed");
+  const [first, retry] = lines(/^Run the tests/);
+  expect(first!.getAttribute("aria-expanded")).toBe("false");
+  expect(retry!.getAttribute("aria-expanded")).toBe("true");
+  // A line the reader opens stays open when the turn moves on.
+  fireEvent.click(first!);
+  expect(piece(first!).querySelector(".work-screen")!.textContent).toContain("7 tests failed");
+  rerender(<WorkTranscript runId="run" blocks={[failed, { ...command, id: "retry", done: true, output: "37 tests passed" }, { ...tool, id: "next", done: false }]} live />);
+  expect(line(/^Run the tests/).getAttribute("aria-expanded")).toBe("true");
 });
 it("defaults completed work closed, preserves the final answer and reveals nested detail with keyboard-accessible controls", () => {
   render(<WorkTranscript runId="run" blocks={[{ ...tool, done: true }, thought, reply, end]} />);
   const work = receipt();
   expect(work.getAttribute("aria-expanded")).toBe("false");
   expect(screen.getByText("The final answer.")).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Read a file" })).toBeNull();
+  expect(document.querySelector("button.work-name")).toBeNull();
   fireEvent.click(work);
-  fireEvent.click(screen.getByRole("button", { name: "Read a file" }));
-  fireEvent.click(screen.getByRole("button", { name: "Read" }));
-  fireEvent.click(screen.getByRole("button", { name: /Read src\/source.ts/ }));
-  expect(screen.getByText("source contents")).toBeTruthy();
+  everything();
+  // One file read is its line and the file's link; the thought after it opens to what it said, and stays open.
+  expect(document.querySelector(".work-act")!.textContent).toMatch(/^Read source\.ts/);
+  fireEvent.click(screen.getByRole("button", { name: /^Thought for/ }));
+  expect(screen.getByText("Available reasoning summary")).toBeTruthy();
   fireEvent.click(work);
   fireEvent.click(work);
-  expect(screen.getByRole("button", { name: /Read src\/source.ts/ }).getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("button", { name: /^Thought for/ }).getAttribute("aria-expanded")).toBe("true");
 });
 it("keeps pending input visible and failed tools inside collapsed work", () => {
   const attention: Block[] = [
@@ -267,13 +281,11 @@ it("keeps pending input visible and failed tools inside collapsed work", () => {
   ];
   render(<WorkTranscript runId="run" blocks={[{ ...tool, done: true }, ...attention, reply, end]} />);
   expect(screen.getByText("Question for you")).toBeTruthy();
-  expect(screen.queryByRole("button", { name: /failed-test.*Failed/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /failed-test.*failed/i })).toBeNull();
+  // Opened, the work has a line for the command that failed, which says so.
   fireEvent.click(receipt());
-  expect(screen.queryByRole("button", { name: /failed-test.*Failed/ })).toBeNull();
-  // The folded step says what failed; the call itself stays one click deeper.
-  fireEvent.click(screen.getByRole("button", { name: "Read a file, ran a command Command failed" }));
-  fireEvent.click(screen.getByRole("button", { name: "Ran" }));
-  expect(screen.getByRole("button", { name: /failed-test.*Failed/ })).toBeTruthy();
+  everything();
+  expect(line(/failed-test.*failed/i)).toBeTruthy();
 });
 
 it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s work through retry, completion, and history reload", async (kind, Component) => {
@@ -299,7 +311,7 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
   runs.applyFrame({ runId, seq: 1, events: events.slice(0, 3) });
   const { rerender, unmount } = render(<Component runId={runId} blocks={runs.get(runId)!.blocks} live />);
   expect(screen.queryByRole("button", { name: /pnpm test.*Failed/ })).toBeNull();
-  expect(screen.getByRole("button", { name: "Running the tests" })).toBeTruthy();
+  expect(document.querySelector('.work-act[data-state="running"]')!.textContent).toMatch(/Run the tests/);
 
   runs.applyFrame({ runId, seq: 2, events: events.slice(3) });
   rerender(<Component runId={runId} blocks={runs.get(runId)!.blocks} />);
@@ -316,16 +328,15 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
   render(<Component runId={runId} blocks={runs.get(runId)!.blocks} />);
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
   fireEvent.click(receipt());
-  expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Read a file, ran the tests" }));
-  fireEvent.click(screen.getByRole("button", { name: "Read" }));
-  // Each run keeps its place in time: the failed one, then the retry that passed.
-  fireEvent.click(screen.getAllByRole("button", { name: "Ran" })[0]!);
-  fireEvent.click(screen.getByRole("button", { name: /cat scripts\/build-mascot-review.cjs.*Failed/ }));
-  fireEvent.click(screen.getByRole("button", { name: /pnpm test.*Failed/ }));
-  expect(screen.getByText("No such file or directory")).toBeTruthy();
-  // The failed run's last line reads under its row too, so its output shows twice once its call is open.
-  expect(screen.getAllByText("7 tests failed")).toHaveLength(2);
+  everything();
+  // Each run keeps its place in time: the read that failed, the run that failed, then the retry that passed.
+  const read = line(/^Read build-mascot-review\.cjs.*Failed/);
+  fireEvent.click(read);
+  expect(piece(read).textContent).toContain("No such file or directory");
+  const [failedRun, retried] = lines(/^Run the tests/);
+  expect(retried).toBeTruthy();
+  fireEvent.click(failedRun!);
+  expect(piece(failedRun!).querySelector(".work-screen")!.textContent).toContain("7 tests failed");
   expect(screen.getByText("Verified all 37 tests.").closest(".work-section")).toBeNull();
 });
 it("preserves the orb presence independently of the work header", () => {

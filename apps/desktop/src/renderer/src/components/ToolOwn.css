@@ -1,0 +1,212 @@
+/* OpenOrc's own tools, drawn as what they were about. A list is rows as the sidebar would show them: a mark, the name
+   in ink with a quiet word after it, something at the far end, and one line under of the newest thing said. */
+.own-rows {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin: 0 -8px;
+  padding: 0;
+  list-style: none;
+}
+.own-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 1px;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px 8px 8px;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  line-height: 18px;
+  text-align: left;
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+button.own-row:hover {
+  background: var(--control-fill);
+}
+button.own-row:focus-visible,
+.own-from-name:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.own-row-mark {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--ink);
+}
+.own-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1.25px var(--ink-4);
+}
+.own-row-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ink);
+}
+.own-row-title > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.own-row-title > small,
+.own-row-end {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.own-row-last {
+  grid-column: 2 / 4;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* In line with the names above it. */
+.own-more {
+  justify-self: start;
+  margin-left: 4px;
+}
+/* Under words, the way to the rest of them starts where they do. */
+.own-words > .work-more {
+  height: 20px;
+  padding-left: 0;
+}
+.own-quiet {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-3);
+}
+.own-quiet[data-tone="bad"] {
+  color: var(--bad);
+}
+
+/* A thread that was read, as its conversation; a message that was sent, as what it said and where it landed. */
+.own-talk,
+.own-sent,
+.own-page,
+.own-note {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.own-words {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: 20px;
+  color: var(--ink-2);
+}
+.own-fold,
+.own-plain,
+.own-note > p {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: 20px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.own-fold {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+.own-plain {
+  white-space: pre-wrap;
+}
+.own-bubble {
+  justify-self: start;
+  max-width: 100%;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-2xl);
+  background: var(--control-fill);
+  font-size: var(--text-sm);
+  line-height: 20px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.own-bubble .own-words,
+.own-bubble .own-fold {
+  color: inherit;
+}
+/* A person's own message sits where theirs do in a conversation. */
+.own-you {
+  justify-self: end;
+  max-width: 80%;
+}
+.own-from {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  min-width: 0;
+  padding-left: 10px;
+  border-left: var(--hairline) solid var(--line);
+}
+.own-from-name {
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-2);
+  text-align: left;
+  transition: color var(--duration-quick) var(--ease-out);
+}
+.own-from-name:hover {
+  color: var(--ink);
+}
+.own-from .own-fold,
+.own-from .own-plain {
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-3);
+}
+
+/* A page the browser was on: its title, where it is, then its picture. */
+.own-page-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--ink-3);
+}
+.own-page-head > svg {
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--ink-4);
+}
+.own-page-title {
+  flex-shrink: 0;
+  color: var(--ink);
+}
+.own-page-head > a {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: inherit;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.own-page-head > a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}

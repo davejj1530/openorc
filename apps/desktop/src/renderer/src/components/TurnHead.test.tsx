@@ -20,11 +20,11 @@ const head = (props: Partial<Parameters<typeof TurnHead>[0]>, together?: { autho
     </ConversationVoice.Provider>,
   ).container;
 
-it("names the agent and model on a turn where they changed, and nothing else", () => {
-  expect(head({ voiced: true }).textContent).toBe("CodexGPT-6-Astra");
+it("names the agent on a turn where it changed, and never its model", () => {
+  expect(head({ voiced: true }).textContent).toBe("Codex");
 });
 
-it("draws nothing on a turn whose agent and model did not change", () => {
+it("draws nothing on a turn whose agent did not change", () => {
   expect(head({}).querySelector(".turn-head")).toBeNull();
 });
 
@@ -44,5 +44,5 @@ it("leaves the sender to the prompt above that names them, and names one the pro
   expect(head({ blocks: [{ id: "joined" }, { id: "reply" }], prompt: "joined" }, { authors }).querySelector(".turn-head")).toBeNull();
   cleanup();
   const joined = { ...authors, authors: { joined: theo } };
-  expect(head({ voiced: true, blocks: [{ id: "joined" }, { id: "reply" }], prompt: "joined" }, { authors: joined }).textContent).toBe("CodexGPT-6-Astra" + "MOMara");
+  expect(head({ voiced: true, blocks: [{ id: "joined" }, { id: "reply" }], prompt: "joined" }, { authors: joined }).textContent).toBe("Codex" + "MOMara");
 });

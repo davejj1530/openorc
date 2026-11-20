@@ -43,8 +43,8 @@ export function useTurnAuthor(named: string | undefined, runId: string): string 
 }
 
 /**
- * Which turns name who spoke in them: each turn against the turn before it, the first against the thread's own agent
- * and model. `runId` stands in for a turn whose blocks name no run; `named` is a byline the caller gives every turn.
+ * Which turns name who spoke in them: each turn against the turn before it, the first against the thread's own
+ * agent. `runId` stands in for a turn whose blocks name no run; `named` is a byline the caller gives every turn.
  */
 export function useVoicedTurns(turns: readonly { blocks: readonly Block[] }[], runId: string, named: string | undefined): boolean[] {
   const { runs, agent, authors } = useContext(ConversationVoice);

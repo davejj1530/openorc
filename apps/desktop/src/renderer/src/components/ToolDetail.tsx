@@ -6,6 +6,7 @@ import {
   type ChangedFile,
   type ChangeStatus,
   joinPath,
+  ownToolView,
   toolInputView,
   toolOutputView,
   type Field,
@@ -17,6 +18,8 @@ import { Globe, Search, WorkDelegate } from "./icons";
 import { FileLine, Matches } from "./Matches";
 import { ThreadLink, ThreadRichText } from "./ThreadImages";
 import { CommandSteps, shortPath } from "./ToolCommand";
+import { ToolData } from "./ToolData";
+import { ToolOwn } from "./ToolOwn";
 import { Code, PrintedText } from "./ToolPrinted";
 import { ToolResult } from "./ToolResult";
 import "./ToolDetail.css";
@@ -44,11 +47,20 @@ export function ToolDetail({ block, output }: { block: ToolBlock; output: unknow
   const quiet = !block.isError && (input.kind === "edit" || input.kind === "write" || input.kind === "patch");
   const view = useMemo(() => (result && !result.media.length && !quiet ? toolOutputView(block, result.text) : null), [block, result, quiet]);
   const [raw, setRaw] = useState(false);
+  // One of OpenOrc's own tools draws as the thing it was about, in place of what it was asked and gave back.
+  const own = useMemo(() => (output === undefined ? null : ownToolView(block, output)), [block, output]);
+  const media = result?.media.length ? <ToolResult output={output} /> : null;
   return (
     <div className="tool-view" data-error={block.isError || undefined}>
-      <InputPart view={input} />
-      {result?.media.length ? <ToolResult output={output} /> : null}
-      {view ? <OutputPart view={view} cwd={input.kind === "command" ? input.cwd : null} /> : null}
+      {own ? (
+        <ToolOwn view={own} media={media} />
+      ) : (
+        <>
+          <InputPart view={input} />
+          {media}
+          {view ? <OutputPart view={view} cwd={input.kind === "command" ? input.cwd : null} /> : null}
+        </>
+      )}
       <button type="button" className="tool-view-more" aria-expanded={raw} onClick={() => setRaw((value) => !value)}>
         {raw ? "Hide raw call" : "Raw call"}
       </button>
@@ -111,7 +123,11 @@ function OutputPart({ view, cwd }: { view: OutputView; cwd: string | null }) {
     case "tests":
       return <PrintedText text={view.text} cwd={cwd} />;
     case "json":
-      return <Code code={view.json} language="json" startLine={null} />;
+      return (
+        <div className="tool-data-answer">
+          <ToolData value={JSON.parse(view.json)} />
+        </div>
+      );
     case "markdown":
       return (
         <div className="tool-view-prose prose-chat">
@@ -173,7 +189,7 @@ function Fields({ fields }: { fields: Field[] }) {
     <dl className="tool-view-fields">
       {fields.map((field) => (
         <div key={field.key}>
-          <dt>{field.key}</dt>
+          <dt>{field.label}</dt>
           <dd>{field.structured ? <pre>{field.value}</pre> : field.value}</dd>
         </div>
       ))}

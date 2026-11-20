@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { PreviewCard } from "@base-ui/react/preview-card";
 import { languageFor, type ReadObject, type WorkChip } from "@openorc/client";
 import type { FileEntry, FileRead, FileScope, FolderPath } from "@openorc/protocol";
@@ -46,7 +46,6 @@ export function ReadView({ read, renderBlocks }: { read: ReadObject; renderBlock
 }
 
 function FileRow({ chip }: { chip: WorkChip }) {
-  const { fileScope } = useThreadMedia();
   const content = (
     <>
       <FileGlyph path={chip.label} size={14} className="work-chip-icon" />
@@ -62,24 +61,35 @@ function FileRow({ chip }: { chip: WorkChip }) {
       ) : null}
     </>
   );
-  const href = fileHref(chip);
-  const link = chip.path ? <ThreadLink href={href}>{content}</ThreadLink> : content;
+  return (
+    <FilePeek chip={chip} className="work-chip">
+      {chip.path ? <ThreadLink href={fileHref(chip)}>{content}</ThreadLink> : content}
+    </FilePeek>
+  );
+}
+
+/**
+ * Its children as what a peek at the file hangs from: holding the pointer there shows the chip's lines. Without a
+ * file it can read, the children stand alone.
+ */
+export function FilePeek({ chip, className, children }: { chip: WorkChip; className: string; children: ReactNode }) {
+  const { fileScope } = useThreadMedia();
   if (!chip.path || !fileScope || failed(chip))
     return (
-      <span className="work-chip" data-kind={chip.kind} data-tip={chip.title}>
-        {link}
+      <span className={className} data-kind={chip.kind} data-tip={chip.title}>
+        {children}
       </span>
     );
   return (
     <PreviewCard.Root>
-      <PreviewCard.Trigger delay={350} closeDelay={150} render={<span className="work-chip" data-kind={chip.kind} />}>
-        {link}
+      <PreviewCard.Trigger delay={350} closeDelay={150} render={<span className={className} data-kind={chip.kind} />}>
+        {children}
       </PreviewCard.Trigger>
       <PreviewCard.Portal>
         <CoversPreview />
         <PreviewCard.Positioner side="bottom" align="start" sideOffset={6} collisionPadding={12}>
           <PreviewCard.Popup ref={floatingGround} className="floating-popover read-peek">
-            <ReadPeek chip={chip} href={href} scope={fileScope} />
+            <ReadPeek chip={chip} href={fileHref(chip)} scope={fileScope} />
           </PreviewCard.Popup>
         </PreviewCard.Positioner>
       </PreviewCard.Portal>

@@ -1,16 +1,14 @@
-/* A turn's work as one card of steps. Each step is a mark and a title; the live one is open and in ink.
-   Class names stay under steps, work-rail, work-phase, work-group and work-chip:
+/* A turn's work as writing on the conversation's own ground. Each step is a sentence; the things it worked on are
+   words in it, and a word shows its thing under the sentence, beside a hairline.
+   Class names stay under steps, work-line, work-phase, work-group and work-chip:
    app.css already owns .work-row and .work-section for the window layout, and .work-row draws a window drag
    region. */
-/* The steps card: an r20 plane. With a plan, a head with "Step k of n" over a 2px track. */
-.steps-card {
+/* With a plan, a head with "Step k of n" over a 2px track. */
+.work-written {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
-  padding: 16px 18px 14px;
-  border-radius: var(--radius-3xl);
-  background: var(--surface);
 }
 .steps-head {
   display: flex;
@@ -50,8 +48,9 @@
   background: var(--ink);
   transition: inline-size var(--duration-resize) var(--ease-out);
 }
-.work-rail {
+.work-lines {
   display: grid;
+  gap: 14px;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -119,51 +118,21 @@
   }
 }
 
-.work-phase-title {
-  grid-column: 2;
-  grid-row: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-  min-height: 30px;
-  text-align: left;
-  font-size: var(--text-base);
-  line-height: 16px;
-  color: var(--ink-2);
-  transition: color var(--duration-arrive) var(--ease-out);
-}
-.work-rail-item[data-state="running"] > .work-phase-title {
-  color: var(--ink);
-}
-button.work-phase-title:enabled:hover {
-  color: var(--ink);
-}
-button.work-phase-title:focus-visible,
-.work-group-label:focus-visible,
 .work-more:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
+/* A step's name reads in full, on as many lines as it takes. */
 .work-line-text {
   min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* The folded work's line is one line: a thought's latest sentence can be long. */
+.work-now .work-line-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.work-phase-meta {
-  flex-shrink: 0;
-  font-size: var(--text-xs);
-  color: var(--ink-4);
-  font-variant-numeric: tabular-nums;
-}
-/* A narrow column keeps the title whole rather than a clipped hint. */
-@container (max-width: 420px) {
-  .work-phase-meta {
-    display: none;
-  }
 }
 .work-elapsed {
   margin-left: auto;
@@ -172,36 +141,7 @@ button.work-phase-title:focus-visible,
   color: var(--ink-4);
   font-variant-numeric: tabular-nums;
 }
-.work-phase-title > .work-chevron {
-  flex-shrink: 0;
-  margin-left: auto;
-  opacity: 0;
-}
-.work-elapsed + .work-chevron {
-  margin-left: 0;
-}
-button.work-phase-title:hover > .work-chevron,
-button.work-phase-title:focus-visible > .work-chevron,
-button.work-phase-title[aria-expanded="true"] > .work-chevron {
-  opacity: 1;
-}
-/* A phase opens to its kinds of work: the verbs share one quiet column, what they touched lines up beside it.
-   Anything else in the body spans both columns. */
-.work-phase-body {
-  grid-column: 2;
-  display: grid;
-  grid-template-columns: fit-content(112px) minmax(0, 1fr);
-  column-gap: 12px;
-  row-gap: 10px;
-  min-width: 0;
-  padding: 2px 0 12px;
-}
-.work-phase-body > :not(.work-group) {
-  grid-column: 1 / -1;
-}
-.work-group-calls[hidden] {
-  display: none;
-}
+
 .work-phase-detail {
   font-size: var(--text-base);
   line-height: 20px;
@@ -211,18 +151,17 @@ button.work-phase-title[aria-expanded="true"] > .work-chevron {
 }
 .work-phase-narration > .transcript-block:first-child,
 .work-phase-extras > .transcript-block:first-child,
-.work-group-calls > .transcript-block:first-child,
 .work-call-details > .transcript-block:first-child,
 .work-rail-blocks > .transcript-block:first-child,
 .work-group-blocks > .transcript-block:first-child {
   margin-top: 0;
 }
-/* Narration under a step reads as a muted note rather than a reply. */
-.work-rail .journal-response .prose-chat,
+/* What the agent wrote at a step's head reads in full, a step quieter than a reply. */
+.work-lines .journal-response .prose-chat,
 .work-phase-narration .text-prose {
   font-size: var(--text-base);
-  line-height: 20px;
-  color: var(--ink-3);
+  line-height: 22px;
+  color: var(--ink-2);
 }
 .work-rail-blocks {
   grid-column: 1 / -1;
@@ -235,58 +174,24 @@ button.work-phase-title[aria-expanded="true"] > .work-chevron {
 }
 
 /* Codex's reasoning titles inside a phase: the steps it took, quieter than what it touched. */
+/* A step's thoughts, shown under it when asked for: quiet prose, each titled one led by its title. */
 .work-thoughts {
   display: grid;
-  gap: 2px;
-  font-size: var(--text-xs);
+  gap: 8px;
+  padding: 2px 0;
+  font-size: var(--text-sm);
+  line-height: 20px;
   color: var(--ink-3);
 }
-.work-thoughts > li {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
+.work-thoughts > p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
-.work-thoughts > li::before {
-  content: "";
-  flex-shrink: 0;
-  width: 4px;
-  height: 4px;
-  margin-bottom: 2px;
-  border-radius: var(--radius-pill);
-  background: var(--ink-4);
-}
-
-.work-group {
-  display: contents;
-}
-/* The verb column is at least as wide as "Searching", so rows start at one edge from phase to phase. */
-.work-group-label {
-  grid-column: 1;
-  align-self: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  justify-self: start;
-  min-width: 72px;
-  min-height: 28px;
-  font-size: var(--text-xs);
-  line-height: 16px;
-  color: var(--ink-4);
-  text-align: left;
-}
-.work-group-label:hover {
+.work-thought-title {
   color: var(--ink-2);
 }
-.work-group-label > .work-chevron {
-  flex-shrink: 0;
-  opacity: 0;
-}
-.work-group-label:hover > .work-chevron,
-.work-group-label:focus-visible > .work-chevron,
-.work-group-label[aria-expanded="true"] > .work-chevron {
-  opacity: 1;
-}
+
 .work-chips {
   grid-column: 2;
   display: grid;
@@ -395,15 +300,7 @@ button.work-chip:focus-visible {
 .work-more:hover {
   color: var(--ink);
 }
-.work-group-calls {
-  min-width: 0;
-}
-.work-group > .work-group-calls {
-  grid-column: 2;
-}
-.work-chips > .work-group-calls {
-  padding: 4px 0 6px;
-}
+
 /* A pressed chip grows into its call: one fill from the chip down, the chip its head, the call set under its name.
    The wrapper takes the chip's reach past the column, and the fills inside the call step up one against it. */
 .work-call {
@@ -477,6 +374,11 @@ button.work-chip:focus-visible {
 }
 
 /* The folded work's line: a loader and what is happening now, under the receipt. */
+/* How the work under way stands to a newer message: said first, and quietly. */
+.work-now-lead {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
 .work-now {
   display: flex;
   align-items: center;
@@ -509,10 +411,100 @@ button.work-chip:focus-visible {
 .work-phase-narration .prose-chat :where(p):last-child {
   margin-bottom: 0;
 }
-/* A command nested in the card steps down a fill, since the card is already the plane. */
-.steps-card .command-card {
-  background: var(--surface-2);
+
+/* A step: its name, then one quiet line of what it came to. Finished steps step back; the one under way is in ink. */
+.work-line {
+  display: grid;
+  min-width: 0;
+  transition:
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out),
+    translate var(--duration-arrive) var(--ease-out);
 }
-.steps-card .inline-diff {
-  background: var(--surface-2);
+/* A step that starts while the turn runs comes in; steps already there when the work mounts stay put. */
+@starting-style {
+  [data-arrivals] .work-line {
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+    translate: 0 var(--arrive-rise);
+  }
+}
+.work-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 24px;
+  text-align: left;
+  font-size: var(--text-base);
+  line-height: 20px;
+  color: var(--ink-2);
+  transition: color var(--duration-arrive) var(--ease-out);
+}
+.work-line[data-state="running"] > .work-name,
+button.work-name:enabled:hover {
+  color: var(--ink);
+}
+.work-name > .work-chevron {
+  flex-shrink: 0;
+  opacity: 0;
+}
+/* A step is open unless the reader folded it, so its chevron shows only under the pointer or once it is folded. */
+button.work-name:is(:hover, :focus-visible, [aria-expanded="false"]) > .work-chevron {
+  opacity: 1;
+}
+button.work-name:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+/* What the step came to, a size down and quiet: words for what it changed or ran, counts for its looking around. */
+.work-came {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 12px;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 22px;
+  color: var(--ink-4);
+}
+
+/* An opened step: its things as words, in the order they happened, then the count that opens its calls. */
+.work-opened {
+  min-width: 0;
+  padding: 2px 0 4px;
+}
+/* Rows that stand on their own between steps read at the size of a step's lines. */
+:is(.work-rail-blocks, .work-phase-extras, .work-group-blocks) :is(.thinking-head, .tool-row) {
+  min-height: 26px;
+  height: auto;
+  font-size: var(--text-sm);
+}
+:is(.work-rail-blocks, .work-phase-extras, .work-group-blocks) :is(.thinking-head, .tool-row) > svg {
+  width: 14px;
+  height: 14px;
+}
+/* A quiet pill under the work: the way from the sentences to the timeline and back, and the timeline's Follow. */
+.work-view-swap {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  align-self: start;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--control-fill);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  transition: color var(--duration-quick) var(--ease-out);
+}
+.work-view-swap:is(:hover, [aria-pressed="true"]) {
+  color: var(--ink);
+}
+.work-view-swap:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }

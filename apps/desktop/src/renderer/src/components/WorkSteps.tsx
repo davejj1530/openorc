@@ -1,41 +1,40 @@
-import { memo, useId, useMemo, useState } from "react";
+import { memo, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   type Block,
   workDuration,
-  chipCalls,
-  type WorkChip,
-  chipTitle,
-  isLive,
+  isSignal,
   liveHeadline,
-  liveSectionLabel,
   workEntries,
   type LiveHeadline,
   type PlanItem,
   type WorkEntry,
   type WorkPhase,
-  type WorkSection,
   useTicking,
-  objectsTitle,
-  phaseOutcome,
   workObjects,
   type WorkObject,
+  firstThought,
+  stepCounts,
+  stepLines,
+  stepRows,
+  stepThoughts,
+  stepTitle,
+  stepWaiting,
+  type ActLine,
+  type StepThoughts,
 } from "@openorc/client";
 import { cn } from "../lib/cn";
-import { Brain, Check, ChevronRight, Folder, Globe, Hammer, Loader2, Search, Terminal, WorkDelegate, X } from "./icons";
-import { FileGlyph } from "./FileGlyph";
-import { useVisited } from "../lib/use-visited";
-import { ThreadLink } from "./ThreadImages";
-import { ObjectGroup } from "./WorkObjects";
-import { fileHref } from "./WorkRead";
-import { OpenedCall, type RenderBlocks } from "./WorkMarks";
+import { Check, ChevronRight, Lightbulb, List, Loader2, Workflow, X } from "./icons";
+import type { RenderBlocks } from "./WorkMarks";
+import { ActRow, ThoughtRow } from "./WorkActs";
+import { WorkTimeline } from "./WorkTimeline";
 import "./WorkSteps.css";
 
-const CHIP_LIMIT = 6;
-
 /**
- * A turn's work as one card of steps. With a plan, its head reads "Step k of n" over a progress track; without one,
- * the phases are the steps. Each step is a row with a ring, a loader or an ink check, and opens to what it touched
- * as chips. `turn` is every block of the turn, so a reply streaming below the work keeps the live row quiet.
+ * A turn's work as writing on the conversation's own ground. Each step has one shape, running or done, and never
+ * folds on its own: what the agent said about it in full, or else its name, then one line of the things it touched
+ * as words, in the order they happened. A word shows its thing under the step. With a plan, a head reads "Step k of
+ * n" over a progress track. `turn` is every block of the turn, so a reply streaming below the work keeps the live
+ * step quiet.
  */
 export function WorkSteps({
   blocks,
@@ -43,7 +42,6 @@ export function WorkSteps({
   live,
   taskCards = true,
   pinned,
-  reveal,
   renderBlocks,
 }: {
   blocks: Block[];
@@ -51,29 +49,51 @@ export function WorkSteps({
   live: boolean;
   taskCards?: boolean | undefined;
   pinned?: string | undefined;
-  /** A message to bring into view: the phase it names opens. */
-  reveal?: string | undefined;
   renderBlocks: RenderBlocks;
 }) {
-  const entries = useMemo(() => workEntries(blocks, taskCards, pinned), [blocks, taskCards, pinned]);
+  const every = useMemo(() => workEntries(blocks, taskCards, pinned), [blocks, taskCards, pinned]);
+  // While the turn runs, its live line says it is waiting; a finished wait is not a row of its own.
+  const entries = useMemo(() => (live ? every.filter((entry) => entry.kind !== "blocks" || !entry.blocks.every(isSignal)) : every), [every, live]);
   const headline = live ? liveHeadline(entries, turn) : null;
+  // The same work, drawn in time, for a closer look.
+  const [timeline, setTimeline] = useState(false);
+  // The timeline draws what a turn changed, so a turn that changed nothing has none.
+  const steps = entries.some((entry) => entry.kind === "phase" && entry.phase.sections.some((section) => section.label === "Edited"));
+  if (timeline && steps)
+    return (
+      <div className="work-written">
+        <div className="motion-arrive">
+          <WorkTimeline entries={entries} turn={turn} live={live} renderBlocks={renderBlocks} />
+        </div>
+        <ViewSwap timeline onSwap={() => setTimeline(false)} />
+      </div>
+    );
   return (
-    <div className="steps-card" data-plane>
+    <div className="work-written">
       <StepsHead entries={entries} />
-      <ol className="work-rail">
+      <ol className="work-lines">
         {entries.map((entry) => (
-          <EntryView key={entryId(entry)} entry={entry} turn={turn} headline={headline} live={live} reveal={reveal} renderBlocks={renderBlocks} />
+          <EntryView key={entryId(entry)} entry={entry} turn={turn} headline={headline} live={live} renderBlocks={renderBlocks} />
         ))}
         {headline && !headline.entryId ? (
-          <li className="work-rail-item" data-state="running">
-            <StepMark state="running" />
-            <div className="work-phase-title" role="status">
-              <LiveWords headline={headline} />
-            </div>
+          <li className="work-line" data-state="running" role="status">
+            <LiveLine headline={headline} />
           </li>
         ) : null}
       </ol>
+      {steps ? <ViewSwap timeline={false} onSwap={() => setTimeline(true)} /> : null}
     </div>
+  );
+}
+
+/** Swaps the sentences for the timeline and back, in place. */
+function ViewSwap({ timeline, onSwap }: { timeline: boolean; onSwap: () => void }) {
+  const Icon = timeline ? List : Workflow;
+  return (
+    <button type="button" className="work-view-swap" onClick={onSwap}>
+      <Icon size={14} />
+      {timeline ? "Summary" : "Timeline"}
+    </button>
   );
 }
 
@@ -108,56 +128,63 @@ function StepsHead({ entries }: { entries: WorkEntry[] }) {
   );
 }
 
-/** The folded work's single line: what the turn is doing now. */
-export function WorkNow({ blocks, turn, taskCards = true }: { blocks: Block[]; turn: Block[]; taskCards?: boolean | undefined }) {
+/**
+ * The folded work's single line: what the turn is doing now. `lead` says how that stands to the reader's message,
+ * for work a newer message is waiting behind.
+ */
+export function WorkNow({ blocks, turn, taskCards = true, lead }: { blocks: Block[]; turn: Block[]; taskCards?: boolean | undefined; lead?: string }) {
   const entries = useMemo(() => workEntries(blocks, taskCards), [blocks, taskCards]);
   const headline = liveHeadline(entries, turn);
   return headline ? (
     <div className="work-now motion-arrive" role="status">
       <Loader2 size={16} className="tool-row-live" />
+      {lead ? <span className="work-now-lead">{lead}</span> : null}
       <LiveWords headline={headline} elapsed />
     </div>
   ) : null;
+}
+
+/**
+ * A call an earlier turn started that is still running. A message sent meanwhile is read once it ends, so until the
+ * newest turn has work of its own, its place says what is being finished first.
+ */
+export function CarriedWork({
+  showActivity,
+  live,
+  work,
+  carried,
+  named,
+  taskCards,
+}: {
+  showActivity: boolean;
+  live: boolean;
+  work: Block[];
+  carried: Block[] | undefined;
+  named: string | undefined;
+  taskCards: boolean | undefined;
+}) {
+  if (!showActivity || !live || work.length || !carried?.length) return null;
+  return (
+    <section className="work-section" aria-label={named ? `${named}’s work` : "Agent work"}>
+      <WorkNow blocks={carried} turn={carried} taskCards={taskCards} lead="Finishing first:" />
+    </section>
+  );
 }
 
 function entryId(entry: WorkEntry): string {
   return entry.kind === "phase" ? entry.phase.id : entry.id;
 }
 
-function EntryView({
-  entry,
-  turn,
-  headline,
-  live,
-  reveal,
-  renderBlocks,
-}: {
-  entry: WorkEntry;
-  turn: Block[];
-  headline: LiveHeadline | null;
-  live: boolean;
-  reveal: string | undefined;
-  renderBlocks: RenderBlocks;
-}) {
+function EntryView({ entry, turn, headline, live, renderBlocks }: { entry: WorkEntry; turn: Block[]; headline: LiveHeadline | null; live: boolean; renderBlocks: RenderBlocks }) {
   if (entry.kind === "phase") {
     const current = headline?.entryId === entry.phase.id ? headline : null;
     const message = entry.phase.origin === "narration" ? entry.phase.source?.id : undefined;
     // Only the live phase reads the rest of the turn (a test run's earlier count), so finished phases hold still while it streams.
-    return (
-      <PhaseView
-        phase={entry.phase}
-        headline={current}
-        earlier={current ? turn : undefined}
-        settled={!live}
-        message={message}
-        revealed={message !== undefined && message === reveal}
-        renderBlocks={renderBlocks}
-      />
-    );
+    return <PhaseView phase={entry.phase} headline={current} earlier={current ? turn : undefined} settled={!live} message={message} renderBlocks={renderBlocks} />;
   }
   if (entry.kind === "plan") return <PlanView items={entry.items} live={live} />;
   return (
-    <li className="work-rail-item">
+    <li className="work-line">
       <div className="work-rail-blocks">{renderBlocks(entry.blocks)}</div>
     </li>
   );
@@ -175,13 +202,56 @@ function Elapsed({ since }: { since: number | undefined }) {
 
 /** What is happening now, in ink, arriving afresh as it changes; the folded line adds how long it has been going. */
 function LiveWords({ headline, elapsed = false }: { headline: LiveHeadline; elapsed?: boolean }) {
+  // A thought with words says more than "Thinking" does.
+  const words = headline.thought ?? headline.label;
   return (
     <>
-      <span key={headline.label} className="work-line-text motion-arrive" data-tip={headline.label}>
-        {headline.label}
+      <span key={words} className="work-line-text motion-arrive" data-tip={words}>
+        {words}
       </span>
       {elapsed ? <Elapsed since={headline.since} /> : null}
     </>
+  );
+}
+
+/**
+ * What the turn is doing between its calls, as a line that moves: its words shimmer and its seconds count. A
+ * thought no step shows is open under it, its newest lines arriving as they are written.
+ */
+function LiveLine({ headline }: { headline: LiveHeadline }) {
+  const { thinking } = headline;
+  return (
+    <div className="work-act work-live" data-state="running">
+      <div className="work-act-head">
+        {thinking ? <Lightbulb size={14} className="work-chip-icon" /> : <Loader2 size={14} className="tool-row-live" />}
+        <span className="work-act-words">
+          <span className="work-live-words">{thinking ? "Thinking" : headline.label}</span>
+        </span>
+        <span className="work-act-result">
+          <Elapsed since={headline.since} />
+        </span>
+      </div>
+      {headline.aside ? <LiveThought text={headline.aside} /> : null}
+    </div>
+  );
+}
+
+/**
+ * A thought as it is written: its newest lines. Once it is taller than its room the older lines run off the top,
+ * and only then does the top fade.
+ */
+function LiveThought({ text }: { text: string }) {
+  const room = useRef<HTMLDivElement>(null);
+  const [over, setOver] = useState(false);
+  useLayoutEffect(() => {
+    const element = room.current;
+    const written = element?.firstElementChild;
+    if (element && written instanceof HTMLElement) setOver(written.offsetHeight > element.clientHeight + 1);
+  }, [text]);
+  return (
+    <div ref={room} className="work-live-thought" data-over={over || undefined}>
+      <p>{text}</p>
+    </div>
   );
 }
 
@@ -210,18 +280,7 @@ export function StepMark({ state }: { state: StepState }) {
   );
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-/** A folded phase's hint of what is inside: "6 files · 2 commands". */
-function phaseMeta(phase: WorkPhase): string {
-  const count = (labels: string[]) => phase.sections.filter((section) => labels.includes(section.label)).reduce((sum, section) => sum + section.chips.length, 0);
-  const files = count(["Read", "Edited"]);
-  const searches = count(["Searched", "Searched the web", "Searched memory"]);
-  const commands = count(["Ran"]);
-  return [files ? plural(files, "file") : "", searches ? plural(searches, "search", "searches") : "", commands ? plural(commands, "command") : ""].filter(Boolean).slice(0, 2).join(" · ");
-}
-
-/** `message` is the narration the phase is named after; `revealed`, that it was asked for. */
+/** `message` is the narration the phase is named after, which marks the step when that message is asked for. */
 type PhaseProps = {
   phase: WorkPhase;
   headline: LiveHeadline | null;
@@ -230,7 +289,6 @@ type PhaseProps = {
   /** The turn has ended, so a call still open stopped with it. */
   settled: boolean;
   message?: string | undefined;
-  revealed?: boolean;
   renderBlocks: RenderBlocks;
 };
 
@@ -240,204 +298,128 @@ const samePhase = (a: PhaseProps, b: PhaseProps) =>
   a.phase.title === b.phase.title &&
   a.headline?.label === b.headline?.label &&
   a.headline?.since === b.headline?.since &&
-  a.revealed === b.revealed &&
+  a.headline?.thinking === b.headline?.thinking &&
   a.earlier === b.earlier &&
   a.settled === b.settled &&
   a.phase.blocks.length === b.phase.blocks.length &&
   a.phase.blocks.every((block, i) => block === b.phase.blocks[i]);
 
 /**
- * Open while it is the live phase, folded once it is done, unless the reader chose. Asking for the message it names
- * opens it as if the reader had, so it stays open once the view moves on.
+ * Which of a step's lines are open. While the step runs, the newest thing it did is open and the ones before it are
+ * each one line; once it is done they all are. A line the reader pressed stays as they left it.
  */
-function usePhaseOpen(live: boolean, revealed: boolean) {
-  const [choice, setChoice] = useState<boolean | null>(null);
-  if (revealed && choice === null) setChoice(true);
-  return { open: choice ?? live, setChoice };
+function useOpenLines(current: string | undefined) {
+  const [chosen, setChosen] = useState<ReadonlyMap<string, boolean>>(new Map());
+  const isOpen = (id: string) => chosen.get(id) ?? id === current;
+  return { isOpen, toggle: (id: string) => setChosen((known) => new Map(known).set(id, !isOpen(id))) };
 }
 
-const PhaseView = memo(function PhaseView({ phase, headline, earlier, settled, message, revealed = false, renderBlocks }: PhaseProps) {
+const isExpandable = (phase: WorkPhase) => phase.sections.length > 0 || phase.extras.length > 0 || phase.thoughts.length > 0 || Boolean(phase.detail || phase.narration);
+
+/** The id a step's thoughts open under, beside the ids of its things. */
+const THOUGHTS = "thoughts";
+
+/** A step's thoughts, in full: each titled one with what it said, then the untitled ones as written. */
+function StepThoughts({ titled, texts }: Pick<StepThoughts, "titled" | "texts">) {
+  return (
+    <div className="work-thoughts motion-stagger">
+      {titled.map((thought, index) => (
+        <p key={index} className="motion-arrive">
+          <span className="work-thought-title">{thought.title}</span>
+          {thought.body ? ` ${thought.body}` : null}
+        </p>
+      ))}
+      {texts
+        .flatMap((text) => text.split(/\n\s*\n/))
+        .filter((paragraph) => paragraph.trim())
+        .map((paragraph, index) => (
+          <p key={`text-${index}`} className="motion-arrive">
+            {paragraph}
+          </p>
+        ))}
+    </div>
+  );
+}
+
+const PhaseView = memo(function PhaseView({ phase, headline, earlier, settled, message, renderBlocks }: PhaseProps) {
   const live = headline !== null;
   const objects = useMemo(() => workObjects(phase.blocks, earlier ?? phase.blocks, !settled), [phase.blocks, earlier, settled]);
-  const { open, setChoice } = usePhaseOpen(live, revealed);
-  const visited = useVisited(open);
+  const acts = useMemo(() => stepLines(phase, objects), [phase, objects]);
+  const [opened, setOpened] = useState(true);
   const bodyId = useId();
-  const expandable = phase.sections.length > 0 || phase.extras.length > 0 || phase.thoughts.length > 0 || Boolean(phase.detail || phase.narration);
+  const expandable = isExpandable(phase);
+  const title = stepTitle(phase, objects);
+  // What the agent wrote stands as the step's head, in full; its name is only a sentence of that.
+  const said = phase.narration;
+  // A step named after its one call would say that call twice: its line stands alone.
+  const named = said !== null || phase.origin !== "summary" || acts.length !== 1;
+  const shown = opened || said !== null;
+  const name = named ? (
+    <button
+      type="button"
+      className="work-name"
+      disabled={!expandable}
+      aria-expanded={expandable ? opened : undefined}
+      aria-controls={expandable ? bodyId : undefined}
+      onClick={() => setOpened((value) => !value)}
+    >
+      <span className="work-line-text" data-tip={title}>
+        {title}
+      </span>
+      {expandable ? <ChevronRight size={12} className={cn("work-chevron", opened && "rotate-90")} /> : null}
+    </button>
+  ) : null;
   return (
-    <li className="work-rail-item" data-state={live ? "running" : "done"} data-message={message}>
-      <StepMark state={live ? "running" : "done"} />
-      <button
-        type="button"
-        className="work-phase-title"
-        disabled={!expandable}
-        aria-expanded={expandable ? open : undefined}
-        aria-controls={expandable ? bodyId : undefined}
-        onClick={() => setChoice(!open)}
-      >
-        <PhaseWords phase={phase} objects={objects} headline={headline} open={open} />
-        {expandable ? <ChevronRight size={12} className={cn("work-chevron", open && "rotate-90")} /> : null}
-      </button>
-      {expandable ? (
-        <div id={bodyId} hidden={!open} className="work-phase-body motion-collapse">
-          {visited ? <PhaseBody phase={phase} objects={objects} live={live} renderBlocks={renderBlocks} /> : null}
-        </div>
-      ) : null}
+    <li className="work-line" data-state={live ? "running" : "done"} data-message={message}>
+      {said ? <div className="work-phase-narration">{renderBlocks([said])}</div> : name}
+      <div id={bodyId} hidden={!shown} className="work-opened motion-collapse">
+        <PhaseOpened phase={phase} objects={objects} acts={acts} live={live && !headline?.thinking} renderBlocks={renderBlocks} />
+      </div>
+      <CameLine phase={phase} objects={objects} opened={shown} wait={stepWaiting(headline, title, objects)} />
     </li>
   );
 }, samePhase);
 
 /**
- * The live words while the phase runs; otherwise its title, and when folded what it came to ("Opened #218",
- * "1 failed" in red) or else a hint of what is inside.
+ * Under a step: how much looking around a folded one took, as counts, and what fills a wait while it runs. A step
+ * named after its calls counts them in its name already, and an open step lists every thing it did.
  */
-function PhaseWords({ phase, objects, headline, open }: { phase: WorkPhase; objects: WorkObject[]; headline: LiveHeadline | null; open: boolean }) {
-  if (headline) return <LiveWords headline={headline} />;
-  const named = phase.origin === "summary" ? objectsTitle(objects) : null;
-  const title = named ?? phase.title;
-  // A title that already names the branch's outcome leaves the rest of the phase to the meta.
-  const outcome = open ? null : phaseOutcome(named ? objects.filter((object) => object.kind !== "git") : objects);
-  const meta = outcome?.text ?? (!open && phase.origin !== "summary" ? phaseMeta(phase) : "");
+function CameLine({ phase, objects, opened, wait }: { phase: WorkPhase; objects: WorkObject[]; opened: boolean; wait: LiveHeadline | null }) {
+  const counts = opened || phase.origin === "summary" ? "" : stepCounts(objects);
   return (
     <>
-      <span className="work-line-text" data-tip={title}>
-        {title}
-      </span>
-      {meta ? (
-        <span className="work-phase-meta" data-tone={outcome?.failed ? "bad" : undefined}>
-          {meta}
-        </span>
-      ) : null}
+      {counts ? <p className="work-came">{counts}</p> : null}
+      {wait ? <LiveLine headline={wait} /> : null}
     </>
   );
 }
 
-function PhaseBody({ phase, objects, live, renderBlocks }: { phase: WorkPhase; objects: WorkObject[]; live: boolean; renderBlocks: RenderBlocks }) {
-  // A phase named after its one plain command ("Run the build") opens straight to its call: the card already shows
-  // the command and its last line, so it stays closed rather than repeat them.
-  const section = phase.sections.length === 1 ? phase.sections[0]! : null;
-  const only = section?.chips.length === 1 ? section.chips[0]! : null;
-  if (only && chipTitle(only) === phase.title && !phase.extras.length && objects.every((object) => object.kind === "command"))
-    return <div className="work-group-calls">{renderBlocks(only.blocks, section?.label !== "Ran")}</div>;
-  // Activities with nothing to list keep their own rows.
-  const activities = phase.sections.flatMap((group) => (group.chips.length ? [] : group.blocks.filter((block) => block.kind === "activity")));
+/**
+ * A step's body: everything it did, each thing on its own line in the order it happened, its thoughts first. While
+ * the step runs the newest line is open; the ones before it have folded to a line each.
+ */
+function PhaseOpened({ phase, objects, acts, live, renderBlocks }: { phase: WorkPhase; objects: WorkObject[]; acts: ActLine[]; live: boolean; renderBlocks: RenderBlocks }) {
+  const thoughts = useMemo(() => stepThoughts(phase), [phase]);
+  // A tool's call is its raw request and answer, which waits to be asked for; everything else opens while it is the newest.
+  const newest = acts[acts.length - 1]?.object;
+  const { isOpen, toggle } = useOpenLines(live && newest && newest.kind !== "tool" ? newest.id : undefined);
+  const { rows, alone } = useMemo(() => stepRows(phase, objects), [phase, objects]);
   return (
     <>
       {phase.detail ? <p className="work-phase-detail">{phase.detail}</p> : null}
-      {phase.narration ? <div className="work-phase-narration">{renderBlocks([phase.narration])}</div> : null}
-      {phase.thoughts.length ? (
-        <ol className="work-thoughts">
-          {phase.thoughts.map((thought, index) => (
-            <li key={index} data-tip={thought.body || undefined}>
-              {thought.title}
-            </li>
-          ))}
-        </ol>
-      ) : null}
-      {objects.length
-        ? objects.map((object) => <ObjectGroup key={object.id} object={object} renderBlocks={renderBlocks} />)
-        : phase.sections.map((group) => <GroupView key={group.id} section={group} live={live} renderBlocks={renderBlocks} />)}
-      {objects.length && activities.length ? <div className="work-group-blocks">{renderBlocks(activities)}</div> : null}
-      {phase.extras.length ? <div className="work-phase-extras">{renderBlocks(phase.extras)}</div> : null}
-    </>
-  );
-}
-
-/**
- * One kind of work in a phase: its verb ("Read") in a quiet column, then what it touched as aligned rows. The verb
- * opens the calls themselves. An activity with nothing to list is its own row already.
- */
-function GroupView({ section, live, renderBlocks }: { section: WorkSection; live: boolean; renderBlocks: RenderBlocks }) {
-  const activities = section.blocks.filter((block) => block.kind === "activity");
-  if (!section.chips.length && activities.length) return <div className="work-group-blocks">{renderBlocks(activities)}</div>;
-  return <ChipGroup section={section} live={live} renderBlocks={renderBlocks} />;
-}
-
-function ChipGroup({ section, live, renderBlocks }: { section: WorkSection; live: boolean; renderBlocks: RenderBlocks }) {
-  const [all, setAll] = useState(false);
-  const [calls, setCalls] = useState(false);
-  // A chip the reader picked grows into its own call.
-  const [picked, setPicked] = useState<string | null>(null);
-  const pick = section.chips.find((chip) => chip.key === picked);
-  const [visited, setVisited] = useState(false);
-  const callsId = useId();
-  const running = live && section.blocks.some(isLive);
-  const first = section.chips.slice(0, CHIP_LIMIT);
-  // The call under way stays in view, in place of the last row that fits.
-  const current = running ? section.chips.findLast((chip) => chip.blocks.some(isLive)) : undefined;
-  const fitting = current && !first.includes(current) ? [...first.slice(0, -1), current] : first;
-  const shown = all ? section.chips : fitting;
-  return (
-    <div className="work-group">
-      <button
-        type="button"
-        className="work-group-label"
-        aria-expanded={calls}
-        aria-controls={callsId}
-        onClick={() => {
-          setVisited(true);
-          setCalls((value) => !value);
-        }}
-      >
-        <span>{running ? liveSectionLabel(section.label) : section.label}</span>
-        <ChevronRight size={10} className={cn("work-chevron", calls && "rotate-90")} />
-      </button>
-      <div className="work-chips">
-        {shown.map((chip) => (
-          <OpenedCall key={chip.key} open={chip === pick} calls={chipCalls(chip)} renderBlocks={renderBlocks}>
-            <ChipView chip={chip} live={live && chip.blocks.some(isLive)} picked={chip.key === picked} onPick={() => setPicked((key) => (key === chip.key ? null : chip.key))} />
-          </OpenedCall>
-        ))}
-        {section.chips.length > shown.length ? (
-          <button type="button" className="work-more" onClick={() => setAll(true)}>
-            {section.chips.length - shown.length} more
-          </button>
+      <ol className="work-acts">
+        {thoughts.titled.length || thoughts.texts.length ? (
+          <ThoughtRow said={firstThought(thoughts)} took={thoughts.took} open={isOpen(THOUGHTS)} onToggle={() => toggle(THOUGHTS)}>
+            <StepThoughts titled={thoughts.titled} texts={thoughts.texts} />
+          </ThoughtRow>
         ) : null}
-      </div>
-      <div id={callsId} hidden={!calls} className="work-group-calls">
-        {visited ? renderBlocks(section.blocks) : null}
-      </div>
-    </div>
-  );
-}
-
-const kindIcons = { folder: Folder, query: Search, command: Terminal, intent: Terminal, web: Globe, tool: Hammer, agent: WorkDelegate, memory: Brain } as const;
-
-/** A file shows its language's mark; anything else shows what kind of thing it is. */
-function ChipIcon({ chip }: { chip: WorkChip }) {
-  if (chip.kind === "file" || chip.kind === "edit") return <FileGlyph path={chip.label} size={14} className="work-chip-icon" />;
-  const Icon = kindIcons[chip.kind];
-  return <Icon size={14} className="work-chip-icon" />;
-}
-
-/**
- * A row: the mark, the name, a faint detail that fills the middle (a file's folder, a search's scope), and at the
- * end a faint note (the lines read, the matches found) or an edit's line counts.
- */
-function ChipView({ chip, live, picked, onPick }: { chip: WorkChip; live: boolean; picked: boolean; onPick: () => void }) {
-  const content = (
-    <>
-      <ChipIcon chip={chip} />
-      <span className="work-chip-label">{chip.label}</span>
-      {/* A file's title carries its whole path, so its folder stays out of the row's name. */}
-      <span className="work-chip-detail" aria-hidden={chip.path ? true : undefined}>
-        {chip.detail}
-      </span>
-      {chip.note ? <span className="work-chip-note">{chip.note}</span> : null}
-      {chip.added ? <span className="work-stat-added">+{chip.added}</span> : null}
-      {chip.removed ? <span className="work-stat-removed">−{chip.removed}</span> : null}
+        {acts.map((line) => (
+          <ActRow key={line.object.id} line={line} open={isOpen(line.object.id)} current={live && line === acts[acts.length - 1]} onToggle={() => toggle(line.object.id)} renderBlocks={renderBlocks} />
+        ))}
+      </ol>
+      {rows.length ? <div className="work-group-blocks">{renderBlocks(rows)}</div> : null}
+      {alone.length ? <div className="work-phase-extras">{renderBlocks(alone)}</div> : null}
     </>
-  );
-  // A file read opens the file; an edit, like any other call, opens below the chips to show what it did.
-  if (chip.kind === "file" && chip.path)
-    return (
-      <span className="work-chip" data-kind={chip.kind} data-live={live || undefined} data-tip={chip.title}>
-        <ThreadLink href={fileHref(chip)}>{content}</ThreadLink>
-      </span>
-    );
-  return (
-    <button type="button" className="work-chip" data-kind={chip.kind} data-live={live || undefined} data-tip={chip.title} aria-pressed={picked} onClick={onPick}>
-      {content}
-    </button>
   );
 }
 

@@ -1,0 +1,250 @@
+/* Everything a step did, a line each: what it was, what it touched, how it came out. A finished thing is one quiet
+   line; the one under way, or one the reader pressed, opens on a piece of its own and is drawn as what it is. */
+.work-acts {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.work-acts:empty {
+  display: none;
+}
+.work-act {
+  min-width: 0;
+  border-radius: var(--radius-5xl);
+  transition:
+    background-color var(--duration-resize) var(--ease-out),
+    margin-block var(--duration-resize) var(--ease-out),
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out),
+    translate var(--duration-arrive) var(--ease-out);
+}
+@starting-style {
+  [data-arrivals] .work-act {
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+    translate: 0 var(--arrive-rise);
+  }
+}
+.work-act[data-open] {
+  margin-block: 4px 6px;
+  background: var(--surface);
+}
+.work-act-head,
+.work-act-head > a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.work-act-head {
+  width: 100%;
+  min-height: 30px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--ink-3);
+  text-align: left;
+  transition:
+    color var(--duration-quick) var(--ease-out),
+    padding var(--duration-resize) var(--ease-out);
+}
+.work-act-head > a {
+  flex: 1;
+}
+.work-act[data-open] > .work-act-head {
+  padding: 10px 14px 4px 12px;
+}
+.work-act-head:focus-visible,
+.work-act-head > a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.work-act-words {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The verb is the quiet part; the thing it was done to carries the line. */
+.work-act-verb {
+  color: var(--ink-4);
+}
+.work-act-name {
+  color: var(--ink-2);
+  transition: color var(--duration-quick) var(--ease-out);
+}
+button.work-act-head:hover .work-act-name,
+.work-act-head > a:hover .work-act-name,
+.work-act[data-open] .work-act-name,
+.work-act[data-state="running"] .work-act-name {
+  color: var(--ink);
+}
+/* A command shown as written stays code. */
+.work-act-words[data-mono] > .work-act-name {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.work-act-result {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+.work-act-result [data-tone="bad"] {
+  color: var(--bad);
+}
+/* The thing itself, under its line and in line with its words. */
+.work-act-body {
+  min-width: 0;
+  padding: 4px 14px 14px 36px;
+}
+.work-act-body > :is(.work-edit-lines, .work-results, .work-quote, .work-found, .work-thoughts) {
+  padding-left: 0;
+}
+/* The call itself, kept inside the piece however long its lines run. */
+.work-act-call {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+/* A command as it ran. It reaches back to the piece's edge, under the line's mark. */
+.work-run {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin-left: -24px;
+}
+/* The way to everything it printed, in line with the results above it. */
+.work-run-whole {
+  justify-self: start;
+  margin-left: 24px;
+}
+/* The command under what it printed, as the steps it ran, on a soft field. */
+.work-run-command {
+  padding: 6px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--control-fill);
+}
+/* What it printed, on a small screen that stays ink in both themes: a pass in green, a failure in red. */
+.work-screen {
+  --screen: #0c0c0d;
+  --screen-ink: #d8d8d8;
+  --screen-quiet: #7d7d7d;
+  display: grid;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--screen);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 19px;
+  color: var(--screen-ink);
+}
+/* On the dark theme the screen is black outright, so it stands apart from the piece and the command's field. */
+.dark .work-screen {
+  --screen: #000;
+}
+.work-screen > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+  transition:
+    opacity var(--duration-arrive) var(--ease-out),
+    translate var(--duration-arrive) var(--ease-out);
+}
+@starting-style {
+  [data-arrivals] .work-screen[data-live] > span {
+    opacity: 0;
+    translate: 0 var(--arrive-rise);
+  }
+}
+.work-screen > [data-tone="ok"] {
+  color: #6fcf9c;
+}
+.work-screen > [data-tone="bad"] {
+  color: #ee8a8a;
+}
+.work-screen-more {
+  justify-self: start;
+  margin-bottom: 4px;
+  color: var(--screen-quiet);
+  transition: color var(--duration-quick) var(--ease-out);
+}
+.work-screen-more:hover {
+  color: var(--screen-ink);
+}
+.work-screen-more:focus-visible {
+  outline: 2px solid var(--screen-quiet);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+/* While the command runs, the screen waits on a fresh line. */
+.work-screen > .work-screen-caret {
+  width: 7px;
+  height: 13px;
+  margin-top: 3px;
+  background: var(--screen-ink);
+  animation: work-caret 1s steps(2, start) infinite;
+}
+@keyframes work-caret {
+  to {
+    visibility: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .work-screen > .work-screen-caret {
+    animation: none;
+  }
+}
+
+/* What the turn is doing between its calls: a line that moves. Its words shimmer and its seconds count. */
+.work-live-words {
+  background: linear-gradient(90deg, var(--ink-3) 0%, var(--ink-3) 40%, var(--ink) 50%, var(--ink-3) 60%, var(--ink-3) 100%) 100% 0 / 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: work-shimmer 2.2s linear infinite;
+}
+@keyframes work-shimmer {
+  to {
+    background-position: -66% 0;
+  }
+}
+/* A thought as it is written: its newest lines, the older ones fading out above them. */
+.work-live-thought {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-height: 104px;
+  margin: 2px 0 6px 24px;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: 20px;
+  color: var(--ink-3);
+}
+/* Older lines have run off the top: they fade out there. A thought that fits is whole. */
+.work-live-thought[data-over] {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 28px);
+}
+.work-live-thought > p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .work-live-words {
+    background: none;
+    color: var(--ink-2);
+    animation: none;
+  }
+}

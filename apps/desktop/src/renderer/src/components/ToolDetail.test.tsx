@@ -83,7 +83,8 @@ it("reads git status as files with what happened to each, leaving deleted ones u
 
 it("shows an MCP call's arguments as fields, and the raw call on request", () => {
   render(<ToolDetail block={call("mcp__claude_ai_Mobbin__search_screens", { query: "onboarding", limit: 8 })} output={{ content: [{ type: "text", text: "Found 8 screens" }] }} />);
-  expect(screen.getByText("query").nextSibling?.textContent).toBe("onboarding");
+  // A parameter reads by its name in words.
+  expect(screen.getByText("Query").nextSibling?.textContent).toBe("onboarding");
   expect(screen.getByText("Found 8 screens")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Raw call" }));
   expect(screen.getByText(/"query": "onboarding"/)).toBeTruthy();

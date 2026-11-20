@@ -1,36 +1,10 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { Block, ObjectState, WorkChip } from "@openorc/client";
-import { Check, Loader2, X } from "./icons";
+import { Brain, Check, Folder, Globe, Hammer, Loader2, Search, Terminal, WorkDelegate, X } from "./icons";
+import { FileGlyph } from "./FileGlyph";
 
 /** How raw blocks render: the transcript's own rows. `details` draws a call as its details alone, under its chip. */
 export type RenderBlocks = (blocks: Block[], details?: boolean) => ReactNode;
-
-/** Whether an object's call is open. Held by the object's group, so it survives the drawing changing kind. */
-export const CallOpen = createContext<[boolean, (update: (open: boolean) => boolean) => void]>([false, () => {}]);
-
-/** Holds the open state for the rows inside it. */
-export function CallOpenScope({ children }: { children: ReactNode }) {
-  const state = useState(false);
-  return <CallOpen.Provider value={state}>{children}</CallOpen.Provider>;
-}
-
-/**
- * An object's row, the handle of the call behind it: pressing it opens that call in place, in place of the excerpt
- * under the row.
- */
-export function CallRow({ chip, calls, renderBlocks, under, children }: { chip: WorkChip; calls: Block[]; renderBlocks: RenderBlocks; under?: ReactNode; children: ReactNode }) {
-  const [open, setOpen] = useContext(CallOpen);
-  return (
-    <>
-      <OpenedCall open={open} calls={calls} renderBlocks={renderBlocks}>
-        <button type="button" className="work-chip" data-kind={chip.kind} data-tip={chip.title} aria-pressed={open} onClick={() => setOpen((value) => !value)}>
-          {children}
-        </button>
-      </OpenedCall>
-      {open ? null : under}
-    </>
-  );
-}
 
 /** A chip, and once it is pressed the call behind it, grown out of the chip on its fill with the chip as its head. */
 export function OpenedCall({ open, calls, renderBlocks, children }: { open: boolean; calls: Block[]; renderBlocks: RenderBlocks; children: ReactNode }) {
@@ -80,4 +54,13 @@ export function SizeStat({ added, removed }: { added: number; removed: number })
       {removed ? <span className="work-stat-removed">−{removed}</span> : null}
     </span>
   );
+}
+
+const kindIcons = { folder: Folder, query: Search, command: Terminal, intent: Terminal, web: Globe, tool: Hammer, agent: WorkDelegate, memory: Brain } as const;
+
+/** A file shows its language's mark; anything else shows what kind of thing it is. */
+export function ChipIcon({ chip }: { chip: WorkChip }) {
+  if (chip.kind === "file" || chip.kind === "edit") return <FileGlyph path={chip.label} size={14} className="work-chip-icon" />;
+  const Icon = kindIcons[chip.kind];
+  return <Icon size={14} className="work-chip-icon" />;
 }

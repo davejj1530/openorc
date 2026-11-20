@@ -1,0 +1,153 @@
+/* The turn drawn in time: one line for the turn, a lane for each file it kept coming back to, a mark for each
+   thing it did. What lies ahead of the step being read steps back. */
+.work-timeline {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+}
+.tl-graph {
+  position: relative;
+  border-radius: var(--radius-sm);
+  outline: none;
+  touch-action: pan-y;
+  user-select: none;
+}
+.tl-graph:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+.tl-graph svg {
+  display: block;
+  overflow: visible;
+}
+.tl-base path,
+.tl-lit path {
+  fill: none;
+  stroke-width: 1.5;
+}
+.tl-base path {
+  stroke: var(--line-strong);
+}
+.tl-lit path {
+  stroke: var(--ink-4);
+}
+.tl-reach {
+  transition: width var(--duration-quick) var(--ease-out);
+}
+.tl-head {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+  opacity: 0;
+  transition:
+    opacity var(--duration-quick) var(--ease-out),
+    translate var(--duration-quick) var(--ease-out);
+}
+.tl-head[data-on] {
+  opacity: 1;
+}
+/* A mark: a ring for a search, a dot for a read, a diamond for an edit, a square for a command, a check for a test
+   run. The ones that changed something are in ink. */
+.tl-mark {
+  color: var(--ink-3);
+  transition:
+    color var(--duration-arrive) var(--ease-out),
+    opacity var(--duration-arrive) var(--ease-out);
+}
+.tl-mark:is([data-tone="ink"], [data-current]) {
+  color: var(--ink);
+}
+.tl-mark[data-tone="ok"] {
+  color: var(--ok);
+}
+.tl-mark[data-tone="bad"] {
+  color: var(--bad);
+}
+.tl-mark[data-after] {
+  opacity: 0.3;
+}
+.tl-fill {
+  fill: currentColor;
+}
+.tl-ring {
+  fill: var(--bg);
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+.tl-stroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.tl-start {
+  fill: var(--ink-4);
+}
+.tl-end {
+  fill: var(--ink);
+}
+.tl-halo {
+  fill: currentColor;
+  opacity: 0;
+  transition: opacity var(--duration-quick) var(--ease-out);
+}
+.tl-mark[data-current] > .tl-halo {
+  opacity: 0.1;
+}
+/* A step the turn reaches while it runs lands with one overshoot; marks already there stay put. */
+.tl-mark > :not(.tl-halo) {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    opacity var(--duration-confirm) var(--ease-out),
+    scale var(--duration-confirm) var(--ease-overshoot);
+}
+@starting-style {
+  [data-arrivals] .tl-mark > :not(.tl-halo) {
+    opacity: 0;
+    scale: 0.3;
+  }
+}
+/* A lane's name, ending where its line bends down into the lane; a long one is cut to the room it has. */
+.tl-name {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 6px 0 4px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  white-space: nowrap;
+  translate: -100% -50%;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-arrive) var(--ease-out);
+}
+.tl-name > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tl-name:hover {
+  background: var(--control-fill);
+}
+.tl-name:is([data-on], :hover) {
+  color: var(--ink);
+}
+.tl-name:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+/* The step being read, as the line a step draws for it, and the switch that sends its file to the panel. */
+.tl-now {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+}
+.tl-now > .work-acts {
+  flex: 1;
+}

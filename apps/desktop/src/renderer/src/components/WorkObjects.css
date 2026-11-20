@@ -1,40 +1,10 @@
-/* What a phase worked on, each drawn as itself in the step's second column. Rows share the chips' 28px rhythm and
-   their 8px reach past the column, so an object lines up with the rows around it. Class names stay under work-:
-   app.css owns .work-row, which draws a window drag region. */
-/* One column that may shrink: an opened call's long command or code line scrolls or truncates inside it rather
-   than widening the step past the thread. */
-.work-object-body {
-  grid-column: 2;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  min-width: 0;
-}
-/* While the turn runs, a verb that changes ("Testing" to "Tested") and a receipt item that appears arrive afresh. */
-.work-object-verb,
-.turn-receipt-item {
-  transition:
-    opacity var(--duration-arrive) var(--ease-out),
-    filter var(--duration-arrive) var(--ease-out);
-}
-@starting-style {
-  [data-arrivals] .work-object-verb,
-  [data-arrivals] .turn-receipt-item {
-    opacity: 0;
-    filter: blur(var(--arrive-blur));
-  }
-}
-.work-object-body .work-chips {
-  grid-column: auto;
-}
-.work-object > .work-group-calls {
-  grid-column: 2;
-  padding: 2px 0 6px;
-}
+/* What a step worked on, each thing drawn as itself under the step. Rows share the chips' 28px rhythm and their 8px
+   reach past the column. Class names stay under work-: app.css owns .work-row, which draws a window drag region. */
 .work-object-mark {
   flex-shrink: 0;
   color: var(--ink);
 }
-.work-rail [data-tone="bad"] {
+.work-lines [data-tone="bad"] {
   color: var(--bad);
 }
 .work-mono {
@@ -46,9 +16,6 @@
 }
 .work-align-end {
   text-align: right;
-}
-.work-phase-meta[data-tone="bad"] {
-  color: var(--bad);
 }
 
 /* Size: +N −M, then five blocks filled by how big the change is. */
@@ -109,13 +76,11 @@
 }
 
 /* Search: the first hits as file:line, the term marked; web results as host and title. */
-.work-hits,
 .work-results {
   display: grid;
   min-width: 0;
   padding: 0 0 6px 22px;
 }
-.work-hits > a,
 .work-results > a {
   display: flex;
   align-items: center;
@@ -129,33 +94,96 @@
   text-decoration: none;
   white-space: nowrap;
 }
-.work-hits > a:hover,
 .work-results > a:hover {
   background: var(--surface-2);
 }
-.work-hits > a {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--ink-3);
-}
-.work-hit-where {
-  flex-shrink: 0;
-  width: min(200px, 38%);
-  overflow: hidden;
-  color: var(--ink-4);
-  text-overflow: ellipsis;
-}
-.work-hit-text,
 .work-result-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.work-hit-term {
-  padding: 0 2px;
-  border-radius: 3px;
-  background: var(--surface-3);
+
+/* What a search found, by file: the opened files in ink with their matching lines, the rest as quiet names. */
+.work-found {
+  display: grid;
+  min-width: 0;
+  padding: 0 0 6px 22px;
+}
+.work-found-file {
+  display: grid;
+  min-width: 0;
+}
+.work-found a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 24px;
+  margin: 0 -6px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.work-found a:hover {
+  background: var(--surface-2);
+}
+.work-found-name {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.work-found-file[data-opened] .work-found-name {
   color: var(--ink);
+}
+.work-found-folder {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+  text-overflow: ellipsis;
+}
+.work-found-line {
+  display: grid;
+  min-width: 0;
+}
+.work-found-line a {
+  gap: 10px;
+  height: 22px;
+  padding-left: 28px;
+  font-size: var(--text-xs);
+}
+.work-found-number {
+  flex-shrink: 0;
+  min-width: 3ch;
+  font-family: var(--font-mono);
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+/* Code stays code; a comment or a document's line reads as the words it is. */
+.work-found-text {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+}
+.work-found-text[data-prose] {
+  font-family: inherit;
+}
+.work-found-text mark {
+  background: none;
+  color: var(--ink);
+}
+.work-found-rest {
+  height: 22px;
+}
+.work-found-unseen {
+  padding-left: 22px;
+  font-size: var(--text-xs);
+  line-height: 28px;
+  color: var(--ink-4);
 }
 .work-results > a {
   height: 24px;
@@ -180,40 +208,6 @@
   color: var(--ink-3);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-}
-
-/* Commands: the newest lines while one runs or once it failed, the oldest fading at the top. */
-.work-tail {
-  display: grid;
-  overflow: hidden;
-  padding: 0 0 6px 22px;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 18px;
-  color: var(--ink-3);
-  white-space: pre;
-}
-.work-tail[data-live] {
-  mask: linear-gradient(transparent, #000 14px);
-}
-.work-tail > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition:
-    opacity var(--duration-arrive) var(--ease-out),
-    filter var(--duration-arrive) var(--ease-out);
-}
-.work-tail > span:last-child {
-  color: var(--ink-2);
-}
-.work-tail[data-tone="bad"] > span:last-child {
-  color: var(--bad);
-}
-@starting-style {
-  .work-tail[data-live] > span:last-child {
-    opacity: 0;
-    filter: blur(2px);
-  }
 }
 
 /* Tests: one cell per case, green, red, or empty while still to come; the failure named under them. */
@@ -300,6 +294,103 @@
   line-height: 18px;
   color: var(--bad);
   overflow-wrap: anywhere;
+}
+
+/* A test run: its count and cells on one line, then its files a row each, failed ones first. A failed case sits under
+   its file with what went wrong in red, what was expected and got on a soft field, and the lines it failed on. */
+.work-tests {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.work-tests-head,
+.work-test-file-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 24px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink-2);
+}
+.work-tests-head > .work-align-end {
+  margin-left: auto;
+}
+.work-test-files {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  min-width: 0;
+}
+.work-test-files > ul {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.work-test-file {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.work-test-mark {
+  flex-shrink: 0;
+  color: var(--ink-4);
+}
+.work-test-file[data-state="passed"] .work-test-mark {
+  color: var(--ok);
+}
+.work-test-file[data-state="failed"] .work-test-mark {
+  color: var(--bad);
+}
+.work-test-file-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-test-file-name > a,
+.work-test-frames > a {
+  color: inherit;
+  text-decoration: none;
+}
+.work-test-file-name > a:hover,
+.work-test-frames > a:hover {
+  text-decoration: underline;
+}
+.work-test-file > .work-failure {
+  padding: 0 0 8px 21px;
+}
+.work-test-detail {
+  margin: 2px 0 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-lg);
+  background: var(--control-fill);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.work-test-frames {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-3);
+}
+.work-test-frames > a {
+  color: var(--ink-2);
 }
 
 /* Git: a branch's commits on a lane off its base, the push filling the lane up to origin, the pull request above. */

@@ -51,7 +51,7 @@
   display: none;
 }
 
-/* The head, on a turn whose agent or model changed: the agent's mark and name, then its model. */
+/* The head, on a turn where who speaks changed: the agent's mark and name. */
 .turn-head {
   display: flex;
   align-items: center;
@@ -67,15 +67,6 @@
 }
 .turn-head-name {
   flex-shrink: 0;
-}
-.turn-head-model {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--text-xs);
-  line-height: 16px;
-  color: var(--ink-4);
 }
 
 /* The receipt: thought time, steps and the last check as faint icon items. It opens the work. */
@@ -111,7 +102,8 @@
     filter var(--duration-arrive) var(--ease-out);
 }
 @starting-style {
-  [data-arrivals] .turn-receipt-item {
+  [data-arrivals] .turn-receipt-item,
+  [data-arrivals] .turn-receipt-chevron {
     opacity: 0;
     filter: blur(var(--arrive-blur));
   }
@@ -123,6 +115,13 @@
 .thinking-chevron {
   flex-shrink: 0;
   transition: rotate var(--duration-arrive) var(--ease-out);
+}
+/* The row's chevron arrives with its first item, when a turn that had nothing to fold gets something. */
+.turn-receipt-chevron {
+  transition:
+    rotate var(--duration-arrive) var(--ease-out),
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out);
 }
 
 /* The prompt: the user's own plane at the right, its copy, fork and time under it on hover, in the gap. */
@@ -457,7 +456,6 @@
   color: var(--ink-4);
   animation: work-spin 1.2s linear infinite;
 }
-.tool-row-progress,
 .tool-row-text {
   margin-left: 24px;
   font-size: var(--text-xs);
@@ -535,82 +533,11 @@
   min-width: 0;
 }
 
-/* A command: an r16 card with the command, a status that trades places with its result, and its last line. */
-.command-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  padding: 12px 14px;
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-}
-.command-card-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-  min-height: 16px;
-  text-align: left;
-}
-.command-card-row:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 4px;
-  border-radius: var(--radius-sm);
-}
-.command-card-icon {
-  flex-shrink: 0;
-  color: var(--ink-4);
-}
-.command-card-command {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 16px;
-  color: var(--ink);
-}
-.command-card-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  font-size: var(--text-xs);
-  line-height: 16px;
-  color: var(--ink-4);
-}
-.command-card-status[data-tone="ok"] {
-  color: var(--ok);
-}
-.command-card-status[data-tone="bad"] {
-  color: var(--bad);
-}
-.command-card-settled {
-  animation: command-settle var(--duration-confirm) var(--ease-overshoot) both;
-}
 @keyframes command-settle {
   from {
     opacity: 0;
     scale: 0.8;
   }
-}
-.command-card-output {
-  min-width: 0;
-  padding-left: 24px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  line-height: 18px;
-  color: var(--ink-4);
-}
-.command-card .tool-view {
-  padding: 0 0 0 24px;
 }
 
 /* Answered: one 44px line remembers a refusal. An allowed call shows as its tool row instead. */

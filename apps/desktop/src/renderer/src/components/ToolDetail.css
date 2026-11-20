@@ -415,7 +415,6 @@
   display: contents;
 }
 .tool-view-fields dt {
-  font-family: var(--font-mono);
   color: var(--ink-3);
 }
 .tool-view-fields dd {
@@ -426,6 +425,56 @@
   color: var(--ink);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+/* Data a call gave back, as an outline: a value under its name, a list as items a hairline apart. */
+.tool-data .tool-data,
+.tool-data-items {
+  min-width: 0;
+}
+.tool-data-items {
+  display: grid;
+  gap: 6px;
+}
+.tool-data-items > ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tool-data-items > ol > li + li {
+  padding-top: 8px;
+  border-top: var(--hairline) solid var(--line);
+}
+/* An outline takes the room it needs: long words fold to their first lines and a long list to its first items. */
+.tool-data dd {
+  max-height: none;
+  overflow: visible;
+}
+.tool-data-value {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 0;
+}
+.tool-data-long {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
+}
+/* What came back, under what was asked. */
+.tool-view > .tool-data-answer:not(:first-child) {
+  padding-top: 10px;
+  border-top: var(--hairline) solid var(--line);
+}
+.tool-data-raw {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  white-space: pre-wrap;
 }
 .tool-view-fields dd pre {
   margin: 0;

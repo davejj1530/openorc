@@ -17,6 +17,14 @@ vi.mock("../lib/hosted-file-scope", () => ({
   useHostedFileScope: () => ({ accountId: "account-a", apiOrigin: "https://example.com", spaceId: "org:studio", destination: { kind: "hosted", projectId: "project-a", threadId: "cloud-example" } }),
 }));
 afterEach(cleanup);
+// The call under way holds its height through a ResizeObserver, which jsdom lacks.
+Object.assign(globalThis, {
+  ResizeObserver: class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+});
 
 const taskId = "2ee7156d-b32d-465b-bb85-271ba9812402";
 const created: Block = {
@@ -65,11 +73,10 @@ it("keeps different task IDs with the same title visible", () => {
 it("keeps failed task actions available in the work history", () => {
   render(<WorkTranscript runId="run" blocks={[created, { ...started, isError: true, status: "error", output: "Could not start task" }]} live />);
   expect(screen.getAllByText(`Task ${taskId}`)).toHaveLength(1);
-  // The newest phase of a live turn stays open, so its chip is right there; it grows into the failed call.
-  const chip = screen.getByRole("button", { name: taskId });
-  fireEvent.click(chip);
-  expect(chip.getAttribute("aria-pressed")).toBe("true");
-  expect(chip.closest(".work-call")?.textContent).toContain("Could not start task");
+  // The failed start has its own line; pressing it shows the call with what went wrong.
+  const row = screen.getAllByRole("button", { name: new RegExp(taskId) }).find((button) => button.classList.contains("work-act-head"))!;
+  fireEvent.click(row);
+  expect(row.closest(".work-act")?.textContent).toContain("Could not start task");
 });
 
 it("coalesces cards even when tool grouping is disabled", () => {

@@ -149,6 +149,20 @@
   line-height: var(--text-prose--line-height);
   letter-spacing: var(--text-prose--letter-spacing);
 }
+/* A passage the message quotes: behind a hairline, a step quieter than the words about it. */
+.message-quote {
+  margin: 2px 0 6px;
+  padding-left: 10px;
+  border-left: var(--hairline) solid var(--line-strong);
+  color: var(--ink-2);
+}
+.message-quote:not(:first-child) {
+  margin-top: 10px;
+}
+/* The passage a note is being written about stays marked after the selection moves into the note. */
+::highlight(quoted-passage) {
+  background-color: var(--selection);
+}
 .journal-message-actions {
   position: absolute;
   top: 100%;

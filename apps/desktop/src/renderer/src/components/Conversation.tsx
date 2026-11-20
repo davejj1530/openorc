@@ -58,6 +58,7 @@ import { AnswersBlocked, AsksDocked } from "./ask-answer";
 import { useHostedComposer } from "./HostedSendNotice";
 import { HostedConversationBoundary } from "./HostedConversationBoundary";
 import { Composer, type ComposerHandle, type SlashCommand } from "./Composer";
+import { QuotableMessages } from "./QuotableMessages";
 import { ComposerChoice } from "./ComposerChoice";
 import { GitBranch, Laptop } from "./icons";
 import { SessionRecovery } from "./SessionRecovery";
@@ -331,7 +332,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   }
   return (
     <div className="conversation-pane h-full min-w-0 flex flex-col min-h-0">
-      <div className="flex-1 min-h-0 relative">{renderTranscript()}</div>
+      <QuotableMessages onQuote={(text, note) => composer.current?.quote(text, note)}>{renderTranscript()}</QuotableMessages>
       <div className="composer-padding shrink-0 px-6 pb-6 pt-2">
         <div className="max-w-chat w-full min-w-0 mx-auto grid grid-cols-1 gap-2">
           <ConversationVoice.Provider value={voice}>

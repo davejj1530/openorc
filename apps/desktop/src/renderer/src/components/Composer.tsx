@@ -34,14 +34,16 @@ import { cn } from "../lib/cn";
 import { useComposerFiles } from "./useComposerFiles";
 import { type MentionEntry } from "../lib/composer-mentions";
 import { useComposerFit } from "../lib/composer-fit";
+import { quotedMessage, useComposerQuotes } from "../lib/composer-quotes";
 import { useComposerSubmission } from "../lib/composer-submission";
 import { ComposerChoice } from "./ComposerChoice";
 import { ComposerReadOnly } from "./composer-read-only";
 import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
-import { ComposerChangesBar } from "./ComposerCommitChip";
+import { ComposerCommitChip } from "./ComposerCommitChip";
 import { ComposerAddMenu, type AddOffers } from "./ComposerAddMenu";
 import { ComposerAsk } from "./ComposerAsk";
 import { ComposerInput, type ComposerLists } from "./ComposerInput";
+import { ComposerQuote } from "./ComposerQuote";
 import type { ComposerEditorHandle } from "./composer-editor/ComposerEditor";
 import { ComposerSendCluster } from "./ComposerSendButton";
 import { useDraftNote, type ComposerNotes } from "./composer-notes";
@@ -104,6 +106,8 @@ export interface ComposerHandle {
   tag: (person: ThreadPerson, replyTo?: string) => void;
   /** Writes the server's note to the person who can release a block, their tag in place, before what is written. */
   note: (note: ThreadHandoffNote) => void;
+  /** Adds a passage from a message to the draft, with what the person wrote about it. */
+  quote: (text: string, note: string) => void;
 }
 
 export interface ComposerProps {
@@ -143,9 +147,9 @@ export interface ComposerProps {
   location: { label: string | null; branch: string | null; directory?: string; cloud?: boolean };
   /** Initial execution location is chosen before the conversation starts. */
   hasStarted?: boolean;
-  /** Uncommitted changes, shown as the Commit chip over the composer's left edge. */
+  /** Uncommitted changes, shown as the Commit chip in the bar, before the context ring. */
   changes?: ComposerChanges | null;
-  /** Status and recovery controls below the Commit chip and above the writing surface; an empty slot takes no room. */
+  /** Status and recovery controls above the writing surface; an empty slot takes no room. */
   notices?: ReactNode;
   busy?: boolean;
   disabledReason?: string | null;
@@ -194,7 +198,7 @@ export interface ComposerProps {
   /** The person is about to write: they focused the message or started one. */
   onReady?: ((why?: "focus" | "words") => void) | undefined;
   size?: "md" | "lg";
-  /** The landing screen draws the roomier composer and places the Commit chip itself. A small chat keeps only attach and send. */
+  /** The landing screen draws the roomier composer, with no Commit chip. A small chat keeps only attach and send. */
   presentation?: "conversation" | "new-thread" | "small";
   error?: string | null;
   /** What the agent waits on the person for, docked at the top of the composer; the first shows. */
@@ -222,9 +226,9 @@ function useSentGhost(text: string | null) {
 /**
  * The one composer, for the landing screen and every conversation. Files
  * paste or drop in and ride along with the prompt, images as thumbnails and
- * everything else as a named card; attach, the model and the mode sit in the
- * bar under the text with the context ring and send at its end; uncommitted
- * changes sit in the Commit chip over its left edge. @ mentions a file, / runs a command.
+ * everything else as a named card, beside the passages quoted from messages; attach, the model and the mode sit in the
+ * bar under the text with the Commit chip for uncommitted changes, the context ring and send at its end.
+ * @ mentions a file, / runs a command.
  */
 /** A file a message carried, as the composer shows it again: an image by its served picture, anything else by its name. */
 /** A send's error, unless it is the reason the composer can't send now, which the composer already shows. */
@@ -262,7 +266,8 @@ export function Composer(props: ComposerProps) {
   const { value, onChange } = props;
   const editor = useRef<ComposerEditorHandle>(null);
   const appendFiles = files.append;
-  const note = useDraftNote(props.notes, props.draftKey, value, attachments.length + uploading);
+  const quoted = useComposerQuotes(props.draftKey);
+  const note = useDraftNote(props.notes, props.draftKey, value, attachments.length + uploading + quoted.quotes.length);
   const { pick: pickPerson, reply: replyTo } = note;
   useImperativeHandle(
     props.handle,
@@ -290,8 +295,9 @@ export function Composer(props: ComposerProps) {
         else editor.current?.write(kept ? `${words}\n\n${kept}` : words, words.length);
         editor.current?.focus();
       },
+      quote: quoted.add,
     }),
-    [value, appendFiles, pickPerson, replyTo],
+    [value, appendFiles, pickPerson, replyTo, quoted.add],
   );
   const interrupt = useRpcMutation("runs.interrupt");
   const { submission, submit: submitDraft, acknowledge } = useComposerSubmission(props.draftKey);
@@ -309,7 +315,7 @@ export function Composer(props: ComposerProps) {
   const drop = useComposerDrop((dropped) => void addFiles(dropped), props.fileSearch);
   const attachmentBlock = files.pendingReason ?? (attachments.length > 0 ? files.blocked : null);
   // A note goes where the server lets the reader post notes (`notes`), whatever holds their messages.
-  const canSend = note.isNote ? Boolean(note.post) && !submitting : messageSends(props, { attachments: attachments.length, uploading, submitting, attachmentBlock });
+  const canSend = note.isNote ? Boolean(note.post) && !submitting : messageSends(props, { attachments: attachments.length, quotes: quoted.quotes.length, uploading, submitting, attachmentBlock });
 
   const canStop = turnStops(props);
   const asks = props.asks ?? [];
@@ -322,7 +328,7 @@ export function Composer(props: ComposerProps) {
     steerReason: props.steerReason,
     queueBlocked: props.queueBlocked,
     canStop,
-    hasDraft: Boolean(props.value.trim()) || attachments.length > 0 || uploading > 0,
+    hasDraft: Boolean(props.value.trim()) || attachments.length > 0 || uploading > 0 || quoted.quotes.length > 0,
     startsTask: props.allowEmpty,
     note: note.isNote,
     asked: asks.length > 0 ? `${props.model ? harnessShortName(props.model.agent) : "The agent"} is waiting for your answer.` : null,
@@ -333,10 +339,12 @@ export function Composer(props: ComposerProps) {
     if (note.post) return submitDraft(props.value.trim(), [], note.post);
     const sent = attachments.map((attachment) => attachment.path);
     const text = props.value.trim();
+    const quotes = quoted.quotes;
     const now = sendsNow(cluster, otherWay);
     setSentText(null);
     submitDraft(text, sent, async () => {
-      await props.onSubmit(text, sent, now);
+      await props.onSubmit(quotedMessage(quotes, text), sent, now);
+      quoted.remove(quotes.map((quote) => quote.id));
       await files.accepted(sent);
     });
   };
@@ -353,7 +361,6 @@ export function Composer(props: ComposerProps) {
 
   const content = (
     <div className={cn("composer min-w-0", props.size === "lg" && "composer-large", isNewThread && "composer-new-thread")}>
-      {isNewThread ? null : <ComposerChangesBar changes={props.changes} />}
       <div className="mb-2 grid grid-cols-1 gap-2 empty:hidden">{props.notices}</div>
       <ComposerAlerts
         message={
@@ -363,7 +370,12 @@ export function Composer(props: ComposerProps) {
       />
       <div ref={shell} className="composer-shell" data-dragging={drop.hover !== null || undefined} {...drop.handlers}>
         <ComposerAsk asks={asks} label={props.asksLabel} blocked={props.asksBlocked ?? null} continues={props.askContinues} fieldHasWords={Boolean(props.value.trim())} focusField={focusField} />
-        {attachments.length > 0 || uploading > 0 ? <div className="composer-attachments">{files.content}</div> : null}
+        <div className="composer-attachments">
+          {quoted.quotes.map((quote) => (
+            <ComposerQuote key={quote.id} quote={quote} edit={(note) => quoted.edit(quote.id, note)} remove={() => quoted.remove([quote.id])} />
+          ))}
+          {files.content}
+        </div>
         <div className="composer-prompt">
           <ComposerInput
             value={props.value}
@@ -416,6 +428,7 @@ export function Composer(props: ComposerProps) {
                 {activityLabel}
               </span>
             ) : null}
+            {isNewThread ? null : <ComposerCommitChip changes={props.changes} />}
             <ComposerContext {...props} />
             <ComposerSendCluster
               cluster={cluster}
@@ -446,13 +459,13 @@ function readyForMessages(onReady: ComposerProps["onReady"], notes: boolean): Co
   };
 }
 
-/** Whether a message can go to the agent now: it has words or files, or may go empty, and nothing holds it. */
+/** Whether a message can go to the agent now: it has words, files or quotes, or may go empty, and nothing holds it. */
 function messageSends(
   props: Pick<ComposerProps, "allowEmpty" | "value" | "busy" | "readOnlyReason" | "disabledReason">,
-  { attachments, uploading, submitting, attachmentBlock }: { attachments: number; uploading: number; submitting: boolean; attachmentBlock: string | null | undefined },
+  { attachments, quotes, uploading, submitting, attachmentBlock }: { attachments: number; quotes: number; uploading: number; submitting: boolean; attachmentBlock: string | null | undefined },
 ): boolean {
   if (props.busy || submitting || props.readOnlyReason || props.disabledReason || attachmentBlock || uploading > 0) return false;
-  return Boolean(props.allowEmpty || props.value.trim() || attachments > 0);
+  return Boolean(props.allowEmpty || props.value.trim() || attachments > 0 || quotes > 0);
 }
 
 function guardHostedCommand(props: ComposerProps, held: HeldCommands): ComposerProps {

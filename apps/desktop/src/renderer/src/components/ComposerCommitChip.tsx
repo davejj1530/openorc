@@ -1,16 +1,7 @@
 import type { ComposerChanges } from "./Composer";
 import { Tooltip } from "./ui";
 
-/** A conversation's Commit chip, over the composer's left edge; the row folds away while there is nothing to commit. */
-export function ComposerChangesBar({ changes }: { changes: ComposerChanges | null | undefined }) {
-  return (
-    <div className="composer-changes-bar empty:hidden">
-      <ComposerCommitChip changes={changes} />
-    </div>
-  );
-}
-
-/** Commit and the diff totals share one pill: Commit opens the commit flow, the totals open the review. While the panel shows the changes, its Commit is the one. */
+/** A conversation's Commit chip, in the composer's bar before the context ring; it goes while there is nothing to commit. Commit and the diff totals share one pill: Commit opens the commit flow, the totals open the review. While the panel shows the changes, its Commit is the one. */
 export function ComposerCommitChip({ changes }: { changes: ComposerChanges | null | undefined }) {
   if (changes?.uncounted) return <HostedCommitChip changes={changes} />;
   if (!changes || changes.files === 0 || changes.inPanel) return null;

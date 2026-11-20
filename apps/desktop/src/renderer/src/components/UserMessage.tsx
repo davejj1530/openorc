@@ -7,12 +7,14 @@ import { ThreadImage } from "./ThreadImages";
 import { IconButton } from "./ui";
 import { HostedMessageAttachments } from "./HostedMessageAttachments";
 import { useHostedConversation } from "./HostedConversationBoundary";
+import { quoteRuns } from "../lib/composer-quotes";
 import { useMessageAuthor } from "../lib/thread-authors";
 import { PromptAuthor } from "./ThreadVoice";
 
 /**
  * The user's message: who wrote it, in a cloud thread others are in, what they attached, then their words as the
- * composer drew them, then copy, fork and when. A badge, such as a reaction, rests on the bubble.
+ * composer drew them, the passages they quote set apart, then copy, fork and when. A badge, such as a reaction, rests on
+ * the bubble.
  */
 export function UserMessage({
   id,
@@ -41,7 +43,15 @@ export function UserMessage({
         {author !== undefined ? <PromptAuthor person={author} /> : null}
         {attachments?.length ? <MessageAttachments hosted={hosted} paths={attachments} /> : null}
         <div ref={bubble} className="message-bubble text-prose whitespace-pre-wrap" onPointerMove={skillHover.onPointerMove} onPointerLeave={skillHover.onPointerLeave}>
-          <MarkedText text={text} commands={marks.commands} connectors={marks.connectors} />
+          {quoteRuns(text).map((run, index) =>
+            run.quote ? (
+              <blockquote key={index} className="message-quote">
+                <MarkedText text={run.text} commands={marks.commands} connectors={marks.connectors} />
+              </blockquote>
+            ) : (
+              <MarkedText key={index} text={run.text} commands={marks.commands} connectors={marks.connectors} />
+            ),
+          )}
           {badge}
         </div>
         <SkillHoverCard mark={skillHover.hovered} commands={marks.commands} />

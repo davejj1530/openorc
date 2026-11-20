@@ -514,12 +514,6 @@
   color: var(--ink-4);
 }
 
-/* Uncommitted changes sit right over the composer, on its left edge. */
-.composer-changes-bar {
-  display: flex;
-  min-width: 0;
-  margin-bottom: 10px;
-}
 .composer-branch {
   min-width: 0;
   overflow: hidden;
@@ -527,16 +521,16 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* The Commit chip sits on the ground beside the composer and takes the composer's own fill, so it
-   reads in palettes whose surface matches the ground. */
+/* The Commit chip: a pill on the control fill like the bar's other chips, before the context ring. */
 .composer-changes {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
   height: var(--control-sm);
   border-radius: var(--radius-pill);
-  background-color: var(--composer-input);
-  box-shadow: var(--well-ring);
+  background-color: var(--control-fill);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
 }
 .composer-changes-commit-wrap {
   display: inline-flex;
@@ -575,6 +569,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.composer-attachments:empty {
+  display: none;
 }
 /* An attachment: an image as its thumbnail, any other file as one row of glyph, name and size on a key. Its remove
    control shows only under the pointer or with the keyboard on it. */
@@ -649,6 +646,43 @@
 }
 .composer-remove-image:hover {
   color: var(--ink);
+}
+
+/* A quote among the attachments: the passage on one line over its note. It opens into the note's popup. */
+.composer-quote {
+  text-align: left;
+}
+.composer-quote:hover,
+.composer-quote[data-popup-open] {
+  background: var(--surface-3);
+}
+.composer-quote-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quote-popup {
+  width: min(320px, calc(100vw - 24px));
+  padding: 12px;
+  border-radius: var(--radius-3xl);
+  background: var(--float-fill);
+  color: var(--ink);
+}
+.quote-note {
+  display: grid;
+  gap: 8px;
+}
+/* The whole passage, where the chip cut it short: as much as fits, then it scrolls. */
+.quote-note-passage {
+  max-height: 120px;
+  overflow-y: auto;
+  padding-left: 10px;
+  border-left: var(--hairline) solid var(--line-strong);
+  color: var(--ink-2);
+  font-size: var(--text-base);
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Files over the composer: the surface darkens a step, the arrow inverts, and the words say
@@ -1379,8 +1413,8 @@
 
 /* Narrow: the chips give up words a step at a time (lib/composer-fit.ts picks the step); their names stay in their
    labels and hover titles. */
-/* What a narrow bar gives up, in order (lib/composer-fit.ts): the effort's word, the mode's words, the context's number,
-   the model's name; then, under the least width, the row itself. */
+/* What a narrow bar gives up, in order (lib/composer-fit.ts): the effort's word, the mode's words, the context's number
+   with the Commit chip's totals, the model's name; then, under the least width, the row itself. */
 .composer-bar:is([data-fit="no-effort"], [data-fit="marks"], [data-fit="no-context"], [data-fit="logos"], [data-fit="least"]) .composer-model-effort {
   display: none;
 }
@@ -1390,8 +1424,11 @@
 .composer-bar:is([data-fit="marks"], [data-fit="no-context"], [data-fit="logos"], [data-fit="least"]) :is(.composer-chip-label, .composer-location > span) {
   display: none;
 }
-.composer-bar:is([data-fit="no-context"], [data-fit="logos"], [data-fit="least"]) .composer-context-number {
+.composer-bar:is([data-fit="no-context"], [data-fit="logos"], [data-fit="least"]) :is(.composer-context-number, .composer-changes-summary) {
   display: none;
+}
+.composer-bar:is([data-fit="no-context"], [data-fit="logos"], [data-fit="least"]) .composer-changes-commit {
+  padding-inline: 12px;
 }
 .composer-bar:is([data-fit="logos"], [data-fit="least"]) .composer-model-trigger {
   padding-inline: 8px;

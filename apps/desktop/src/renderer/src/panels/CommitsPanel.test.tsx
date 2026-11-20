@@ -1,6 +1,7 @@
 import type { Commit, Project, PushState, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { invalidateTags, queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
@@ -86,6 +87,8 @@ afterEach(() => {
   queryClient.clear();
   vi.restoreAllMocks();
 });
+
+vi.mock("../components/DiffView", () => ({ DiffView: ({ patch }: { patch: string }) => <pre aria-label="Diff">{patch}</pre> }));
 
 const mount = (source: ThreadSummary = thread) =>
   render(
@@ -201,4 +204,36 @@ it("keeps your pull request edits when the dialog closes", async () => {
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   fireEvent.click(screen.getByRole("button", { name: "PR" }));
   expect((await screen.findByRole<HTMLInputElement>("textbox", { name: "Title" })).value).toBe("Faster site");
+});
+
+it("opens a thread's commit as its changes and goes back to the list", async () => {
+  const sha = commits[1]!.sha;
+  vi.mocked(core.call).mockImplementation(async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => {
+    if (method === "git.threadLog") return commits as RpcResults[M];
+    if (method === "git.threadPushState") return state as RpcResults[M];
+    if (method === "system.info") return { gh: { installed: true, path: "/usr/bin/gh" } } as unknown as RpcResults[M];
+    if (method === "git.threadCommit") return { commit: commits[1]!, url: null } as RpcResults[M];
+    if (method === "review.threadCommitDiff") {
+      expect(params).toEqual({ threadId: thread.id, sha });
+      return { baseSha: null, patch: "@@ -1 +1 @@\n-old\n+new\n", files: [{ path: "site.css", status: "modified", oldPath: null }], since: null } as RpcResults[M];
+    }
+    return [] as unknown as RpcResults[M];
+  });
+  // The panel as its tab holds it: the commit open is the tab's page.
+  function Panel() {
+    const [open, setOpen] = useState<string | null>(null);
+    return <CommitsPanel source={{ kind: "thread", thread, project }} commit={open} onOpen={setOpen} />;
+  }
+  render(
+    <QueryClientProvider client={queryClient}>
+      <Panel />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: /fix: site ui bugs/ }));
+  expect((await screen.findByLabelText("Diff")).textContent).toContain("+new");
+  expect(screen.getByText("1 file")).toBeTruthy();
+  expect(screen.queryByRole("list", { name: "Commits" })).toBeNull();
+
+  fireEvent.click(screen.getByRole("button", { name: "All commits" }));
+  expect(await screen.findByRole("list", { name: "Commits" })).toBeTruthy();
 });

@@ -33,7 +33,8 @@ interface LayoutState {
   panelWidth: number;
   panelSide: PanelSide;
   panelTab: PanelTab;
-  panelRequest: { tab: PanelTab } | null;
+  /** The tab asked for, and with Commits the one commit to open there. */
+  panelRequest: { tab: PanelTab; commit?: string } | null;
   selectedChanges: ChangeSelection | null;
   openChanges: (selection: ChangeSelection) => void;
   clearChanges: () => void;
@@ -54,6 +55,8 @@ interface LayoutState {
   panelThreadId: string | null;
   toggleThreadPanel: (id: string) => void;
   openThreadPanel: (id: string, tab: PanelTab) => void;
+  /** One of a thread's commits, in its Commits tab. */
+  openCommit: (threadId: string, sha: string) => void;
   /** Only the pinned threads. Never persisted: a relaunch lists them all again. */
   pinnedOnly: boolean;
   /** Workspaces the person unticked in the sidebar's filter, kept on this device. What is hidden is stored, so a new one shows. */
@@ -224,6 +227,7 @@ export const useLayout = create<LayoutState>((set, get) => {
       if (get().workspace !== ALL_WORKSPACES) commit({ workspace: id === WORKSPACE_ID ? ALL_WORKSPACES : id });
     },
     openThreadPanel: (id, tab) => commit({ panelThreadId: id, panelOpen: true, panelTab: tab, panelRequest: { tab } }),
+    openCommit: (threadId, sha) => commit({ panelThreadId: threadId, panelOpen: true, panelTab: "commits", panelRequest: { tab: "commits", commit: sha } }),
     toggleThreadPanel: (id) => {
       const open = get().panelThreadId !== id || !get().panelOpen;
       commit({ panelThreadId: id, panelOpen: open, ...(open ? {} : { panelExpanded: false }) });

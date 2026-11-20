@@ -95,9 +95,12 @@ export function PanelContent({ context, page, onNavigate }: ContentProps) {
     case "terminal":
       return <TerminalContent context={context} page={page} />;
     case "commits": {
-      if (context.kind === "thread" && context.thread.owner?.brain === "hosted") return <HostedCommitsPanel key={context.thread.id} thread={context.thread} />;
+      // A commit and the list it came from are pages of the same tab, so Back returns to the list.
+      const open = (commit: string | null) => onNavigate({ kind: "tool", tool: "commits", ...(commit ? { commit } : {}) });
+      if (context.kind === "thread" && context.thread.owner?.brain === "hosted")
+        return <HostedCommitsPanel key={context.thread.id} thread={context.thread} commit={page.commit ?? null} onOpen={open} />;
       const source = commitSource(context);
-      return source ? <CommitsPanel source={source} /> : null;
+      return source ? <CommitsPanel source={source} commit={page.commit ?? null} onOpen={open} /> : null;
     }
     case "memory":
       return <MemoryPanel context={context} />;

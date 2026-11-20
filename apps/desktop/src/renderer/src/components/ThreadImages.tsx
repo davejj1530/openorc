@@ -1,12 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
-import { defaultRehypePlugins, defaultUrlTransform, type Components, type StreamdownProps, type UrlTransform } from "streamdown";
+import { defaultRehypePlugins, defaultUrlTransform, type Components, type ExtraProps, type StreamdownProps, type UrlTransform } from "streamdown";
 import { ChevronRight, Image, FolderOpen, Loader2, X, ZoomIn, ZoomOut } from "./icons";
 import { cn } from "../lib/cn";
 import { imageSource, isImagePath, localPath } from "../../../shared/image-paths";
 import { fileReference } from "../../../shared/file-reference";
 import { useLayout, type FileSelection } from "../lib/layout";
 import { citationLinks, type Block } from "@openorc/client";
+import { COMMIT_ID } from "@openorc/protocol";
+import { useRpc } from "../lib/client";
 import { Button } from "./ui";
 import { RichText } from "./RichText";
 import { codePathLinks } from "../lib/code-path-links";
@@ -14,11 +16,15 @@ import { rehypeMentionNames } from "../lib/mention-names";
 import { CoversPreview } from "../lib/browser-preview";
 import { ImageDownload } from "./ImageDownload";
 
+/** The thread whose commits a reply's ids name: in its folder on this Mac, or in the cloud. */
+export type CommitScope = { threadId: string; hosted: boolean };
+
 type ImageSelection = { src: string; label: string; path: string | null; download?: (() => Promise<unknown>) | undefined; onInvalidated?: ((close: () => void) => () => void) | undefined };
 const MediaContext = createContext<{
   basePath?: string;
   fileScope?: FileSelection["scope"];
   fileLinks?: "open" | "cite";
+  commits?: CommitScope | undefined;
   mentionNames?: ReadonlyMap<string, string> | undefined;
   openImage: (image: ImageSelection) => void;
 }>({
@@ -35,6 +41,8 @@ export interface MediaScope {
   fileScope?: FileSelection["scope"];
   /** "cite" when the files live elsewhere: links to them read as references. */
   fileLinks?: "open" | "cite";
+  /** Set where a commit's id in a reply can open that commit. */
+  commits?: CommitScope | undefined;
 }
 
 export function ThreadMedia({
@@ -43,6 +51,7 @@ export function ThreadMedia({
   scopeKey,
   fileScope,
   fileLinks = "open",
+  commits,
   mentionNames: ownNames,
 }: MediaScope & {
   children: ReactNode;
@@ -63,11 +72,14 @@ export function ThreadMedia({
   const scopeKind = fileScope?.kind;
   const scopeId = fileScope?.id;
   const scopeDirectory = fileScope?.kind === "project" ? fileScope.workingDirectory : undefined;
+  const commitThread = commits?.threadId;
+  const commitsHosted = commits?.hosted === true;
   const context = useMemo(() => {
     let scope: FileSelection["scope"] | undefined;
     if (scopeKind && scopeId !== undefined) scope = scopeKind === "project" ? { kind: scopeKind, id: scopeId, workingDirectory: scopeDirectory } : { kind: scopeKind, id: scopeId };
-    return { basePath, openImage, fileScope: scope, fileLinks, mentionNames };
-  }, [basePath, openImage, scopeKind, scopeId, scopeDirectory, fileLinks, mentionNames]);
+    const commitScope = commitThread === undefined ? undefined : { threadId: commitThread, hosted: commitsHosted };
+    return { basePath, openImage, fileScope: scope, fileLinks, commits: commitScope, mentionNames };
+  }, [basePath, openImage, scopeKind, scopeId, scopeDirectory, fileLinks, commitThread, commitsHosted, mentionNames]);
   return (
     <MediaContext.Provider value={context}>
       {children}
@@ -249,7 +261,57 @@ export function ThreadLink({ href = "", children }: ComponentProps<"a">) {
   );
 }
 
+/** The commit an id names in the thread: read from its folder on this Mac, or found among a cloud thread's own commits. */
+function useNamedCommit({ threadId, hosted }: CommitScope, id: string): { sha: string; subject: string; url: string | null } | null {
+  // An id that names no commit is not an error to try again.
+  const local = useRpc("git.threadCommit", { threadId, sha: id }, { enabled: !hosted, retry: false });
+  const cloud = useRpc("hosted.review.commits", { threadId }, { enabled: hosted, retry: false });
+  if (hosted) {
+    const commit = cloud.data?.commits.find((entry) => entry.sha.startsWith(id));
+    return commit ? { sha: commit.sha, subject: commit.subject, url: null } : null;
+  }
+  return local.data ? { sha: local.data.commit.sha, subject: local.data.commit.subject, url: local.data.url } : null;
+}
+
+/** A commit's id as the way to the commit: its page on GitHub once origin has it, else the commit in the thread's Commits. */
+function CommitLink({ scope, id, children }: { scope: CommitScope; id: string; children: ReactNode }) {
+  const commit = useNamedCommit(scope, id);
+  if (!commit) return children;
+  if (commit.url) return <ThreadLink href={commit.url}>{children}</ThreadLink>;
+  return (
+    <a
+      href={`#${commit.sha}`}
+      data-tip={`View commit: ${commit.subject}`}
+      onClick={(event) => {
+        event.preventDefault();
+        useLayout.getState().openCommit(scope.threadId, commit.sha);
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
+/** Inline code as the renderer draws it. Where it is a commit's id and the thread holds that commit, it opens the commit. */
+function ThreadCode({ node: _node, className, children, ...props }: ComponentProps<"code"> & ExtraProps) {
+  const { commits } = useContext(MediaContext);
+  const code = (
+    <code className={cn("rounded bg-muted px-1.5 py-0.5 font-mono text-sm", className)} data-streamdown="inline-code" {...props}>
+      {children}
+    </code>
+  );
+  const id = typeof children === "string" && COMMIT_ID.test(children) ? children : null;
+  return commits && id ? (
+    <CommitLink scope={commits} id={id}>
+      {code}
+    </CommitLink>
+  ) : (
+    code
+  );
+}
+
 export const threadMarkdownComponents: Components = {
+  inlineCode: ThreadCode,
   a: (props) => <ThreadLink href={typeof props.href === "string" ? props.href : ""}>{props.children as ReactNode}</ThreadLink>,
   img: (props) => <ThreadImage key={String(props.src)} src={typeof props.src === "string" ? props.src : ""} alt={typeof props.alt === "string" ? props.alt : "Image"} />,
 };

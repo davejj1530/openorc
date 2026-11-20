@@ -243,6 +243,9 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const fork = useRpcMutation("threads.fork");
   const forkThread = fork.mutate;
   const threadId = thread?.id;
+  const hosted = thread?.owner?.brain === "hosted";
+  // A commit's id in a reply opens the commit where the thread has commits: a project with git, or the cloud.
+  const commits = useMemo(() => (threadId && (hosted || git.tracks) ? { threadId, hosted } : undefined), [threadId, hosted, git.tracks]);
   const forkConversation = useCallback(() => {
     if (threadId) forkThread({ id: threadId }, { onSuccess: (t) => void (!("rejected" in t) && openThread(t.id)) });
   }, [threadId, forkThread]);
@@ -310,7 +313,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
         <TranscriptContext voice={voice} marks={marks} footers={footers} threadId={threadId} answersBlocked={answersBlocked} together={together.voices} notes={notes}>
           <Transcript
             working={working}
-            media={links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }}
+            media={{ ...(links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }), commits }}
             run={heard}
             scrollKey={conversation.id}
             followKey={sends}

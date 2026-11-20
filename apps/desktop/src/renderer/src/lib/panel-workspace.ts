@@ -35,7 +35,8 @@ function scopedChanges(context: PanelContext, changes: ChangeSelection | null): 
   return context.kind === "thread" && context.thread.id === changes.id ? changes : null;
 }
 
-function requestedPage(context: PanelContext, tab: PanelTab, file: FileSelection | null, changes: ChangeSelection | null): PanelPage {
+function requestedPage(context: PanelContext, { tab, commit }: { tab: PanelTab; commit?: string }, file: FileSelection | null, changes: ChangeSelection | null): PanelPage {
+  if (tab === "commits" && commit) return { kind: "tool", tool: tab, commit };
   if (tab === "browser") return { kind: "browser", url: useLayout.getState().previewUrls[panelScope(context)] ?? "", title: "" };
   const scope = panelFileScope(context);
   if (tab === "file" && file && scope.kind === file.scope.kind && scope.id === file.scope.id) return { kind: "file", selection: file };
@@ -55,7 +56,7 @@ export function usePanelWorkspace(context: PanelContext) {
     if (!open) return;
     if (request) {
       const layout = useLayout.getState();
-      usePanelSessions.getState().open(scope, requestedPage(context, request.tab, layout.selectedFile, layout.selectedChanges));
+      usePanelSessions.getState().open(scope, requestedPage(context, request, layout.selectedFile, layout.selectedChanges));
       useLayout.setState({ panelRequest: null });
     } else useLayout.setState({ panelTab: pageType(page) });
   }, [context, scope, request, open, page]);

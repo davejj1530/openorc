@@ -9,7 +9,8 @@ export type PanelPage =
   | { kind: "file"; selection: FileSelection | null }
   | { kind: "changes"; selection: ChangeSelection | null }
   | DevicePage
-  | { kind: "tool"; tool: Exclude<PanelTab, "newtab" | "browser" | "file" | "changes" | "device">; shell?: TerminalShell };
+  /** `commit` is the one commit Commits shows in place of its list, by id. */
+  | { kind: "tool"; tool: Exclude<PanelTab, "newtab" | "browser" | "file" | "changes" | "device">; shell?: TerminalShell; commit?: string };
 
 /** A simulator or emulator's screen. With no device it is the picker; `name` labels the tab before the list loads. */
 export type DevicePage = { kind: "device"; deviceId: string | null; name: string };

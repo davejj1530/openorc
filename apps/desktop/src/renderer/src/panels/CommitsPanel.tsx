@@ -6,6 +6,7 @@ import { PanelBar, PanelNotice } from "../components/PanelBar";
 import { Button, Empty } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useThreadMutationPending } from "../lib/thread-mutations";
+import { CommitView } from "./CommitView";
 import { ThreadPullRequest } from "./ThreadPullRequest";
 import "./commits.css";
 
@@ -28,8 +29,17 @@ function useCommits(source: CommitSource) {
   return { log: logs[source.kind], push: thread ? threadPush : checkoutPush };
 }
 
-/** The commits on a task's branch since its base, a thread's workspace or the checkout, marking the ones origin doesn't have yet. */
-export function CommitsPanel({ source }: { source: CommitSource }) {
+/**
+ * The commits on a task's branch since its base, a thread's workspace or the checkout, marking the ones origin doesn't
+ * have yet. With `onOpen`, a thread's commits open: `commit` names the one shown in place of the list.
+ */
+export function CommitsPanel({ source, commit, onOpen }: { source: CommitSource; commit?: string | null; onOpen?: (commit: string | null) => void }) {
+  const opens = source.kind === "thread" ? onOpen : undefined;
+  if (commit && opens && source.kind === "thread") return <CommitView key={commit} threadId={source.thread.id} sha={commit} onBack={() => opens(null)} />;
+  return <SourceCommits source={source} onOpen={opens ? (entry) => opens(entry.sha) : undefined} />;
+}
+
+function SourceCommits({ source, onOpen }: { source: CommitSource; onOpen: ((commit: Commit) => void) | undefined }) {
   const { log, push } = useCommits(source);
   const commits = log.data ?? [];
   const unpushed = new Set(push.data?.unpushed);
@@ -60,7 +70,7 @@ export function CommitsPanel({ source }: { source: CommitSource }) {
           <Empty title={emptyTitle[source.kind]}>Commit from Changes once the diff looks right.</Empty>
         </div>
       ) : (
-        <CommitList commits={commits} unpushed={unpushed} />
+        <CommitList commits={commits} unpushed={unpushed} onOpen={onOpen} />
       )}
     </div>
   );
@@ -88,7 +98,7 @@ export function CommitList({
   unpushed: ReadonlySet<string>;
   unsent?: string;
   more?: number;
-  onOpen?: (commit: Commit) => void;
+  onOpen?: ((commit: Commit) => void) | undefined;
 }) {
   return (
     <ol className="commit-rows flex-1 min-h-0 overflow-y-auto" aria-label="Commits">

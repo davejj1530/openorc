@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { HOSTED_REASONS, type Commit, type HostedThreadCommits, type ThreadSummary } from "@openorc/protocol";
+import { useEffect } from "react";
+import { shortSha } from "@openorc/client";
+import { HOSTED_REASONS, type HostedThreadCommits, type ThreadSummary } from "@openorc/protocol";
 import { Button, Empty } from "../components/ui";
 import { useRpc } from "../lib/client";
 import { HostedPublish } from "./HostedPublish";
@@ -14,13 +15,12 @@ function unpushedOf({ commits, pushed }: HostedThreadCommits): Set<string> {
   return new Set((at < 0 ? commits : commits.slice(0, at)).map((commit) => commit.sha));
 }
 
-export function HostedCommitsPanel({ thread }: { thread: ThreadSummary }) {
+/** A cloud thread's commits, or the one of them `commit` names in place of the list. */
+export function HostedCommitsPanel({ thread, commit, onOpen }: { thread: ThreadSummary; commit: string | null; onOpen: (commit: string | null) => void }) {
   const read = useRpc("hosted.review.state", { threadId: thread.id });
   const commits = useRpc("hosted.review.commits", { threadId: thread.id });
   // A project from a folder of a Mac has no remote: its commits are the cloud's until brought here.
   const mac = useBringable(thread.id).data?.mac === true;
-  // The commit open, for the thread it was opened in.
-  const [open, setOpen] = useState<{ threadId: string; commit: Commit } | null>(null);
   const refresh = () => {
     void read.refetch();
     void commits.refetch();
@@ -30,8 +30,12 @@ export function HostedCommitsPanel({ thread }: { thread: ThreadSummary }) {
     return () => window.removeEventListener("focus", refresh);
   });
   if (read.error?.message === HOSTED_REASONS.publishing) return <HostedUnavailablePanel title="Commits" reason={HOSTED_REASONS.publishing} />;
-  if (open?.threadId === thread.id) return <HostedCommitView threadId={thread.id} commit={open.commit} onBack={() => setOpen(null)} />;
   const listed = commits.data;
+  if (commit) {
+    // A commit opened from a reply is known by its id until the list names it.
+    const subject = listed?.commits.find((entry) => entry.sha === commit)?.subject ?? `Commit ${shortSha(commit)}`;
+    return <HostedCommitView threadId={thread.id} commit={{ sha: commit, subject }} onBack={() => onOpen(null)} />;
+  }
   return (
     <section className="h-full flex flex-col min-h-0">
       <HostedPublish thread={thread} state={read.error ? undefined : read.data} stateError={read.error} surface="commits" heading="Commits" />
@@ -49,7 +53,7 @@ export function HostedCommitsPanel({ thread }: { thread: ThreadSummary }) {
           unpushed={unpushedOf(listed)}
           unsent={mac ? "In the cloud" : "Not pushed"}
           more={listed.total - listed.commits.length}
-          onOpen={(commit) => setOpen({ threadId: thread.id, commit })}
+          onOpen={(entry) => onOpen(entry.sha)}
         />
       ) : null}
     </section>

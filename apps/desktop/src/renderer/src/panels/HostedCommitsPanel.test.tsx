@@ -1,6 +1,7 @@
 import type { BringState, HostedThreadCommits, ThreadSummary } from "@openorc/protocol";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
@@ -45,7 +46,17 @@ afterEach(() => {
 });
 
 const thread = { id: "thread-1", owner: { reach: "live" } } as unknown as ThreadSummary;
-const show = () => render(<QueryClientProvider client={queryClient}>{<HostedCommitsPanel thread={thread} />}</QueryClientProvider>);
+/** The panel as its tab holds it: the commit open is the tab's page. */
+function Panel() {
+  const [open, setOpen] = useState<string | null>(null);
+  return <HostedCommitsPanel thread={thread} commit={open} onOpen={setOpen} />;
+}
+const show = () =>
+  render(
+    <QueryClientProvider client={queryClient}>
+      <Panel />
+    </QueryClientProvider>,
+  );
 
 it("lists the thread's commits as this Mac's rows, newest first, the ones after its last push not pushed", async () => {
   show();

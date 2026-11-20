@@ -131,7 +131,7 @@ function RowView({ row }: { row: Row }): ReactElement | null {
     case "work":
       return <WorkRow row={row} />;
     case "reply":
-      return <Reply text={row.text} streaming={row.streaming} source={row.source} />;
+      return <Reply text={row.text} streaming={row.streaming} source={row.source} proofs={row.proofs} />;
     case "card":
       return <Card block={row.block} runId={row.runId} />;
     case "subagents":

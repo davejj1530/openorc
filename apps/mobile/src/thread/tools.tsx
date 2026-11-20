@@ -1,20 +1,18 @@
-import { activityIdOf, isCheckCommand, isImageView, liveVerb, stateLabel, toolCallPresentation, toolIntent, toolResult, type Block, type ToolIconName } from "@openorc/client";
+import { activityIdOf, isImageView, liveVerb, stateLabel, toolCallPresentation, type Block, type ToolIconName } from "@openorc/client";
 import { router } from "expo-router";
-import { memo, useRef, type ComponentType } from "react";
+import { memo, type ComponentType } from "react";
 import { Keyboard, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import {
   Check,
   ChevronDown,
   ChevronRight,
-  CircleCheck,
   FileText,
   Globe,
   Hammer,
   Image as ImageIcon,
   Lightbulb,
   Search,
-  Terminal,
   WorkAgent,
   WorkCommand,
   WorkDelegate,
@@ -22,7 +20,6 @@ import {
   WorkMessage,
   WorkRead,
   WorkSearch,
-  X,
 } from "../generated/icons";
 import { cn } from "../ui/cn";
 import type { IconProps } from "../ui/icon";
@@ -90,76 +87,6 @@ export const PlainToolRow = memo(function PlainToolRow({ block, runId, label: na
       {block.progress ? <Text className="ml-6 text-xs leading-4.5 text-ink-4">{block.progress}</Text> : null}
     </View>
   );
-});
-
-/** The last line a finished command printed, or what a running one is for. */
-function commandLine(block: ToolBlock): string {
-  if (!block.done) return toolIntent(block) ?? "";
-  if (block.output === undefined || block.output === null) return "";
-  return (
-    toolResult(block.output)
-      .text.trim()
-      .split("\n")
-      .findLast((line) => line.trim())
-      ?.trim() ?? ""
-  );
-}
-
-/** Running, then the result in its place with one overshoot. Only a live command animates the swap. */
-function CommandStatus({ state, check }: { state: string; check: boolean }) {
-  const first = useRef(state);
-  const still = useReducedMotion();
-  if (state === "running")
-    return (
-      <View className="flex-row items-center gap-1.5">
-        <Spinner size={14} />
-        <Text className="text-xs leading-4 text-ink-4">Running</Text>
-      </View>
-    );
-  const passed = state === "success";
-  const word = check ? "Passed" : "Done";
-  const settled = state !== first.current && !still;
-  return (
-    <Animated.View className="flex-row items-center gap-1.5" style={settled ? confirm : undefined}>
-      {passed ? <CircleCheck size={14} className="text-ok" /> : <X size={14} className="text-bad" />}
-      <Text className={cn("text-xs leading-4", passed ? "text-ok" : "text-bad")}>{passed ? word : stateLabel(state)}</Text>
-    </Animated.View>
-  );
-}
-
-/** A command the agent ran, as an r16 card: the command, a status that trades places with its result, its last line. */
-export const CommandCard = memo(function CommandCard({ block, runId, inset = false }: { block: ToolBlock; runId: string; inset?: boolean }) {
-  const command = toolCallPresentation(block.name, block.input).object;
-  const state = toolState(block);
-  const line = commandLine(block);
-  return (
-    <TranscriptPressable
-      accessibilityRole="button"
-      accessibilityLabel={`${block.done ? "Ran" : liveVerb("Ran")} ${command}${state === "running" || state === "success" ? "" : `, ${stateLabel(state)}`}`}
-      onPress={() => openTool(block, runId)}
-      className={cn("gap-2 rounded-xl px-3.5 py-3 active:opacity-80", inset ? "bg-surface-2" : "bg-surface")}
-    >
-      <View className="min-h-4 flex-row items-center gap-2">
-        <Terminal size={16} className="text-ink-4" />
-        <Text numberOfLines={1} className="min-w-0 flex-1 font-mono text-xs leading-4">
-          {command || "Command"}
-        </Text>
-        <CommandStatus state={state} check={isCheckCommand(command)} />
-      </View>
-      {line ? (
-        <Text numberOfLines={1} className="pl-6 font-mono text-xs leading-4.5 text-ink-4">
-          {line}
-        </Text>
-      ) : null}
-      {block.progress ? <Text className="pl-6 font-mono text-xs leading-4.5 text-ink-4">{block.progress}</Text> : null}
-    </TranscriptPressable>
-  );
-});
-
-/** A call: a command as its own card, anything else as one quiet row. */
-export const ToolRow = memo(function ToolRow({ block, runId, inset = false }: { block: ToolBlock; runId: string; inset?: boolean }) {
-  if (toolCallPresentation(block.name, block.input).verb === "Ran") return <CommandCard block={block} runId={runId} inset={inset} />;
-  return <PlainToolRow block={block} runId={runId} />;
 });
 
 /** "Thought for 12 seconds", or "Thinking" while it runs. */

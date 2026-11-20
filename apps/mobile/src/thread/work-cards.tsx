@@ -7,7 +7,7 @@ import { ArrowUpRight, ListTodo, MessageSquare } from "../generated/icons";
 import { boardStatus } from "../tasks/board";
 import { cn } from "../ui/cn";
 import { Text } from "../ui/Text";
-import { ToolRow } from "./tools";
+import { ToolRow } from "./lines";
 
 type ToolBlock = Extract<Block, { kind: "tool" }>;
 

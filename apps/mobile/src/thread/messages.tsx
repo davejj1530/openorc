@@ -8,9 +8,11 @@ import { attachmentRef, CloudImageTile, ImageTile, isImagePath } from "./images"
 import { client } from "../client";
 import { runBlock, useRunRead } from "../run-read";
 import { useOpen } from "./disclosure";
+import { openProof } from "./open-sheet";
 import { messagePieces } from "./markdown-chunks";
 import { Markdown } from "./Markdown";
 import { replySegments } from "./reply-images";
+import type { ReplyProof } from "./reply-proof";
 import type { MessageBlock, PieceSource } from "./rows";
 import { useOtherAuthor } from "./thread-authors";
 
@@ -140,17 +142,18 @@ function usePieceText({ runId, blockId, index }: PieceSource, text: string, stre
  * A piece of the agent's answer as prose: unboxed Markdown in ink, the last piece streaming in place while the turn
  * writes it. The piece keeps one native view from its first word on, so finishing changes only how it draws.
  */
-export const Reply = memo(function Reply({ text, streaming, source }: { text: string; streaming: boolean; source: PieceSource }) {
+export const Reply = memo(function Reply({ text, streaming, source, proofs }: { text: string; streaming: boolean; source: PieceSource; proofs: ReplyProof[] }) {
   const words = usePieceText(source, text, streaming);
   const segments = useMemo(() => replySegments(words), [words]);
+  const pills = useMemo(() => (proofs.length ? { list: proofs, open: (proof: ReplyProof) => openProof(proof, source.runId) } : undefined), [proofs, source.runId]);
   if (streaming && !words) return <Pending />;
-  if (!segments.some((segment) => segment.kind === "image")) return <Markdown text={words} streaming={streaming} />;
+  if (!segments.some((segment) => segment.kind === "image")) return <Markdown text={words} streaming={streaming} proofs={pills} />;
   // The gap is a paragraph's own margin, so an image sits in the reply's rhythm.
   return (
     <View className="gap-3.5">
       {segments.map((segment, index) =>
         segment.kind === "text" ? (
-          <Markdown key={index} text={segment.text} streaming={streaming && index === segments.length - 1} />
+          <Markdown key={index} text={segment.text} streaming={streaming && index === segments.length - 1} proofs={pills} />
         ) : (
           <ReplyImage key={index} path={segment.path} alt={segment.alt} source={source} streaming={streaming} />
         ),

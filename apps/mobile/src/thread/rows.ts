@@ -17,6 +17,7 @@ import type { ThreadNote, ThreadPerson, Visualization } from "@openorc/protocol"
 import { height } from "../generated/tokens";
 import { messagePieces } from "./markdown-chunks";
 import { NO_NOTES, notesAfter, notesKey, type NotePlaces } from "./note-places";
+import { holdsProof, NO_PROOFS, replyProofs, type ReplyProof } from "./reply-proof";
 import { messageAuthor, turnSender, type ThreadSenders } from "./senders";
 import { NO_VOICES, voiceOf, type Voice, type Voices } from "./voices";
 import type { WaitingApproval } from "./waiting-approvals";
@@ -36,7 +37,7 @@ export type Row = { key: string; gap: number } & (
   | { kind: "prompt"; block: MessageBlock }
   | { kind: "notice"; block: MessageBlock }
   /**
-   * A turn's head, only where it has something to say: the agent and model where they changed from the turn before
+   * A turn's head, only where it has something to say: the agent where it changed from the turn before
    * (`voice`), and in a cloud thread others are in, who sent the turn where its prompt does not already name them
    * (`sender`; null: a former member).
    */
@@ -46,7 +47,7 @@ export type Row = { key: string; gap: number } & (
    * A piece of a reply: long replies are drawn a piece per row, so the list lays them out a piece at a time. The piece
    * still streaming reads its words from the run as they arrive (`source`), so the list itself holds still.
    */
-  | { kind: "reply"; text: string; streaming: boolean; source: PieceSource }
+  | { kind: "reply"; text: string; streaming: boolean; source: PieceSource; proofs: ReplyProof[] }
   | { kind: "card"; runId: string; block: Block }
   | { kind: "subagents"; blocks: ToolBlock[] }
   /** The run that asks what the cards after it ask, outside the loaded conversation: its task's title, or its agent's. */
@@ -160,7 +161,7 @@ const sameAs: { [K in RowKind]: (a: RowOf<K>, b: RowOf<K>) => boolean } = {
   // A streamed delta the row does not draw keeps the row, so the list and the open steps card hold still.
   work: (a, b) => a.live === b.live && a.runId === b.runId && sameNow(a.now, b.now) && a.work.length === b.work.length && a.work.every((block, i) => drawnSame(block, b.work[i]!)),
   // A streaming piece reads its own words, so only a change of shape makes it a new row.
-  reply: (a, b) => a.streaming === b.streaming && (a.streaming || a.text === b.text),
+  reply: (a, b) => a.streaming === b.streaming && (a.streaming || a.text === b.text) && a.proofs === b.proofs,
 };
 
 function sameRow(a: Row, b: Row): boolean {
@@ -176,23 +177,46 @@ function runOf(blocks: Block[], fallback: string): string {
 /** The row key of one piece of a reply. */
 export const replyKey = (blockId: string, index: number) => `reply:${blockId}:${index}`;
 
+/** Each finished reply's proofs by piece, read once: a finished turn's work does not change. */
+const proven = new WeakMap<MessageBlock, ReplyProof[][]>();
+
+/**
+ * The proofs each piece of a reply shows, each on the first piece that holds its line. `work`: the turn's work once
+ * the turn has ended; a reply still being written, or one whose turn still runs, shows none.
+ */
+function pieceProofs(block: MessageBlock, pieces: string[], work: Block[] | null): ReplyProof[][] | null {
+  if (!work?.length || block.streaming) return null;
+  const known = proven.get(block);
+  if (known) return known;
+  const placed: ReplyProof[][] = pieces.map(() => NO_PROOFS);
+  for (const proof of replyProofs(block.text, work)) {
+    const index = pieces.findIndex((piece) => holdsProof(piece, proof));
+    if (index >= 0) placed[index] = [...placed[index]!, proof];
+  }
+  proven.set(block, placed);
+  return placed;
+}
+
 /** A reply as its pieces; only the last can still be streaming. An empty streaming reply is one row that waits. */
-function replyRows(block: MessageBlock, runId: string): Unspaced[] {
+function replyRows(block: MessageBlock, runId: string, work: Block[] | null): Unspaced[] {
   const pieces = messagePieces(block);
+  const proofs = pieceProofs(block, pieces, work);
   return pieces.map((text, index) => ({
     kind: "reply",
     key: replyKey(block.id, index),
     text,
     streaming: block.streaming && index === pieces.length - 1,
     source: { runId: block.runId ?? runId, blockId: block.id, index },
+    proofs: proofs?.[index] ?? NO_PROOFS,
   }));
 }
 
 /** A provider's error the agent passed on as its words: drawn as an error card, not as the reply. */
 const providerError = (block: Block) => block.kind === "message" && block.role === "assistant" && /^API Error:/.test(block.text);
 
-function afterRows(block: Block, runId: string): Unspaced[] {
-  if (block.kind === "message" && block.role === "assistant" && !providerError(block)) return replyRows(block, runId);
+/** `work`: the ended turn's work, which its reply's claims rest on. */
+function afterRows(block: Block, runId: string, work: Block[] | null = null): Unspaced[] {
+  if (block.kind === "message" && block.role === "assistant" && !providerError(block)) return replyRows(block, runId, work);
   if (block.kind === "message" && block.role === "system") return [{ kind: "notice", key: `notice:${block.id}`, block }];
   const visualization = block.kind === "tool" ? visualizationFromTool(block) : null;
   if (block.kind === "tool" && visualization) return [{ kind: "visualization", key: `visualization:${block.id}`, runId, block, visualization }];
@@ -204,7 +228,7 @@ function beforeRows(block: Block, runId: string): Unspaced[] {
   return block.text || block.attachments?.length ? [{ kind: "prompt", key: `prompt:${block.id}`, block }] : [];
 }
 
-function afterTurnRows(after: Block[], runId: string): Unspaced[] {
+function afterTurnRows(after: Block[], runId: string, work: Block[] | null): Unspaced[] {
   const rows: Unspaced[] = [];
   const groups = subagentGroups(after);
   for (const block of after) {
@@ -215,13 +239,13 @@ function afterTurnRows(after: Block[], runId: string): Unspaced[] {
     }
     // "turn error" and "session error" restate the error card above them.
     if (block.kind === "status" && /^(turn|session) /.test(block.text)) continue;
-    rows.push(...afterRows(block, runId));
+    rows.push(...afterRows(block, runId, work));
   }
   return rows;
 }
 
 /**
- * What the open thread knows of who speaks in it, for the turn heads: each run's agent and model and the thread's own,
+ * What the open thread knows of who speaks in it, for the turn heads: each run's agent and the thread's own,
  * and in a cloud thread, who sent each turn and wrote each prompt.
  */
 export interface TurnNames {
@@ -264,7 +288,7 @@ function turnParts(turn: { id: string; blocks: Block[] }, live: boolean, fallbac
   });
   rows.push(...noteRows(notesAfter(notes, work)));
   const rest = after.filter((block) => block.kind !== "approval");
-  rows.push(...afterTurnRows(rest, runId));
+  rows.push(...afterTurnRows(rest, runId, timing.live ? null : work));
   const reply = turnReply(after.filter((block) => !providerError(block)));
   const writing = after.some((block) => block.kind === "message" && block.role === "assistant" && block.streaming);
   const end = { live: timing.live, writing, startedAt: timing.startedAt, durationMs: timing.durationMs, outcome: timing.outcome };
@@ -343,7 +367,7 @@ export function transcriptRows(blocks: Block[], { live, working }: TranscriptAct
   const turns = workTurns(blocks);
   const next: RowMemo["turns"] = new Map();
   const rows: Row[] = [...topNoteRows(memo, notes)];
-  // Each turn names its agent and model only where they changed from the turn before; the first, from the thread's own.
+  // Each turn names its agent only where it changed from the turn before; the first, from the thread's own.
   let spoken = voices.own;
   turns.forEach((turn, index) => {
     const turnLive = live && index === turns.length - 1;

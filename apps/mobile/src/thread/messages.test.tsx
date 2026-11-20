@@ -9,6 +9,7 @@ import { activity, type runStore } from "./test-fixtures/run-store";
 /** The run store the reply reads, and every Markdown view: how many mounted, and what each render drew. */
 const probe = vi.hoisted(() => ({ store: null as ReturnType<typeof runStore> | null, mounts: 0, renders: [] as { text: string; streaming: boolean }[] }));
 
+vi.mock("expo-router", () => ({ router: { push: () => undefined } }));
 vi.mock("../client", async () => {
   const { runStore } = await import("./test-fixtures/run-store");
   probe.store = runStore();
@@ -44,7 +45,7 @@ function replyRows(): ReplyRow[] {
   const run = probe.store!.client.runs.get("r")!;
   return transcriptRows(run.blocks, activity(run), "r", memo).filter((row): row is ReplyRow => row.kind === "reply");
 }
-const reply = (row: ReplyRow) => <Reply text={row.text} streaming={row.streaming} source={row.source} />;
+const reply = (row: ReplyRow) => <Reply text={row.text} streaming={row.streaming} source={row.source} proofs={row.proofs} />;
 const paragraph = (n: number) => `Paragraph ${n}. ${"A sentence that fills the reply. ".repeat(12)}\n\n`;
 
 it("keeps one Markdown view for a piece from its first words through finishing, and for the next piece the list hands it", () => {
@@ -81,7 +82,7 @@ it("keeps one Markdown view for a piece from its first words through finishing, 
 it("draws an image of a file on the Mac as a tile asked for by its message, and the words around it as Markdown", () => {
   probe.renders.length = 0;
   tiles.length = 0;
-  render(<Reply text={"Fixed:\n\n![Agent details, dark](/Users/me/dark.png)\n\nDone."} streaming={false} source={{ runId: "r", blockId: "m1", index: 0 }} />);
+  render(<Reply text={"Fixed:\n\n![Agent details, dark](/Users/me/dark.png)\n\nDone."} streaming={false} source={{ runId: "r", blockId: "m1", index: 0 }} proofs={[]} />);
   expect(tiles).toEqual([{ asset: { kind: "reply-image", runId: "r", messageId: "m1", path: "/Users/me/dark.png" }, label: "Agent details, dark" }]);
   expect(probe.renders.map((drawn) => drawn.text)).toEqual(["Fixed:", "Done."]);
 });

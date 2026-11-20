@@ -13,7 +13,7 @@ type HeadRow = Extract<Row, { kind: "head" }>;
 const agentName = (voice: Voice | undefined) => (voice && isHarnessId(voice.agent) ? harnessShortName(voice.agent) : "Assistant");
 
 /**
- * A turn's head, only on a turn that keeps one: the agent's mark, name and model where they changed from the turn
+ * A turn's head, only on a turn that keeps one: the agent's mark and name where the agent changed from the turn
  * before, and in a cloud thread others are in, the first name of who sent the turn where its prompt does not say it.
  */
 export const TurnHead = memo(function TurnHead({ row }: { row: HeadRow }) {
@@ -22,11 +22,6 @@ export const TurnHead = memo(function TurnHead({ row }: { row: HeadRow }) {
     <View className="flex-row items-center gap-2" style={{ height: FIXED_HEIGHT.head }}>
       {voice ? <HarnessLogo agent={voice.agent} size={14} /> : null}
       {voice ? <Text className="leading-4">{agentName(voice)}</Text> : null}
-      {voice?.model ? (
-        <Text numberOfLines={1} className="min-w-0 shrink text-xs leading-4 text-ink-4">
-          {voice.model}
-        </Text>
-      ) : null}
       {sender === undefined ? null : <Text className={cn("text-xs leading-4 text-ink-3", voice && "ml-1")}>{personFirst(sender)}</Text>}
     </View>
   );

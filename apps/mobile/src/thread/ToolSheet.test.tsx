@@ -6,10 +6,17 @@ import { flatStyle, nativeProps, placed, screen } from "../test-fixtures/react-n
 import type { Draft, runStore } from "./test-fixtures/run-store";
 import { ToolSheet } from "./ToolSheet";
 
-/** The sheet's route, the run store its call comes from, the link, and the Mac's answers to reading an output. */
-const sheet = vi.hoisted(() => ({ store: null as ReturnType<typeof runStore> | null, link: null as FakeLink | null, read: vi.fn() }));
+/** The sheet's route and where it was asked to go, the run store its calls come from, the link, and the Mac's answers to reading an output. */
+const sheet = vi.hoisted(() => ({
+  params: { runId: "r", id: "seq" } as { runId: string; id: string; calls?: string },
+  replaced: [] as unknown[],
+  store: null as ReturnType<typeof runStore> | null,
+  link: null as FakeLink | null,
+  read: vi.fn(),
+}));
 
-vi.mock("expo-router", () => ({ useLocalSearchParams: () => ({ runId: "r", id: "seq" }), router: { push: () => undefined } }));
+vi.mock("expo-router", () => ({ useLocalSearchParams: () => sheet.params, router: { push: () => undefined, replace: (href: unknown) => void sheet.replaced.push(href) } }));
+vi.mock("./Markdown", () => ({ Markdown: ({ text }: { text: string }) => <div>{text}</div> }));
 vi.mock("../client", async () => {
   const { runStore } = await import("./test-fixtures/run-store");
   const { fakeLink } = await import("../test-fixtures/fake-link");
@@ -55,6 +62,80 @@ afterEach(() => {
   screen.fontScale = 1;
   sheet.store!.client.runs.reset();
   sheet.read.mockReset();
+  sheet.params = { runId: "r", id: "seq" };
+  sheet.replaced.length = 0;
+});
+
+/** The sheet opened from a line whose one call ran `name` with `input` and came back with `output`. */
+function line(name: string, input: unknown, output: string, isError = false) {
+  sheet.params = { runId: "r", id: "c", calls: "c" };
+  sheet.store!.frame(
+    { type: "session.started", agent: "claude", externalSessionId: "s", model: "m", tools: [] },
+    { type: "turn.started", turnId: "t1" },
+    { type: "tool.started", toolCallId: "c", name, input, parentToolCallId: null },
+    { type: "tool.completed", toolCallId: "c", name, output, isError },
+  );
+  render(<ToolSheet />);
+}
+
+const failing = [
+  " RUN  v4.1.11 /repo",
+  " ✓ src/cart.test.ts (3 tests) 10ms",
+  " ❯ src/auth.test.ts (2 tests | 1 failed) 60ms",
+  " FAIL  src/auth.test.ts > auth > locks the account after five attempts",
+  "AssertionError: expected 423, got 401",
+  "",
+  " ❯ src/auth.test.ts:58:31",
+  " ❯ node_modules/vitest/dist/chunk.js:12:3",
+  " ❯ node_modules/vitest/dist/runner.js:40:9",
+  "⎯⎯⎯⎯[1/1]⎯",
+  " Test Files  1 failed | 1 passed (2)",
+  "      Tests  1 failed | 4 passed (5)",
+  "   Duration  70ms (transform 10ms)",
+].join("\n");
+
+it("draws a test run as its files, a failed case with what went wrong and where, the whole output a press away", () => {
+  line("Bash", { command: "npx vitest run", description: "Run the tests" }, failing, true);
+  expect(shown.getByText("Run the tests")).toBeTruthy();
+  expect(shown.getByText("auth.test.ts")).toBeTruthy();
+  expect(shown.getByText("cart.test.ts")).toBeTruthy();
+  expect(shown.getByText("locks the account after five attempts")).toBeTruthy();
+  expect(shown.getByText("AssertionError: expected 423, got 401")).toBeTruthy();
+  expect(shown.getByText("src/auth.test.ts:58")).toBeTruthy();
+  // Code the project did not write is a count, not lines.
+  expect(shown.getByText("2 library frames")).toBeTruthy();
+  expect(document.body.textContent).not.toContain("chunk.js");
+  fireEvent.click(shown.getByRole("button", { name: "Whole output" }));
+  expect(document.body.textContent).toContain("chunk.js");
+});
+
+it("draws a command as a screen of its last lines, the earlier ones a press away", () => {
+  line("Bash", { command: "seq 40" }, numbered(40));
+  expect(shown.getByText("line 40")).toBeTruthy();
+  expect(shown.queryByText("line 1")).toBeNull();
+  fireEvent.click(shown.getByRole("button", { name: "28 earlier lines" }));
+  expect(drawnLines()).toEqual(numbered(40).split("\n"));
+});
+
+it("draws an edit as the lines it took out and put in, the whole change a press away", () => {
+  line("Edit", { file_path: "/repo/src/a.ts", old_string: "const a = 1;", new_string: "const a = 2;" }, "The file has been updated");
+  expect(shown.getByText("− const a = 1;")).toBeTruthy();
+  expect(shown.getByText("+ const a = 2;")).toBeTruthy();
+  expect(shown.getByRole("button", { name: "Whole change" })).toBeTruthy();
+});
+
+it("draws a list of threads as threads, each a way to its thread but the one already open", () => {
+  const threads = [
+    { id: "here", title: "Agent activity interface", activity: "running", branch: "cloud", current: true, lastReply: "Building the sheet.", lastActivityAt: Date.now() },
+    { id: "other", title: "Worktree file previews", activity: "idle", branch: "cloud", current: false, lastReply: "**Done.** Replayed the command.", lastActivityAt: Date.now() - 240_000 },
+  ];
+  line("mcp__openorc_0123456789abcdef0123456789abcdef__thread_list", {}, JSON.stringify(threads));
+  expect(shown.getByText("this thread")).toBeTruthy();
+  // A reply reads as one plain line.
+  expect(shown.getByText("Done. Replayed the command.")).toBeTruthy();
+  expect(shown.queryByRole("button", { name: "Open thread Agent activity interface" })).toBeNull();
+  fireEvent.click(shown.getByRole("button", { name: "Open thread Worktree file previews" }));
+  expect(sheet.replaced).toEqual([{ pathname: "/thread/[id]", params: { id: "other" } }]);
 });
 
 it("draws only the lines near the screen once all of a long output shows, and follows the reader down", () => {

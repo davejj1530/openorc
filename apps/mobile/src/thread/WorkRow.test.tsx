@@ -99,7 +99,8 @@ it("stays open when the turn ends once the reader has pressed inside the live wo
       <WorkRow row={live} />
     </DisclosureContext.Provider>,
   );
-  const chip = () => screen.queryByRole("button", { name: "pnpm test" });
+  // The line says what the command is for, in plain words.
+  const chip = () => screen.queryByRole("button", { name: "Run the tests" });
   act(() => chip()!.click());
   const done = workRow(
     { type: "tool.completed", toolCallId: "test", name: "commandExecution", output: "ok", isError: false },
@@ -133,8 +134,9 @@ it("puts the keyboard away before a call's sheet opens, as it would cover the sh
   );
   render(<WorkRow row={row} />);
   keyboard.up = true;
-  act(() => screen.getByRole("button", { name: "pnpm lint" }).click());
-  expect(work.pushed).toEqual([{ href: { pathname: "/tool", params: { runId: "r", id: expect.any(String) } }, keyboardUp: false }]);
+  act(() => screen.getByRole("button", { name: "Run lint" }).click());
+  // The sheet is told the calls behind the line.
+  expect(work.pushed).toEqual([{ href: { pathname: "/tool", params: { runId: "r", id: "lint", calls: "lint" } }, keyboardUp: false }]);
 });
 
 it("gives the work's receipt a 44 pt row of its own, the space around its line inside it, reaching into no other row", () => {

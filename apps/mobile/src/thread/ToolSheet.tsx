@@ -1,155 +1,77 @@
-import { liveVerb, stateLabel, toolCallPresentation, toolInputView, toolOutputView, toolResult, type InputView, type OutputView } from "@openorc/client";
-import { TOOL_IMAGE_URL } from "@openorc/protocol";
+import {
+  lineCall,
+  lineEnd,
+  lineWords,
+  liveVerb,
+  ownToolView,
+  shortPath,
+  stateLabel,
+  testReport,
+  toolCallPresentation,
+  toolInputView,
+  workObjects,
+  type ActLine,
+  type EditObject,
+  type TestsObject,
+  type WorkObject,
+} from "@openorc/client";
 import { router, useLocalSearchParams } from "expo-router";
-import { memo, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { call, useLinkRead, useRun } from "../client";
-import type { LinkRead } from "../connection/link-hooks";
+import { useRun } from "../client";
+import { cn } from "../ui/cn";
 import { Mono } from "../ui/Mono";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
-import { ImageTile } from "./images";
-import { matchLines } from "./mono-lines";
+import { End, Mark } from "./lines";
+import { Call, Calls, InputPart, Reading, usePrinted } from "./sheet-call";
+import { EditLines, Fetched, GitView, Links, More, Screen, TestsView, Whole } from "./sheet-parts";
 import { createSheetWindow, SheetWindowContext, windowScroll } from "./sheet-window";
 import { toolIcons, toolState, type ToolBlock } from "./tools";
 
-/** Reads a call's output from the Mac's ledger; `key` names the run and the call. */
-const readToolOutput = (key: string) => call("events.toolOutput", JSON.parse(key) as { runId: string; toolCallId: string });
+type Run = NonNullable<ReturnType<typeof useRun>>;
 
-/** A page leaves large outputs out; the sheet reads the call's output from the ledger when it opens. */
-function useToolOutput(block: ToolBlock | undefined): { output: unknown; state: LinkRead<unknown>["state"] } {
-  const omitted = block?.outputOmitted && block.runId ? JSON.stringify({ runId: block.runId, toolCallId: block.id }) : null;
-  const read = useLinkRead(omitted, readToolOutput);
-  if (!omitted) return { output: block?.output, state: "ready" };
-  return { output: read.state === "ready" ? (read.value.output ?? undefined) : undefined, state: read.state };
+const toolBlocks = (object: WorkObject) => object.blocks.filter((block): block is ToolBlock => block.kind === "tool");
+
+/**
+ * The lines the sheet shows, read again from the run's own calls, so one still running fills in as it goes. `calls`
+ * names the calls behind them: the one line the reader pressed, or with `whole` every line a claim rests on. A sheet
+ * opened on a call alone has no line.
+ */
+function sheetLines(run: Run | undefined, id: string, calls: string | undefined, whole: boolean): ActLine[] {
+  if (!run || !calls) return [];
+  const named = new Set(calls.split(","));
+  const blocks = run.blocks.filter((block) => named.has(block.id));
+  const objects = workObjects(blocks, run.blocks, run.turnOpen);
+  const shown = whole ? objects : objects.filter((object) => object.blocks.some((block) => block.id === id)).slice(0, 1);
+  return shown.map((object) => ({ object, times: 1, group: [] }));
 }
 
-function Label({ children }: { children: ReactNode }) {
-  return <Text className="text-xs leading-4 text-ink-4">{children}</Text>;
+/** Whether the line's name is a message it sent, which the sheet shows whole in its bubble. */
+function namesMessage(object: WorkObject): boolean {
+  const call = object.kind === "tool" ? lineCall(object) : null;
+  return call ? ownToolView(call)?.kind === "sent" : false;
 }
 
-function diffTone(line: string): string {
-  if (line.startsWith("+") && !line.startsWith("+++")) return "text-ok";
-  if (line.startsWith("-") && !line.startsWith("---")) return "text-bad";
-  return "text-ink-3";
+/** The line as the sheet's title: its mark, what was done and to what, and how it came out. */
+function LineHead({ line }: { line: ActLine }) {
+  const words = lineWords(line);
+  const title = namesMessage(line.object) ? { verb: null, name: words.verb ?? words.name, code: false } : words;
+  return (
+    <View className="flex-row items-center gap-2.5">
+      <Mark object={line.object} />
+      <Text accessibilityRole="header" numberOfLines={2} className={cn("min-w-0 flex-1 text-lg", title.code && "font-mono text-base")}>
+        {title.verb ? <Text className={cn("text-lg text-ink-4", title.code && "font-mono text-base")}>{`${title.verb} `}</Text> : null}
+        {title.name}
+      </Text>
+      {/* A test run's results say how it came out, cell by cell. */}
+      {line.object.kind === "tests" ? null : <End result={lineEnd(line).result} />}
+    </View>
+  );
 }
 
-/** A unified diff with its added and removed lines in the desktop's result tones. */
-function Diff({ patch }: { patch: string }) {
-  return <Mono text={patch} lineTone={diffTone} />;
-}
-
-/** Search results in one block, each file's path in the faint tone over its lines, so one line budget covers them all. */
-function Matches({ groups }: { groups: Extract<OutputView, { kind: "matches" }>["groups"] }) {
-  const { text, paths } = useMemo(() => matchLines(groups), [groups]);
-  return <Mono text={text} lineTone={(_, index) => (paths.has(index) ? "text-ink-4" : "text-ink-2")} />;
-}
-
-const InputPart = memo(function InputPart({ view }: { view: InputView }) {
-  switch (view.kind) {
-    case "command":
-      return (
-        <View className="gap-1.5">
-          <Mono tone="text-ink" text={view.steps.map((step) => `$ ${step.text}${step.body ? `\n${step.body.code}` : ""}`).join("\n")} />
-          {view.cwd ? <Label>{view.cwd}</Label> : null}
-        </View>
-      );
-    case "file":
-      return <Mono tone="text-ink" text={view.lines ? `${view.path}  ${view.lines}` : view.path} />;
-    case "patch":
-      return <Diff patch={view.patch} />;
-    case "edit":
-      return (
-        <View className="gap-1.5">
-          <Label>{view.path}</Label>
-          <Diff patch={[...view.before.split("\n").map((line) => `-${line}`), ...view.after.split("\n").map((line) => `+${line}`)].join("\n")} />
-        </View>
-      );
-    case "write":
-      return (
-        <View className="gap-1.5">
-          <Label>{view.path}</Label>
-          <Mono text={view.content} />
-        </View>
-      );
-    case "search":
-      return <Mono tone="text-ink" text={[view.pattern, view.scope, ...view.flags].filter(Boolean).join("  ")} />;
-    case "web":
-      return <Mono tone="text-ink" text={view.target} />;
-    case "prompt":
-      return (
-        <View className="gap-1.5">
-          {view.agent ? <Label>{view.agent}</Label> : null}
-          <Text selectable className="text-ink-2">
-            {view.text}
-          </Text>
-        </View>
-      );
-    case "fields":
-      return (
-        <View className="gap-2">
-          {view.fields.map((field) => (
-            <View key={field.key} className="gap-1">
-              <Label>{field.key}</Label>
-              {field.structured ? <Mono text={field.value} /> : <Text selectable>{field.value}</Text>}
-            </View>
-          ))}
-        </View>
-      );
-    case "none":
-      return null;
-  }
-});
-
-const OutputPart = memo(function OutputPart({ view }: { view: OutputView }) {
-  switch (view.kind) {
-    case "code":
-      return (
-        <View className="gap-1.5">
-          {view.path ? <Label>{view.path}</Label> : null}
-          <Mono text={view.code} />
-        </View>
-      );
-    case "matches":
-      return <Matches groups={view.groups} />;
-    case "files":
-      return <Mono text={view.paths.join("\n")} />;
-    case "changes":
-      return <Mono text={view.files.map((file) => `${file.status.padEnd(9)} ${file.path}`).join("\n")} />;
-    case "diff":
-      return <Diff patch={view.patch} />;
-    case "tests":
-      return (
-        <View className="gap-1.5">
-          <Text className={view.tally.failed ? "text-bad" : "text-ok"}>
-            {[`${view.tally.passed} passed`, view.tally.failed ? `${view.tally.failed} failed` : "", view.tally.skipped ? `${view.tally.skipped} skipped` : ""].filter(Boolean).join(" · ")}
-          </Text>
-          <Mono text={view.text} />
-        </View>
-      );
-    case "json":
-      return <Mono text={view.json} />;
-    case "markdown":
-    case "text":
-      return <Mono text={view.text} />;
-  }
-});
-
-/** What came back, as the sheet shows it: a view of the output, and the images the call returned. */
-function useOutput(block: ToolBlock | undefined, input: InputView | null) {
-  const { output, state } = useToolOutput(block);
-  return useMemo(() => {
-    const result = output === undefined || output === null ? null : toolResult(output);
-    // A successful edit's diff says what happened; "The file has been updated" adds nothing. A failed one says why.
-    const quiet = Boolean(block && !block.isError && input && (input.kind === "edit" || input.kind === "write" || input.kind === "patch"));
-    const view = block && result && !quiet ? toolOutputView(block, result.text) : null;
-    const images = result?.media.flatMap((item) => (item.kind === "image" && item.src && TOOL_IMAGE_URL.test(item.src) ? [item.src] : [])) ?? [];
-    return { view, images, state };
-  }, [block, input, output, state]);
-}
-
-function Heading({ block }: { block: ToolBlock }) {
+function CallHead({ block }: { block: ToolBlock }) {
   const { icon, verb } = toolCallPresentation(block.name, block.input);
   const Icon = toolIcons[icon];
   const state = toolState(block);
@@ -165,34 +87,124 @@ function Heading({ block }: { block: ToolBlock }) {
   );
 }
 
+/** The command a run was given, as the steps it ran. */
+function Command({ call }: { call: ToolBlock }) {
+  const input = useMemo(() => toolInputView(call), [call]);
+  return input.kind === "command" && input.steps.length ? <InputPart view={input} /> : null;
+}
+
+/** A command as it ran: a screen with the last lines it printed, and under it the command. */
+function RunBody({ object }: { object: Extract<WorkObject, { kind: "command" }> }) {
+  const call = lineCall(object);
+  const { text, state } = usePrinted(call ?? undefined);
+  if (!call) return null;
+  return (
+    <>
+      <Screen text={text || object.tail.join("\n")} />
+      <Reading state={state} />
+      <Command call={call} />
+    </>
+  );
+}
+
+/** A test run as its results; its screen only when its output named no file to draw, since the results are that output read. */
+function TestsBody({ tests }: { tests: TestsObject }) {
+  const call = toolBlocks(tests).at(-1);
+  const { text, state } = usePrinted(call);
+  const files = useMemo(() => testReport(text), [text]);
+  return (
+    <>
+      <TestsView tests={tests} files={files} />
+      <Reading state={state} />
+      {files.length ? (
+        <Whole label="Whole output">
+          <Mono text={text} />
+        </Whole>
+      ) : (
+        <Screen text={text} />
+      )}
+      {call ? <Command call={call} /> : null}
+    </>
+  );
+}
+
+/** An edit as a few of the lines it took out and put in; the whole change is one press away. One that failed shows the call, which says why. */
+function EditBody({ edit }: { edit: EditObject }) {
+  const [whole, setWhole] = useState(false);
+  if (whole || !edit.lines.length || edit.state === "failed") return <Calls blocks={toolBlocks(edit)} />;
+  return (
+    <View className="gap-2">
+      {edit.chip.path ? (
+        // A long way to the file keeps its end, where the file is.
+        <Text numberOfLines={1} ellipsizeMode="head" className="text-xs text-ink-4">
+          {shortPath(edit.chip.path)}
+        </Text>
+      ) : null}
+      <EditLines lines={edit.lines} />
+      <More label="Whole change" onPress={() => setWhole(true)} />
+    </View>
+  );
+}
+
+/** What the line did, drawn as the thing it is. */
+function LineBody({ object }: { object: WorkObject }) {
+  switch (object.kind) {
+    case "command":
+      return <RunBody object={object} />;
+    case "tests":
+      return <TestsBody tests={object} />;
+    case "edit":
+      return <EditBody edit={object} />;
+    case "web":
+      return object.links.length ? <Links web={object} /> : <Calls blocks={toolBlocks(object)} />;
+    case "fetch":
+      return <Fetched fetch={object} />;
+    case "git":
+      return (
+        <>
+          <GitView git={object} />
+          <Calls blocks={toolBlocks(object)} />
+        </>
+      );
+    case "read":
+    case "search":
+    case "tool":
+      return <Calls blocks={toolBlocks(object)} />;
+  }
+}
+
 /**
- * One call in full, in a sheet over the thread: what the agent asked for and what came back. It reads the call from
- * the run, so a call still running fills in as it goes; an output the page left out loads from the ledger.
+ * What a line of the work did, in a sheet over the thread, drawn as the thing it is: an edit as its lines, a command
+ * as its screen, a test run as its results, one of OpenOrc's own tools as what it was about. It reads the calls from
+ * the run, so one still running fills in as it goes. Opened from a claim in the reply, it shows everything the claim
+ * rests on. Opened on a call alone, it shows that call in full.
  */
 export function ToolSheet() {
-  const { runId, id } = useLocalSearchParams<{ runId: string; id: string }>();
+  const { runId, id, calls, proof } = useLocalSearchParams<{ runId: string; id: string; calls?: string; proof?: string }>();
   const insets = useSafeAreaInsets();
   const run = useRun(runId);
+  const lines = useMemo(() => sheetLines(run, id, calls, Boolean(proof)), [run, id, calls, proof]);
   const index = run?.blockIndex.get(id);
   const found = index === undefined ? undefined : run?.blocks[index];
   const block = found?.kind === "tool" ? found : undefined;
-  const input = useMemo(() => (block ? toolInputView(block) : null), [block]);
-  const { view, images, state } = useOutput(block, input);
   const [sheet] = useState(createSheetWindow);
-  if (!block || !input) return <View className="flex-1 bg-bg" />;
+  if (!lines.length && !block) return <View className="flex-1 bg-bg" />;
   return (
     <SheetWindowContext.Provider value={sheet}>
       <ScrollView className="flex-1 bg-bg" {...windowScroll(sheet)} onAccessibilityEscape={() => router.back()}>
-        <View ref={sheet.content} className="gap-4 px-5 pt-6" style={{ paddingBottom: insets.bottom + 24 }}>
-          <Heading block={block} />
-          <InputPart view={input} />
-          {state === "loading" ? <Spinner /> : null}
-          {state === "failed" ? <Text className="text-ink-4">Could not load the output</Text> : null}
-          {images.map((url) => (
-            <ImageTile key={url} asset={{ kind: "tool-image", url }} label="Tool image" />
+        <View ref={sheet.content} className="gap-8 px-5 pt-6" style={{ paddingBottom: insets.bottom + 24 }}>
+          {lines.map((line) => (
+            <View key={line.object.id} className="gap-4">
+              <LineHead line={line} />
+              <LineBody object={line.object} />
+            </View>
           ))}
-          {view ? <OutputPart view={view} /> : null}
-          {block.progress ? <Text className="text-ink-3">{block.progress}</Text> : null}
+          {lines.length ? null : (
+            <View className="gap-4">
+              <CallHead block={block!} />
+              <Call block={block!} />
+            </View>
+          )}
         </View>
       </ScrollView>
     </SheetWindowContext.Provider>

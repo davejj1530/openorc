@@ -6,7 +6,7 @@ import { emptyRowMemo, transcriptRows, type Row } from "./rows";
 import { activity, finishedTurn, runStore } from "./test-fixtures/run-store";
 
 const prompt = (id: string): Row => ({ kind: "prompt", key: `prompt:${id}`, gap: 24, block: { id, kind: "message", role: "user", text: id, streaming: false } });
-const piece = (id: string, index: number): Row => ({ kind: "reply", key: `reply:${id}:${index}`, gap: 14, text: "", streaming: false, source: { runId: "r", blockId: id, index } });
+const piece = (id: string, index: number): Row => ({ kind: "reply", key: `reply:${id}:${index}`, gap: 14, text: "", streaming: false, source: { runId: "r", blockId: id, index }, proofs: [] });
 const end = (id: string, live: boolean): Row => ({
   kind: "end",
   key: `end:${id}`,

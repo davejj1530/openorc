@@ -51,8 +51,8 @@ describe("transcriptRows", () => {
     expect(again.filter((row, index) => row !== rows[index]).map((row) => row.key)).toEqual(["note:n-work"]);
   });
 
-  const codex = (model: string) => ({ agent: "codex", model });
-  const voices = (own: string, runs: [string, string][]): TurnNames => ({ voices: { runs: new Map(runs.map(([run, model]) => [run, codex(model)])), own: codex(own) }, senders: null });
+  const voice = (agent: string, model = "GPT-5.5") => ({ agent, model });
+  const voices = (own: string, runs: [string, string][]): TurnNames => ({ voices: { runs: new Map(runs.map(([run, agent]) => [run, voice(agent)])), own: voice(own) }, senders: null });
   /** Two finished turns, the second in a run of its own. */
   function twoRuns() {
     const { frame } = runStore();
@@ -68,7 +68,7 @@ describe("transcriptRows", () => {
   }
   const heads = (rows: Row[]) => rows.flatMap((row) => (row.kind === "head" ? [[row.key, row.voice, row.sender]] : []));
 
-  it("names the agent and model on no turn while they stay the thread's own, and on each turn where they change", () => {
+  it("names the agent on no turn while it stays the thread's own, and on each turn where it changes", () => {
     const { run, blocks } = twoRuns();
     expect(
       heads(
@@ -77,13 +77,25 @@ describe("transcriptRows", () => {
           activity(run),
           "r",
           emptyRowMemo(),
-          voices("GPT-5.5", [
-            ["r", "GPT-5.5"],
-            ["r2", "GPT-5.5"],
+          voices("codex", [
+            ["r", "codex"],
+            ["r2", "codex"],
           ]),
         ),
       ),
     ).toEqual([]);
+    // A switch of model alone names nothing: the composer says which model works.
+    const models: TurnNames = {
+      voices: {
+        runs: new Map([
+          ["r", voice("codex")],
+          ["r2", voice("codex", "GPT-5.4")],
+        ]),
+        own: voice("codex"),
+      },
+      senders: null,
+    };
+    expect(heads(transcriptRows(blocks, activity(run), "r", emptyRowMemo(), models))).toEqual([]);
     // The first turn against the thread's own, which its composer names; the next against the turn before.
     expect(
       heads(
@@ -92,24 +104,24 @@ describe("transcriptRows", () => {
           activity(run),
           "r",
           emptyRowMemo(),
-          voices("GPT-5.5", [
-            ["r", "GPT-5"],
-            ["r2", "GPT-5"],
+          voices("codex", [
+            ["r", "claude"],
+            ["r2", "claude"],
           ]),
         ),
       ),
-    ).toEqual([[expect.stringMatching(/^head:r:0\//), codex("GPT-5"), undefined]]);
+    ).toEqual([[expect.stringMatching(/^head:r:0\//), voice("claude"), undefined]]);
     const switched = transcriptRows(
       blocks,
       activity(run),
       "r",
       emptyRowMemo(),
-      voices("GPT-5.5", [
-        ["r", "GPT-5.5"],
-        ["r2", "GPT-5.4"],
+      voices("codex", [
+        ["r", "codex"],
+        ["r2", "claude"],
       ]),
     );
-    expect(heads(switched)).toEqual([[expect.stringContaining("ask-2"), codex("GPT-5.4"), undefined]]);
+    expect(heads(switched)).toEqual([[expect.stringContaining("ask-2"), voice("claude"), undefined]]);
     expect(switched.map((row) => [row.kind, row.gap]).slice(4, 7)).toEqual([
       ["prompt", 24],
       ["head", 28],
@@ -126,14 +138,14 @@ describe("transcriptRows", () => {
       activity(run),
       "r",
       memo,
-      voices("GPT-5.5", [
-        ["r", "GPT-5.5"],
-        ["r2", "GPT-5.4"],
+      voices("codex", [
+        ["r", "codex"],
+        ["r2", "claude"],
       ]),
     );
     expect(named.slice(0, 4)).toEqual(unnamed.slice(0, 4));
     expect(named[0]).toBe(unnamed[0]);
-    expect(named[5]).toMatchObject({ kind: "head", voice: codex("GPT-5.4") });
+    expect(named[5]).toMatchObject({ kind: "head", voice: voice("claude") });
   });
 
   it("names who sent a turn, in a cloud thread others are in, only where its prompt does not already name them", () => {

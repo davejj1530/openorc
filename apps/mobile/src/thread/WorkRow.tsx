@@ -1,76 +1,69 @@
 import {
-  chipCalls,
-  chipTitle,
-  isLive,
+  firstThought,
   liveHeadline,
-  liveSectionLabel,
   receiptItems,
+  stepCounts,
+  stepLines,
+  stepRows,
+  stepThoughts,
+  stepTitle,
+  stepWaiting,
   useTicking,
   workDuration,
   workEntries,
+  workObjects,
+  type ActLine,
   type Block,
   type LiveHeadline,
   type PlanItem,
   type ReceiptItem,
-  type WorkChip,
+  type StepThoughts,
   type WorkEntry,
+  type WorkObject,
   type WorkPhase,
-  type WorkSection,
 } from "@openorc/client";
-import { memo, useCallback, useMemo, useRef, useState, type ComponentType } from "react";
+import { memo, useCallback, useMemo, useRef, type ComponentType } from "react";
 import { View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
-import { Brain, ChevronDown, ChevronRight, CircleCheck, FileDiff, FileText, Folder, GitPullRequest, Globe, Hammer, Lightbulb, Search, Terminal, Upload, WorkDelegate, X } from "../generated/icons";
+import { ChevronDown, ChevronRight, CircleCheck, FileDiff, GitPullRequest, Globe, Lightbulb, Terminal, Upload, WorkDelegate, X } from "../generated/icons";
 import { cn } from "../ui/cn";
 import type { IconProps } from "../ui/icon";
 import { arrive } from "../ui/motion";
 import { Spinner } from "../ui/Spinner";
+import { SweepText } from "../ui/SweepText";
 import { Text } from "../ui/Text";
 import { client } from "../client";
 import { useRunRead } from "../run-read";
 import { useOpen } from "./disclosure";
+import { LineRow, ToolRow } from "./lines";
 import { Markdown } from "./Markdown";
 import { TranscriptPressable, WorkChoice } from "./TranscriptPressable";
 import type { Row } from "./rows";
 import { keepPhases, phaseDetail } from "./work-entries";
-import { ActivityRow, openTool, StepMark, ThinkingRow, ToolRow } from "./tools";
+import { ActivityRow, StepMark, ThinkingRow } from "./tools";
 
 type WorkRowProps = Extract<Row, { kind: "work" }>;
 
-const CHIP_LIMIT = 6;
 /** As on the Mac: a pull request reads as one, a push or a commit as sending, a failure as a cross. */
 function receiptIcon(item: ReceiptItem): ComponentType<IconProps> {
   if (item.failed) return X;
   if (item.kind === "git") return item.label.startsWith("#") ? GitPullRequest : Upload;
   return { thought: Lightbulb, steps: CircleCheck, check: Terminal, tests: CircleCheck, changes: FileDiff, agents: WorkDelegate, sources: Globe }[item.kind];
 }
-const chipIcons: Record<WorkChip["kind"], ComponentType<IconProps>> = {
-  file: FileText,
-  edit: FileText,
-  folder: Folder,
-  query: Search,
-  command: Terminal,
-  intent: Terminal,
-  web: Globe,
-  tool: Hammer,
-  agent: WorkDelegate,
-  memory: Brain,
-};
-
 /** A part of the work arriving while the turn runs rises in; one loaded from history is simply there. */
 function useArriving(live: boolean): boolean {
   const still = useReducedMotion();
   return useRef(live).current && !still;
 }
 
-/** Steps inside the card: a call as its row (commands on the card's fill), a thought or an activity as its own. */
+/** What a step shows beside its lines: a call as its lines, a thought or an activity as its own row. */
 function Blocks({ blocks, runId }: { blocks: Block[]; runId: string }) {
   return (
     <View className="gap-1">
       {blocks.map((block) => {
         switch (block.kind) {
           case "tool":
-            return <ToolRow key={block.id} block={block} runId={runId} inset />;
+            return <ToolRow key={block.id} block={block} runId={runId} />;
           case "thinking":
             return <ThinkingRow key={block.id} block={block} />;
           case "activity":
@@ -93,10 +86,12 @@ function Blocks({ blocks, runId }: { blocks: Block[]; runId: string }) {
 function LiveWords({ headline, elapsed = false }: { headline: LiveHeadline; elapsed?: boolean }) {
   const now = useTicking(elapsed && headline.since !== undefined);
   const still = useReducedMotion();
+  // A thought with words says more than "Thinking" does.
+  const words = headline.thought ?? headline.label;
   return (
     <>
-      <Animated.View key={headline.label} className="min-w-0 flex-shrink" style={still ? undefined : arrive}>
-        <Text numberOfLines={1}>{headline.label}</Text>
+      <Animated.View key={words} className="min-w-0 flex-shrink" style={still ? undefined : arrive}>
+        <Text numberOfLines={1}>{words}</Text>
       </Animated.View>
       {elapsed && headline.since !== undefined ? (
         <Text className="ml-auto text-xs text-ink-4 tabular-nums" accessibilityElementsHidden>
@@ -107,73 +102,36 @@ function LiveWords({ headline, elapsed = false }: { headline: LiveHeadline; elap
   );
 }
 
-/** One row of what a step touched: its mark, its name, a faint detail and note, an edit's line counts. */
-function Chip({ chip, live, runId }: { chip: WorkChip; live: boolean; runId: string }) {
-  const Icon = chipIcons[chip.kind];
-  const call = chipCalls(chip).findLast((block) => block.kind === "tool");
-  const named = chip.kind === "file" || chip.kind === "edit" || chip.kind === "folder";
-  return (
-    <TranscriptPressable
-      accessibilityRole="button"
-      accessibilityLabel={chip.title}
-      disabled={!call}
-      onPress={() => call && openTool(call, runId)}
-      className="-mx-2 min-h-touch flex-row items-center gap-2 rounded-md px-2 active:bg-surface-2"
-    >
-      <Icon size={14} className="text-ink-3" />
-      <Text numberOfLines={1} className={cn("min-w-0 flex-shrink text-ink-2", named && "text-ink", chip.kind === "command" && "font-mono text-xs", live && "text-ink")}>
-        {chip.label}
-      </Text>
-      {chip.detail ? (
-        <Text numberOfLines={1} className="min-w-0 flex-1 text-xs text-ink-4">
-          {chip.detail}
-        </Text>
-      ) : (
-        <View className="flex-1" />
-      )}
-      {chip.note ? <Text className="text-xs text-ink-4 tabular-nums">{chip.note}</Text> : null}
-      {chip.added ? <Text className="font-mono text-xs text-ok">+{chip.added}</Text> : null}
-      {chip.removed ? <Text className="font-mono text-xs text-bad">−{chip.removed}</Text> : null}
-    </TranscriptPressable>
-  );
+/** How much of a thought being written shows: its newest words, from the start of a word. */
+const THOUGHT = 220;
+function newest(text: string): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length <= THOUGHT ? flat : `…${flat.slice(flat.indexOf(" ", flat.length - THOUGHT) + 1)}`;
 }
 
-/** One kind of work in a phase: its verb in a quiet column, then what it touched. The verb opens the calls themselves. */
-function Section({ section, live, runId }: { section: WorkSection; live: boolean; runId: string }) {
-  const [calls, setCalls] = useOpen(`section:${section.id}`, false);
-  const [all, setAll] = useState(false);
-  const activities = section.blocks.filter((block) => block.kind === "activity");
-  if (!section.chips.length && activities.length) return <Blocks blocks={activities} runId={runId} />;
-  const running = live && section.blocks.some(isLive);
-  const first = section.chips.slice(0, CHIP_LIMIT);
-  // The call under way stays in view, in place of the last row that fits.
-  const current = running ? section.chips.findLast((chip) => chip.blocks.some(isLive)) : undefined;
-  const fitting = current && !first.includes(current) ? [...first.slice(0, -1), current] : first;
-  const shown = all ? section.chips : fitting;
+/**
+ * What the turn is doing between its calls, as a line that moves: its words shimmer and its seconds count. A thought
+ * no step shows has its newest lines under it as they are written.
+ */
+function LiveLine({ headline }: { headline: LiveHeadline }) {
+  const now = useTicking(headline.since !== undefined);
+  const { thinking, aside } = headline;
   return (
-    <View className="gap-1">
-      <View className="flex-row gap-3">
-        <TranscriptPressable
-          accessibilityRole="button"
-          accessibilityState={{ expanded: calls }}
-          onPress={() => setCalls(!calls)}
-          className="min-h-touch min-w-18 flex-row items-center gap-1 self-start active:opacity-60"
-        >
-          <Text className="text-xs leading-4 text-ink-4">{running ? liveSectionLabel(section.label) : section.label}</Text>
-          {calls ? <ChevronDown size={10} className="text-ink-4" /> : null}
-        </TranscriptPressable>
-        <View className="min-w-0 flex-1 gap-px">
-          {shown.map((chip) => (
-            <Chip key={chip.key} chip={chip} live={live && chip.blocks.some(isLive)} runId={runId} />
-          ))}
-          {section.chips.length > shown.length ? (
-            <TranscriptPressable accessibilityRole="button" onPress={() => setAll(true)} className="min-h-touch justify-center pl-5.5">
-              <Text className="text-xs text-ink-4">{section.chips.length - shown.length} more</Text>
-            </TranscriptPressable>
-          ) : null}
-        </View>
+    <View accessibilityRole="text">
+      <View className="min-h-control-row flex-row items-center gap-2.5">
+        {thinking ? <Lightbulb size={16} className="text-ink-4" /> : <Spinner size={14} />}
+        <SweepText text={thinking ? "Thinking" : headline.label} className="flex-1 text-ink" sweeping />
+        {headline.since === undefined ? null : (
+          <Text className="text-xs text-ink-4 tabular-nums" accessibilityElementsHidden>
+            {workDuration(now - headline.since)}
+          </Text>
+        )}
       </View>
-      {calls ? <Blocks blocks={section.blocks} runId={runId} /> : null}
+      {aside ? (
+        <Text prose numberOfLines={3} className="pb-1 pl-6.5 text-ink-3">
+          {newest(aside)}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -182,75 +140,100 @@ function Section({ section, live, runId }: { section: WorkSection; live: boolean
 function PhaseDetail({ phase, live, runId }: { phase: WorkPhase; live: boolean; runId: string }) {
   const detail = useRunRead(client.runs, (runs) => (live ? phaseDetail(runs, runId, phase) : phase.detail), live);
   return detail ? (
-    <Text prose className="text-ink-3">
+    <Text prose className="pb-1.5 text-ink-3">
       {detail}
     </Text>
   ) : null;
 }
 
-function PhaseBody({ phase, live, runId }: { phase: WorkPhase; live: boolean; runId: string }) {
-  // A phase named after its one call ("Run the desktop tests") opens straight to that call.
-  const section = phase.sections.length === 1 ? phase.sections[0]! : null;
-  const only = section?.chips.length === 1 ? section.chips[0]! : null;
-  if (only && chipTitle(only) === phase.title && !phase.extras.length) return <Blocks blocks={chipCalls(only)} runId={runId} />;
+/** A step's thoughts as one line, the first of them said in its own words; tapping it shows them in full. */
+function Thoughts({ id, thoughts }: { id: string; thoughts: StepThoughts }) {
+  const [open, setOpen] = useOpen(`thoughts:${id}`, false);
+  const paragraphs = thoughts.texts.flatMap((text) => text.split(/\n\s*\n/)).filter((paragraph) => paragraph.trim());
+  if (!thoughts.titled.length && !paragraphs.length) return null;
   return (
-    <View className="gap-2.5 pb-3 pt-0.5">
-      <PhaseDetail phase={phase} live={live} runId={runId} />
-      {phase.narration?.kind === "message" ? <Markdown text={phase.narration.text} streaming={phase.narration.streaming} tone="note" /> : null}
-      {phase.thoughts.length ? (
-        <View className="gap-0.5">
-          {phase.thoughts.map((thought, index) => (
-            <View key={index} className="flex-row items-center gap-2">
-              <View className="size-1 rounded-full bg-ink-4" />
-              <Text className="min-w-0 flex-1 text-xs text-ink-3">{thought.title}</Text>
-            </View>
+    <View>
+      <TranscriptPressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen(!open)}
+        className="-mx-2 min-h-touch flex-row items-center gap-2.5 rounded-xl px-2 active:bg-surface-2"
+      >
+        <Lightbulb size={16} className="text-ink-4" />
+        <Text numberOfLines={1} className="min-w-0 flex-1 text-ink-2">
+          <Text className="text-ink-4">Thought </Text>
+          {firstThought(thoughts)}
+        </Text>
+        {thoughts.took >= 1000 ? <Text className="text-xs text-ink-4 tabular-nums">{workDuration(thoughts.took)}</Text> : null}
+      </TranscriptPressable>
+      {open ? (
+        <View className="gap-2 pb-2 pl-6.5">
+          {thoughts.titled.map((thought, index) => (
+            <Text key={index} prose className="text-ink-3">
+              <Text prose className="text-ink-2">
+                {thought.title}
+              </Text>
+              {thought.body ? ` ${thought.body}` : null}
+            </Text>
+          ))}
+          {paragraphs.map((paragraph, index) => (
+            <Text key={`text-${index}`} prose className="text-ink-3">
+              {paragraph}
+            </Text>
           ))}
         </View>
       ) : null}
-      {phase.sections.map((item) => (
-        <Section key={item.id} section={item} live={live} runId={runId} />
-      ))}
-      {phase.extras.length ? <Blocks blocks={phase.extras} runId={runId} /> : null}
     </View>
   );
 }
 
-/** Open while it is the live phase, folded once it is done, unless the reader chose. */
-const Phase = memo(function Phase({ phase, headline, runId, live }: { phase: WorkPhase; headline: LiveHeadline | null; runId: string; live: boolean }) {
-  const running = headline !== null;
-  const [open, setOpen] = useOpen(`phase:${phase.id}`, running);
-  const arriving = useArriving(live);
-  const expandable = phase.sections.length > 0 || phase.extras.length > 0 || phase.thoughts.length > 0 || Boolean(phase.detail || phase.narration);
+/**
+ * One step, as writing on the thread's own ground: what the agent said about it in full, or else its name, then
+ * everything it did as a line each in the order it happened. Its name folds the lines to a count; while it runs, a
+ * line that moves says what it is waiting on.
+ */
+/** What a step holds once open: its detail and thoughts, a line for each thing it did, then the rows that draw as themselves. */
+function StepBody({ phase, objects, lines, running, runId }: { phase: WorkPhase; objects: WorkObject[]; lines: ActLine[]; running: boolean; runId: string }) {
+  const { rows, alone } = useMemo(() => stepRows(phase, objects), [phase, objects]);
+  const thoughts = useMemo(() => stepThoughts(phase), [phase]);
   return (
-    <Animated.View style={arriving ? arrive : undefined}>
-      <TranscriptPressable
-        accessibilityRole="button"
-        accessibilityState={expandable ? { expanded: open } : undefined}
-        disabled={!expandable}
-        onPress={() => setOpen(!open)}
-        className="min-h-touch flex-row items-center gap-2.5 active:opacity-60"
-      >
-        <StepMark state={running ? "running" : "done"} arrived={arriving} />
-        <View className="min-h-control-md min-w-0 flex-1 flex-row items-center gap-2">
-          {headline ? (
-            <LiveWords headline={headline} />
-          ) : (
-            <Text numberOfLines={1} className="min-w-0 flex-shrink text-ink-2">
-              {phase.title}
-            </Text>
-          )}
-          {expandable && open ? (
-            <View className="ml-auto" style={{ transform: [{ rotate: "90deg" }] }}>
-              <ChevronRight size={12} className="text-ink-4" />
-            </View>
-          ) : null}
-        </View>
-      </TranscriptPressable>
-      {expandable && open ? (
-        <View className="pl-6.5">
-          <PhaseBody phase={phase} live={running} runId={runId} />
-        </View>
+    <View>
+      <PhaseDetail phase={phase} live={running} runId={runId} />
+      <Thoughts id={phase.id} thoughts={thoughts} />
+      {lines.map((line) => (
+        <LineRow key={line.object.id} line={line} runId={runId} />
+      ))}
+      {rows.length ? <Blocks blocks={rows} runId={runId} /> : null}
+      {alone.length ? <Blocks blocks={alone} runId={runId} /> : null}
+    </View>
+  );
+}
+
+const Step = memo(function Step({ phase, headline, runId, live, turn }: { phase: WorkPhase; headline: LiveHeadline | null; runId: string; live: boolean; turn: Block[] | undefined }) {
+  const running = headline !== null;
+  const objects = useMemo(() => workObjects(phase.blocks, turn ?? phase.blocks, live), [phase.blocks, turn, live]);
+  const lines = useMemo(() => stepLines(phase, objects), [phase, objects]);
+  const [open, setOpen] = useOpen(`phase:${phase.id}`, true);
+  const arriving = useArriving(live);
+  const title = stepTitle(phase, objects);
+  const said = phase.narration?.kind === "message" ? phase.narration : null;
+  // A step named after its one call would say that call twice: its line stands alone.
+  const named = said === null && (phase.origin !== "summary" || lines.length !== 1);
+  const shown = open || said !== null;
+  const wait = stepWaiting(headline, title, objects);
+  const counts = shown || phase.origin === "summary" ? "" : stepCounts(objects);
+  return (
+    <Animated.View style={arriving ? arrive : undefined} className="pt-2">
+      {said ? <Markdown text={said.text} streaming={said.streaming} tone="note" /> : null}
+      {named ? (
+        <TranscriptPressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} className="min-h-touch flex-row items-center gap-2 active:opacity-60">
+          <Text className={cn("min-w-0 flex-shrink text-ink-2", running && "text-ink")}>{title}</Text>
+          {open ? null : <ChevronRight size={12} className="text-ink-4" />}
+        </TranscriptPressable>
       ) : null}
+      {shown ? <StepBody phase={phase} objects={objects} lines={lines} running={running} runId={runId} /> : null}
+      {counts ? <Text className="pb-1 text-xs text-ink-4">{counts}</Text> : null}
+      {wait ? <LiveLine headline={wait} /> : null}
     </Animated.View>
   );
 });
@@ -302,25 +285,22 @@ function StepsHead({ entries }: { entries: WorkEntry[] }) {
   );
 }
 
-/** The turn's work as one r20 card of steps: with a plan, "Step k of n" over its track; without one, the phases. */
-function StepsCard({ entries, headline, live, runId }: { entries: WorkEntry[]; headline: LiveHeadline | null; live: boolean; runId: string }) {
+/** The turn's work as writing: with a plan, "Step k of n" over its track; then each step and what it did, a line each. */
+function Steps({ entries, headline, live, runId, turn }: { entries: WorkEntry[]; headline: LiveHeadline | null; live: boolean; runId: string; turn: Block[] }) {
   return (
-    <View className="gap-4 rounded-3xl bg-surface px-4.5 pb-3.5 pt-4">
+    <View className="gap-1">
       <StepsHead entries={entries} />
       <View>
         {entries.map((entry) => {
-          if (entry.kind === "phase") return <Phase key={entry.phase.id} phase={entry.phase} headline={headline?.entryId === entry.phase.id ? headline : null} runId={runId} live={live} />;
+          if (entry.kind === "phase") {
+            const current = headline?.entryId === entry.phase.id ? headline : null;
+            // Only the live step reads the rest of the turn (a test run's earlier count), so finished steps hold still while it streams.
+            return <Step key={entry.phase.id} phase={entry.phase} headline={current} runId={runId} live={live} turn={current ? turn : undefined} />;
+          }
           if (entry.kind === "plan") return <Plan key={entry.id} items={entry.items} live={live} />;
           return <Blocks key={entry.id} blocks={entry.blocks} runId={runId} />;
         })}
-        {headline && !headline.entryId ? (
-          <View className="flex-row gap-2.5">
-            <StepMark state="running" arrived={false} />
-            <View className="min-h-control-md min-w-0 flex-1 flex-row items-center gap-2">
-              <LiveWords headline={headline} />
-            </View>
-          </View>
-        ) : null}
+        {headline && !headline.entryId ? <LiveLine headline={headline} /> : null}
       </View>
     </View>
   );
@@ -349,7 +329,7 @@ export const WorkRow = memo(function WorkRow({ row }: { row: WorkRowProps }) {
     return (
       <View className="py-3.5">
         <WorkChoice.Provider value={keepOpen}>
-          <StepsCard entries={entries} headline={headline} live={row.live} runId={row.runId} />
+          <Steps entries={entries} headline={headline} live={row.live} runId={row.runId} turn={row.work} />
         </WorkChoice.Provider>
       </View>
     );
@@ -386,7 +366,7 @@ export const WorkRow = memo(function WorkRow({ row }: { row: WorkRowProps }) {
           ) : null}
           {open ? (
             <WorkChoice.Provider value={keepOpen}>
-              <StepsCard entries={entries} headline={headline} live={row.live} runId={row.runId} />
+              <Steps entries={entries} headline={headline} live={row.live} runId={row.runId} turn={row.work} />
             </WorkChoice.Provider>
           ) : null}
         </View>

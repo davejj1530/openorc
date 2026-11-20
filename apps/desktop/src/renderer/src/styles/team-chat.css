@@ -110,9 +110,15 @@ body:has(.sidebar-shell[data-open="true"]) .work-row[data-chat="true"] > .team-c
   right: -10%;
   bottom: -10%;
 }
-.work-tab-icon.team-chat-pair {
+/* In a tab the faces take 18px, one person's or a group's, so the slot is as large as what it holds. */
+.work-tab-icon.team-chat-faces {
   width: 18px;
   height: 18px;
+}
+.work-tab-icon.team-chat-faces:not(.team-chat-pair) .account-face {
+  width: 18px;
+  height: 18px;
+  font-size: 8px;
 }
 .team-chat-heading {
   display: flex;

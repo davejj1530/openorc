@@ -76,6 +76,15 @@ it("adds and closes tabs, supports arrow navigation, and restores a reopened pan
   expect(screen.getByRole("tab", { name: "Memory" }).getAttribute("aria-selected")).toBe("true");
   fireEvent.click(screen.getByRole("button", { name: "Close Memory" }));
   expect(screen.getByRole("tab", { name: "New tab" })).toBeTruthy();
+  expect(useLayout.getState().panelOpen).toBe(true);
+});
+
+it("hides the panel when its last New tab page closes", () => {
+  mount();
+  fireEvent.click(screen.getByRole("button", { name: "Close New tab" }));
+  expect(useLayout.getState().panelOpen).toBe(false);
+  act(() => useLayout.getState().setPanel(true));
+  expect(screen.getByRole("tab", { name: "New tab" })).toBeTruthy();
 });
 
 it("opens independent website tabs and releases only the closed page", async () => {

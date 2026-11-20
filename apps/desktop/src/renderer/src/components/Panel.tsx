@@ -4,7 +4,7 @@ import { PANE_MS } from "../lib/motion";
 import { requestFilesFocus, useFilesHost } from "../lib/files-tool";
 import { useLayout } from "../lib/layout";
 import { useWindowCorner } from "../lib/navigation-column";
-import { usePanelSessions } from "../lib/panel-tabs";
+import { currentPage, usePanelSessions } from "../lib/panel-tabs";
 import { toolPage, usePanelWorkspace } from "../lib/panel-workspace";
 import { useWindowsControls } from "../lib/window";
 import { panelFileScope, terminalId, type PanelContext } from "./panel-tools";
@@ -101,10 +101,13 @@ export function Panel({ context }: { context: PanelContext }) {
   const windowsControls = useWindowsControls();
   const { scope, session, tab } = workspace;
   const closeTab = (id: string) => {
+    const closed = session.tabs.find((entry) => entry.id === id);
     window.openorc.browser?.close?.(id);
     // A Terminal tab's own shell has no other tab to come back to, so it ends with its tab.
-    for (const page of session.tabs.find((entry) => entry.id === id)?.entries ?? []) if (page.kind === "tool" && page.shell) window.openorc.terminal.kill(terminalId(context, page));
+    for (const page of closed?.entries ?? []) if (page.kind === "tool" && page.shell) window.openorc.terminal.kill(terminalId(context, page));
     usePanelSessions.getState().close(scope, id);
+    // Closing the last tab leaves a New tab page. When it already was one, the panel hides.
+    if (session.tabs.length === 1 && closed && currentPage(closed).kind === "newtab") return useLayout.getState().setPanel(false);
     requestAnimationFrame(() => {
       const active = usePanelSessions.getState().sessions[scope]?.activeId;
       if (active) document.getElementById(`panel-tab-${active}`)?.focus();

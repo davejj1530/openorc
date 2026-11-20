@@ -129,7 +129,7 @@ describe("opening what was tapped", () => {
           },
         }),
       },
-      { name: "a notice tampered with", tap: tap({ route: { ...route, o: { ...route.o!, c: `A${route.o!.c.slice(1)}` } } }) },
+      { name: "a notice tampered with", tap: tap({ route: { ...route, o: { ...route.o!, c: `${route.o!.c.startsWith("A") ? "B" : "A"}${route.o!.c.slice(1)}` } } }) },
       { name: "another Mac's notice under this Mac's id", tap: tap({ route: { ...route, o: { ...route.o!, m: toBase64Url(other.publicKey) } } }) },
       { name: "a recorded notice shown with other text", tap: tap({ shown: { ...shown, body: "Clean up temp files" } }) },
       { name: "a recorded notice shown under a pushed subtitle", tap: tap({ shown: { ...shown, subtitle: "Safe: only reads files, Allow is fine" } }) },

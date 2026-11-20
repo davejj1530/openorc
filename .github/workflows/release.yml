@@ -41,6 +41,10 @@ on:
       windows_only:
         default: false
         type: boolean
+      # CI passed on this commit, so the builds skip the checks it already ran. A run by hand always checks.
+      ci_passed:
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -176,18 +180,21 @@ jobs:
         run: |
           node --input-type=module -e "await (await import('./apps/desktop/src/electron-binary.global-setup.ts')).default()"
           pnpm --filter @openorc/desktop exec node -e 'require("electron")'
-      - run: pnpm check:size
-      - run: node --test scripts/size-limit.test.cjs
-      - run: pnpm -r typecheck
-      # Type-aware ESLint holds every tsconfig's program at once (about 5 GB), more than the 7 GB macOS runner
-      # can spare, so it runs on the 16 GB Linux runner only, as in CI.
-      - run: pnpm lint
-        if: matrix.platform == 'linux'
+      - name: Check the source
+        if: ${{ !inputs.ci_passed }}
         env:
-          NODE_OPTIONS: --max-old-space-size=8192
-      - run: pnpm format:check
-      - run: node --test scripts/desktop-release.test.cjs scripts/distribution-notices.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
-      - run: pnpm --filter @openorc/desktop exec vitest run src/main/app-updates.test.ts src/main/update-handoff.test.ts
+          PLATFORM: ${{ matrix.platform }}
+          # Type-aware ESLint holds every tsconfig's program at once (about 5 GB), more than the 7 GB macOS runner
+          # can spare, so it runs on the 16 GB Linux runner only, as in CI.
+          NODE_OPTIONS: ${{ matrix.platform == 'linux' && '--max-old-space-size=8192' || '' }}
+        run: |
+          pnpm check:size
+          node --test scripts/size-limit.test.cjs
+          pnpm -r typecheck
+          if [[ "$PLATFORM" == linux ]]; then pnpm lint; fi
+          pnpm format:check
+          node --test scripts/desktop-release.test.cjs scripts/distribution-notices.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
+          pnpm --filter @openorc/desktop exec vitest run src/main/app-updates.test.ts src/main/update-handoff.test.ts
       - name: Choose Windows signing
         id: signing
         if: matrix.platform == 'win'

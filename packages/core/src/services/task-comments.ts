@@ -1,16 +1,11 @@
 import { orclings, projects, retiredTeams, runs, taskComments, tasks, threads, type Db } from "@openorc/db";
 import {
   commentRecipientKey,
-  executionModeUnavailable,
-  harnessIds,
-  modelEfforts,
   resolveCommentMentions,
   type AgentEvent,
   type CommentAttempt,
   type CommentIntent,
   type CommentRecipient,
-  type ModelOption,
-  type Orcling,
   type RpcParams,
   type Run,
   type Task,
@@ -19,6 +14,7 @@ import {
 } from "@openorc/protocol";
 import { AttachmentService } from "./attachments.js";
 import { isSessionLost, type RunService, type TurnSettledOutcome } from "./runs.js";
+import { asOrcling, recipientCatalog, taskSideRunFolder, validateRecipient } from "./task-side-runs.js";
 import type { ThreadService } from "./threads.js";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -78,10 +74,6 @@ export class TaskCommentService {
       executionActivity: Object.fromEntries(result.attempts.filter((a) => a.threadId && a.state === "working").map((a) => [a.id, this.runService.threadActivity(a.threadId!)])),
     };
   }
-  private async catalog(): Promise<ModelOption[]> {
-    const results = await Promise.allSettled(harnessIds.map((agent) => this.runService.models(agent)));
-    return results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
-  }
   private writableTask(taskId: string): Task {
     const task = this.task(taskId);
     if (task.retiredTeam) throw new Error("This item is no longer available.");
@@ -92,7 +84,7 @@ export class TaskCommentService {
     if (previous) return previous;
     const initialTask = this.writableTask(input.taskId);
     const needsModels = input.recipients.length > 0 || /(?:^|\s)@/.test(input.source === "description" ? (initialTask.spec ?? "") : input.body);
-    const catalog = needsModels ? await this.catalog() : [];
+    const catalog = needsModels ? await recipientCatalog(this.runService) : [];
     if (this.closing) throw new Error("OpenOrc is closing.");
     const task = this.task(input.taskId);
     const body = input.source === "description" ? "Please discuss the saved task description with me." : input.body.trim();
@@ -173,10 +165,9 @@ export class TaskCommentService {
     try {
       // Resolve the same task images as execution, without preparing a workspace.
       const images = await new AttachmentService(this.dataDir).forTask(comment.context);
-      const owner = task.executionThreadId || task.threadId ? threads.get(this.db, (task.executionThreadId || task.threadId)!) : null;
       await this.runService.start({
         scope: { task: null, thread: null, comment: { id, task, resumeRunId } },
-        project: { ...project, rootPath: owner?.worktreePath ?? task.worktreePath ?? owner?.workingDirectory ?? project.rootPath },
+        project: { ...project, rootPath: await taskSideRunFolder(this.db, task, project) },
         ...item.recipient,
         model: item.recipient.model,
         effort: item.recipient.effort ?? undefined,
@@ -386,23 +377,6 @@ export class TaskCommentService {
     for (const item of taskComments.unfinished(this.db)) if (item.state === "queued" || item.state === "running") await this.cancel(item.taskId, item.id);
     await Promise.allSettled([...this.jobs]);
   }
-}
-
-function validateRecipient(recipient: CommentRecipient, catalog: ModelOption[]): void {
-  const unavailable = executionModeUnavailable(recipient.agent, "plan");
-  if (unavailable) throw new Error(unavailable);
-  const model = catalog.find((m) => m.agent === recipient.agent && m.id === recipient.model);
-  if (!model || model.unavailable) throw new Error(model?.unavailable ?? `Model ${recipient.model} is unavailable. Choose another recipient.`);
-  const efforts = modelEfforts(recipient.agent, recipient.model, model.efforts);
-  if (recipient.effort !== null && !efforts.includes(recipient.effort)) throw new Error(`Unsupported effort for ${model.label}.`);
-}
-
-/** An Orcling replies with its current model, whatever an older reply recorded. */
-function asOrcling(recipient: CommentRecipient, everyOrcling: Orcling[]): CommentRecipient {
-  if (!recipient.orclingId) return recipient;
-  const orcling = everyOrcling.find((o) => o.id === recipient.orclingId);
-  if (!orcling) throw new Error("That Orcling no longer exists. Mention another agent.");
-  return { agent: orcling.settings.agent, model: orcling.settings.model, effort: orcling.settings.effort, orclingId: orcling.id };
 }
 
 function workOutcomeLabel(status: TurnSettledOutcome["status"]): string {

@@ -74,6 +74,7 @@ import { createSystemHandlers } from "./handlers/system.js";
 import { createUsageHandlers } from "./handlers/usage.js";
 import { createTaskCreateHandlers } from "./handlers/task-create.js";
 import { createTaskDeleteHandlers } from "./handlers/task-delete.js";
+import { createTaskWorkHandlers } from "./handlers/task-work.js";
 import { createTaskQueriesHandlers } from "./handlers/task-queries.js";
 import { createTaskUpdateHandlers } from "./handlers/task-update.js";
 import { createThreadLaunchHandlers } from "./handlers/thread-launch.js";
@@ -119,6 +120,7 @@ import { SlackService } from "./services/slack/service.js";
 import { SystemService } from "./services/system.js";
 import { TaskCheckoutService } from "./services/task-checkout.js";
 import { TaskCommentService } from "./services/task-comments.js";
+import { TaskRefineService } from "./services/task-refine.js";
 import { TextGenerationService } from "./services/text-generation.js";
 import { ThreadService } from "./services/threads.js";
 import { ToolImageStore } from "./services/tool-images.js";
@@ -153,6 +155,7 @@ export class OpenOrc {
   private phonePlace: HostedThreads | undefined;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
+  readonly refines: TaskRefineService;
   readonly review: ReviewService;
   readonly taskCheckout: TaskCheckoutService;
   readonly system: SystemService;
@@ -282,6 +285,7 @@ export class OpenOrc {
       (id) => claudeConfigDir(undefined, this.claudeAccounts.environment(this.environment.current(), id).env),
     );
     this.comments = new TaskCommentService(db, this.runs, this.threads, invalidate, options.dataDir);
+    this.refines = new TaskRefineService(db, this.runs, invalidate, options.dataDir);
     this.taskCheckout = new TaskCheckoutService(db, this.workspaceWriters, options.dataDir);
     this.review = new ReviewService(db, this.workspaceWriters, { dataDir: options.dataDir, conversations: this.threads });
     this.providerUsage = new ProviderUsageService(db, this.system, { apiKey: () => this.memory.credentialStatus(), cloud: async () => (await this.account?.account.agentUsage()) ?? [] }, (id) =>
@@ -464,6 +468,7 @@ export class OpenOrc {
       onEvent: (event) => {
         this.slack?.observe(event);
         this.comments?.observe(event);
+        this.refines?.observe(event);
       },
       onRunFinished: (run, scope, project) => {
         this.memory.onRunFinished(run, { task: scope.task, thread: scope.thread ?? this.threads.scopeThreadFor(scope) }, project);
@@ -471,6 +476,7 @@ export class OpenOrc {
       },
       onTurnSettled: (run, scope, _project, outcome) => {
         this.comments?.settled(run, outcome);
+        this.refines?.settled(run, outcome);
         if (scope.comment) return;
         this.claudeAccountSwitch.settled(run, scope, outcome);
         this.claudeSignInRetry.settled(run, scope, outcome);
@@ -520,6 +526,7 @@ export class OpenOrc {
     // Runs the last instance left open get their ending before anyone sees them as alive.
     core.runs.recoverInterrupted();
     core.comments.recover();
+    core.refines.recover();
     plans.recover(db);
     core.started = core.start();
     return core;
@@ -563,6 +570,7 @@ export class OpenOrc {
       threads: this.threads,
       runs: this.runs,
       comments: this.comments,
+      refines: this.refines,
       devices: this.devices,
       memory: this.memory,
       slack: this.slack,
@@ -669,6 +677,7 @@ export class OpenOrc {
     await this.claudeAccounts.close();
     await this.agentUpdates.close();
     await this.comments.close();
+    await this.refines.close();
     await this.slack.close();
     this.lifecycle.stop();
     this.reviewerApp.shutdown();
@@ -753,9 +762,10 @@ export class OpenOrc {
       }),
       createThreadMessagesHandlers({ db: this.db, threadService: this.threads }),
       createTaskQueriesHandlers({ db: this.db, comments: this.comments, threadService: this.threads, runService: this.runs }),
+      createTaskWorkHandlers({ db: this.db, refines: this.refines, threadService: this.threads, dataDir: this.options.dataDir }),
       createTaskCreateHandlers({ db: this.db, settings: this.settings, threadService: this.threads, invalidate, dataDir: this.options.dataDir }),
       createTaskUpdateHandlers({ threadService: this.threads, db: this.db, runService: this.runs, workspaceWriters: this.workspaceWriters, workspaces: this.workspaces, invalidate }),
-      createTaskDeleteHandlers({ workspaces: this.workspaces, comments: this.comments, runService: this.runs, db: this.db, log: this.log, upkeep: this.upkeep, invalidate }),
+      createTaskDeleteHandlers({ workspaces: this.workspaces, comments: this.comments, refines: this.refines, runService: this.runs, db: this.db, log: this.log, upkeep: this.upkeep, invalidate }),
       createWorkspaceHandlers({ runService: this.runs, workspaces: this.workspaces, db: this.db, invalidate }),
       createWorktreeHandlers({ worktrees: new WorktreeCleanup({ db: this.db, workspaces: this.workspaces, runs: this.runs, writers: this.workspaceWriters, invalidate }) }),
       createRunsHandlers({ threadService: this.threads, runService: this.runs, db: this.db, dataDir: this.options.dataDir }),

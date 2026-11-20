@@ -1,6 +1,9 @@
 import { relativeTime } from "@openorc/client";
-import { harnessName, type Project, type Run, type Task } from "@openorc/protocol";
+import { harnessName, type Project, type Run, type Task, type TaskThreadLink, type ThreadSummary } from "@openorc/protocol";
 import { useImperativeHandle, type ReactNode, type Ref } from "react";
+import { TaskFooterActions } from "../components/task-buttons/TaskFooterActions";
+import { ContinueThreadChooser, OpenThreadChooser } from "../components/task-threads/TaskThreadChoosers";
+import { TaskThreadList, useTaskThreads } from "../components/task-threads/TaskThreadList";
 import { TaskDocumentFields } from "../components/task-list/TaskDocumentFields";
 import { ArrowUpRight, Check, GitBranch, MessageSquare } from "../components/icons";
 import { StatusIcon } from "../components/status";
@@ -59,8 +62,22 @@ export function taskDraftStatus(input: {
   );
 }
 
-/** The task's creation and recorded runs, with the way into its activity and conversation. */
-function TaskHistory({ task, history, openActivity, openConversation }: { task: Task; history: Run[]; openActivity: () => void; openConversation: () => void }) {
+/** The task's creation, its threads and recorded runs, with the way into its conversation. */
+function TaskHistory({
+  task,
+  history,
+  threads,
+  openActivity,
+  openConversation,
+  continueInNewThread,
+}: {
+  task: Task;
+  history: Run[];
+  threads: readonly TaskThreadLink[];
+  openActivity: () => void;
+  openConversation: () => void;
+  continueInNewThread: ReactNode;
+}) {
   return (
     <section className="task-activity">
       <h2 className="text-base mb-4">Activity</h2>
@@ -68,6 +85,7 @@ function TaskHistory({ task, history, openActivity, openConversation }: { task: 
         <StatusIcon status="backlog" />
         <span>Created {relativeTime(task.createdAt)}</span>
       </div>
+      <TaskThreadList links={threads} />
       {history.map((run) => (
         <button key={run.id} onClick={openActivity} className="flex items-start gap-2 text-left text-sm text-ink-2 hover:text-ink mt-4 max-w-full">
           <MessageSquare size={13} className="mt-0.5" />
@@ -80,21 +98,32 @@ function TaskHistory({ task, history, openActivity, openConversation }: { task: 
           <ArrowUpRight size={12} className="mt-0.5" />
         </button>
       ))}
-      {taskActivityPrompt(history.length)}
-      {task.threadId || task.executionThreadId ? (
-        <TextButton tone="muted" className="flex items-center gap-2 mt-4 text-sm" onClick={openConversation}>
-          <MessageSquare size={13} /> {"Open thread"}
-          <ArrowUpRight size={12} />
-        </TextButton>
-      ) : null}
+      {taskActivityPrompt(history.length + threads.length)}
+      <div className="flex flex-wrap items-center gap-x-5">
+        {task.threadId || task.executionThreadId ? (
+          <TextButton tone="muted" className="flex items-center gap-2 mt-4 text-sm" onClick={openConversation}>
+            <MessageSquare size={13} /> {"Open thread"}
+            <ArrowUpRight size={12} />
+          </TextButton>
+        ) : null}
+        {continueInNewThread}
+      </div>
     </section>
   );
+}
+
+/** The current thread while it has worked and is quiet, so a new one can take over without resuming its long session. */
+function continuableThread(links: readonly TaskThreadLink[]): ThreadSummary | null {
+  const current = links.find((link) => link.current)?.thread;
+  return current && current.hasStarted !== false && current.activity === "idle" ? current : null;
 }
 
 export function TaskDocument({ task, project, ref }: { task: Task; project: Project; ref?: Ref<TaskDocumentHandle> }) {
   const document = useTaskDocumentDraft(task);
   const { draft, imagesReady, draftStored, dirty, saving, saveError, error: flushError, reportError: setFlushError, flush } = document;
   const conversation = useRpcMutation("tasks.openThread");
+  const threads = useTaskThreads(task.id);
+  const continuable = continuableThread(threads);
   const properties = useRpcMutation("tasks.update");
   const execution = useTaskExecutionLocation(task, flush);
   const { runs } = execution;
@@ -103,8 +132,7 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
   const openConversation = async () => {
     if (!(await flushAll())) return;
     try {
-      const thread = await conversation.mutateAsync({ taskId: task.id });
-      openThread(thread.id);
+      openThread((await conversation.mutateAsync({ taskId: task.id })).id);
     } catch (error) {
       setFlushError(error instanceof Error ? error.message : String(error));
     }
@@ -135,12 +163,20 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
             pending={properties.isPending}
             error={properties.error?.message ?? null}
             basePath={task.worktreePath ?? project.rootPath}
+            refine={{ taskId: task.id, project }}
             onStatus={(status) => properties.mutate({ id: task.id, patch: { status } })}
             onPriority={(priority) => properties.mutate({ id: task.id, patch: { priority } })}
           />
           <TaskComments key={task.id} taskId={task.id} description={draft.spec} beforeSend={flushAll} />
           <TaskExecutionSettings execution={execution} />
-          <TaskHistory task={task} history={history} openActivity={openActivity} openConversation={() => void openConversation()} />
+          <TaskHistory
+            task={task}
+            history={history}
+            threads={threads}
+            openActivity={openActivity}
+            openConversation={() => void openConversation()}
+            continueInNewThread={continuable ? <ContinueThreadChooser task={task} thread={continuable} project={project} beforeOpen={flushAll} /> : null}
+          />
           <TaskDelete task={task} />
         </article>
       </div>
@@ -152,9 +188,12 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
           <GitBranch size={12} />
           <span className="truncate">{execution.branch ?? (execution.mode === "worktree" ? "Isolated worktree on start" : "Local checkout")}</span>
         </span>
-        <Button disabled={saving || conversation.isPending || execution.isPending} onClick={() => void openConversation()}>
-          Open thread <ArrowUpRight size={13} />
-        </Button>
+        <TaskFooterActions task={task} buttons={project.settings.taskButtons ?? []} disabled={saving || execution.isPending} beforeRun={flushAll}>
+          <Button disabled={saving || conversation.isPending || execution.isPending} onClick={() => void openConversation()}>
+            Open thread <ArrowUpRight size={13} />
+          </Button>
+          <OpenThreadChooser task={task} project={project} runs={history} beforeOpen={flushAll} />
+        </TaskFooterActions>
       </footer>
     </div>
   );

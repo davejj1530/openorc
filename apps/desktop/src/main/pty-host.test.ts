@@ -348,6 +348,18 @@ describe("pty host", () => {
     expect(spawned).toHaveLength(2);
   });
 
+  it("starts a new shell when a panel asks for another folder, as a thread does once its worktree exists", async () => {
+    const worktree = await mkdtemp(join(dir, "worktree-"));
+    await open("thread-a");
+    await open("thread-a");
+    expect(spawned).toHaveLength(1);
+
+    await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 });
+    expect(spawned.map((pty) => pty.killed)).toEqual([true, false]);
+    await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 });
+    expect(spawned).toHaveLength(2);
+  });
+
   it("applies a resize that arrived while the shell was still starting", async () => {
     const release = holdSpawns();
     const opening = open("thread-a");

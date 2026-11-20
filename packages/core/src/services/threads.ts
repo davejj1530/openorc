@@ -746,6 +746,15 @@ export class ThreadService {
   startTaskInThread(...args: Parameters<ThreadTaskExecution["startTaskInThread"]>) {
     return this.taskExecution.startTaskInThread(...args);
   }
+  taskThreadList(...args: Parameters<ThreadTaskExecution["taskThreadList"]>) {
+    return this.taskExecution.taskThreadList(...args);
+  }
+  newTaskThread(...args: Parameters<ThreadTaskExecution["newTaskThread"]>) {
+    return this.taskExecution.newTaskThread(...args);
+  }
+  runTaskButton(...args: Parameters<ThreadTaskExecution["runTaskButton"]>) {
+    return this.taskExecution.runTaskButton(...args);
+  }
   startTask(...args: Parameters<ThreadTaskExecution["startTask"]>) {
     return this.taskExecution.startTask(...args);
   }

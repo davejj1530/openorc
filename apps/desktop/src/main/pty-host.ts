@@ -163,6 +163,8 @@ export class Scrollback {
 
 interface Session {
   readonly pty: PtyProcess;
+  /** The folder it was opened for, not where it has cd'd since. */
+  readonly cwd: string;
   readonly scrollback: Scrollback;
   /** onData and onExit. A shell that ignores SIGHUP outlives the kill, so the host lets go of it explicitly. */
   readonly listeners: PtyListener[];
@@ -184,6 +186,7 @@ interface Session {
  */
 interface Start {
   readonly session: Promise<Session | null>;
+  readonly cwd: string;
   cancelled: boolean;
   /** A resize that arrived with no pty to take it. Applied once there is one. */
   size: TerminalSize | null;
@@ -226,9 +229,9 @@ export class PtyHost {
     if (this.updating) throw new Error("OpenOrc is restarting to update. Please wait.");
     const size = clampSize(input.cols, input.rows);
     const live = this.sessions.get(input.id);
-    if (live) {
+    if (live?.cwd === input.cwd) {
       // The shell is where it is and may have cd'd since, so a re-attach
-      // adopts it rather than arguing about the cwd the caller asked for.
+      // adopts it rather than arguing about where it is now.
       if (!live.exited) live.pty.resize(size.cols, size.rows);
       return this.replay(live);
     }
@@ -236,6 +239,9 @@ export class PtyHost {
     // skipped on the branch that joins an in-flight start, which is exactly
     // where a directory that went away between two opens shows up.
     const cwd = validateCwd(input.cwd, this.folder);
+    // Another folder for the same panel, as a thread's once its worktree exists: the old shell is left where the
+    // conversation no longer works, so it ends and a new one starts here.
+    if (live || (this.starting.get(input.id)?.cwd ?? cwd) !== cwd) this.kill(input.id);
     const start = this.starting.get(input.id) ?? this.begin(input.id, cwd, size);
     const session = await start.session;
     // Killed before it ever ran. Nothing was installed, so there is nothing to
@@ -316,6 +322,7 @@ export class PtyHost {
 
   private begin(id: string, cwd: string, size: TerminalSize): Start {
     const start: Start = {
+      cwd,
       cancelled: false,
       size: null,
       // `start` is read only once the spawn settles, by which point this
@@ -344,6 +351,7 @@ export class PtyHost {
     }
     const session: Session = {
       pty,
+      cwd: start.cwd,
       scrollback: new Scrollback(),
       pending: "",
       timer: null,

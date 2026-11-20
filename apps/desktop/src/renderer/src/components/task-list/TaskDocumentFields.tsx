@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
+import type { AccountsProject } from "@openorc/client";
 import { TaskPriority, TaskStatus } from "@openorc/protocol";
 import type { useTaskDocumentDraft } from "../../lib/task-document-draft";
 import { DocumentEditor } from "../DocumentEditor";
+import { useTaskRefine } from "../task-refine/TaskRefine";
 import { PriorityIcon, StatusIcon, priorityLabel, priorityOrder, statusLabel, statusOrder } from "../status";
 import { Select } from "../ui";
+import { TaskLabelsField, TaskTitleField } from "./TaskTextFields";
 
 type Document = ReturnType<typeof useTaskDocumentDraft>;
 export function TaskDocumentFields({
@@ -17,6 +20,7 @@ export function TaskDocumentFields({
   error,
   basePath,
   imageUnavailableReason,
+  refine: refinable,
   onStatus,
   onPriority,
 }: {
@@ -30,21 +34,16 @@ export function TaskDocumentFields({
   error: string | null;
   basePath?: string;
   imageUnavailableReason?: string;
+  /** Tasks on this Mac can be refined by an agent, on the Claude accounts their project uses. */
+  refine?: { taskId: string; project: AccountsProject };
   onStatus(value: TaskStatus): void;
   onPriority(value: TaskPriority): void;
 }) {
   const { draft, patch, flush } = document;
+  const refine = useTaskRefine(refinable?.taskId ?? null, document, basePath, refinable?.project);
   return (
     <>
-      <textarea
-        rows={1}
-        aria-label="Task title"
-        className="document-title native-field"
-        value={draft.title}
-        readOnly={disabled}
-        onChange={(e) => patch({ title: e.target.value.replace(/\n/g, " ") })}
-        onBlur={() => void flush()}
-      />
+      {refine.title ?? <TaskTitleField label="Task title" value={draft.title} readOnly={disabled} onChange={(title) => patch({ title })} onBlur={() => void flush()} />}
       <div className="task-properties" aria-label="Task properties">
         {assignee}
         <label className="property-chip">
@@ -84,21 +83,11 @@ export function TaskDocumentFields({
         basePath={basePath}
         disabled={disabled}
         imageUnavailableReason={imageUnavailableReason}
+        controls={refine.button}
+        bar={refine.bar}
+        replacement={refine.suggestion}
       />
-      <div className="flex flex-wrap items-center gap-3 mt-6 text-sm text-ink-3">
-        <label className="flex min-w-0 flex-1 items-center gap-2">
-          <span>Labels</span>
-          <input
-            aria-label="Labels"
-            className="min-w-0 flex-1 bg-transparent py-1 text-ink-2 placeholder:text-ink-4"
-            placeholder="Add labels, comma separated"
-            value={draft.labels}
-            readOnly={disabled}
-            onChange={(event) => patch({ labels: event.target.value })}
-            onBlur={() => void flush()}
-          />
-        </label>
-      </div>
+      {refine.labels ?? <TaskLabelsField label="Labels" value={draft.labels} readOnly={disabled} onChange={(labels) => patch({ labels })} onBlur={() => void flush()} />}
     </>
   );
 }

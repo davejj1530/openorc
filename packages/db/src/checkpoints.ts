@@ -63,8 +63,8 @@ export const checkpoints = {
   },
   /**
    * Whether an agent other than `threadId`'s own may have worked in `root` since `since`: another thread saved a turn
-   * there, a run of another conversation started there, or a task run there was still going. Comment runs only
-   * talk, and a thread's process rests between turns, so a thread run's end time says nothing.
+   * there, a run of another conversation started there, or a task run there was still going. Comment and Refine runs
+   * only read, and a thread's process rests between turns, so a thread run's end time says nothing.
    */
   agentWorkSince(db: Db, input: { root: string; threadId: string; since: number }): boolean {
     const { root, threadId, since } = input;
@@ -72,7 +72,7 @@ export const checkpoints = {
       .stmt(
         `SELECT 1 AS found FROM thread_checkpoints WHERE root = ? AND run_id IS NOT NULL AND thread_id != ? AND created_at >= ?
          UNION ALL
-         SELECT 1 FROM runs WHERE working_directory = ? AND comment_turn_id IS NULL AND (thread_id IS NULL OR thread_id != ?)
+         SELECT 1 FROM runs WHERE working_directory = ? AND comment_turn_id IS NULL AND refine_id IS NULL AND (thread_id IS NULL OR thread_id != ?)
            AND (started_at >= ? OR (task_id IS NOT NULL AND (ended_at IS NULL OR ended_at >= ?)))
          LIMIT 1`,
       )

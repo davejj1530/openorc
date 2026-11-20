@@ -1,0 +1,146 @@
+/* Task buttons: the project settings list and the row in a task's footer. The card sets Settings' measures itself,
+   as the Claude accounts card does, since the project page sits outside Settings. */
+.project-task-buttons {
+  --settings-card-fill: var(--well);
+  margin-top: 32px;
+}
+.task-button-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.task-button-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: var(--hairline) solid var(--line);
+}
+.task-button-row:last-child {
+  border-bottom: 0;
+}
+/* The pills sit in one column, so every prompt starts at the same edge. */
+.task-button-open {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding-block: 14px;
+  text-align: left;
+}
+.task-button-preview {
+  display: inline-block;
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: var(--control-sm);
+  height: var(--control-sm);
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  background: var(--control-fill);
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+.task-button-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.task-button-prompt,
+.task-button-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-button-prompt {
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  color: var(--ink-2);
+}
+.task-button-meta {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--ink-4);
+}
+.task-button-open:hover .task-button-prompt,
+.task-button-open:focus-visible .task-button-prompt {
+  color: var(--ink);
+}
+.task-button-empty {
+  padding-block: 18px;
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--ink-3);
+}
+.task-button-error {
+  padding-bottom: 14px;
+  font-size: var(--text-sm);
+  color: var(--bad);
+}
+
+.task-button-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-bottom: 12px;
+}
+.task-button-checks label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+.task-button-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.task-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+.task-footer-actions > button {
+  flex-shrink: 0;
+}
+
+.task-button-skills {
+  max-height: 260px;
+  overflow: auto;
+  padding: 6px;
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-lg);
+}
+.task-button-skills button[role="option"] {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  min-height: 36px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  text-align: left;
+  font-size: var(--text-sm);
+}
+.task-button-skills button[aria-selected="true"],
+.task-button-skills button[role="option"]:hover {
+  background: var(--surface-2);
+}
+.task-button-skills button[role="option"] span:first-child {
+  flex-shrink: 0;
+}
+.task-button-skills button[role="option"] span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-3);
+}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import type { AgentKind, AgentSkill, FileScope } from "@openorc/protocol";
+import { skillCallPrefix, type AgentKind, type AgentSkill, type FileScope } from "@openorc/protocol";
 import type { ClientQueries } from "./query.js";
 
 /** What an agent takes before a skill's name: Claude `/name`, Codex `$name`, Pi and Oh My Pi `/skill:name`. */
@@ -58,8 +58,8 @@ function listNotice(prefix: SkillPrefix, reading: boolean, error: Error | null):
 
 /**
  * The selected agent's skills where a conversation works, for any composer on any client, or with `only` the ones of
- * that source alone, as a conversation that runs elsewhere takes the person's own. OpenCode loads skills
- * through its own tool, so it is offered none.
+ * that source alone, as a conversation that runs elsewhere takes the person's own. An agent with no call for skills,
+ * such as OpenCode, is offered none. Each goes by the name its call puts after `/` or `$`, which for Pi is `skill:name`.
  *
  * Reading the list starts the agent's CLI, so it is read when a composer opens and again when the composer asks, as a
  * `/` or `$` word starts: a skill installed while a conversation is open shows up the next time the picker opens, not
@@ -73,7 +73,8 @@ export function useSkillCommandsWith(
   only?: AgentSkill["source"],
 ): SkillCommands {
   const agent = selectedAgent === "acp" ? "opencode" : selectedAgent;
-  const enabled = Boolean(scope && agent && agent !== "opencode");
+  const call = agent ? skillCallPrefix(agent) : null;
+  const enabled = Boolean(scope && call !== null);
   const skills = queries.useRpc(
     "skills.list",
     { ...(agent === "claude" && claudeAccountId ? { claudeAccountId } : {}), scope: scope ?? NO_SCOPE, agent: agent ?? "claude" },
@@ -81,21 +82,20 @@ export function useSkillCommandsWith(
   );
   const found = skills.data;
   const { dataUpdatedAt, isFetching, refetch } = skills;
-  const prefix: SkillPrefix = agent === "codex" || agent === "fx" ? "$" : "/";
+  const prefix: SkillPrefix = call === "$" ? "$" : "/";
   // By the clock, not `isStale`: a list going stale renders nothing, so the flag can still say fresh.
   const onCommandsWanted = useCallback(() => {
     if (enabled && !isFetching && Date.now() - dataUpdatedAt > FRESH_MS) void refetch();
   }, [enabled, isFetching, dataUpdatedAt, refetch]);
   const commands = useMemo(
     () =>
-      agent === "opencode"
+      call === null
         ? []
         : (found ?? [])
             .filter((skill) => skill.enabled !== false && (!only || skill.source === only))
             .sort((a, b) => SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source])
             .map((skill) => ({
-              // Pi and Oh My Pi call a skill by its command, `/skill:<name>`.
-              name: agent === "omp" || agent === "pi" ? `skill:${skill.name}` : skill.name,
+              name: `${call.slice(1)}${skill.name}`,
               hint: skill.description,
               insert: true as const,
               prefix,
@@ -103,7 +103,7 @@ export function useSkillCommandsWith(
               ...(skill.displayName ? { displayName: skill.displayName } : {}),
               ...(skill.icon ? { icon: skill.icon } : {}),
             })),
-    [agent, found, prefix, only],
+    [call, found, prefix, only],
   );
   // A list read before keeps being offered while it is read again, and when that fails.
   const commandsNotice = enabled && !found ? listNotice(prefix, isFetching, skills.error) : null;

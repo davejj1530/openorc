@@ -24,3 +24,6 @@ export function removeDraft(key: string): void {
     /* storage unavailable */
   }
 }
+
+/** Where a thread's message box keeps what this window typed in it. */
+export const conversationDraftKey = (threadId: string) => `conversation.${threadId}`;

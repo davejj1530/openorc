@@ -15,6 +15,8 @@ export { scheduleFirings, schedules, type SchedulePatch } from "./schedules.js";
 export { messages } from "./search.js";
 export { subagents, type SubagentRecord } from "./subagents.js";
 export { taskComments } from "./task-comments.js";
+export { taskRefines } from "./task-refines.js";
+export { taskThreads, type TaskThreadRow } from "./task-threads.js";
 export { threadQueue, type ThreadQueueEntry } from "./thread-queue.js";
 export { digestedEvent, messageText, OMIT_OUTPUT_CHARS, pagedEvent, transcriptPage, type TranscriptPage } from "./transcript-page.js";
 

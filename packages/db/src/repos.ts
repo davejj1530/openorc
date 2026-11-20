@@ -527,6 +527,7 @@ export const threads = {
 interface RunRow {
   claude_account_id: string | null;
   comment_turn_id: string | null;
+  refine_id?: string | null;
   id: string;
   working_directory: string | null;
   task_id: string | null;
@@ -551,6 +552,7 @@ function runFromRow(r: RunRow): Run {
   return {
     claudeAccountId: r.claude_account_id,
     commentTurnId: r.comment_turn_id,
+    refineId: r.refine_id ?? null,
     workingDirectory: r.working_directory,
     id: r.id,
     taskId: r.task_id,
@@ -589,6 +591,7 @@ export const runs = {
       claudeAccountId?: string | null;
       id: string;
       commentTurnId?: string;
+      refineId?: string;
       workingDirectory?: string;
       taskId: string | null;
       threadId: string | null;
@@ -601,7 +604,7 @@ export const runs = {
       orclingId?: string | null;
     },
   ): Run {
-    if ([r.taskId, r.threadId, r.commentTurnId].filter(Boolean).length !== 1) throw new Error("a run belongs to exactly one task, thread or comment turn");
+    if ([r.taskId, r.threadId, r.commentTurnId, r.refineId].filter(Boolean).length !== 1) throw new Error("a run belongs to exactly one task, thread, comment turn or refine");
     db.stmt(
       "INSERT INTO runs (claude_account_id, id, task_id, thread_id, agent, model, effort, fast_mode, mode, permission_mode, state, started_at, working_directory, comment_turn_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'starting', ?, ?, ?)",
     ).run(
@@ -619,6 +622,7 @@ export const runs = {
       r.workingDirectory ?? null,
       r.commentTurnId ?? null,
     );
+    if (r.refineId) db.stmt("UPDATE runs SET refine_id = ? WHERE id = ?").run(r.refineId, r.id);
     // Set apart so ledgers from before Orclings accept every other run unchanged.
     if (r.orclingId) db.stmt("UPDATE runs SET orcling_id = ? WHERE id = ?").run(r.orclingId, r.id);
     return runs.get(db, r.id) as Run;

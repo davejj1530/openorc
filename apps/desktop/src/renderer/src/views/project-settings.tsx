@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ClaudeAccountConnection, ClaudeAccounts, Project, ProjectClaudeAccounts } from "@openorc/protocol";
+import { TaskButtonsSection } from "../components/task-buttons/TaskButtonsSection";
 import { Button, Checkbox, Field, Input, Textarea, TextButton } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 import { accountMeta, connectionLabels } from "./settings-claude-accounts";
@@ -86,6 +87,7 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
           </div>
           {update.error ? <p className="mt-2 text-sm text-bad">{update.error.message}</p> : null}
         </section>
+        <TaskButtonsSection project={p} />
         <ProjectClaudeAccountsSection project={p} />
       </div>
     </div>

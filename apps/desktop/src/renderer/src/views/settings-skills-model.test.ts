@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { AgentSkill } from "@openorc/protocol";
-import { skillFolder, skillTree, skillTrigger, splitFrontmatter } from "./settings-skills-model";
+import { skillFolder, skillTree, skillTrigger, splitFrontmatter, tryPrompt } from "./settings-skills-model";
 
 const skill = (extra: Partial<AgentSkill> = {}): AgentSkill => ({ name: "research", description: "", source: "user", path: "/Users/me/.claude/skills/research/SKILL.md", ...extra });
 
@@ -11,6 +11,13 @@ it("reads how a skill starts from the agent's own settings", () => {
   expect(skillTrigger("codex", skill(), "policy:\n  allow_implicit_invocation: false\n")).toEqual({ call: "$research", auto: false });
   expect(skillTrigger("codex", skill(), "")).toEqual({ call: "$research", auto: true });
   expect(skillTrigger("opencode", skill(), "")).toEqual({ call: null, auto: true });
+});
+
+it("tries a skill with the agent's call for it, or by name where the agent has none", () => {
+  expect(tryPrompt("claude", skill())).toBe("/research ");
+  expect(tryPrompt("codex", skill())).toBe("$research ");
+  expect(tryPrompt("pi", skill())).toBe("/skill:research ");
+  expect(tryPrompt("opencode", skill())).toBe("Use the research skill. ");
 });
 
 it("leaves the header out of the text it previews", () => {

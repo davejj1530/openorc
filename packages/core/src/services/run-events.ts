@@ -106,7 +106,8 @@ export class RunEvents {
 
   private routeSubagent(entry: LiveRun, event: AgentEvent): boolean {
     if (event.type === "raw" || !event.subagentId) return false;
-    const threadId = entry.scope.task?.executionThreadId ?? entry.scope.comment?.task.executionThreadId;
+    // A Refine's subagents only read for its suggestion; they aren't the task's work, so its thread doesn't show them.
+    const threadId = entry.scope.task?.executionThreadId ?? (entry.scope.comment?.refine ? null : entry.scope.comment?.task.executionThreadId);
     const thread = entry.scope.thread ?? (threadId ? threads.get(this.deps.db, threadId) : null);
     const wasWorking = working(entry);
     if (!thread) return true;

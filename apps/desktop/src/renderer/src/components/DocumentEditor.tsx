@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref, type RefObject } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
 import { EditorContent, useEditor, type Editor, type UseEditorOptions } from "@tiptap/react";
 import { BubbleMenu, type BubbleMenuProps } from "@tiptap/react/menus";
 import type { EditorView } from "@tiptap/pm/view";
@@ -18,7 +18,8 @@ import { useDocumentMode } from "./editor/use-document-mode";
 import { IconButton, Tooltip } from "./ui";
 import "./editor/document-editor.css";
 
-export type DocumentEditorHandle = { focus: () => void; flush: () => Promise<boolean> };
+/** `replace` swaps in a whole new description as one edit, so in rich text undo brings back what was there. */
+export type DocumentEditorHandle = { focus: () => void; flush: () => Promise<boolean>; replace: (markdown: string) => void };
 type Props = {
   value: string;
   onChange: (value: string) => void;
@@ -27,6 +28,11 @@ type Props = {
   imageUnavailableReason?: string;
   onReadyChange?: (ready: boolean) => void;
   ref?: Ref<DocumentEditorHandle>;
+  controls?: ReactNode;
+  /** Takes the controls row's place while something else has the document, such as a Refine at work. */
+  bar?: ReactNode;
+  /** Shown instead of the editor, which stays mounted with its history, such as a suggestion to review. */
+  replacement?: ReactNode;
 };
 type EditorHandlers = {
   update: (editor: Editor) => void;
@@ -68,7 +74,7 @@ function editorOptions(content: string, handlers: RefObject<EditorHandlers | nul
 }
 
 /** Rich editing transactions stay local; Markdown remains the task/MCP persistence boundary. */
-export function DocumentEditor({ value, onChange, basePath, disabled = false, onReadyChange, imageUnavailableReason, ref }: Props) {
+export function DocumentEditor({ value, onChange, basePath, disabled = false, onReadyChange, imageUnavailableReason, ref, controls, bar, replacement }: Props) {
   const [error, setError] = useState("");
   const [link, setLink] = useState<string | null>(null);
   // Link editing ends with the menu it sits in, when the selection moves on.
@@ -138,6 +144,10 @@ export function DocumentEditor({ value, onChange, basePath, disabled = false, on
   };
   useImperativeHandle(ref, () => ({
     focus: mode.focus,
+    replace: (markdown) => {
+      if (source || !editor?.markdown) mode.emitSource(markdown);
+      else editor.commands.setContent(editor.markdown.parse(markdown), { emitUpdate: true });
+    },
     flush: () => {
       if (!imageUnavailableReason) return images.flush(editor, source, value);
       try {
@@ -176,26 +186,30 @@ export function DocumentEditor({ value, onChange, basePath, disabled = false, on
           if (commands.menu && ["Enter", "Escape", "ArrowUp", "ArrowDown"].includes(event.key)) event.stopPropagation();
         }}
       >
-        <div className="task-editor-controls">
-          {source ? null : (
-            <>
-              <Tooltip label="Insert content">
-                <IconButton type="button" disabled={disabled} aria-label="Insert content" onMouseDown={(event) => event.preventDefault()} onClick={commands.open}>
-                  <Plus size={15} />
-                </IconButton>
-              </Tooltip>
-              <Tooltip label={imageUnavailableReason ?? "Insert image"}>
-                <IconButton type="button" disabled={disabled || Boolean(imageUnavailableReason)} aria-label="Insert image" onMouseDown={(event) => event.preventDefault()} onClick={pickImage}>
-                  <Image size={15} />
-                </IconButton>
-              </Tooltip>
-            </>
-          )}
-          <button type="button" className="task-editor-mode" disabled={images.busy} onClick={switchMode}>
-            {source ? "Rich text" : "Markdown"}
-          </button>
-        </div>
-        <div hidden={source}>
+        {bar ?? (
+          <div className="task-editor-controls">
+            {source ? null : (
+              <>
+                <Tooltip label="Insert content">
+                  <IconButton type="button" disabled={disabled} aria-label="Insert content" onMouseDown={(event) => event.preventDefault()} onClick={commands.open}>
+                    <Plus size={15} />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip label={imageUnavailableReason ?? "Insert image"}>
+                  <IconButton type="button" disabled={disabled || Boolean(imageUnavailableReason)} aria-label="Insert image" onMouseDown={(event) => event.preventDefault()} onClick={pickImage}>
+                    <Image size={15} />
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
+            {controls}
+            <button type="button" className="task-editor-mode" disabled={images.busy} onClick={switchMode}>
+              {source ? "Rich text" : "Markdown"}
+            </button>
+          </div>
+        )}
+        {replacement}
+        <div hidden={source || Boolean(replacement)}>
           <EditorContent editor={editor} />
           {editor ? (
             <BubbleMenu editor={editor} options={menuOptions} shouldShow={shouldShowMenu}>
@@ -215,7 +229,7 @@ export function DocumentEditor({ value, onChange, basePath, disabled = false, on
             </BubbleMenu>
           ) : null}
         </div>
-        {source ? (
+        {source && !replacement ? (
           <textarea
             ref={mode.sourceInput}
             aria-label="Task description Markdown"

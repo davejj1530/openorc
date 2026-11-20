@@ -4,7 +4,7 @@ import { startingAccount } from "./project-claude-accounts.js";
 import type { StartRunInput } from "./run-types.js";
 
 /** Saved conversations keep their account; an Orcling speaks on its own account wherever it is asked. */
-export function claudeRunAccount(db: Db, input: StartRunInput): string {
+export function claudeRunAccount(db: Db, input: Pick<StartRunInput, "scope" | "orclingId" | "claudeAccountId">): string {
   const commentRun = input.scope.comment?.resumeRunId ? runs.get(db, input.scope.comment.resumeRunId) : null;
   if (commentRun?.agent === "claude") return commentRun.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
   const orcling = input.orclingId ? orclings.get(db, input.orclingId) : null;

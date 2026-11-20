@@ -1,4 +1,4 @@
-import type { ClaudeAccounts } from "@openorc/protocol";
+import type { ClaudeAccount, ClaudeAccounts } from "@openorc/protocol";
 import { Select, TextButton } from "./ui";
 import { useRouter } from "../lib/router";
 
@@ -34,7 +34,7 @@ export function ClaudeAccountPicker({
 }
 
 /** Each account as a choice. A disabled one stays listed, and only the choice already made can keep it. */
-export function ClaudeAccountOptions({ accounts, value }: { accounts: ClaudeAccounts | undefined; value: string | null | undefined }) {
+export function ClaudeAccountOptions({ accounts, value }: { accounts: { accounts: readonly ClaudeAccount[] } | undefined; value: string | null | undefined }) {
   return (
     <>
       {accounts?.accounts.map((account) => (

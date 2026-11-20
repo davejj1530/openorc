@@ -1,0 +1,79 @@
+/* Proof beside claims. A sentence that says what the turn did ends in a mark for what backs it: a small pill that
+   names the edit or the run. Pressed, it turns ink and the work opens under the sentence, as its line in the activity. */
+.proof-chip,
+.proof-none {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-xs);
+  line-height: 18px;
+  letter-spacing: normal;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out),
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out);
+}
+/* The marks arrive when the turn ends, on a reply that was just written. */
+@starting-style {
+  [data-arrivals] :is(.proof-chip, .proof-none) {
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+  }
+}
+.proof-chip {
+  padding: 1px 9px 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--control-fill);
+  color: var(--ink-2);
+}
+.proof-chip > svg {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  transition: color var(--duration-quick) var(--ease-out);
+}
+.proof-chip[data-tone="ok"] > svg {
+  color: var(--ok);
+}
+.proof-chip[data-tone="bad"],
+.proof-chip[data-tone="bad"] > svg {
+  color: var(--bad);
+}
+.proof-chip:hover {
+  color: var(--ink);
+}
+.proof-chip:active {
+  background: var(--surface-3);
+}
+/* Ink means chosen: the mark whose work is open. */
+.proof-chip[aria-expanded="true"] {
+  background: var(--ink);
+  color: var(--surface);
+}
+.proof-chip[aria-expanded="true"] > svg {
+  color: var(--surface);
+}
+.proof-chip:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+/* A check the reply says passed that the turn never ran: said plainly, with nothing to open. */
+.proof-none {
+  color: var(--ink-4);
+}
+.proof-none > svg {
+  flex-shrink: 0;
+}
+
+/* The work behind a sentence, under it. After a paragraph it closes most of the gap the paragraph leaves. */
+.proof-body {
+  min-width: 0;
+  margin-block: -8px 8px;
+  font-size: var(--text-base);
+  letter-spacing: normal;
+}
+li > .proof-body {
+  margin-block: 4px 2px;
+}

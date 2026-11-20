@@ -317,11 +317,19 @@ export const threadMarkdownComponents: Components = {
 };
 export const threadUrlTransform: UrlTransform = (url, key, node) => (localPath(url) || imageSource(url) ? url : defaultUrlTransform(url, key, node));
 
+/** A caller's own marks in the text: steps that run on the cleaned tree, and the components that draw what they add. */
+export interface TextMarks {
+  steps: NonNullable<StreamdownProps["rehypePlugins"]>;
+  components: Components;
+}
+
 /** Resolve relative citations in the workspace before Markdown's URL sanitizer runs. */
 export function ThreadRichText({
   codePaths = false,
+  marks,
   ...props
 }: StreamdownProps & {
+  marks?: TextMarks | undefined;
   /**
    * Inline code that names a file links to it. Only an agent's own words ask: it writes paths from the folder it works
    * in, while a document's or a fetched page's are from somewhere else, such as the repository's root for a file under
@@ -344,11 +352,13 @@ export function ThreadRichText({
     // Streamdown keys its parser cache by serialized plugin options. A Map
     // serializes as {}, which would reuse names from another conversation.
     if (mentionNames?.size) plugins.push([rehypeMentionNames, { names: [...mentionNames] }]);
+    if (marks) plugins.push(...marks.steps);
     return plugins;
-  }, [basePath, fileLinks, mentionNames, pathLinks]);
+  }, [basePath, fileLinks, mentionNames, pathLinks, marks]);
+  const components = useMemo(() => (marks ? { ...threadMarkdownComponents, ...marks.components } : threadMarkdownComponents), [marks]);
   const text = typeof props.children === "string" ? citationLinks(props.children) : props.children;
   return (
-    <RichText {...props} components={threadMarkdownComponents} rehypePlugins={rehypePlugins} urlTransform={threadUrlTransform}>
+    <RichText {...props} components={components} rehypePlugins={rehypePlugins} urlTransform={threadUrlTransform}>
       {text}
     </RichText>
   );

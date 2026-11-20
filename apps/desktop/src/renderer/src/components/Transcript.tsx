@@ -26,6 +26,7 @@ import { AgentPresence } from "./AgentPresence";
 import { toolIcons } from "./tool-icons";
 import { CarriedWork, WorkNow, WorkSteps } from "./WorkSteps";
 import { TurnHead } from "./TurnHead";
+import { TurnProof, useReplyProof } from "./ReplyProof";
 import { NoteList, useNotesAfter, useTopNotes } from "./ThreadNotes";
 import { TurnReceipt } from "./TurnReceipt";
 import { useTurnSize } from "./TurnFooter";
@@ -507,7 +508,9 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
       ) : null}
       <NoteList notes={notes.work} />
       <FoldedRecovery work={work} open={open} showActivity={showActivity} />
-      <TranscriptContents {...props} blocks={after} replyActions={false} />
+      <TurnProof work={work} live={turn.live} renderBlocks={renderBlocks}>
+        <TranscriptContents {...props} blocks={after} replyActions={false} />
+      </TurnProof>
       {footer}
       {end ? <TurnEnd status={turn.status} text={turn.reply?.text} at={turn.reply?.at} onFork={onFork} /> : null}
       <NoteList notes={notes.after} />
@@ -604,6 +607,7 @@ const wordFade = { animation: "fadeIn", sep: "word", duration: 240 } as const;
 
 /** A reply as prose, with its copy and time under it unless the turn's actions row carries them. */
 function ReplyMessage({ block, actions }: { block: Extract<Block, { kind: "message" }>; actions: boolean }) {
+  const marks = useReplyProof(block.text, block.streaming);
   if (block.streaming && !block.text)
     return (
       <div data-state="running" className="reply-pending" role="status">
@@ -614,7 +618,7 @@ function ReplyMessage({ block, actions }: { block: Extract<Block, { kind: "messa
   return (
     <div className="group journal-message journal-response">
       <div className="text-prose text-ink prose-chat">
-        <ThreadRichText mode="streaming" isAnimating={block.streaming} animated={wordFade} codePaths>
+        <ThreadRichText mode="streaming" isAnimating={block.streaming} animated={wordFade} codePaths marks={marks}>
           {block.text}
         </ThreadRichText>
       </div>

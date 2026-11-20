@@ -190,6 +190,9 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
       "stream-json",
       "--verbose",
       "--include-partial-messages",
+      // Thinking arrives as text. Print mode ignores the showThinkingSummaries setting, so only this flag asks for it.
+      "--thinking-display",
+      "summarized",
       // Scope the preference to this process, including explicit Standard on resume.
       "--settings",
       JSON.stringify({

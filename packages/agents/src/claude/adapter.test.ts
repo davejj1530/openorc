@@ -693,6 +693,7 @@ describe("Claude Fast mode", () => {
       expect(args[args.indexOf("--model") + 1]).toBe("claude-opus-5");
       expect(args[args.indexOf("--effort") + 1]).toBe("high");
       expect(args[args.indexOf("--resume") + 1]).toBe("existing");
+      expect(args[args.indexOf("--thinking-display") + 1]).toBe("summarized");
     } finally {
       handle.close();
       await handle.wait();

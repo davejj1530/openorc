@@ -191,7 +191,8 @@ describe("ModelPicker", () => {
   });
   it("keeps model selection and effort in one composer panel", async () => {
     const gpt: ModelOption = { ...models[0]!, fastMode: { supported: true } };
-    const catalog = [gpt, { ...gpt, id: "gpt-plus", label: "GPT Plus", defaultEffort: "high", isDefault: false }];
+    const plus: ModelOption = { ...gpt, id: "gpt-plus", label: "GPT Plus", defaultEffort: "high", isDefault: false };
+    const catalog = [gpt, plus, { ...plus, id: "gpt-deep", label: "GPT Deep", efforts: ["medium", "high"] }];
     mocks.call.mockImplementation(async (method) => (method === "agents.modelCatalog" ? { models: catalog, providers: [] } : info));
     function Fixture() {
       const [choice, setChoice] = useState<ModelChoice>({ agent: "codex", model: "gpt", effort: "low" });
@@ -213,8 +214,11 @@ describe("ModelPicker", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: /GPT default/ }));
     fireEvent.click(screen.getByRole("button", { name: "GPT Plus" }));
     expect(screen.getByRole("dialog", { name: "Model and effort" })).toBeTruthy();
-    expect(screen.getByRole("slider", { name: "Reasoning effort" }).getAttribute("aria-valuetext")).toBe("High");
+    // The chosen effort follows to a model that offers it, and gives way to the model's default where it does not.
+    expect(screen.getByRole("slider", { name: "Reasoning effort" }).getAttribute("aria-valuetext")).toBe("Low");
     expect(screen.getByRole("button", { name: "GPT Plus" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "GPT Deep" }));
+    expect(screen.getByRole("slider", { name: "Reasoning effort" }).getAttribute("aria-valuetext")).toBe("High");
   });
   it("keeps the rocket for Fast and the galaxy at maximum effort", async () => {
     const astra: ModelOption = {
@@ -364,7 +368,7 @@ describe("ModelPicker", () => {
     expect(document.activeElement).toBe(search);
     fireEvent.keyDown(search, { key: "ArrowDown" });
     fireEvent.click(last);
-    expect(onChange).toHaveBeenCalledWith({ agent: "codex", model: "gpt-plus", effort: "high", fastMode: false });
+    expect(onChange).toHaveBeenCalledWith({ agent: "codex", model: "gpt-plus", effort: "low", fastMode: false });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 

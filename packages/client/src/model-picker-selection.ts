@@ -70,12 +70,17 @@ export function browserModels(input: { list: ModelOption[]; section: HarnessId |
   return { legacy, searching, visible, multiProvider: multiProviderAgents(input.list) };
 }
 
-/** A model change resets effort to its advertised default and retains Fast only where supported. */
+/** The effort a switch to `model` runs at: the one already chosen where the model offers it, else `fallback`. */
+function carriedEffort(model: ModelOption, chosen: string | null | undefined, fallback: string | null): string | null {
+  return chosen && modelEfforts(model.agent, model.id, model.efforts).includes(chosen) ? chosen : fallback;
+}
+
+/** A model change keeps the chosen effort where the model offers it, and retains Fast only where supported. */
 export function modelChoiceFor(model: ModelOption, previous: ModelChoice | null): ModelChoice {
   return {
     agent: model.agent,
     model: model.id,
-    effort: model.defaultEffort ?? (model.efforts.includes(previous?.effort ?? "") ? (previous?.effort ?? null) : null),
+    effort: carriedEffort(model, previous?.effort, model.defaultEffort),
     fastMode: Boolean(previous?.fastMode && previous.agent === model.agent && model.fastMode?.supported),
   };
 }
@@ -98,10 +103,14 @@ export function agentDefaultChoice(list: ModelOption[], agent: AgentKind): Model
   return pick ? { agent, model: pick.id, effort: pick.defaultEffort } : null;
 }
 
-/** What a provider's tab selects: the agent's earlier choice while it still runs, else the agent's own default. */
-export function providerChoice(list: ModelOption[], agent: AgentKind, earlier: ModelChoice | undefined): ModelChoice | null {
-  const model = catalogModel(list, earlier ?? null);
-  if (earlier && model && !model.unavailable) return earlier;
-  const fallback = defaultChoice(list, agent);
-  return fallback?.agent === agent ? fallback : null;
+/**
+ * What a provider's tab selects: the agent's earlier choice while it still runs, else the agent's own default, at the
+ * effort already chosen where that model offers it.
+ */
+export function providerChoice(list: ModelOption[], agent: AgentKind, earlier: ModelChoice | undefined, current: ModelChoice | null): ModelChoice | null {
+  const kept = catalogModel(list, earlier ?? null);
+  const choice = earlier && kept && !kept.unavailable ? earlier : defaultChoice(list, agent);
+  const model = catalogModel(list, choice);
+  if (!choice || !model || choice.agent !== agent) return null;
+  return { ...choice, effort: carriedEffort(model, current?.effort, choice.effort) };
 }

@@ -145,7 +145,7 @@ function useProviderTabChoice({
   return (next: PickerSection) => {
     if (!isHarnessId(next) || next === value?.agent || locked || !runs(next)) return;
     if (value) earlier.current.set(value.agent, value);
-    const choice = providerChoice(list, next, earlier.current.get(next));
+    const choice = providerChoice(list, next, earlier.current.get(next), value);
     if (!choice) return;
     reveal.current = true;
     select(choice);

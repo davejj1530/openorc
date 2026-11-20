@@ -126,7 +126,7 @@ export function ResolvedDrawer({
       >
         Resolved
         <span className="resolved-mark" aria-hidden="true">
-          <ChevronRight size={14} className="resolved-chevron" data-open={open || undefined} />
+          <ChevronRight size={12} className="resolved-chevron" data-open={open || undefined} />
           <CircleCheck size={14} className="resolved-check" />
         </span>
       </button>

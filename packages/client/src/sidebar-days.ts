@@ -29,7 +29,11 @@ function startOfDay(now: number, daysAgo: number): number {
 
 /** The place for a time: the last three hours, then by local calendar day: today, yesterday, and before that resolved. */
 export function sidebarPlace(at: number, now: number): SidebarPlace {
-  if (at >= now - RECENT_MS) return "recent";
+  return at >= now - RECENT_MS ? "recent" : calendarPlace(at, now);
+}
+
+/** The place for a time by local calendar day alone: today, yesterday, and before that resolved. */
+function calendarPlace(at: number, now: number): Exclude<SidebarPlace, "recent"> {
   if (at >= startOfDay(now, 0)) return "today";
   if (at >= resolvedBefore(now)) return "yesterday";
   return "resolved";
@@ -99,6 +103,40 @@ export function sidebarDaySections(roots: readonly ThreadSummary[], all: readonl
     byPlace.set(place, [...(byPlace.get(place) ?? []), root]);
   }
   return SIDEBAR_DAYS.filter(({ day }) => byPlace.has(day)).map(({ day, label }) => ({ day, label, roots: byPlace.get(day) ?? [] }));
+}
+
+/** A day inside a project's group: today and yesterday, then Earlier for a tree kept past them because it waits on the person. */
+export type ProjectDay = "today" | "yesterday" | "earlier";
+
+export type ProjectDaySection = { day: ProjectDay; label: string; roots: ThreadSummary[] };
+
+const PROJECT_DAYS: readonly { day: ProjectDay; label: string }[] = [
+  { day: "today", label: "Today" },
+  { day: "yesterday", label: "Yesterday" },
+  { day: "earlier", label: "Earlier" },
+];
+
+/**
+ * A project's rows under the calendar days their trees last worked, in the rows' own order, and only the days that hold
+ * rows. A row never files under a day before the row above it, so a held list keeps every row where it was: one that
+ * got work since stays under its old day until the list settles and it rises.
+ */
+export function projectDaySections(rows: readonly ThreadSummary[], all: readonly ThreadSummary[], now: number): ProjectDaySection[] {
+  const sections: ProjectDaySection[] = [];
+  let reached = 0;
+  for (const root of rows) {
+    const place = calendarPlace(threadTreeActivity(root, all), now);
+    reached = Math.max(
+      reached,
+      PROJECT_DAYS.findIndex(({ day }) => day === (place === "resolved" ? "earlier" : place)),
+    );
+    const day = PROJECT_DAYS[reached];
+    if (!day) continue;
+    const last = sections.at(-1);
+    if (last?.day === day.day) last.roots.push(root);
+    else sections.push({ ...day, roots: [root] });
+  }
+  return sections;
 }
 
 /** How many threads the list reads by itself to complete an open day; past it the reader asks. */

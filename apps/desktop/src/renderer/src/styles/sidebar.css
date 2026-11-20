@@ -184,6 +184,7 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   gap: 2px;
   padding: 2px 8px 0;
 }
+/* Back to app takes New thread's place, on the same line, so the first row holds still as Settings opens. */
 .settings-destinations {
   display: grid;
   flex: 1;
@@ -192,7 +193,7 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   gap: 1px;
   min-height: 0;
   overflow-y: auto;
-  padding: 6px 8px 10px;
+  padding: 2px 8px 10px;
 }
 .settings-destinations > .sidebar-nav-row {
   margin-bottom: 18px;
@@ -213,9 +214,14 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
     background-color var(--duration-leave) var(--ease-out),
     color var(--duration-leave) var(--ease-out);
 }
+/* A row's fill arrives with the pointer and fades as it leaves; a press takes the strong fill. */
 button.sidebar-nav-row:hover {
   background-color: var(--navigation-hover);
   color: var(--ink);
+  transition-duration: 0s;
+}
+button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) {
+  background-color: var(--surface-3);
 }
 /* A row with tools at its end lays them over the row, as a project's label does. */
 .sidebar-nav-item {
@@ -225,12 +231,13 @@ button.sidebar-nav-row:hover {
 .sidebar-nav-item > * {
   grid-area: 1 / 1;
 }
+/* Its tools stand on the list head's columns, 28px apart, the last one on the counts' line. */
 .sidebar-nav-tools {
   display: flex;
   align-items: center;
   align-self: center;
   justify-self: end;
-  gap: 2px;
+  gap: 4px;
   margin-right: 4px;
 }
 .sidebar-nav-tools button:hover {
@@ -473,16 +480,42 @@ button.sidebar-nav-row:hover {
     transform: translateY(var(--edge-from));
   }
 }
-/* Groups: a project's name, or Pinned and Snoozed, as a 28px label 8px under the group before it, its
-   chevron after the word. The chevron shows while the group is folded and on hover; it turns down as
-   the group opens. Its rows sit flush under it, at the lead slot's start. */
+/* Groups: a project's name, or Pinned and Snoozed, as a quiet 28px label in the third ink, its chevron after
+   the word. Folded labels stack 8px apart; a group that shows its rows keeps 16px after them, so its threads
+   read as one group and the label that follows as the next. The chevron shows while the group is folded and on
+   hover; it turns down as the group opens. Its rows sit flush under it, at the lead slot's start. */
 .sidebar-section + .sidebar-section {
   margin-top: 8px;
+}
+.sidebar-section[data-open] + .sidebar-section {
+  margin-top: 16px;
 }
 .sidebar-thread-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 2px;
+}
+/* Inside an open project, a faint label over each day's rows that holds some: Today, Yesterday. It sits on the
+   titles' line in the fourth ink, a size under the project's name, with a hairline from 8px after the word to the
+   rows' end. It belongs to the rows under it: its words rest 4px over them, with 10px between it and the day before. */
+.sidebar-day-label {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 20px;
+  padding: 0 8px 2px;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+.sidebar-day-label::after {
+  content: "";
+  flex: 1;
+  align-self: center;
+  border-top: var(--hairline) solid var(--line);
+}
+.sidebar-day-label:not(:first-child) {
+  margin-top: 10px;
 }
 /* A project's label keeps More and New thread at its end, shown on hover and focus in place of its count,
    the pen centred on the line the counts and row marks share. */
@@ -511,7 +544,7 @@ button.sidebar-nav-row:hover {
 .sidebar-project-tools {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 .sidebar-project-tool {
   display: grid;
@@ -534,8 +567,11 @@ button.sidebar-nav-row:hover {
   opacity: 0;
 }
 .sidebar-project-tool:is(:hover, [data-popup-open]) {
-  background-color: var(--surface-2);
+  background-color: var(--navigation-hover);
   color: var(--ink);
+}
+.sidebar-project-tool:active {
+  background-color: var(--surface-3);
 }
 /* The project's mark leads its label in full, centred in the sidebar's 18px lead slot so the name starts at
    42 as a screen's does. Rows stay flush with the slot's start. */
@@ -577,6 +613,10 @@ button.sidebar-nav-row:hover {
 }
 .app-shell .thread-preview:hover {
   background-color: var(--navigation-hover);
+  transition-duration: 0s;
+}
+.app-shell .thread-preview:active:not([data-open]) {
+  background-color: var(--surface-3);
 }
 /* The open row is lit where the palette lights it. */
 .app-shell .sidebar-shell .thread-preview[data-open]:not(:focus-visible) {
@@ -596,10 +636,21 @@ button.sidebar-nav-row:hover {
   flex: 1;
   min-width: 0;
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: 16px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+/* A sub thread's state leads its row, where its branch ends. Every sub thread keeps the 16px slot, so their titles
+   share one line 24px in, under the first letters of the thread above. */
+.thread-lead-slot {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--ink-3);
 }
 /* Present facts pack against the count line; absent facts leave their space to the title. */
 .thread-facts {
@@ -649,7 +700,7 @@ button.sidebar-nav-row:hover {
   padding: 0 8px;
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
-  color: var(--ink-2);
+  color: var(--ink-3);
   transition: color var(--duration-quick) var(--ease-out);
 }
 .sidebar-section-toggle:hover {
@@ -694,6 +745,10 @@ button.browser-empty:hover,
 .sidebar-thread-list > .browser-load-more {
   padding-left: 8px;
 }
+/* A project's "Show N more" keeps the rows' 32px, so it stays on their 34px pitch. */
+.sidebar-thread-list > .browser-load-more {
+  min-height: 32px;
+}
 /* Orclings: contacts with a face, a name and the last thing said. The 24px face is centred on the lead slot's
    line, so the name starts at 42 as a screen's does. */
 .orcling-contact {
@@ -710,6 +765,10 @@ button.browser-empty:hover,
 }
 .orcling-contact:hover {
   background-color: var(--navigation-hover);
+  transition-duration: 0s;
+}
+.orcling-contact:active:not([aria-current="page"]) {
+  background-color: var(--surface-3);
 }
 .app-shell .sidebar-shell .orcling-contact[aria-current="page"]:not(:focus-visible) {
   background-color: var(--current-row-fill);

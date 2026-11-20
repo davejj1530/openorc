@@ -23,7 +23,16 @@ export type RowProject = { name: string };
 
 type ThreadRowProps = { thread: ThreadSummary; subthreads?: ThreadStatus | null; active: boolean; project?: RowProject; compact?: boolean };
 
-/** A title and right-aligned facts. Parent status includes its children; all open panes share the selected fill. */
+/** Whether a row has a state to mark: its own or its sub threads' status, a subagent's result, or an unread mention. */
+export function rowHasState(thread: ThreadSummary, subthreads: ThreadStatus | null): boolean {
+  const status = threadTreeStatus(threadStatus(thread), subthreads);
+  return Boolean(status || thread.subagent || mentionLeads(thread, status));
+}
+
+/**
+ * A title and right-aligned facts. A sub thread's state leads its row instead, where its branch ends. Parent status
+ * includes its children; all open panes share the selected fill.
+ */
 export function ThreadRow({ thread, subthreads = null, active, project, compact = false }: ThreadRowProps) {
   const navigate = useRouter((s) => s.navigate);
   const addPane = useRouter((s) => s.addThreadPane);
@@ -63,7 +72,7 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
           />
         }
       >
-        <ThreadLine thread={thread} subthreads={subthreads} facts={facts} status={status} mention={mention} />
+        <ThreadLine thread={thread} subthreads={subthreads} facts={facts} child={compact} />
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <CoversPreview />
@@ -84,22 +93,11 @@ function rowDescription(thread: ThreadSummary, detail: string): string {
   return [detail, ...about, ownerMark(thread)?.label, [...new Set(agents)].map(harnessShortName).join(", ")].filter(Boolean).join(" · ");
 }
 
-function ThreadLine({
-  thread,
-  subthreads,
-  facts,
-  status,
-  mention,
-}: {
-  thread: ThreadSummary;
-  subthreads: ThreadStatus | null;
-  facts: ReturnType<typeof rowFacts>;
-  status: ThreadStatus | null;
-  mention: boolean;
-}) {
+/** Every sub thread keeps the lead slot, marked or not, so their titles share one line. */
+function ThreadLine({ thread, subthreads, facts, child }: { thread: ThreadSummary; subthreads: ThreadStatus | null; facts: ReturnType<typeof rowFacts>; child: boolean }) {
   const { starter, pull, cloud } = facts;
   const PullIcon = pull ? pullRequestIcons[pull.state] : GitPullRequest;
-  const state = status || thread.subagent || mention ? <SidebarThreadMark thread={thread} subthreads={subthreads} /> : null;
+  const state = rowHasState(thread, subthreads) ? <SidebarThreadMark thread={thread} subthreads={subthreads} /> : null;
   const slots = [
     { kind: "starter", mark: starter ? <AccountFace name={starter.name} image={starter.image} className="thread-preview-face" /> : null },
     {
@@ -118,10 +116,15 @@ function ThreadLine({
         </span>
       ) : null,
     },
-    { kind: "state", mark: state },
+    { kind: "state", mark: child ? null : state },
   ].filter((slot) => slot.mark !== null);
   return (
     <span className="thread-preview-heading">
+      {child ? (
+        <span className="thread-lead-slot" data-fact="state">
+          {state}
+        </span>
+      ) : null}
       <span className="thread-preview-title" data-tip-title>
         {thread.title}
       </span>

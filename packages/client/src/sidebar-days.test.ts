@@ -1,6 +1,18 @@
 import type { ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { liveSidebarFold, RECENT_MS, resolvedRows, sidebarDayKey, sidebarDayList, sidebarDayOpen, sidebarDaySections, sidebarListGrows, sidebarPlace, threadResolved } from "./sidebar-days.js";
+import {
+  liveSidebarFold,
+  projectDaySections,
+  RECENT_MS,
+  resolvedRows,
+  sidebarDayKey,
+  sidebarDayList,
+  sidebarDayOpen,
+  sidebarDaySections,
+  sidebarListGrows,
+  sidebarPlace,
+  threadResolved,
+} from "./sidebar-days.js";
 import { sidebarFoldKey, sidebarThreadPage, toggleSidebarFold } from "./sidebar-thread-groups.js";
 
 const now = new Date(2026, 10, 6, 20, 0).getTime();
@@ -166,5 +178,20 @@ describe("sidebar days", () => {
     expect(saved.filter(liveSidebarFold)).toEqual(["pinned:threads", "snoozed-open:threads", "resolved-open:threads", "thread-closed:a", "thread-open:b", "day-closed:today"]);
     // Yesterday used to start open, so folding it saved a key; it starts folded now.
     expect(["day-closed:yesterday", "day-open:today", "day-closed:recent", "day-open:yesterday"].filter(liveSidebarFold)).toEqual(["day-closed:recent", "day-open:yesterday"]);
+  });
+});
+
+describe("a project's rows under their days", () => {
+  const days = (rows: ThreadSummary[]) => projectDaySections(rows, rows, now).map(({ label, roots }) => [label, ...roots.map((root) => root.id)]);
+
+  it("labels only the days that hold rows, by calendar day, and files a tree kept past yesterday under Earlier", () => {
+    expect(days([thread("new", now - 1000), thread("morning", at(6, 9)), thread("waiting", at(2), { activity: "waiting" })])).toEqual([
+      ["Today", "new", "morning"],
+      ["Earlier", "waiting"],
+    ]);
+  });
+
+  it("keeps a held row under the day of the row above it, so no row moves for work it got since", () => {
+    expect(days([thread("old", at(5)), thread("woke", now - 1000)])).toEqual([["Yesterday", "old", "woke"]]);
   });
 });

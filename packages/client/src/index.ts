@@ -115,6 +115,7 @@ export {
   sidebarDayList,
   sidebarDayOpen,
   sidebarDaySections,
+  projectDaySections,
   sidebarListGrows,
   sidebarGroupsGrow,
   resolvedBefore,
@@ -126,6 +127,8 @@ export {
   type SidebarDayList,
   type SidebarDaySection,
   type SidebarPlace,
+  type ProjectDay,
+  type ProjectDaySection,
 } from "./sidebar-days.js";
 export { useSidebarNow } from "./sidebar-clock.js";
 export {

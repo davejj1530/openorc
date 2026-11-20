@@ -1,11 +1,12 @@
 import { useSpaceThread, useSpaceProjects } from "../lib/space-queries";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { ALL_WORKSPACES, useLayout } from "../lib/layout";
 import {
   type GroupProject,
   type ListLayout,
+  type ProjectDaySection,
   type SidebarDayList,
   type SidebarFilter,
   cachedListPage,
@@ -16,6 +17,7 @@ import {
   NEEDS_YOU_PAGE,
   needingAlone,
   pinOrder,
+  projectDaySections,
   projectRows,
   rootStatuses,
   subthreadStatuses,
@@ -343,7 +345,7 @@ function ThreadGroups({ children }: { children: ChildPages }) {
               onToggle={toggle(sidebarFoldKey.project(group.project.id))}
               onShowMore={group.showMore}
             >
-              {rows(group.rows)}
+              {group.open ? <ProjectDays sections={projectDaySections(group.rows, list.all, now)} rows={rows} /> : rows(group.rows)}
             </SidebarProjectGroup>
           ))}
           {everyHidden ? null : <ListFeedback state={state} shown={list.pinned.length + list.rest.length + list.resolved.roots.length} snoozed={list.snoozed.length} />}
@@ -362,6 +364,19 @@ function ThreadGroups({ children }: { children: ChildPages }) {
       </div>
     </section>
   );
+}
+
+/**
+ * An open project's rows under the days they last worked, each day a faint label over its rows and only while it holds
+ * some. A folded project keeps only the open thread's tree, with no label.
+ */
+function ProjectDays({ sections, rows }: { sections: ProjectDaySection[]; rows: (roots: ThreadSummary[]) => ReactNode }) {
+  return sections.map(({ day, label, roots }) => (
+    <Fragment key={day}>
+      <p className="sidebar-day-label">{label}</p>
+      {rows(roots)}
+    </Fragment>
+  ));
 }
 
 /**

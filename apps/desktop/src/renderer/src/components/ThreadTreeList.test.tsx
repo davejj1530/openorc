@@ -4,7 +4,7 @@ import type { ThreadSummary } from "@openorc/protocol";
 import { useLayout } from "../lib/layout";
 import { ThreadTreeList } from "./ThreadTreeList";
 
-vi.mock("./ThreadLibraryRow", () => ({ ThreadRow: ({ thread }: { thread: ThreadSummary }) => <span>{thread.title}</span> }));
+vi.mock("./ThreadLibraryRow", () => ({ ThreadRow: ({ thread }: { thread: ThreadSummary }) => <span>{thread.title}</span>, rowHasState: () => false }));
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

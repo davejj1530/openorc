@@ -19,7 +19,7 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   height: var(--resolved-head);
   padding: 0 8px;
   border-radius: var(--radius-md);
@@ -37,9 +37,10 @@
 .resolved-toggle:hover {
   color: var(--ink);
 }
+/* The chevron starts where a project's does, 4px after the word; the check that takes its place shares the start. */
 .resolved-mark {
   display: grid;
-  place-items: center;
+  place-items: center start;
   margin-right: auto;
 }
 .resolved-mark > * {

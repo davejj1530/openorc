@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { subthreadStatuses, threadAncestors, threadBranchPath, threadPageBranchPath, threadChildren, threadTreeRows, type ThreadTreeRow } from "@openorc/client";
 import { useLayout } from "../lib/layout";
 import { ChevronDown } from "./icons";
-import { ThreadRow, type RowProject } from "./ThreadLibraryRow";
+import { rowHasState, ThreadRow, type RowProject } from "./ThreadLibraryRow";
 
 export function ThreadTreeList({
   roots,
@@ -37,10 +37,11 @@ export function ThreadTreeList({
     visited.add(thread.id);
     const { depth, hasChildren, expanded } = row;
     const project = projects?.get(thread.projectId);
+    const below = subthreads.get(thread.id) ?? null;
     return (
       <div key={thread.id} className="sidebar-tree-node" data-child={depth > 0 || undefined}>
-        <BranchRow row={row} onToggle={hasChildren ? () => toggle(thread.id, expanded) : undefined}>
-          <ThreadRow thread={thread} subthreads={subthreads.get(thread.id) ?? null} active={activeId === thread.id} compact={depth > 0} project={project} />
+        <BranchRow row={row} marked={rowHasState(thread, below)} onToggle={hasChildren ? () => toggle(thread.id, expanded) : undefined}>
+          <ThreadRow thread={thread} subthreads={below} active={activeId === thread.id} compact={depth > 0} project={project} />
         </BranchRow>
         {expanded && hasChildren ? (
           <div className="sidebar-tree-children" data-capped={depth >= 3 || undefined}>
@@ -60,16 +61,19 @@ export function ThreadTreeList({
   return roots.map(render);
 }
 
-/** The branch starts under the parent title and ends before the indented child title. */
+/** The branch starts under the parent title and ends before the child's state mark, 24px ahead of its title. */
 const MARK_X = 16;
 const STEP = 24;
+const END_INSET = 4;
+/** The mark's 16px slot and the 8px after it: a child with no mark has its branch run on across them to its title. */
+const LEAD = 24;
 
 /**
  * A row of the tree with its share of the branch lines drawn over its lead. A parent carries its disclosure at the end
  * of its title line, where the phone keeps it: the chevron points down while its sub threads are folded and turns up
  * as they open.
  */
-function BranchRow({ row, children, paging = false, onToggle }: { row: ThreadTreeRow; children: ReactNode; paging?: boolean; onToggle?: () => void }) {
+function BranchRow({ row, children, marked = true, paging = false, onToggle }: { row: ThreadTreeRow; children: ReactNode; marked?: boolean; paging?: boolean; onToggle?: () => void }) {
   const element = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ height: 32, mid: 16, title: 16 });
   useLayoutEffect(() => {
@@ -116,7 +120,7 @@ function BranchRow({ row, children, paging = false, onToggle }: { row: ThreadTre
         </button>
       ) : null}
       <svg aria-hidden className="sidebar-tree-lines" style={{ left: -indent }} width={MARK_X + 16 + indent} height={size.height}>
-        <path d={(paging ? threadPageBranchPath : threadBranchPath)(row, { markX: MARK_X, step: STEP, endInset: 4, mid: size.mid, height: size.height + 2 })} />
+        <path d={(paging ? threadPageBranchPath : threadBranchPath)(row, { markX: MARK_X, step: STEP, endInset: marked ? END_INSET : END_INSET - LEAD, mid: size.mid, height: size.height + 2 })} />
       </svg>
     </div>
   );

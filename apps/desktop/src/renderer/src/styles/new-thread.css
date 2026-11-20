@@ -306,6 +306,10 @@
   .new-thread-column {
     --new-thread-reserve: 0px;
   }
+  .dither-backdrop,
+  .composer-new-thread {
+    --new-thread-stage-floor: initial;
+  }
   .new-thread-activity {
     display: none;
   }
@@ -347,19 +351,32 @@
   image-rendering: pixelated;
 }
 /* A picture, the painting or the person's own image, is a card behind the mark, the question and the composer: set
-   in from the stage's edges and ending a little under the composer, which anchors it. The year of work stays on the
-   plain ground below it. */
-.composer-new-thread {
-  anchor-name: --new-thread-composer;
-}
+   in from the stage's edges and ending where the year of work begins. Its size is the window's alone, so writing in
+   the composer never moves it. The year of work stays on the plain ground below it. */
 .dither-backdrop[data-picture] {
   overflow: hidden;
   mask-image: none;
 }
 .new-thread-body > .dither-backdrop[data-picture] {
-  inset: 14px 14px auto;
-  bottom: calc(anchor(--new-thread-composer bottom) - 64px);
+  inset: 14px;
+  bottom: var(--new-thread-stage-floor, 14px);
   border-radius: var(--radius-5xl);
+}
+/* Where the stage ends over the pane's bottom while the year of work shows: at the activity's top. */
+.app-shell .new-thread-body:has(> .new-thread-activity) {
+  --new-thread-stage-floor: calc(var(--new-thread-activity-h) + var(--new-thread-activity-floor));
+}
+/* On the card the column centres in the card rather than the pane, the card's own inset above it and the same room
+   under it. */
+.new-thread-body:has(> [data-picture]) .new-thread-column {
+  --new-thread-reserve: 14px;
+  padding-bottom: 24px;
+}
+/* The composer stops growing where the column would leave the card, and its writing area scrolls from there. The pane's
+   height is the container's plus the padding under it; 274px is the rest of the column: its padding, the mark, a
+   one-line question and the composer around its writing area. */
+.new-thread-body:has(> [data-picture]) .composer-new-thread {
+  --composer-max-height: clamp(72px, calc(100cqh + var(--new-thread-bottom) - var(--new-thread-stage-floor, var(--new-thread-bottom)) - 274px), 240px);
 }
 .dither-backdrop[data-style="painting"] canvas {
   position: absolute;

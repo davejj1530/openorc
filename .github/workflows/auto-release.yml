@@ -61,6 +61,7 @@ jobs:
       publish: true
       # Betas ship an unsigned Windows installer until a Windows certificate is configured; stable releases never do.
       unsigned_windows_beta: ${{ contains(needs.plan.outputs.tag, '-beta.') }}
+      ci_passed: true
     secrets: inherit
     permissions:
       contents: write

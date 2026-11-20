@@ -21,6 +21,23 @@
   font-display: swap;
 }
 
+/* PP Neue Montreal ships two static faces here, Regular 400 and Medium 500, upright only. Medium is
+   declared at 700 so author emphasis uses it as drawn, not a synthesized bold. */
+@font-face {
+  font-family: "PP Neue Montreal";
+  src: url("./assets/fonts/PPNeueMontreal-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PP Neue Montreal";
+  src: url("./assets/fonts/PPNeueMontreal-Medium.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 [data-font="immaculate-gothic"] {
   --font-sans: "Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -29,6 +46,9 @@
 }
 [data-font="geist"] {
   --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+[data-font="pp-neue-montreal"] {
+  --font-sans: "PP Neue Montreal", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 [data-font="system"] {
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;

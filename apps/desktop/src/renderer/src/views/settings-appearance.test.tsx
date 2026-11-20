@@ -12,6 +12,7 @@ it("sets each font choice in its own face and applies the one picked", () => {
     ["Immaculate Gothic", "immaculate-gothic", "true"],
     ["Inter", "inter", "false"],
     ["Geist", "geist", "false"],
+    ["PP Neue Montreal", "pp-neue-montreal", "false"],
     ["System", "system", "false"],
   ]);
   fireEvent.click(screen.getByRole("button", { name: "Inter" }));

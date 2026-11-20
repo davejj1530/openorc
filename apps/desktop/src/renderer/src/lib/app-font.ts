@@ -5,6 +5,7 @@ export const appFonts = [
   { id: "immaculate-gothic", name: "Immaculate Gothic" },
   { id: "inter", name: "Inter" },
   { id: "geist", name: "Geist" },
+  { id: "pp-neue-montreal", name: "PP Neue Montreal" },
   { id: "system", name: "System" },
 ] as const;
 

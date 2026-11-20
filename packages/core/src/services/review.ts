@@ -3,6 +3,9 @@ import {
   changedFiles,
   changeStats,
   commitAll,
+  commitNamed,
+  commitPage,
+  commitPatch,
   commitRange,
   createPr,
   filePatch,
@@ -11,6 +14,8 @@ import {
   hasGh,
   headCommit,
   log,
+  onRemote,
+  originUrl,
   patchAgainst,
   patchSinceTree,
   pullRequestTemplate,
@@ -18,7 +23,7 @@ import {
   unpushedCommits,
   workspaceTransfer,
 } from "@openorc/git";
-import type { ChangeComparison, Commit, CommitRange, FileDiff, Project, PushState, ReviewComment, ReviewDiff, Snapshot, Task, Thread, WorkspaceChanges } from "@openorc/protocol";
+import type { ChangeComparison, Commit, CommitRange, FileDiff, NamedCommit, Project, PushState, ReviewComment, ReviewDiff, Snapshot, Task, Thread, WorkspaceChanges } from "@openorc/protocol";
 import { isDetachedCopy, reviewCommentPlace, WORKSPACE_ID } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { access, mkdir, writeFile } from "node:fs/promises";
@@ -341,6 +346,24 @@ export class ReviewService {
   async threadLog(thread: Thread, project: Project, limit = 50): Promise<Commit[]> {
     const range = thread.worktreePath && thread.baseSha ? `${thread.baseSha}..HEAD` : null;
     return log(await this.threadCwd(thread, project), range, limit);
+  }
+
+  /** The commit `sha` names in the thread's workspace, with its page on GitHub once a branch on origin has it. */
+  async threadCommit(thread: Thread, project: Project, sha: string): Promise<NamedCommit | null> {
+    const cwd = await this.threadCwd(thread, project);
+    const commit = await commitNamed(cwd, sha);
+    if (!commit) return null;
+    const [pushed, origin] = await Promise.all([onRemote(cwd, commit.sha), originUrl(cwd)]);
+    return { commit, url: pushed && origin ? commitPage(origin, commit.sha) : null };
+  }
+
+  /** One commit's changes against its first parent. An id that names no commit here is refused. */
+  async threadCommitDiff(thread: Thread, project: Project, sha: string): Promise<ReviewDiff> {
+    const cwd = await this.threadCwd(thread, project);
+    const commit = await commitNamed(cwd, sha);
+    if (!commit) throw new Error("This commit is not in the thread's folder.");
+    const { parent, patch, files } = await commitPatch(cwd, commit.sha);
+    return { baseSha: parent, patch, files, since: null };
   }
 
   async commitRange(thread: Thread, project: Project, request: { from: string | null; to: string; base: string | null; limit?: number }): Promise<CommitRange | null> {

@@ -352,6 +352,12 @@ export function remoteRepository(url: string): { host: string; path: string } | 
   return { host: match[1]!.toLowerCase(), path: match[2]!.toLowerCase() };
 }
 
+/** A commit's page on GitHub, for a remote that is there. Null for a remote anywhere else. */
+export function commitPage(remote: string, sha: string): string | null {
+  const repository = remoteRepository(remote);
+  return repository?.host === "github.com" ? `https://github.com/${repository.path}/commit/${sha}` : null;
+}
+
 /** The specific reasons in a GitHub API error body, such as "Can not approve your own pull request". */
 export function githubErrorReason(body: string): string | null {
   try {

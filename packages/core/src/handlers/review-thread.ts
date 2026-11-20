@@ -5,7 +5,18 @@ import type { Handlers } from "./types.js";
 type Dependencies = {
   review: Pick<
     ReviewService,
-    "threadDiff" | "threadChanges" | "threadFileDiff" | "commitThread" | "pushThread" | "createThreadPr" | "threadPrTemplate" | "threadLog" | "commitRange" | "threadPushState"
+    | "threadDiff"
+    | "threadChanges"
+    | "threadFileDiff"
+    | "commitThread"
+    | "pushThread"
+    | "createThreadPr"
+    | "threadPrTemplate"
+    | "threadLog"
+    | "commitRange"
+    | "threadCommit"
+    | "threadCommitDiff"
+    | "threadPushState"
   >;
   db: Db;
   invalidate: (keys: string[]) => void;
@@ -26,6 +37,8 @@ export function createReviewThreadHandlers({
   | "review.threadPrTemplate"
   | "git.threadLog"
   | "git.commitRange"
+  | "git.threadCommit"
+  | "review.threadCommitDiff"
   | "git.threadPushState"
 > {
   /**
@@ -80,6 +93,14 @@ export function createReviewThreadHandlers({
     "git.commitRange": ({ threadId, from, to, base, limit }) => {
       const { thread, project } = threadAndProject(db, threadId);
       return review.commitRange(thread, project, { from, to, base, ...(limit ? { limit } : {}) });
+    },
+    "git.threadCommit": ({ threadId, sha }) => {
+      const { thread, project } = threadAndProject(db, threadId);
+      return review.threadCommit(thread, project, sha);
+    },
+    "review.threadCommitDiff": ({ threadId, sha }) => {
+      const { thread, project } = threadAndProject(db, threadId);
+      return review.threadCommitDiff(thread, project, sha);
     },
     "git.threadPushState": ({ threadId }) => {
       const { thread, project } = threadAndProject(db, threadId);

@@ -586,6 +586,16 @@ export const Commit = z.object({
 });
 export type Commit = z.infer<typeof Commit>;
 
+/** A commit's id, short or whole: never a word git could read as an option. */
+export const COMMIT_ID = /^[0-9a-f]{7,40}$/;
+
+/** A commit a reply names, as the thread's workspace holds it. */
+export interface NamedCommit {
+  commit: Commit;
+  /** Its page on GitHub once a branch on origin has it. Null while only this Mac has it, or origin is somewhere else. */
+  url: string | null;
+}
+
 /** A run of commits for the work view: from `from` (or where `to` left `base`) up to `to`. */
 export interface CommitRange {
   /** Newest first. */

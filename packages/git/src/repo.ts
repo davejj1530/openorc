@@ -115,10 +115,10 @@ export async function changedFiles(cwd: string, baseSha: string | null): Promise
   return out;
 }
 
-/** What differs between `base` and the working tree, staged or not, in git's order. Renames name both paths. */
-export async function trackedChanges(cwd: string, base: string): Promise<FileChange[]> {
+/** What differs between `base` and the working tree, staged or not, or the commit `to` when given, in git's order. Renames name both paths. */
+export async function trackedChanges(cwd: string, base: string, to?: string): Promise<FileChange[]> {
   const out: FileChange[] = [];
-  const tracked = (await git(cwd, ["diff", "--name-status", "-z", "-M", base])).stdout;
+  const tracked = (await git(cwd, ["diff", "--name-status", "-z", "-M", base, ...(to === undefined ? [] : [to])])).stdout;
   const parts = tracked.split("\0");
   for (let i = 0; i < parts.length;) {
     const code = parts[i];
@@ -213,6 +213,25 @@ export async function log(cwd: string, range: string | null, limit = 50): Promis
       const [sha = "", author = "", at = "0", subject = ""] = line.split("\x1f");
       return { sha, author, at: Number(at) * 1000, subject };
     });
+}
+
+/** The commit `sha` names here, a short id included. Null when it names none, or more than one. */
+export async function commitNamed(cwd: string, sha: string): Promise<Commit | null> {
+  const full = await firstCommit(cwd, [sha]);
+  return full ? ((await log(cwd, full, 1))[0] ?? null) : null;
+}
+
+/** Whether a branch on `remote` has the commit, judged by the remote-tracking refs the last fetch or push left. */
+export async function onRemote(cwd: string, sha: string, remote = "origin"): Promise<boolean> {
+  return (await git(cwd, ["for-each-ref", "--count=1", "--contains", sha, `refs/remotes/${remote}`])).stdout.trim() !== "";
+}
+
+/** A commit's changes against its first parent, or against nothing for a first commit: the patch and the files it names. */
+export async function commitPatch(cwd: string, sha: string): Promise<{ parent: string | null; patch: string; files: FileChange[] }> {
+  const parent = await firstCommit(cwd, [`${sha}^`]);
+  const base = parent ?? (await emptyTree(cwd));
+  const [patch, files] = await Promise.all([git(cwd, ["diff", "--no-color", "--no-ext-diff", "-M", base, sha], { okCodes: [0, 1] }), trackedChanges(cwd, base, sha)]);
+  return { parent, patch: patch.stdout, files };
 }
 
 async function mergeBase(cwd: string, base: string | null, to: string): Promise<string | null> {

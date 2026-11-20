@@ -110,6 +110,8 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "review.threadPrTemplate": refused("Pull request templates aren't available in this cloud thread yet."),
   "git.threadLog": refused(HOSTED_REASONS.commitHistory),
   "git.commitRange": refused(HOSTED_REASONS.commitHistory),
+  "git.threadCommit": refused(HOSTED_REASONS.commitHistory),
+  "review.threadCommitDiff": refused(HOSTED_REASONS.commitHistory),
   "git.threadPushState": NO_FILES,
   "threads.moveWorkspace": NO_FILES,
   "threads.movePreview": NO_FILES,

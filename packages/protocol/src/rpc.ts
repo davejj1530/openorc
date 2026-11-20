@@ -30,7 +30,9 @@ import {
   AgentSkill,
   AppSettings,
   Commit,
+  COMMIT_ID,
   type CommitRange,
+  type NamedCommit,
   FileChange,
   ImportableSession,
   type InstructionFile,
@@ -87,6 +89,8 @@ import { worktreeRpcParams, type WorktreeRpcResults } from "./worktrees.js";
 const reviewCommentScope = { threadId: z.string().min(1).optional(), taskId: z.string().min(1).optional() };
 const hasReviewScope = (scope: { threadId?: string; taskId?: string }) => Boolean(scope.threadId || scope.taskId);
 const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
+
+const CommitId = z.string().regex(COMMIT_ID);
 
 export const rpcParams = {
   ...threadSendRpcParams,
@@ -310,15 +314,16 @@ export const rpcParams = {
    */
   "git.commitRange": z.object({
     threadId: z.string(),
-    from: z
-      .string()
-      .regex(/^[0-9a-f]{7,40}$/)
-      .nullable(),
+    from: CommitId.nullable(),
     // A commit id, never a word git could read as an option.
     to: z.string().regex(/^[0-9a-f]{7,40}$|^HEAD$/),
     base: BranchName.nullable(),
     limit: z.number().int().positive().max(50).optional(),
   }),
+  /** The commit an id names in the thread's workspace, short ids included, and its page on GitHub once origin has it. Null when it names none. */
+  "git.threadCommit": z.object({ threadId: z.string(), sha: CommitId }),
+  /** One commit's changes against its first parent. */
+  "review.threadCommitDiff": z.object({ threadId: z.string(), sha: CommitId }),
   /** Which branch Push would publish from the thread's workspace and which commits origin lacks. Local refs only; never fetches. */
   "git.threadPushState": z.object({ threadId: z.string() }),
   "review.threadPrTemplate": z.object({ threadId: z.string() }),
@@ -646,6 +651,8 @@ export interface RpcResults
   "review.createThreadPr": { url: string };
   "git.threadLog": Commit[];
   "git.commitRange": CommitRange | null;
+  "git.threadCommit": NamedCommit | null;
+  "review.threadCommitDiff": ReviewDiff;
   "git.threadPushState": PushState;
   /** The repository's pull request template, read from the thread's workspace; null when it has none. */
   "review.threadPrTemplate": { body: string | null };

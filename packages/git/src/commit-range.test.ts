@@ -3,7 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { git } from "./exec.js";
-import { commitRange } from "./repo.js";
+import { commitPage } from "./github.js";
+import { commitNamed, commitPatch, commitRange, onRemote } from "./repo.js";
 
 let root: string;
 const commit = async (file: string, text: string, message: string) => {
@@ -56,4 +57,41 @@ it("reads what a push moved from its old tip, and counts what the limit leaves o
 
 it("says nothing for a commit the repository does not have", async () => {
   expect(await commitRange(root, { from: null, to: "deadbee", base: "main" })).toBeNull();
+});
+
+it("finds the commit an id names, says when origin has it, and reads its changes against its parent", async () => {
+  await git(root, ["switch", "-q", "main"]);
+  const parent = (await git(root, ["rev-parse", "HEAD"])).stdout.trim();
+  const sha = await commit("g.txt", "g\n", "Add g");
+
+  expect(await commitNamed(root, sha.slice(0, 7))).toMatchObject({ sha, subject: "Add g" });
+  expect(await commitNamed(root, "0123456")).toBeNull();
+  // A word of hex letters is an id only where a commit has it.
+  expect(await commitNamed(root, "deadbeef")).toBeNull();
+
+  expect(await onRemote(root, sha)).toBe(false);
+  await git(root, ["update-ref", "refs/remotes/origin/main", sha]);
+  expect(await onRemote(root, sha)).toBe(true);
+  expect(await onRemote(root, parent)).toBe(true);
+
+  const changes = await commitPatch(root, sha);
+  expect(changes.parent).toBe(parent);
+  expect(changes.files).toEqual([{ path: "g.txt", status: "added", oldPath: null }]);
+  expect(changes.patch).toContain("+g");
+  expect(changes.patch).not.toContain("f.txt");
+});
+
+it("reads a first commit's changes against nothing", async () => {
+  const first = (await git(root, ["rev-list", "--max-parents=0", "HEAD"])).stdout.trim();
+  const changes = await commitPatch(root, first);
+  expect(changes.parent).toBeNull();
+  expect(changes.files).toEqual([{ path: "a.txt", status: "added", oldPath: null }]);
+});
+
+it("gives a commit's page on GitHub for a remote there, in any of its forms, and none elsewhere", () => {
+  const sha = "a".repeat(40);
+  expect(commitPage("git@github.com:Acme/App.git", sha)).toBe(`https://github.com/acme/app/commit/${sha}`);
+  expect(commitPage("https://github.com/acme/app", sha)).toBe(`https://github.com/acme/app/commit/${sha}`);
+  expect(commitPage("https://gitlab.com/acme/app.git", sha)).toBeNull();
+  expect(commitPage("/Users/someone/app", sha)).toBeNull();
 });

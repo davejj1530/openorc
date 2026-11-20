@@ -42,6 +42,28 @@ describe("ClaudeStreamParser", () => {
     expect(events.filter((e) => e.type === "raw")).toHaveLength(7);
   });
 
+  it("keeps the folder a command ran in when Claude Code dropped its leading cd", () => {
+    const p = new ClaudeStreamParser("run-1");
+    const events = p.parseLine(
+      line({
+        type: "assistant",
+        message: {
+          id: "m1",
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "t1", name: "Bash", input: { command: "cat a.txt" } },
+            { type: "tool_use", id: "t2", name: "Bash", input: { command: "ls" } },
+          ],
+        },
+        wire_tool_inputs: { t1: { command: "cd /repo/sub && cat a.txt" }, t2: { command: "ls" } },
+        wire_ingest_context: { t1: { cwd: "/repo/sub" } },
+      }),
+      1000,
+    );
+    const inputs = events.flatMap((event) => (event.type === "tool.started" ? [event.input] : []));
+    expect(inputs).toEqual([{ command: "cat a.txt", cwd: "/repo/sub" }, { command: "ls" }]);
+  });
+
   it("shows waiting, thinking and tool progress the way Claude Code reports them", () => {
     const p = new ClaudeStreamParser("run-5");
     const types = (lines: unknown[]) => lines.flatMap((l) => p.parseLine(line(l), 1000)).filter((e) => e.type !== "raw");

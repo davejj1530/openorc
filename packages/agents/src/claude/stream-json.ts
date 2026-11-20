@@ -50,6 +50,13 @@ export interface ClaudeTranscriptTarget {
   finished: boolean;
 }
 
+/** A call's input with the folder it ran in, when the message's context names one for it. */
+function inFolder(input: unknown, context: unknown, id: string): unknown {
+  const ranIn = isRecord(context) ? context[id] : null;
+  const cwd = isRecord(ranIn) ? str(ranIn["cwd"]) : null;
+  return cwd && isRecord(input) ? { ...input, cwd } : input;
+}
+
 export class ClaudeStreamParser {
   private readonly childRecords = new Set<string>();
   readonly workflows: ClaudeWorkflows;
@@ -341,20 +348,26 @@ export class ClaudeStreamParser {
       if (!parent) this.finishThinking(now, out);
       out.push({ type: "message.completed", runId: this.runId, ts: now, messageId, role: "assistant", text });
     }
-    this.assistantTools(content, parent, now, out);
+    this.assistantTools(content, msg["wire_ingest_context"], parent, now, out);
     const usage = readUsage(message["usage"], { context: true });
     if (usage) out.push({ type: "usage.updated", runId: this.runId, ts: now, usage });
   }
 
-  private assistantTools(content: Record<string, unknown>[], parent: string | null, now: number, out: AgentEvent[]): void {
+  /**
+   * Claude Code's shell keeps its folder between calls, and a command that starts by moving to the folder it is
+   * already in arrives without that `cd`. `context` then names the folder per call, which the call keeps as its `cwd`
+   * so the paths in it can be found.
+   */
+  private assistantTools(content: Record<string, unknown>[], context: unknown, parent: string | null, now: number, out: AgentEvent[]): void {
     for (const b of content) {
       if (b["type"] === "tool_use" && typeof b["id"] === "string" && typeof b["name"] === "string") {
+        const input = inFolder(b["input"], context, b["id"]);
         if (!parent) this.finishThinking(now, out);
         this.toolNames.set(b["id"], b["name"]);
         if (parent) this.toolParents.set(b["id"], parent);
         // A streamed block already announced the tool with an empty input; the full input arrives here.
-        if (this.toolsStarted.has(b["id"])) out.push({ type: "tool.updated", runId: this.runId, ts: now, toolCallId: b["id"], input: b["input"] });
-        else out.push({ type: "tool.started", runId: this.runId, ts: now, toolCallId: b["id"], name: b["name"], input: b["input"], parentToolCallId: parent ?? null });
+        if (this.toolsStarted.has(b["id"])) out.push({ type: "tool.updated", runId: this.runId, ts: now, toolCallId: b["id"], input });
+        else out.push({ type: "tool.started", runId: this.runId, ts: now, toolCallId: b["id"], name: b["name"], input, parentToolCallId: parent ?? null });
         if (b["name"] === "Agent" || b["name"] === "Task") this.subagents.launch(b["id"], b["input"], parent, now, out);
         if (b["name"] === "Skill") this.subagents.skill(b["id"]);
         if (b["name"] === "Workflow") this.workflows.launch(b["id"], b["input"], parent, now, out);

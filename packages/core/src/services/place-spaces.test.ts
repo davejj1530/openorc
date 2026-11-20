@@ -151,12 +151,12 @@ it("projects local work before pagination even when the organization has no clou
   await signIn();
   expect((await call("threads.list", { spaceId: team, limit: 1 })).map((row) => row.id)).toEqual([a.thread.id]);
   expect(await call("threads.list", { spaceId: team, limit: 1, offset: 1 })).toEqual([]);
-  expect((await call("threads.list", { spaceId: `personal-${EMAIL}` })).map((row) => row.id)).toEqual([b.thread.id]);
+  expect(new Set((await call("threads.list", { spaceId: `personal-${EMAIL}` })).map((row) => row.id))).toEqual(new Set([a.thread.id, b.thread.id]));
   expect(await call("threads.resolvedCount", { spaceId: team, projectIds: [a.project.id, b.project.id], quietBefore: Date.now() + 60_000 })).toBe(1);
   expect((await call("threads.list", {})).map((row) => row.id)).toEqual(expect.arrayContaining([a.thread.id, b.thread.id]));
 });
 
-it("merges duplicate local copies once each with own and teammate cloud rows, keeping personal cloud under its own key", async () => {
+it("merges duplicate local copies once each with own and teammate cloud rows, and with personal cloud rows in Personal", async () => {
   const team = stand.addTeam("Birch Studio", [EMAIL, "member@example.com"]);
   const teamProject = stand.addProject(EMAIL, { name: "Canvas", fullName: "example/canvas" }, team);
   const personalProject = stand.addProject(EMAIL, { name: "Canvas", fullName: "example/canvas" });
@@ -172,7 +172,10 @@ it("merges duplicate local copies once each with own and teammate cloud rows, ke
   expect(new Set([...first, ...second].map((row) => row.id))).toEqual(new Set([a.thread.id, b.thread.id, own, other]));
   expect((await call("threads.list", { spaceId: team, ownership: "mine" })).map((row) => row.id)).toEqual(expect.arrayContaining([a.thread.id, b.thread.id, own]));
   expect(await call("threads.list", { spaceId: team, ownership: "mine" })).toHaveLength(3);
-  expect(await call("threads.list", { spaceId: `personal-${EMAIL}` })).toMatchObject([{ id: personal, projectId: `openorc-cloud:${personalProject}` }]);
+  const personalRows = await call("threads.list", { spaceId: `personal-${EMAIL}` });
+  expect(new Set(personalRows.map((row) => row.id))).toEqual(new Set([a.thread.id, b.thread.id, personal]));
+  const [personalPrimary] = await call("spaces.projects", { spaceId: `personal-${EMAIL}` });
+  expect(personalRows.find((row) => row.id === personal)).toMatchObject({ projectId: personalPrimary!.key });
   const presentations = await call("spaces.projects", { spaceId: team });
   const [primary, secondary] = presentations;
   expect(await call("threads.list", { spaceId: team, projectIds: [primary!.key] })).toHaveLength(3);

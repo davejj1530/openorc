@@ -69,7 +69,7 @@ it("reports the lifetime creation limit independently from current memberships",
   expect(hosted.spaces.status()).toMatchObject({ create: { allowed: false, reason: "You've made 5 organizations, the most one person can." } });
 });
 
-it("keeps local duplicates and personal cloud projects distinct from an organization's local pair", async () => {
+it("lists every folder in Personal, and in an organization those of its projects, each paired with that space's own", async () => {
   const organization = stand.addTeam("Birch Studio", [ADMIN]);
   const team = stand.addProject(ADMIN, { name: "Canvas", fullName: "example/canvas" }, organization);
   const personal = stand.addProject(ADMIN, { name: "Canvas", fullName: "example/canvas" });
@@ -85,7 +85,11 @@ it("keeps local duplicates and personal cloud projects distinct from an organiza
     { key: "copy-b", hostedProjectId: team },
     { key: `openorc-cloud:${cloudOnly}`, localProjectId: null },
   ]);
-  expect(await hosted.spaces.projects(`personal-${ADMIN}`)).toMatchObject([{ key: "notes" }, { key: `openorc-cloud:${personal}`, localProjectId: null }]);
+  expect(await hosted.spaces.projects(`personal-${ADMIN}`)).toMatchObject([
+    { key: "copy-a", hostedProjectId: personal },
+    { key: "copy-b", hostedProjectId: personal },
+    { key: "notes", hostedProjectId: null },
+  ]);
 });
 
 it("retains other spaces when access to one disappears between the index and project reads", async () => {

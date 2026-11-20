@@ -95,7 +95,7 @@ export class Spaces implements HostedSpaces {
     await (this.#reading ?? (this.#snapshot ? undefined : this.refresh()));
     const heard = this.#require(spaceId);
     const personal = heard.index.personalSpaceId;
-    // A folder paired with an organization's project is the person's own again, in Personal, while they are frozen.
+    // A frozen person's organizations hold none of their projects; Personal keeps every folder either way.
     const listed = this.frozen() ? heard.projects.filter((project) => project.space === personal) : heard.projects;
     return spaceProjects(spaceId, personal, listed, this.deps.projects());
   }

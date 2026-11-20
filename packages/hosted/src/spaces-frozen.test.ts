@@ -38,11 +38,11 @@ const personal = (hosted: Hosted) => {
   return status.personalSpaceId;
 };
 
-it("keeps a folder paired with an organization's project in that organization while the person has access", async () => {
+it("lists a folder paired with an organization's project in that organization and in Personal while the person has access", async () => {
   stand.setBilling(MEMBER, { pro: true, standing: "live", at: new Date(Date.now() + 86_400_000).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
   const { hosted } = await person();
   expect(keys(await hosted.spaces.projects(team))).toEqual(["local-canvas"]);
-  expect(keys(await hosted.spaces.projects(personal(hosted)))).toEqual([]);
+  expect(keys(await hosted.spaces.projects(personal(hosted)))).toEqual(["local-canvas"]);
 });
 
 it("lists a frozen person's paired folder in Personal and nothing in the organization", async () => {

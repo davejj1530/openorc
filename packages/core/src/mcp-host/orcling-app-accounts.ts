@@ -2,6 +2,7 @@ import { orclings, projects, pullReviews, runs, tasks, threads, type Db } from "
 import type { InboxList, Orcling, OrclingChatSummary, OrclingDraft, Task } from "@openorc/protocol";
 import { ACCOUNTS_KEPT_SEPARATE, accountReach, accountsSeparate, reachesTask, threadAccount } from "../services/claude-account-separation.js";
 import { projectAccountPolicy } from "../services/project-claude-accounts.js";
+import { reviewGoesOn } from "../services/pull-requests.js";
 
 type Reach = (account: string) => boolean;
 
@@ -12,16 +13,34 @@ type Reach = (account: string) => boolean;
  */
 export function separateAccountsRefusal(db: Db, self: Orcling, method: string, params: Record<string, unknown>): string | null {
   if (!accountsSeparate(db)) return null;
-  if (method === "threads.switchClaudeAccount") return `${ACCOUNTS_KEPT_SEPARATE}, so only the person moves a conversation to another account.`;
-  const chosen = params["claudeAccountId"];
-  if (method === "threads.start" && typeof chosen === "string" && chosen !== self.claudeAccountId) return `${ACCOUNTS_KEPT_SEPARATE}, so you start threads only on your own Claude account.`;
+  const named = namedAccountRefusal(self, method, params);
+  if (named) return named;
+  if (method === "runs.start" && startsLooseTask(db, params))
+    return `${ACCOUNTS_KEPT_SEPARATE}, so take up a task that has no conversation with orcling_thread_start, which starts it on your own Claude account.`;
   const reach = accountReach(db, self.claudeAccountId);
   const drafted = (params["draft"] as Partial<OrclingDraft> | undefined)?.claudeAccountId;
   if (drafted && !reach(drafted)) return `${ACCOUNTS_KEPT_SEPARATE}, so you keep Orclings on your own Claude account.`;
   const reviewOn = method === "pulls.review.start" ? reviewAccount(db, params) : null;
   if (reviewOn && !reach(reviewOn)) return `That review runs on another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`;
-  const listedElsewhere = method === "threads.list" && typeof chosen === "string" && chosen !== self.claudeAccountId;
-  return !listedElsewhere && reachesAll(db, reach, method, params) ? null : `That belongs to another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`;
+  return reachesAll(db, reach, method, params) ? null : `That belongs to another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`;
+}
+
+/** Why a call that moves a conversation, or names a Claude account that is not the Orcling's own, is refused. */
+function namedAccountRefusal(self: Orcling, method: string, params: Record<string, unknown>): string | null {
+  const chosen = params["claudeAccountId"];
+  const elsewhere = typeof chosen === "string" && chosen !== self.claudeAccountId;
+  if (method === "threads.switchClaudeAccount" || (method === "runs.start" && elsewhere)) return `${ACCOUNTS_KEPT_SEPARATE}, so only the person moves a conversation to another account.`;
+  if (method === "threads.start" && elsewhere) return `${ACCOUNTS_KEPT_SEPARATE}, so you start threads only on your own Claude account.`;
+  if (method === "threads.list" && elsewhere) return `That belongs to another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`;
+  return null;
+}
+
+/** Whether the call starts a task that has no conversation yet: its thread would go on its project's default account. */
+function startsLooseTask(db: Db, params: Record<string, unknown>): boolean {
+  const { taskId, threadId } = params;
+  if (typeof taskId !== "string" || typeof threadId === "string") return false;
+  const task = tasks.get(db, taskId);
+  return Boolean(task && !task.executionThreadId && !task.threadId);
 }
 
 /** Every thread, run, task, Orcling and review the call names, by the parameter names the methods use. */
@@ -59,7 +78,7 @@ function reviewAccount(db: Db, params: Record<string, unknown>): string | null {
   const projectId = String(params["projectId"]);
   if (!projects.get(db, projectId)) return null;
   const conversation = reviewConversation(db, params);
-  if (conversation && conversation.archivedAt === null && conversation.worktreePath) return threadAccount(conversation);
+  if (reviewGoesOn(conversation)) return threadAccount(conversation);
   return projectAccountPolicy(db, projectId).defaultId;
 }
 

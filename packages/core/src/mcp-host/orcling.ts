@@ -227,9 +227,9 @@ function assertOwnAccountWork(db: Db, self: Orcling, input: OrclingStartInput, p
   if (named && named !== self.claudeAccountId) throw new Error(`${ACCOUNTS_KEPT_SEPARATE}, so ${self.name} starts work only on its own Claude account.`);
 }
 
-/** Kept separate, a chosen Claude agent works on the Orcling's own account, so a project that doesn't use it refuses before the person is asked. */
+/** Kept separate, a chosen agent works on the Orcling's own account, so a project that doesn't use it refuses before the person is asked. */
 function assertProjectUsesOwnAccount(db: Db, self: Orcling, target: Project, on: WorkSettings | undefined): void {
-  if (on?.agent === "claude" && accountsSeparate(db)) startingAccount(db, target.id, self.claudeAccountId, "inherited");
+  if (on && accountsSeparate(db)) startingAccount(db, target.id, self.claudeAccountId, "inherited");
 }
 
 const workspaceFor = (worktree: boolean): WorkspaceMode => (worktree ? "worktree" : "current");

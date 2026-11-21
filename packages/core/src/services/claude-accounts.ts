@@ -17,9 +17,25 @@ type Connection = Pick<ClaudeAccountConnection, "status" | "email" | "organizati
 const disconnected: Connection = { status: "signed_out", email: null, organization: null, message: null };
 /**
  * What of the existing CLI login's folder is its own: sessions and memory, prompt history, sign-in, plans, file
- * snapshots, pasted text, to-dos and logs. Its skills and plugins every account uses.
+ * snapshots, pasted text, to-dos, background jobs, backups and logs. Its skills and plugins every account uses.
  */
-const CLI_LOGIN_PRIVATE = ["projects", "history.jsonl", ".credentials.json", "plans", "file-history", "paste-cache", "todos", "shell-snapshots", "session-env", "sessions", "debug"];
+const CLI_LOGIN_PRIVATE = [
+  "projects",
+  "history.jsonl",
+  ".credentials.json",
+  "plans",
+  "file-history",
+  "paste-cache",
+  "todos",
+  "shell-snapshots",
+  "session-env",
+  "sessions",
+  "debug",
+  "jobs",
+  "daemon",
+  "daemon.log",
+  "backups",
+];
 
 /**
  * An added account uses the personal skills installed for the existing CLI login: each is linked into the

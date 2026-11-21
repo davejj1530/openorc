@@ -3,7 +3,7 @@ import type { Logger } from "../transport.js";
 import type { LiveRun, Notification, RunHooks, RunScope } from "./run-types.js";
 
 export function runScopeKeys(scope: RunScope): string[] {
-  if (scope.comment) return [`task-comments:${scope.comment.task.id}`];
+  if (scope.comment) return [scope.comment.refine ? `task-refine:${scope.comment.task.id}` : `task-comments:${scope.comment.task.id}`];
   if (scope.task) return ["tasks", "inbox", `task:${scope.task.id}`, `runs:${scope.task.id}`, ...(scope.task.threadId ? ["threads", `thread:${scope.task.threadId}`] : [])];
   return ["threads", `thread:${scope.thread.id}`, `runs:thread:${scope.thread.id}`, "inbox"];
 }

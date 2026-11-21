@@ -103,7 +103,7 @@ const api: OpenOrcApi = {
       ipcRenderer.send("terminal:detach", id);
     },
     open(input) {
-      return ipcRenderer.invoke("terminal:open", input) as Promise<{ backlog: string; running: boolean; exitCode: number | null }>;
+      return ipcRenderer.invoke("terminal:open", input) as Promise<{ backlog: string; running: boolean; exitCode: number | null; stayedIn?: string }>;
     },
     write(id, data) {
       ipcRenderer.send("terminal:write", id, data);

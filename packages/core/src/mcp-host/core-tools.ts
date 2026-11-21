@@ -14,7 +14,7 @@ import { createTasksHost } from "./tasks.js";
 import { createThreadsHost } from "./threads.js";
 
 /** What the core's tools for its agents are made from: its services, and the few things only the core itself holds. */
-export type CoreTools = Pick<OpenOrc, "db" | "threads" | "runs" | "comments" | "devices" | "memory" | "slack" | "orclings" | "settings" | "pullRequests"> & {
+export type CoreTools = Pick<OpenOrc, "db" | "threads" | "runs" | "comments" | "refines" | "devices" | "memory" | "slack" | "orclings" | "settings" | "pullRequests"> & {
   /** Read each time, since the account comes and goes. */
   account: () => OpenOrc["account"];
   browser: OpenOrcOptions["browser"];
@@ -41,7 +41,7 @@ export function startCoreMcp(core: CoreTools): Promise<OpenOrcMcpServer> {
     captureProcess: (runId) => core.runs.captureProcess(runId),
   });
   return startMcpServer({
-    ...createRunHost({ runService: core.runs, db: core.db, comments: core.comments, assertRunAvailable }),
+    ...createRunHost({ runService: core.runs, db: core.db, comments: core.comments, refines: core.refines, assertRunAvailable }),
     ...createBrowserHost({ db: core.db, runService: core.runs, browser: core.browser, assertRunAvailable }),
     ...createDeviceHost({ db: core.db, runService: core.runs, devices: core.devices, assertRunAvailable }),
     ...createMemoryHost({ memoryService: core.memory, runService: core.runs, db: core.db, assertRunAvailable, taskFor, projectFor, online }),

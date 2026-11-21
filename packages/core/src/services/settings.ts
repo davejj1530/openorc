@@ -1,5 +1,5 @@
 import { settings, type Db } from "@openorc/db";
-import { AppSettings, enabledHarnessIds, type HarnessId } from "@openorc/protocol";
+import { AppSettings, defaultHarnessId, enabledHarnessIds, type HarnessId } from "@openorc/protocol";
 
 const defaults: AppSettings = {
   notifications: true,
@@ -47,5 +47,10 @@ export class AppSettingsService {
 
   enabledHarnesses(): readonly HarnessId[] {
     return enabledHarnessIds(this.get());
+  }
+
+  /** The agent the person chose to start new threads with, else the first one OpenOrc lists. */
+  defaultAgent(): HarnessId {
+    return this.get().defaultHarness ?? defaultHarnessId;
   }
 }

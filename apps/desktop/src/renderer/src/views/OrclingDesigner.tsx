@@ -151,7 +151,7 @@ function AccountField({ value, onChange }: { value: string | undefined; onChange
     <div className="orcling-designer-field">
       <span>Claude account</span>
       <Select aria-label="Claude account" value={chosen} onChange={(event) => onChange(event.target.value)} className="h-7 max-w-48 rounded-full text-sm">
-        <ClaudeAccountOptions accounts={accounts} value={chosen} />
+        <ClaudeAccountOptions accounts={accounts.accounts} value={chosen} />
       </Select>
     </div>
   );

@@ -39,7 +39,7 @@ export function readTaskDraft(taskId: string): TaskDocumentDraft | null {
   throw new Error("The local task draft could not be read. Open Overview and save the task before continuing.");
 }
 
-function labelList(labels: string): string[] {
+export function labelList(labels: string): string[] {
   return [
     ...new Set(
       labels

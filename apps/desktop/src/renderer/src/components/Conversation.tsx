@@ -36,6 +36,7 @@ import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutat
 import { useThreadAccounts } from "../lib/use-thread-accounts";
 import { MessageMarks, useMessageMarks } from "./MarkedText";
 import { useConversationDraft } from "../lib/conversation-draft";
+import { conversationDraftKey } from "../lib/drafts";
 import {
   conversationEmptyHint,
   conversationEmptyTitle,
@@ -239,7 +240,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const orclings = useOrclingConversation({ thread, runs, choice, onModel: settings.selectModel, accounts });
   const voice = useRunVoices(orclings.voice, runs, thread);
   const together = useThreadVoices(thread);
-  const draftKey = capturedKey ?? `conversation.${conversation.id}`;
+  const draftKey = capturedKey ?? conversationDraftKey(conversation.id);
   const { prompt, setPrompt, clearDraft, error: draftError } = useConversationDraft({ draftKey, threadId: thread?.id ?? null, initialText: thread?.draft ?? "" });
   const taskDraft = useTaskComposerDraft({ scope: hostedFiles ?? null, threadId: thread?.id ?? null, draftKey, prompt, setPrompt });
   const submitter = useSubmit();
@@ -293,7 +294,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const suggestScope = cloud.hosted ? null : conversation;
   // A cloud thread's turns get the person's own skills from this Mac where its server serves them, and no project's from here.
   const ownSkillsScope = useHostedSkills(thread) ? OWN_SKILLS_SCOPE : null;
-  const skillsAsked: Parameters<typeof useSkillCommands> = cloud.hosted ? [ownSkillsScope, choice?.agent, undefined, "user"] : [conversation, choice?.agent];
+  const skillsAsked: Parameters<typeof useSkillCommands> = cloud.hosted ? [ownSkillsScope, choice?.agent, undefined, { only: "user" }] : [conversation, choice?.agent];
   const skills = useSkillCommands(...skillsAsked);
   const connectorMentions = useConnectorMentions(suggestScope, choice?.agent, executionMode(mode, permission));
   const onFork = useFork(thread, forkConversation);

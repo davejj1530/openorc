@@ -54,7 +54,7 @@ export function createOrclingHost(deps: Dependencies): Pick<McpHost, "orcling"> 
     orcling: {
       available: (runId) => {
         const run = runs.get(deps.db, runId);
-        return Boolean(run?.orclingId && !run.commentTurnId && deps.orclings.forRun(runId));
+        return Boolean(run?.orclingId && !run.commentTurnId && !run.refineId && deps.orclings.forRun(runId));
       },
       ownConversation: (runId) => {
         const run = runs.get(deps.db, runId);

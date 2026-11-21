@@ -10,6 +10,7 @@ import { wslDistro } from "./wsl/distro";
 
 /** A shell that never existed. Every test here asserts on the host's bookkeeping, which is the half that has to be right before a real one is worth spawning. */
 class FakePty implements PtyProcess {
+  constructor(readonly cwd = "") {}
   readonly written: string[] = [];
   readonly sizes: { cols: number; rows: number }[] = [];
   killed = false;
@@ -253,9 +254,9 @@ describe("pty host", () => {
     exits = [];
     settles = [];
     gate = null;
-    const spawn: SpawnPty = async () => {
+    const spawn: SpawnPty = async ({ cwd }) => {
       if (gate) await gate;
-      const pty = new FakePty();
+      const pty = new FakePty(cwd);
       spawned.push(pty);
       return pty;
     };
@@ -345,6 +346,53 @@ describe("pty host", () => {
     // The first spawn settling last must not forget the second one, or a
     // later open would start a third shell nothing is holding.
     await open("thread-a");
+    expect(spawned).toHaveLength(2);
+  });
+
+  it("starts a new shell when a panel asks for another folder, as a thread does once its worktree exists", async () => {
+    const worktree = await mkdtemp(join(dir, "worktree-"));
+    await open("thread-a");
+    await open("thread-a");
+    expect(spawned).toHaveLength(1);
+
+    await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 });
+    expect(spawned.map((pty) => pty.killed)).toEqual([true, false]);
+    await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 });
+    expect(spawned).toHaveLength(2);
+  });
+
+  it("keeps a shell running a command where it is when its panel asks for another folder, until a restart", async () => {
+    const worktree = await mkdtemp(join(dir, "worktree-"));
+    await open("thread-a");
+    host.write("thread-a", "npm run dev\r");
+    first(spawned).say("\x1b[?2004l\r\r\nready on :3000\r\n");
+    expect(await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 })).toMatchObject({ running: true, stayedIn: dir });
+    first(spawned).say("^C\r\n~ % \x1b[?2004h");
+    expect(await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 })).toMatchObject({ running: true, stayedIn: dir });
+    expect(spawned.map((pty) => pty.killed)).toEqual([false]);
+
+    host.kill("thread-a");
+    expect(await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 })).toEqual({ backlog: "", running: true, exitCode: null });
+    expect(spawned.map((pty) => [pty.cwd, pty.killed])).toEqual([
+      [dir, true],
+      [worktree, false],
+    ]);
+  });
+
+  it("ends a shell still starting when its panel asks for another folder, and keeps the one started there", async () => {
+    const worktree = await mkdtemp(join(dir, "worktree-"));
+    const release = holdSpawns();
+    const first = open("thread-a");
+    const moved = host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 });
+    release();
+
+    expect(await first).toEqual({ backlog: "", running: false, exitCode: null });
+    expect(await moved).toEqual({ backlog: "", running: true, exitCode: null });
+    expect(spawned.map((pty) => [pty.cwd, pty.killed])).toEqual([
+      [dir, true],
+      [worktree, false],
+    ]);
+    await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 });
     expect(spawned).toHaveLength(2);
   });
 

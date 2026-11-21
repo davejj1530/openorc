@@ -7,7 +7,7 @@ import type { RunService } from "../services/runs.js";
  */
 export function conversationSurface(db: Db, runService: Pick<RunService, "isBusy">, runId: string, tool: "Browser" | "Device"): `thread:${string}` | `task:${string}` {
   const run = runs.get(db, runId);
-  if (!run || run.commentTurnId || !runService.isBusy(runId)) throw new Error(`${tool} access requires an active conversation turn.`);
+  if (!run || run.commentTurnId || run.refineId || !runService.isBusy(runId)) throw new Error(`${tool} access requires an active conversation turn.`);
   const task = run.taskId ? tasks.get(db, run.taskId) : null;
   const threadId = run.threadId ?? task?.threadId;
   if (threadId && (!threads.get(db, threadId) || retiredTeams.isHidden(db, threadId))) throw new Error(`The ${tool.toLowerCase()}'s conversation no longer exists.`);

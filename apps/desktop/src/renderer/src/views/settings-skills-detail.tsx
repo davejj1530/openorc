@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { AgentSkill } from "@openorc/protocol";
+import { skillCall, type AgentSkill } from "@openorc/protocol";
 import { Switch } from "../components/ui";
 import { useRpc } from "../lib/client";
 import { SkillActions } from "./settings-skills-actions";
@@ -11,7 +11,6 @@ import {
   addedBy,
   mainFile,
   readableDescription,
-  skillCall,
   skillFolder,
   skillRef,
   skillTitle,
@@ -79,7 +78,7 @@ interface DetailProps {
 
 function SkillHead({ place, skill, onToggle, onProblem }: Omit<DetailProps, "file" | "drafts"> & { onProblem: (problem: string | null) => void }) {
   const title = skillTitle(skill);
-  const call = skillCall(place.agent, skill);
+  const call = skillCall(skill.name, place.agent);
   return (
     <div className="skill-head">
       <SkillImage skill={skill} place={place} onProblem={onProblem} />

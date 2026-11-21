@@ -1,6 +1,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { AgentKind, CommentIntent, parseFileBoundary, type ApprovalDecision, type BrowserCommand, type BrowserResult, type DeviceToolInput, type DeviceToolResult } from "@openorc/protocol";
+import {
+  AgentKind,
+  CommentIntent,
+  parseFileBoundary,
+  TaskSuggestion,
+  type ApprovalDecision,
+  type BrowserCommand,
+  type BrowserResult,
+  type DeviceToolInput,
+  type DeviceToolResult,
+} from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import http from "node:http";
 import { z } from "zod";
@@ -56,6 +66,7 @@ export interface McpHost {
   /** The Device panel's simulators and emulators. The host refuses with a reason while device support or agent access is off. */
   device?(runId: string, input: DeviceToolInput): Promise<DeviceToolResult>;
   commentTurn?: { isComment(runId: string): boolean; intent(runId: string, input: CommentIntent): Promise<unknown> };
+  refineTurn?: { isRefine(runId: string): boolean; suggest(runId: string, input: TaskSuggestion): unknown };
   askUser?(runId: string, requestId: string, input: UserInput, signal: AbortSignal): Promise<UserInputResult>;
   /** The plan document of a Plan-mode run whose harness has no native one. */
   plan?: { available(runId: string): boolean; write(runId: string, text: string): Promise<void> };
@@ -251,21 +262,24 @@ function registerOptionalTools(mcp: McpServer, host: McpHost, runId: string): vo
 function buildServer(host: McpHost, runId: string, scopes: readonly OnlineTaskScopeChoice[]): McpServer {
   const mcp = new McpServer({ name: "openorc", version: "0.0.0" });
   const memoryEnabled = host.memoryEnabled?.() !== false;
+  // Nothing on the task page answers a question, so a Refine has no ask_user.
+  const refine = host.refineTurn?.isRefine(runId) ?? false;
 
-  mcp.registerTool(
-    "ask_user",
-    {
-      description:
-        "Ask the user one or more interactive questions in OpenOrc and wait for their explicit answer, even in Autonomous mode. Use unique ids to correlate answers. Returns answered with arrays keyed by question id, or cancelled; cancellation is not consent.",
-      inputSchema: UserInput,
-      outputSchema: z.object({ requestId: z.string(), status: z.enum(["answered", "cancelled"]), answers: z.record(z.string(), z.array(z.string())).optional() }),
-    },
-    async (input, extra) => {
-      if (!host.askUser) throw new Error("User questions are unavailable in this host.");
-      const result = await host.askUser(runId, `ask-user-${randomUUID()}`, input, extra.signal);
-      return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
-    },
-  );
+  if (!refine)
+    mcp.registerTool(
+      "ask_user",
+      {
+        description:
+          "Ask the user one or more interactive questions in OpenOrc and wait for their explicit answer, even in Autonomous mode. Use unique ids to correlate answers. Returns answered with arrays keyed by question id, or cancelled; cancellation is not consent.",
+        inputSchema: UserInput,
+        outputSchema: z.object({ requestId: z.string(), status: z.enum(["answered", "cancelled"]), answers: z.record(z.string(), z.array(z.string())).optional() }),
+      },
+      async (input, extra) => {
+        if (!host.askUser) throw new Error("User questions are unavailable in this host.");
+        const result = await host.askUser(runId, `ask-user-${randomUUID()}`, input, extra.signal);
+        return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
+      },
+    );
 
   // Claude Code's --permission-prompt-tool contract: receives the pending tool
   // call, returns a JSON-stringified {behavior, updatedInput | message}.
@@ -289,6 +303,19 @@ function buildServer(host: McpHost, runId: string, scopes: readonly OnlineTaskSc
       return { content: [{ type: "text", text: JSON.stringify(approvalPayload(tool_name, input, result)) }] };
     },
   );
+
+  if (refine) {
+    mcp.registerTool(
+      "task_suggest",
+      {
+        description:
+          "Hand back your refined task for the user to review: the complete title, the complete Markdown description and the labels, with a one-sentence note on what you changed and what it is based on. The task changes only if the user uses it. Call it once, when you are done.",
+        inputSchema: TaskSuggestion,
+      },
+      async (input) => ({ content: [{ type: "text", text: JSON.stringify(await host.refineTurn!.suggest(runId, input)) }] }),
+    );
+    return mcp;
+  }
 
   if (host.commentTurn?.isComment(runId)) {
     mcp.registerTool(

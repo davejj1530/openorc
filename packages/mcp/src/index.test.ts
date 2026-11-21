@@ -241,6 +241,22 @@ test("browser is absent from hosts without a browser and from read-only task com
   assert.ok(!(await client.listTools()).tools.some((tool) => tool.name === "browser"));
 });
 
+void test("a task Refine gets only task_suggest beside approve, and hands its suggestion to the host", async (t) => {
+  const { host, connect } = await fixture(t);
+  const received: unknown[] = [];
+  host.refineTurn = { isRefine: (runId) => runId === "refine", suggest: (runId, input) => (received.push({ runId, input }), { saved: true }) };
+  host.commentTurn = { isComment: () => false, intent: async () => ({}) };
+  const names = (await (await connect("refine")).listTools()).tools.map((tool) => tool.name).sort();
+  assert.deepEqual(names, ["approve", "task_suggest"]);
+  const client = await connect("refine");
+  const suggestion = { title: "Edit labels as chips", description: "## Goal\nOne at a time.", labels: ["tasks"], note: "Based on the Labels field." };
+  assert.notEqual((await client.callTool({ name: "task_suggest", arguments: suggestion })).isError, true);
+  assert.deepEqual(received, [{ runId: "refine", input: suggestion }]);
+  assert.equal((await client.callTool({ name: "task_suggest", arguments: { title: "No note", description: "" } })).isError, true);
+  assert.ok((await (await connect("thread")).listTools()).tools.some((tool) => tool.name === "ask_user"));
+  assert.ok(!internalToolNames.includes("task_suggest"));
+});
+
 test("plan_write is offered only where the host accepts a plan document", async (t) => {
   const { host, connect } = await fixture(t);
   const client = await connect("plan-run");

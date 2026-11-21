@@ -2,17 +2,26 @@ import { Db, runs } from "@openorc/db";
 import { type McpHost } from "@openorc/mcp";
 import { RunService } from "../services/runs.js";
 import { TaskCommentService } from "../services/task-comments.js";
+import type { TaskRefineService } from "../services/task-refine.js";
 import type { RunContext } from "./context.js";
 type Dependencies = {
   runService: Pick<RunService, "isLive" | "requestUserInput" | "acceptsPlanWrite" | "writePlan" | "requestApproval">;
   db: Db;
   comments: Pick<TaskCommentService, "intent">;
+  refines: Pick<TaskRefineService, "suggest">;
   assertRunAvailable: RunContext["assertRunAvailable"];
 };
-export function createRunHost({ runService, db, comments, assertRunAvailable }: Dependencies): Pick<McpHost, "live" | "commentTurn" | "askUser" | "plan" | "approve"> {
+export function createRunHost({ runService, db, comments, refines, assertRunAvailable }: Dependencies): Pick<McpHost, "live" | "commentTurn" | "refineTurn" | "askUser" | "plan" | "approve"> {
   return {
     live: (runId) => runService.isLive(runId),
     commentTurn: { isComment: (runId) => Boolean(runs.get(db, runId)?.commentTurnId), intent: (runId, input) => comments.intent(runId, input) },
+    refineTurn: {
+      isRefine: (runId) => Boolean(runs.get(db, runId)?.refineId),
+      suggest: (runId, input) => {
+        assertRunAvailable(runId);
+        return refines.suggest(runId, input);
+      },
+    },
     askUser: (runId, requestId, input, signal) => {
       assertRunAvailable(runId);
       return runService.requestUserInput(runId, requestId, input, signal);

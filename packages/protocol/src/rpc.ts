@@ -55,6 +55,7 @@ import {
   TaskStatus,
   Thread,
   ThreadCheckpoint,
+  ThreadChoice,
   ThreadMessage,
   ThreadSearchHit,
   ThreadSummary,
@@ -75,6 +76,8 @@ import { remoteRpcParams, type RemoteRpcResults } from "./remote.js";
 import { slackRpcParams, type SlackStatus } from "./slack.js";
 import type { TaskCheckoutState } from "./task-checkout.js";
 import { type CommentAttempt, CommentRecipient, type TaskComment, type TaskDiscussion } from "./task-comments.js";
+import { taskRefineRpcParams, type TaskRefineRpcResults } from "./task-refine.js";
+import { taskThreadRpcParams, type TaskThreadRpcResults } from "./task-threads.js";
 import { ThreadListParams } from "./thread-list.js";
 import { ThreadStartParams } from "./thread-start.js";
 import { threadSendRpcParams } from "./thread-send.js";
@@ -118,6 +121,8 @@ export const rpcParams = {
   ...pullRequestRpcParams,
   ...orclingRpcParams,
   ...projectRpcParams,
+  ...taskRefineRpcParams,
+  ...taskThreadRpcParams,
   ...fileRpcParams,
   ...editorRpcParams,
   ...codeExplanationRpcParams,
@@ -233,7 +238,8 @@ export const rpcParams = {
   "threads.send": z.object({ id: z.string(), text: z.string().min(1), fromThreadId: z.string().optional() }),
   "tasks.list": z.object({ spaceId: SpaceId.optional(), threadId: z.string().optional(), projectId: z.string().optional(), statuses: z.array(TaskStatus).optional() }),
   "tasks.get": z.object({ id: z.string() }),
-  "tasks.openThread": z.object({ taskId: z.string() }),
+  /** The task's working thread, made when it has none: with the model and account chosen, else the ones it would inherit. */
+  "tasks.openThread": z.object({ taskId: z.string(), choice: ThreadChoice.optional() }),
   "tasks.executionThread": z.object({ taskId: z.string() }),
   "tasks.create": z
     .object({
@@ -569,6 +575,8 @@ export interface RpcResults
     PullRequestRpcResults,
     OrclingRpcResults,
     ProjectRpcResults,
+    TaskRefineRpcResults,
+    TaskThreadRpcResults,
     FileRpcResults,
     EditorRpcResults,
     CodeExplanationRpcResults,

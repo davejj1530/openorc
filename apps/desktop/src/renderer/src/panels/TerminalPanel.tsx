@@ -73,11 +73,34 @@ function shortPath(cwd: string): string {
   return parts.length <= 2 ? cwd : `…/${parts.slice(-2).join("/")}`;
 }
 
+/** Why the shell isn't simply running where the panel is: it ended, or it stayed where a command was running. */
+function ShellNotice({ status, stayedIn, cwd, onRestart }: { status: Status; stayedIn: string | null; cwd: string; onRestart: () => void }) {
+  if (status.kind === "exited")
+    return (
+      <PanelNotice>
+        The shell ended{status.code === null ? "" : ` with code ${status.code}`}.{" "}
+        <TextButton type="button" underline onClick={onRestart}>
+          Start a new one
+        </TextButton>
+      </PanelNotice>
+    );
+  if (!stayedIn || status.kind !== "running") return null;
+  return (
+    <PanelNotice>
+      A command was running, so this shell stayed in {shortPath(stayedIn)}.{" "}
+      <TextButton type="button" underline onClick={onRestart}>
+        Restart it in {shortPath(cwd)}
+      </TextButton>
+    </PanelNotice>
+  );
+}
+
 export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
   const resolved = useTheme((s) => s.resolved);
   const preset = useTheme((s) => s.preset);
   const custom = useTheme((s) => s.custom);
   const [status, setStatus] = useState<Status>({ kind: "starting" });
+  const [stayedIn, setStayedIn] = useState<string | null>(null);
   const [generation, setGeneration] = useState(0);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Xterm | null>(null);
@@ -114,8 +137,9 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
     api.attach(id);
     void (async () => {
       try {
-        const { backlog, running, exitCode } = await api.open({ id, cwd, cols: term.cols, rows: term.rows });
+        const { backlog, running, exitCode, stayedIn: kept } = await api.open({ id, cwd, cols: term.cols, rows: term.rows });
         if (!live) return;
+        setStayedIn(kept ?? null);
         if (backlog) term.write(backlog);
         // Subscribing here rather than before the call is what keeps the replay
         // and the live stream from overlapping: main stops batching at the
@@ -167,6 +191,7 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
 
   const restart = (): void => {
     window.openorc.terminal.kill(id);
+    setStayedIn(null);
     setStatus({ kind: "starting" });
     setGeneration((n) => n + 1);
   };
@@ -177,15 +202,8 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <TerminalBar meta={<ShellPath cwd={cwd} />} running={status.kind === "running"} onStop={stop} onRestart={restart} />
-      {status.kind === "exited" ? (
-        <PanelNotice>
-          The shell ended{status.code === null ? "" : ` with code ${status.code}`}.{" "}
-          <TextButton type="button" underline onClick={restart}>
-            Start a new one
-          </TextButton>
-        </PanelNotice>
-      ) : null}
+      <TerminalBar meta={<ShellPath cwd={stayedIn ?? cwd} />} running={status.kind === "running"} onStop={stop} onRestart={restart} />
+      <ShellNotice status={status} stayedIn={stayedIn} cwd={cwd} onRestart={restart} />
       <div className="relative flex-1 min-h-0">
         {/* The host stays mounted through every state: xterm measures it to lay out, and it still holds the output of a shell that has ended. */}
         <div ref={hostRef} className="absolute inset-0 pl-5 pr-2.5 pb-2.5" />

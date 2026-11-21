@@ -117,7 +117,9 @@ describe("the OpenOrc account in the core", () => {
     await stand.close();
     stand = await standIn({ signup: "open", services: ["host-a", "host-b"] });
     await open();
-    expect(await signIn()).toMatchObject({ name: "Ada", sandbox: { chosen: null, fallback: "host-a" } });
+    await signIn();
+    // The name and where threads run come with the account's first read, which lands after the session is kept.
+    await vi.waitFor(async () => expect(await call("account.status", {})).toMatchObject({ name: "Ada", sandbox: { chosen: null, fallback: "host-a" } }), { timeout: 5_000 });
     expect(await call("account.setSandbox", { service: "host-b" })).toMatchObject({ state: "signed-in", sandbox: { chosen: "host-b" } });
     await expect(call("account.setSandbox", { service: "local" })).rejects.toThrow("This server doesn't run threads on this machine.");
   });

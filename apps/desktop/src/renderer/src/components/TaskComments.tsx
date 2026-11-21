@@ -188,7 +188,7 @@ export function TaskComments({ taskId, description, beforeSend }: TaskCommentsPr
           }}
         />
         {query ? (
-          <div className="task-comment-mentions" role="listbox" id={`comment-models-${taskId}`} aria-label="Mention a model">
+          <div className="typed-options task-comment-mentions" role="listbox" id={`comment-models-${taskId}`} aria-label="Mention a model">
             <MentionOptions matches={matches} selected={selected} taskId={taskId} choose={choose} />
             {!matches.length ? (
               <p>

@@ -1,6 +1,6 @@
 # Multiple Claude Code accounts
 
-OpenOrc supports any number of named Claude Code accounts. Add them in **Settings → Connections → Claude accounts**, then choose one when starting a Claude thread, creating a schedule, or designing an Orcling.
+OpenOrc supports any number of named Claude Code accounts. Add them in **Settings → Connections → Claude accounts**, then choose one when starting a Claude thread, opening or continuing a task's thread, refining a task, setting up a task button, creating a schedule, or designing an Orcling.
 
 ## Add an account
 

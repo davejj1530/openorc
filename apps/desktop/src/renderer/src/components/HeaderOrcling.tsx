@@ -5,6 +5,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcs, useSubmit } from "../lib/client";
 import { useConversationDraft } from "../lib/conversation-draft";
+import { conversationDraftKey } from "../lib/drafts";
 import { modelLabel } from "../lib/model-effort-label";
 import { headerOrcling, orclingById, useOrclings } from "../lib/orclings";
 import { useReadWhileShown } from "../lib/read-while-shown";
@@ -124,7 +125,7 @@ function useSmallChatSend(thread: ThreadSummary) {
   const { merged, liveTranscript } = useConversationTranscript({ runs, threadId: thread.id });
   const settings = useConversationSettings({ thread, activeRun });
   const { choice, mode, permission, permissionReady } = settings;
-  const draftKey = `conversation.${thread.id}`;
+  const draftKey = conversationDraftKey(thread.id);
   const { prompt, setPrompt, clearDraft } = useConversationDraft({ draftKey, threadId: thread.id, initialText: thread.draft ?? "" });
   const submitter = useSubmit();
   const { live, working } = conversationActivity({ thread, activeRun, liveTranscript, compacting: false });

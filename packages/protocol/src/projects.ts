@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ProjectClaudeAccounts, type Project, type ProjectGit } from "./domain.js";
+import { MAX_TASK_BUTTONS, ProjectClaudeAccounts, TaskButton, type Project, type ProjectGit } from "./domain.js";
 
 export const projectRpcParams = {
   "workspace.get": z.object({}),
@@ -20,6 +20,11 @@ export const projectRpcParams = {
       worktreeInclude: z.array(z.string()).optional(),
       branchPrefix: z.string().optional(),
       claudeAccounts: ProjectClaudeAccounts.nullable().optional(),
+      taskButtons: z
+        .array(TaskButton)
+        .max(MAX_TASK_BUTTONS)
+        .refine((buttons) => new Set(buttons.map((button) => button.id)).size === buttons.length, "Each task button needs its own id.")
+        .optional(),
     }),
   }),
 };

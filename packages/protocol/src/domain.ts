@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ClaudeAccountId } from "./claude-accounts.js";
 import { ActivityRecovery, AgentKind, BackgroundCommand, SubagentStatus, Usage } from "./events.js";
+import { ExecutionMode } from "./execution-mode.js";
 import { ExecutionTarget } from "./execution-target.js";
 import { HarnessId } from "./harness.js";
 import { ThreadOwner } from "./thread-owner.js";
@@ -35,6 +36,49 @@ export const ProjectClaudeAccounts = z.object({
 });
 export type ProjectClaudeAccounts = z.infer<typeof ProjectClaudeAccounts>;
 
+/**
+ * The model, effort and Claude account a person chose for a task's thread. The account only matters for Claude; without
+ * one, the thread keeps the account of the thread it follows, else it starts on the project's default.
+ */
+export const ThreadChoice = z.object({ agent: HarnessId, model: z.string().min(1), effort: z.string().nullable(), claudeAccountId: ClaudeAccountId.optional() }).strict();
+export type ThreadChoice = z.infer<typeof ThreadChoice>;
+
+/**
+ * A button on a task's page that runs a saved prompt for it, such as Review in a new thread. It runs in the task's own
+ * thread, as Start does, or in a new thread linked to the task that works in the task's checkout.
+ */
+export const TaskButton = z
+  .object({
+    id: z.string().min(1).max(64),
+    label: z.string().trim().min(1).max(40),
+    prompt: z.string().trim().min(1).max(8000),
+    runsIn: z.enum(["task", "new"]),
+    /** The task's thread's mode and permission, or one of the app's execution modes. Buttons saved as "act" read as "thread". */
+    mode: z.preprocess((value) => (value === "act" ? "thread" : value), z.union([z.literal("thread"), ExecutionMode])),
+    /** The model and account it runs with. Without one, the task's thread's, as Start uses. */
+    choice: ThreadChoice.optional(),
+    /** Whether the task goes with the prompt. Absent means it does; false sends the prompt alone. */
+    includeTask: z.boolean().optional(),
+    /** Whether the message is sent when the thread opens. Absent means it is; false leaves it in the message box. */
+    autoSend: z.boolean().optional(),
+    /** The task statuses the button shows on. Absent means every status but Archived, where no button shows. */
+    statuses: z.array(TaskStatus).min(1).max(TaskStatus.options.length).optional(),
+    /** The skills the prompt calls, which it writes `/name`; the agent running it gets each in its own form. */
+    skills: z.array(z.string().min(1).max(120)).max(20).optional(),
+  })
+  .strict();
+export type TaskButton = z.infer<typeof TaskButton>;
+
+/**
+ * The execution mode a button runs in, or null for the task thread's. Saved settings are read without their schema, so
+ * a mode an earlier build saved, such as "act", reads as the thread's.
+ */
+export function buttonExecutionMode(button: Pick<TaskButton, "mode">): ExecutionMode | null {
+  const mode = ExecutionMode.safeParse(button.mode);
+  return mode.success ? mode.data : null;
+}
+export const MAX_TASK_BUTTONS = 12;
+
 export const ProjectSettings = z.object({
   /** Shell script run in a new worktree before the agent starts. */
   setupScript: z.string().nullable(),
@@ -45,8 +89,15 @@ export const ProjectSettings = z.object({
   detectedConfigs: z.array(z.string()),
   /** The project's own Claude accounts. Missing or null, as on rows saved before it existed, follows the app's. */
   claudeAccounts: ProjectClaudeAccounts.nullable().optional(),
+  taskButtons: z.array(TaskButton).max(MAX_TASK_BUTTONS).optional(),
 });
 export type ProjectSettings = z.infer<typeof ProjectSettings>;
+
+/**
+ * A task's thread as its page lists it: the one Open thread goes to is current; others are earlier work or a button's.
+ * `label` is the button's that started it, or null for a working thread.
+ */
+export type TaskThreadLink = { thread: ThreadSummary; label: string | null; current: boolean };
 
 /** Stable personal conversation scope; never an imported repository. */
 export const WORKSPACE_ID = "openorc-workspace";
@@ -443,8 +494,9 @@ export const Run = z.object({
   id: z.string(),
   /** Canonical execution folder captured when this run was admitted. */
   workingDirectory: z.string().nullable().optional(),
-  /** Exactly one of taskId, threadId and commentTurnId is set. */
+  /** Exactly one of taskId, threadId, commentTurnId and refineId is set. */
   commentTurnId: z.string().nullable().optional(),
+  refineId: z.string().nullable().optional(),
   taskId: z.string().nullable(),
   threadId: z.string().nullable(),
   agent: AgentKind,

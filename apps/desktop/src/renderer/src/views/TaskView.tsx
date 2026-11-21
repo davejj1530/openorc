@@ -101,7 +101,7 @@ function LocalTaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
     setPanel(false);
   }, [tab, taskId, setPanel]);
   const thread = owner.data && !owner.data.teamInstanceId ? owner.data : null;
-  const activityContext: PanelContext | null = t && p ? { kind: "task", task: t, project: p } : null;
+  const activityContext: PanelContext | null = t && p ? { kind: "task", task: t, project: p, thread: owner.data } : null;
   const body = activityContext ? (
     <TaskTabBody key={activityContext.task.id} tab={tab} task={activityContext.task} project={activityContext.project} thread={thread} owner={owner} editor={editor} />
   ) : null;
@@ -119,7 +119,8 @@ function LocalTaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
               },
             })}
       </TaskWorkspace>
-      {tab === "chat" && activityContext ? <Panel context={activityContext} /> : null}
+      {/* After the task's thread is known, so a terminal doesn't start in the project folder first. */}
+      {tab === "chat" && activityContext && !owner.isPending ? <Panel context={activityContext} /> : null}
     </TaskDraftProvider>
   );
 }

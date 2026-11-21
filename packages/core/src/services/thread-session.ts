@@ -18,7 +18,7 @@ export function switchedClaudeAccount(db: Db, thread: Thread, agent: AgentKind, 
   if (agent !== "claude" || !requested || requested === (thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT)) return null;
   if (thread.orclingId) throw new Error("An Orcling's conversation runs on the Orcling's Claude account.");
   if (!claudeAccounts.get(db, requested).enabled) throw new Error("This Claude account is disabled. Enable it in Settings → Connections.");
-  if (!allowsAccount(projectAccountPolicy(db, thread.projectId, { claudeAccountAutoSwitch: false }), requested)) throw new Error(NOT_A_PROJECT_ACCOUNT);
+  if (!allowsAccount(projectAccountPolicy(db, thread.projectId, { claudeAccountAutoSwitch: false, claudeAccountsSeparate: false }), requested)) throw new Error(NOT_A_PROJECT_ACCOUNT);
   return requested;
 }
 

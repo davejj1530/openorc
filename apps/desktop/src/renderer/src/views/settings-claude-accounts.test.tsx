@@ -125,6 +125,17 @@ it("turns on switching accounts at usage limits once a second account is enabled
   expect(screen.queryByRole("switch", { name: /Switch accounts at usage limits/ })).toBeNull();
 });
 
+it("keeps accounts separate in reach while it is on, even with one account enabled", async () => {
+  separate = true;
+  data.accounts = data.accounts.map((account, index) => ({ ...account, enabled: index === 0 }));
+  mount();
+  const keep = await screen.findByRole<HTMLInputElement>("switch", { name: /Keep accounts separate/ });
+  await waitFor(() => expect(keep.checked).toBe(true));
+  fireEvent.click(keep);
+  await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("app.settings.set", { claudeAccountsSeparate: false }));
+  await waitFor(() => expect(screen.queryByRole("switch", { name: /Keep accounts separate/ })).toBeNull());
+});
+
 it("keeps sign-in recovery visible and manages enabled accounts from their menu", async () => {
   data.accounts[1]!.status = "signed_out";
   data.accounts[2]!.status = "signing_in";

@@ -1,7 +1,7 @@
 import { claudeAccounts, orclingGroups, orclings, projects, type Db } from "@openorc/db";
 import type { OrclingTools } from "@openorc/mcp";
 import { percentLeft, STATUS_PRIORITY, threadStatus, WORKSPACE_ID, type AgentKind, type Orcling, type PlanLimits, type ThreadSummary } from "@openorc/protocol";
-import { accountReach, threadAccount } from "../services/claude-account-separation.js";
+import { accountReach, listedAccount, reachableTitle, threadAccount } from "../services/claude-account-separation.js";
 import { newThreadAgent } from "../services/orcling-work.js";
 import type { RunService } from "../services/runs.js";
 import type { AppSettingsService } from "../services/settings.js";
@@ -73,12 +73,13 @@ export function overviewTools(deps: OverviewDependencies, speaker: (runId: strin
   const { db } = deps;
   return {
     activity: async (runId) => {
-      const reach = accountReach(db, speaker(runId).claudeAccountId);
+      const self = speaker(runId);
+      const reach = accountReach(db, self.claudeAccountId);
       const chats = orclingChatIds(db);
       const waiting = new Map<string, string>();
       for (const pending of deps.runs.pending()) if (pending.threadId && !waiting.has(pending.threadId)) waiting.set(pending.threadId, pending.detail);
       // Recent threads for results and failures; whatever is working or waiting, however old, by id.
-      const found = new Map(deps.threads.list({ filter: "active", orderBy: "activity", limit: 60 }).map((thread) => [thread.id, thread]));
+      const found = new Map(deps.threads.list({ filter: "active", orderBy: "activity", limit: 60, ...listedAccount(db, self.claudeAccountId) }).map((thread) => [thread.id, thread]));
       for (const id of deps.runs.attentionThreadIds()) {
         const thread = found.has(id) ? null : deps.threads.get(id);
         if (thread) found.set(id, thread);
@@ -93,7 +94,7 @@ export function overviewTools(deps: OverviewDependencies, speaker: (runId: strin
         .sort((a, b) => STATUS_PRIORITY.indexOf(a.status.kind) - STATUS_PRIORITY.indexOf(b.status.kind) || b.thread.lastActivityAt - a.thread.lastActivityAt)
         .slice(0, 40);
       if (!rows.length) return json({ now: iso(Date.now()), threads: [], note: "Nothing is working, waiting on the person, failed or unread right now." });
-      const titleOf = (id: string) => found.get(id)?.title ?? deps.threads.get(id)?.title;
+      const titleOf = (id: string) => reachableTitle(reach, found.get(id) ?? deps.threads.get(id));
       return json({
         now: iso(Date.now()),
         threads: rows.map(({ thread }) => ({

@@ -18,7 +18,7 @@ import {
   type Thread,
 } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
-import { accountsSeparate } from "./claude-account-separation.js";
+import { ACCOUNTS_KEPT_SEPARATE, accountReach, accountsSeparate, reachableTitle } from "./claude-account-separation.js";
 import { AttachmentService } from "./attachments.js";
 import type { MemoryService } from "./memory.js";
 import { catchUp, orclingBrief, rolloverSeed, type OrclingPlace } from "./orcling-briefs.js";
@@ -332,7 +332,14 @@ export class OrclingService {
     if (!task) throw new Error("No such task.");
     const who = workerFor(this.deps.db, orcling, options.on);
     const current = [task.executionThreadId, task.threadId].map((threadId) => (threadId ? threads.get(db, threadId) : null)).find(Boolean);
-    if (current && (!who.orclingId || current.orclingId !== id)) throw new Error(`This task already has a conversation, "${current.title}". Message it with orcling_thread_send instead.`);
+    if (current && (!who.orclingId || current.orclingId !== id)) {
+      const title = reachableTitle(accountReach(db, orcling.claudeAccountId), current);
+      throw new Error(
+        title
+          ? `This task already has a conversation, "${title}". Message it with orcling_thread_send instead.`
+          : `This task's conversation works on another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`,
+      );
+    }
     const ceiling = orclingExecution(orcling);
     const { agent, model, effort, fastMode } = who.settings;
     const thread = this.deps.threads().taskThreadForStart(taskId, { agent, model: model ?? null, effort: effort ?? null }, taskAccount(db, task.projectId, who));

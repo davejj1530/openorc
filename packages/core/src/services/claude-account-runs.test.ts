@@ -249,7 +249,14 @@ it("moves a conversation stopped at its usage limit to the enabled account with 
   const reports: Record<string, ProviderUsage> = { [personal]: fiveHourReport(70), [client]: fiveHourReport(40), [spare]: fiveHourReport(0, 100), [off]: fiveHourReport(0) };
   const recent = vi.fn(async (_provider: string, id: string | undefined) => reports[id!] ?? signedOut());
   let enabled = true;
-  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: enabled }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: enabled, claudeAccountsSeparate: false }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
   turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
 
   const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
@@ -291,7 +298,14 @@ it("leaves a stopped conversation alone when no account has 5-hour usage left, o
     await answered;
     return reports[id!] ?? signedOut();
   });
-  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
   turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
   const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
   const ts = Date.now();
@@ -309,7 +323,7 @@ it("leaves a stopped conversation alone when no account has 5-hour usage left, o
   reports[client] = fiveHourReport(30);
   const again = new ClaudeAccountSwitch({
     db,
-    settings: { get: () => ({ claudeAccountAutoSwitch: true }) },
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
     usage: { recent: async (_provider, id) => (await conversations.switchClaudeAccount(thread.id, personal), reports[id!] ?? signedOut()) },
     runs: service,
     threads: conversations,
@@ -330,7 +344,14 @@ it("goes on with an account that has no 5-hour window when its week has room, af
   const [work, personal, weekly, spent] = ["Work", "Personal", "Weekly", "Spent"].map((name) => accounts.add(name).id) as [string, string, string, string];
   const reports: Record<string, ProviderUsage> = { [personal]: fiveHourReport(100), [weekly]: weekOnlyReport(3), [spent]: weekOnlyReport(100) };
   const recent = vi.fn(async (_provider: string, id: string | undefined) => reports[id!] ?? signedOut());
-  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
   turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
   const limit = (handle: RunHandle, runId: string) => {
     const ts = Date.now();
@@ -360,7 +381,7 @@ it("keeps looking when no account has anything left, says why once, and goes on 
   const warn = vi.fn();
   const switcher = new ClaudeAccountSwitch({
     db,
-    settings: { get: () => ({ claudeAccountAutoSwitch: true }) },
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
     usage: { recent },
     runs: service,
     threads: conversations,
@@ -395,7 +416,7 @@ it("goes on with its own account once a reading taken after the stop says its li
   const warn = vi.fn();
   const switcher = new ClaudeAccountSwitch({
     db,
-    settings: { get: () => ({ claudeAccountAutoSwitch: true }) },
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
     usage: { recent },
     runs: service,
     threads: conversations,
@@ -581,7 +602,14 @@ it("switches a project's threads among its own accounts by its own setting, with
   // Client has the most left, but the project does not use it.
   const reports: Record<string, ProviderUsage> = { [personal]: fiveHourReport(70), [client]: fiveHourReport(10) };
   const recent = vi.fn(async (_provider: string, id: string | undefined) => reports[id!] ?? signedOut());
-  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: false }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: false, claudeAccountsSeparate: false }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
   turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
   onlyUse([work, personal], work, true);
   const { thread, run } = await conversations.start({ ...input, projectId: project.id });
@@ -595,7 +623,14 @@ it("switches a project's threads among its own accounts by its own setting, with
 it("leaves a project's threads where they stopped when its own setting is off, or turns off while usage is read, with the app's on", async () => {
   const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
   const recent = vi.fn(async (_provider: string, id: string | undefined) => (id === personal ? fiveHourReport(10) : signedOut()));
-  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
   turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
   onlyUse([work, personal], work, false);
   const { thread, run } = await conversations.start({ ...input, projectId: project.id });
@@ -619,7 +654,14 @@ it("leaves a project's threads where they stopped when its own setting is off, o
 it("switches a project that follows the app's accounts by the app's setting, as before", async () => {
   const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
   const recent = vi.fn(async (_provider: string, id: string | undefined) => (id === personal ? fiveHourReport(10) : signedOut()));
-  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
   turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
   // Turned off, the project's own switch no longer counts.
   projects.updateSettings(db, project.id, { claudeAccounts: { only: false, accountIds: [work], defaultId: work, autoSwitch: false } });

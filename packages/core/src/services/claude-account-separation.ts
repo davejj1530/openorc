@@ -14,6 +14,11 @@ export function threadAccount(thread: Pick<Thread, "claudeAccountId">): string {
   return thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
 }
 
+/** A thread's title, kept back when the thread is on an account the speaker can't reach. */
+export function reachableTitle(reach: (account: string) => boolean, thread: Pick<Thread, "title" | "claudeAccountId"> | null | undefined): string | undefined {
+  return thread && reach(threadAccount(thread)) ? thread.title : undefined;
+}
+
 /** The account a run's agent speaks for: the one it runs on, else its thread's. */
 export function runAccount(db: Db, runId: string, thread: Pick<Thread, "claudeAccountId"> | null): string {
   return runs.get(db, runId)?.claudeAccountId ?? (thread ? threadAccount(thread) : DEFAULT_CLAUDE_ACCOUNT);
@@ -23,6 +28,11 @@ export function runAccount(db: Db, runId: string, thread: Pick<Thread, "claudeAc
 export function accountReach(db: Db, from: string): (account: string) => boolean {
   if (!accountsSeparate(db)) return () => true;
   return (account) => account === from;
+}
+
+/** The thread list filter that keeps a speaker on `from` to its own account while accounts are kept separate. */
+export function listedAccount(db: Db, from: string): { claudeAccountId?: string } {
+  return accountsSeparate(db) ? { claudeAccountId: from } : {};
 }
 
 /** A task belongs to the account of the thread it runs in, else of the thread that saved it; one with neither is anyone's. */

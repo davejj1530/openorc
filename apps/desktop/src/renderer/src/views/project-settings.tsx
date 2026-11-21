@@ -152,7 +152,7 @@ function ProjectClaudeAccountsSection({ project }: { project: Project }) {
   const separate = app?.claudeAccountsSeparate ?? false;
   const { value, save, pending, error } = useProjectAccountsSave(project);
   const only = Boolean(value?.only);
-  const appSetting = appAutoSwitch && !separate ? "On" : "Off";
+  const appSetting = appAutoSwitch ? "On" : "Off";
   return (
     <section className="settings-section project-accounts" aria-labelledby="project-accounts-title">
       <header className="settings-section-intro">

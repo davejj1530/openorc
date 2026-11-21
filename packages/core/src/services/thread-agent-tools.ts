@@ -16,7 +16,7 @@ import {
 } from "@openorc/protocol";
 import { createHash } from "node:crypto";
 import { checkoutBranch } from "./checkout-branch.js";
-import { accountReach, reachesTask, runAccount, threadAccount } from "./claude-account-separation.js";
+import { accountReach, listedAccount, reachesTask, runAccount, threadAccount } from "./claude-account-separation.js";
 import { projectGit } from "./project-git.js";
 import type { RunService } from "./runs.js";
 import { titleFromPrompt, type StartThreadInput } from "./thread-inputs.js";
@@ -320,10 +320,8 @@ export class ThreadAgentTools {
   async toolThreadList(runId: string): Promise<ThreadCard[]> {
     const { thread } = this.scopeOf(runId);
     if (!thread) return [];
-    const reach = this.accountReach(runId);
-    // Read past the threads on other accounts, so a list kept to one account still shows up to 30.
-    const listed = threads.list(this.db, { projectId: thread.projectId, filter: "active", excludeSubagents: true, limit: 120 }).filter((t) => reach(threadAccount(t)));
-    const rows = await this.context.withCheckoutBranches(listed.slice(0, 30));
+    const only = listedAccount(this.db, runAccount(this.db, runId, thread));
+    const rows = await this.context.withCheckoutBranches(threads.list(this.db, { projectId: thread.projectId, filter: "active", excludeSubagents: true, limit: 30, ...only }));
     return rows.map((t) => this.threadCard(t, thread.id));
   }
 

@@ -11,6 +11,7 @@ import nested from "./test-fixtures/nested-transcript.json";
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
+  vi.restoreAllMocks();
 });
 const line = (value: unknown) => `${JSON.stringify(value)}\n`;
 const assistant = (uuid: string, text: string) => ({ type: "assistant", uuid, message: { id: "shared-message", content: [{ type: "text", text }] } });
@@ -119,11 +120,13 @@ it.each(["done", "error"])("drains trailing lines on %s and retires the file whi
   await writeFile(file, line(assistant("one", "Working")));
   files.sync();
   await files.drain();
+  // The clock stands still while the trailing line is written: a slow disk must not outlast the file's last reads.
+  const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now());
   progress(state);
   files.sync();
   await appendFile(file, line(assistant("two", "Trailing result")));
   await expect.poll(() => events.filter((event) => event.type === "message.completed").length).toBe(2);
-  await new Promise((resolve) => setTimeout(resolve, 80));
+  clock.mockReturnValue(Date.now() + 41);
   await appendFile(file, line(assistant("late", "No longer watched")));
   await files.drain();
   expect(events.filter((event) => event.type === "message.completed")).toHaveLength(2);

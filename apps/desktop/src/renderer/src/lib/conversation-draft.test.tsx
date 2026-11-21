@@ -58,6 +58,16 @@ it("opens a box with nothing typed here on the thread's saved draft, which ends 
   expect(result.current.prompt).toBe("Earlier note\n\nReview this.");
 });
 
+it("reads the thread again once the message is added, so it shows the mode and model the press gave it", () => {
+  queryClient.setQueryData(["threads.get", { id: "thread" }], { id: "thread", draft: "", mode: "act" });
+  addToConversationDraft("thread", "Review this.", "Review this.");
+  expect(queryClient.getQueryState(["threads.get", { id: "thread" }])?.isInvalidated).toBe(true);
+  localStorage.setItem(key, JSON.stringify({ text: "Look at the tests too." }));
+  queryClient.setQueryData(["threads.get", { id: "thread" }], { id: "thread", draft: "", mode: "act" });
+  addToConversationDraft("thread", "Review this.", "Review this.");
+  expect(queryClient.getQueryState(["threads.get", { id: "thread" }])?.isInvalidated).toBe(true);
+});
+
 it("adds the message after what this window typed in the box", () => {
   const { result } = renderHook(() => useConversationDraft({ draftKey: key, threadId: "thread", initialText: "" }));
   act(() => result.current.setPrompt("Look at the tests too."));

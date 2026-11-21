@@ -22,6 +22,8 @@ export function addToConversationDraft(threadId: string, message: string, draft:
     removeDraft(key);
     queryClient.setQueryData<RpcResults["threads.get"]>(["threads.get", { id: threadId }], (thread) => thread && { ...thread, draft });
   }
+  // The press may have changed the thread's mode and model as well, so the copy kept here is read again as it shows.
+  void queryClient.invalidateQueries({ queryKey: ["threads.get", { id: threadId }] });
   window.dispatchEvent(new CustomEvent<DraftAdded>(DRAFT_ADDED, { detail: { key, text } }));
 }
 

@@ -447,6 +447,7 @@ export class OpenOrc {
       },
       claudeUserMcpServers: () => this.settings.get().claudeUserMcpServers,
       claudeConnectorsOff: () => this.settings.get().claudeConnectorsOff,
+      claudeOffLimits: (accountId) => this.claudeAccounts.offLimits(accountId),
       orclings: this.orclings.runHooks,
       taskImages: (spec) => new AttachmentService(options.dataDir).forTask(spec),
       inlineToolImages: (output) => this.toolImages.inline(output),
@@ -775,7 +776,14 @@ export class OpenOrc {
       }),
       createCodeExplanationHandlers({ db: this.db, files: this.files, textGeneration: this.textGeneration, settings: this.settings, dataDir: this.options.dataDir }),
       createInstructionsHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
-      createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate }),
+      createSettingsHandlers({
+        settings: this.settings,
+        textGeneration: this.textGeneration,
+        invalidate,
+        accountsSeparateChanged: () => {
+          for (const account of storedClaudeAccounts.list(this.db)) void this.runs.retireIdleClaudeSessions(account.id).catch(() => undefined);
+        },
+      }),
       createSchedulesHandlers({ schedules: this.schedules }),
       createCatalogHandlers({ runService: this.runs, invalidate }),
       createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files }),

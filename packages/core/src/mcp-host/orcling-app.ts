@@ -4,6 +4,7 @@ import { REMOTE_METHODS, rpcParams, type Orcling, type RemoteMethod, type RpcMet
 import { z } from "zod";
 import { admitRemoteRequest, type GuardContext } from "../remote/policy.js";
 import type { RunService } from "../services/runs.js";
+import { keptToOwnAccount, onOwnAccount, separateAccountsRefusal } from "./orcling-app-accounts.js";
 
 /**
  * What an Orcling may do in OpenOrc for the person: everything their paired phone may, under the guards the Mac's own
@@ -165,14 +166,18 @@ export function appTools(deps: AppDependencies, speaker: (runId: string) => Orcl
       if (!isAppMethod(method)) throw new Error(`${method} is not something you can do for the person. orcling_app_methods lists what you can.`);
       const parsed = rpcParams[method].safeParse(params ?? {});
       if (!parsed.success) throw new Error(`${method} takes other parameters: ${parsed.error.message}`);
-      const refusal = selfRefusal(self, db, method, parsed.data) ?? (isRemote(method) ? admitRemoteRequest(method, parsed.data, deps.guard, "person") : { ok: true as const });
+      const data = onOwnAccount(db, self, method, parsed.data);
+      const refusal =
+        selfRefusal(self, db, method, data) ??
+        separateAccountsRefusal(db, self, method, data as Record<string, unknown>) ??
+        (isRemote(method) ? admitRemoteRequest(method, data, deps.guard, "person") : { ok: true as const });
       if (typeof refusal === "string") throw new Error(refusal);
       if (!refusal.ok) throw new Error(refusal.message);
       if (ACCESS[method] === "changes") {
-        await deps.runs.authorizeAppAction(runId, "person_action", { toolName: "orcling_app", reason: `${self.name} wants to ${method} for you.`, input: { method, params: parsed.data } });
+        await deps.runs.authorizeAppAction(runId, "person_action", { toolName: "orcling_app", reason: `${self.name} wants to ${method} for you.`, input: { method, params: data } });
         audit.record(db, { actor: "agent", action: "orcling.act", resourceType: "orcling", resourceId: self.id, metadata: { runId, method } });
       }
-      const result = redactValue(await deps.call(method, parsed.data as RpcParams<typeof method>)).value;
+      const result = redactValue(keptToOwnAccount(db, self, method, await deps.call(method, data as RpcParams<typeof method>))).value;
       const text = JSON.stringify(result ?? null);
       return text.length > RESULT_CHARS ? `${text.slice(0, RESULT_CHARS)}… (cut at ${RESULT_CHARS} characters; narrow the call, such as a limit or an id, to read the rest)` : text;
     },

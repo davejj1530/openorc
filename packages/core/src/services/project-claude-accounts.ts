@@ -1,5 +1,6 @@
 import { claudeAccounts, projects, type Db } from "@openorc/db";
 import { WORKSPACE_ID, type AppSettings, type ProjectClaudeAccounts } from "@openorc/protocol";
+import { ACCOUNTS_KEPT_SEPARATE, accountsSeparate } from "./claude-account-separation.js";
 import { AppSettingsService } from "./settings.js";
 
 /**
@@ -13,9 +14,11 @@ export interface ProjectAccountPolicy {
   allowed: string[];
   /** New threads' account: the project's default while it is allowed, else its first allowed account. */
   defaultId: string;
-  /** Whether a thread that reaches its account's usage limit goes on with another allowed account. */
+  /** Whether a thread that reaches its account's usage limit goes on with another allowed account; never while accounts are kept separate. */
   autoSwitch: boolean;
 }
+
+type AccountSettings = Pick<AppSettings, "claudeAccountAutoSwitch" | "claudeAccountsSeparate">;
 
 /**
  * Where a starting thread's account came from, which decides what happens when the project does not use it. "unused"
@@ -37,16 +40,17 @@ function ownAccounts(db: Db, projectId: string): ProjectClaudeAccounts | null {
  * The project's accounts as they stand: selected ids that were removed or disabled since are dropped as they are read,
  * never rewritten, so enabling an account again brings it back.
  */
-export function projectAccountPolicy(db: Db, projectId: string, settings: Pick<AppSettings, "claudeAccountAutoSwitch"> = new AppSettingsService(db).get()): ProjectAccountPolicy {
+export function projectAccountPolicy(db: Db, projectId: string, settings: AccountSettings = new AppSettingsService(db).get()): ProjectAccountPolicy {
   const enabled = claudeAccounts
     .list(db)
     .filter((account) => account.enabled)
     .map((account) => account.id);
   const own = ownAccounts(db, projectId);
-  if (!own) return { restricted: false, allowed: enabled, defaultId: claudeAccounts.defaultId(db), autoSwitch: settings.claudeAccountAutoSwitch };
+  const switches = (preference: boolean) => preference && !settings.claudeAccountsSeparate;
+  if (!own) return { restricted: false, allowed: enabled, defaultId: claudeAccounts.defaultId(db), autoSwitch: switches(settings.claudeAccountAutoSwitch) };
   const allowed = enabled.filter((id) => own.accountIds.includes(id));
   const defaultId = own.defaultId && allowed.includes(own.defaultId) ? own.defaultId : (allowed[0] ?? claudeAccounts.defaultId(db));
-  return { restricted: true, allowed, defaultId, autoSwitch: own.autoSwitch };
+  return { restricted: true, allowed, defaultId, autoSwitch: switches(own.autoSwitch) };
 }
 
 /** Whether a thread in the project may start on, or move to, the account. A project that follows the app's allows any. */
@@ -69,17 +73,24 @@ function onlyTheseAccounts(db: Db, policy: ProjectAccountPolicy): string {
 /**
  * The account a thread in the project starts on. With none asked for, the project's default (the app's for a project
  * that follows the app's). One a person chose that the project does not use is refused; one passed down from a parent,
- * a task or a schedule gives way to the project's default; a starter's own, as an Orcling's, is left alone. A thread
- * that is not Claude's starts even when none of the project's accounts is enabled.
+ * a task or a schedule gives way to the project's default, or is refused while accounts are kept separate; a starter's
+ * own, as an Orcling's, is left alone. A thread that is not Claude's starts even when none of the project's accounts is enabled.
  */
 export function startingAccount(db: Db, projectId: string, requested: string | undefined, from: AccountSource = "chosen"): string {
   if (from === "own" && requested) return requested;
-  const policy = projectAccountPolicy(db, projectId, { claudeAccountAutoSwitch: false });
+  const policy = projectAccountPolicy(db, projectId, { claudeAccountAutoSwitch: false, claudeAccountsSeparate: false });
   if (from === "unused") return requested && allowsAccount(policy, requested) ? requested : policy.defaultId;
   if (!requested) return newThreadAccount(policy);
   if (allowsAccount(policy, requested)) return requested;
+  if (from === "inherited" && accountsSeparate(db)) throw new Error(notCarriedOver(db, requested));
   if (from === "inherited" || !policy.allowed.length) return newThreadAccount(policy);
   throw new Error(onlyTheseAccounts(db, policy));
+}
+
+/** Why work can't go on in a project that no longer uses the account it would carry on with. */
+function notCarriedOver(db: Db, requested: string): string {
+  const name = claudeAccounts.list(db).find((account) => account.id === requested)?.name ?? "its Claude account";
+  return `This project doesn't use ${name}, and ${ACCOUNTS_KEPT_SEPARATE}, so this can't start on another account.`;
 }
 
 /** Refuses a project's own accounts that could not work: none selected, unknown ones, a default outside them, or the Workspace. */

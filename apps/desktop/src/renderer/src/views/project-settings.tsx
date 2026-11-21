@@ -145,7 +145,9 @@ function useProjectAccountsSave(project: Project) {
 /** Which Claude accounts the project's threads use: the app's, or only those chosen here, with their own default and switch. */
 function ProjectClaudeAccountsSection({ project }: { project: Project }) {
   const list = useRpc("claude.accounts.list", {});
-  const appAutoSwitch = useRpc("app.settings.get", {}).data?.claudeAccountAutoSwitch ?? false;
+  const app = useRpc("app.settings.get", {}).data;
+  const appAutoSwitch = app?.claudeAccountAutoSwitch ?? false;
+  const separate = app?.claudeAccountsSeparate ?? false;
   const { value, save, pending, error } = useProjectAccountsSave(project);
   const only = Boolean(value?.only);
   const appSetting = appAutoSwitch ? "On" : "Off";
@@ -167,7 +169,9 @@ function ProjectClaudeAccountsSection({ project }: { project: Project }) {
           disabled={pending || !list.data}
           onChange={(on) => list.data && save(on ? turnedOn(value, list.data, appAutoSwitch) : { ...value!, only: false })}
         />
-        {only && value && list.data ? <ChosenAccounts own={withoutRemoved(value, list.data.accounts)} accounts={list.data.accounts} appSetting={appSetting} pending={pending} onChange={save} /> : null}
+        {only && value && list.data ? (
+          <ChosenAccounts own={withoutRemoved(value, list.data.accounts)} accounts={list.data.accounts} appSetting={appSetting} separate={separate} pending={pending} onChange={save} />
+        ) : null}
       </div>
       {error ? (
         <p role="alert" className="mt-2 text-sm text-bad">
@@ -178,16 +182,25 @@ function ProjectClaudeAccountsSection({ project }: { project: Project }) {
   );
 }
 
+function switchHint(separate: boolean, usable: number, appSetting: string): string {
+  if (separate) return "Off while Settings keeps Claude accounts separate.";
+  if (usable < 2) return "Select two or more accounts to switch";
+  return `When a thread's account reaches its limit, it continues on the selected account with the most 5-hour usage left. Overrides the app setting (${appSetting}).`;
+}
+
 function ChosenAccounts({
   own,
   accounts,
   appSetting,
+  separate,
   pending,
   onChange,
 }: {
   own: ProjectClaudeAccounts;
   accounts: ClaudeAccountConnection[];
   appSetting: string;
+  /** Settings keeps Claude accounts separate, so nothing switches at a usage limit. */
+  separate: boolean;
   pending: boolean;
   onChange: (next: ProjectClaudeAccounts) => void;
 }) {
@@ -222,13 +235,9 @@ function ChosenAccounts({
       })}
       <Toggle
         label="Switch accounts at usage limits"
-        hint={
-          usable < 2
-            ? "Select two or more accounts to switch"
-            : `When a thread's account reaches its limit, it continues on the selected account with the most 5-hour usage left. Overrides the app setting (${appSetting}).`
-        }
-        checked={own.autoSwitch}
-        disabled={pending || usable < 2}
+        hint={switchHint(separate, usable, appSetting)}
+        checked={own.autoSwitch && !separate}
+        disabled={pending || usable < 2 || separate}
         onChange={(autoSwitch) => onChange({ ...own, autoSwitch })}
       />
     </>

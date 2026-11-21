@@ -433,6 +433,11 @@ export const AppSettings = z.object({
   claudeConnectorsOff: z.array(z.string()),
   /** Whether a conversation stopped by its Claude account's usage limit goes on with the enabled account that has the most 5-hour usage left. */
   claudeAccountAutoSwitch: z.boolean(),
+  /**
+   * Whether work on one Claude account never sees or reaches work on another: threads, tasks and Orclings keep to
+   * their own account, nothing moves to another account at a usage limit, and each account keeps its own Claude memory.
+   */
+  claudeAccountsSeparate: z.boolean(),
   /** By agent, the person's own skills kept from their cloud turns: on this Mac they stay as Settings > Skills has them. */
   cloudSkillsOff: z.partialRecord(HarnessId, z.array(z.string())).default({}),
 });

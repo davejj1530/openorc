@@ -378,6 +378,7 @@ export const threads = {
       selectedId?: string;
       childLimits?: Record<string, number>;
       attentionIds?: readonly string[];
+      claudeAccountId?: string;
     } = {},
   ): (Thread & { hiddenChildren?: number; treeActivityAt?: number })[] {
     const where: string[] = [];
@@ -395,6 +396,10 @@ export const threads = {
       args.push(WORKSPACE_ID);
     }
     if (filter.excludeSubagents) where.push("COALESCE(parent_relation, '') != 'subagent'");
+    if (filter.claudeAccountId) {
+      where.push("COALESCE(claude_account_id, ?) = ?");
+      args.push(DEFAULT_CLAUDE_ACCOUNT, filter.claudeAccountId);
+    }
     if (filter.pinnedOnly) where.push("pinned_at IS NOT NULL");
     // Unread as the thread summary reads it, or with a run that is working or waiting on you.
     if (filter.needsYou) {

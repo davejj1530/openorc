@@ -114,7 +114,7 @@ export function pickEffort(model: ModelOption | null, name: string | undefined):
   return found;
 }
 
-function accountNamed(db: Db, agent: AgentKind | undefined, name: string | undefined): string | undefined {
+export function accountNamed(db: Db, agent: AgentKind | undefined, name: string | undefined): string | undefined {
   if (!name) return undefined;
   if (agent !== "claude") throw new Error(`Claude accounts are for Claude; ${agent} runs on its own sign-in.`);
   const accounts = claudeAccounts.list(db).filter((account) => account.enabled);

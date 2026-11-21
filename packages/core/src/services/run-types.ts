@@ -272,6 +272,8 @@ export interface RunHooks {
   claudeUserMcpServers?(): boolean;
   /** Claude MCP servers the user turned off in Connectors. */
   claudeConnectorsOff?(): string[];
+  /** Paths a Claude run on this account keeps its file tools out of: other accounts' own, while accounts are kept separate. */
+  claudeOffLimits?(accountId: string): string[];
   orclings?: OrclingRunHooks;
   /** Folder-relative paths the editor saved under `root` since `since`, for crediting changes between turns to the user. */
   editorSaves?(root: string, since: number): string[];

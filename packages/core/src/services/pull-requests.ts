@@ -84,6 +84,11 @@ function againPrompt(detail: PullRequestDetail, previous: string | null): string
   return lines.join("\n");
 }
 
+/** Whether a review's next round goes on in its conversation. An archived one, or one whose copy was removed, was put away: the next round starts fresh. */
+export function reviewGoesOn(conversation: Thread | null): conversation is Thread {
+  return conversation !== null && conversation.archivedAt === null && Boolean(conversation.worktreePath);
+}
+
 /** The `owner/name` of a cloud project's repository on GitHub. */
 function cloudRepository(project: Project): string {
   const repository = project.gitRemote ? remoteRepository(project.gitRemote) : null;
@@ -212,8 +217,7 @@ export class PullRequestService {
     const stale = this.staleReason(current, detail.headSha);
     if (stale) throw new Error(stale);
     try {
-      // An archived conversation, or one whose copy was removed, was put away: the next round starts fresh.
-      if (conversation && conversation.archivedAt === null && conversation.worktreePath) return await this.reviewAgain(key, project, detail, conversation, reviewer);
+      if (reviewGoesOn(conversation)) return await this.reviewAgain(key, project, detail, conversation, reviewer);
       return await this.reviewAnew(key, project, detail, reviewer);
     } finally {
       this.changed();

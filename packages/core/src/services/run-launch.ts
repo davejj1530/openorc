@@ -60,7 +60,7 @@ interface RunLaunchDependencies {
   writers: WorkspaceWriters;
   turnStarts: Pick<TurnStartCapture, "capture">;
   adapters: RunAdapterRegistry;
-  hooks: Pick<RunHooks, "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "claudeConnectorsOff" | "processRegistry" | "untrustedCheckout" | "orclings">;
+  hooks: Pick<RunHooks, "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "claudeConnectorsOff" | "claudeOffLimits" | "processRegistry" | "untrustedCheckout" | "orclings">;
   log: Logger;
   isClosing: () => boolean;
   live: ReadonlyMap<string, LiveRun>;
@@ -295,9 +295,15 @@ export class RunLaunch {
       ...(forkSession ? { forkSession: true } : {}),
       ...(input.agent === "claude" && this.deps.hooks.claudeUserMcpServers?.() === false ? { strictMcp: true } : {}),
       ...(input.agent === "claude" && this.deps.hooks.claudeConnectorsOff?.().length ? { connectorsOff: this.deps.hooks.claudeConnectorsOff() } : {}),
+      ...this.offLimits(input),
       // Decided by the conversation, not its mode, so switching a review to Act keeps it.
       ...(input.scope.thread && this.deps.hooks.untrustedCheckout?.(input.scope.thread) ? { untrustedCheckout: true } : {}),
     };
+  }
+
+  private offLimits(input: PreparedSession["input"]): Pick<RunSpec, "offLimits"> {
+    const paths = input.agent === "claude" && input.claudeAccountId ? (this.deps.hooks.claudeOffLimits?.(input.claudeAccountId) ?? []) : [];
+    return paths.length ? { offLimits: paths } : {};
   }
 
   private resumedSubagents({ input, resumeSessionId, forkSession }: PreparedSession): RunSpec["resumedSubagents"] {

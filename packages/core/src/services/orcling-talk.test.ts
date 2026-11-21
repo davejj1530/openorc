@@ -2,13 +2,15 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
-import { listEvents, orclingMessages, runs, threads } from "@openorc/db";
+import { claudeAccounts, listEvents, orclingMessages, projects, runs, threads } from "@openorc/db";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { defaultOrclingLook, WORKSPACE_ID, type OrclingDraft } from "@openorc/protocol";
+import type { OrclingStartInput } from "@openorc/mcp";
 import { createOrclingHost } from "../mcp-host/orcling.js";
 import { guardContext } from "../remote/policy.js";
 import { OpenOrc } from "../openorc.js";
 import { GROUP_TURNS, ORCLING_MESSAGE_CHAIN, askedIn, namedIn } from "./orcling-talk.js";
+import { AppSettingsService } from "./settings.js";
 
 let root: string | undefined;
 afterEach(async () => {
@@ -116,6 +118,39 @@ it("delivers a direct message into the other Orcling's own chat as the sender's,
     expect(orclingMessages.list(core.db, bo.threadId)).toMatchObject([{ fromOrclingId: pip.id, toOrclingId: bo.id }]);
     // Bo said nothing to the person, so its chat is not marked for them.
     expect(core.threads.get(bo.threadId)!.unread).toBe(false);
+  } finally {
+    await core.close();
+  }
+});
+
+it("keeps an Orcling to the Orclings, threads and accounts of its own Claude account while accounts are kept separate", async () => {
+  const { core, say, settled, host } = await fixture();
+  try {
+    const client = claudeAccounts.add(core.db, "Client").id;
+    const pip = await core.orclings.create(draft("Pip"));
+    await core.orclings.create({ ...draft("Bo"), claudeAccountId: client });
+    const project = projects.insert(core.db, { name: "Fixture", rootPath: join(root!, "project"), gitRemote: null, defaultBranch: "main", settings: {} });
+    const elsewhere = threads.insert(core.db, { projectId: project.id, title: "On the client account", agent: "codex", model: null, mode: "act", permissionMode: "trusted", claudeAccountId: client });
+    say("Pip", "on it");
+    await core.threads.continueThread(pip.threadId, { ...turn, prompt: "check in with Bo" });
+    await settled(pip.threadId, 1);
+    const pipRun = runs.listForThread(core.db, pip.threadId)[0]!;
+    const listed = async () => (JSON.parse(await host().app(pipRun.id, "threads.list", { projectId: project.id })) as { id: string }[]).map((thread) => thread.id);
+    expect(JSON.parse(await host().orclings(pipRun.id)).orclings).toEqual([{ name: "Bo", busy: false }]);
+    expect(await listed()).toEqual([elsewhere.id]);
+
+    new AppSettingsService(core.db).set({ claudeAccountsSeparate: true });
+    expect(JSON.parse(await host().orclings(pipRun.id)).orclings).toEqual([]);
+    await expect(host().message(pipRun.id, { to: "bo", text: "is the review done?" })).rejects.toThrow("Bo works on another Claude account, and Settings keeps Claude accounts separate.");
+    await expect(host().startGroup(pipRun.id, { with: ["bo"], text: "hello" })).rejects.toThrow(/another Claude account/);
+    expect(await listed()).toEqual([]);
+    await expect(host().app(pipRun.id, "threads.get", { id: elsewhere.id })).rejects.toThrow("That belongs to another Claude account, and Settings keeps Claude accounts separate.");
+    await expect(host().app(pipRun.id, "threads.switchClaudeAccount", { id: pip.threadId, claudeAccountId: client })).rejects.toThrow(/only the person moves a conversation/);
+    const work = (input: Partial<OrclingStartInput>) => host().startWork(pipRun.id, { prompt: "Fix the build", worker: { kind: "self" }, reportBack: false, ...input });
+    await expect(work({ projectId: project.id, worker: { kind: "agent", claudeAccount: "Client" } })).rejects.toThrow(
+      "Settings keeps Claude accounts separate, so Pip starts work only on its own Claude account.",
+    );
+    await expect(work({ under: elsewhere.id })).rejects.toThrow('"On the client account" works on another Claude account, and Settings keeps Claude accounts separate.');
   } finally {
     await core.close();
   }

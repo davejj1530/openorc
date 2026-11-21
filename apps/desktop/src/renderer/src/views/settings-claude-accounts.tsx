@@ -65,7 +65,7 @@ export function ClaudeAccountSettings({ active }: { active: boolean }) {
           </form>
         </details>
       </div>
-      {(accounts.data?.accounts.filter((account) => account.enabled).length ?? 0) > 1 ? <AutoSwitch /> : null}
+      {(accounts.data?.accounts.filter((account) => account.enabled).length ?? 0) > 1 ? <AccountPreferences /> : null}
       {accounts.isPending ? <p className="settings-note">Checking accounts…</p> : null}
       {error ? (
         <p role="alert" className="text-sm text-bad mt-2">
@@ -76,15 +76,24 @@ export function ClaudeAccountSettings({ active }: { active: boolean }) {
   );
 }
 
-function AutoSwitch() {
+/** Whether work stays on its own account, and whether a thread at its account's usage limit goes on with another. */
+function AccountPreferences() {
   const preference = usePreference("app.settings.set");
+  const separate = preference.value.claudeAccountsSeparate ?? false;
   return (
     <div className="settings-group settings-account-preferences">
       <Toggle
-        label="Switch accounts at usage limits"
-        hint="Continue with the account that has the most 5-hour usage left. Projects with their own accounts use their own setting."
-        checked={preference.value.claudeAccountAutoSwitch ?? false}
+        label="Keep accounts separate"
+        hint="Threads, tasks and Orclings only see and reach work on their own account, and each account keeps its own Claude memory. You can still move a conversation yourself."
+        checked={separate}
         disabled={preference.disabled}
+        onChange={(claudeAccountsSeparate) => void preference.commit({ claudeAccountsSeparate })}
+      />
+      <Toggle
+        label="Switch accounts at usage limits"
+        hint={separate ? "Off while accounts are kept separate." : "Continue with the account that has the most 5-hour usage left. Projects with their own accounts use their own setting."}
+        checked={!separate && (preference.value.claudeAccountAutoSwitch ?? false)}
+        disabled={preference.disabled || separate}
         onChange={(claudeAccountAutoSwitch) => void preference.commit({ claudeAccountAutoSwitch })}
       />
     </div>

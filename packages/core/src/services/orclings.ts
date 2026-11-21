@@ -18,6 +18,7 @@ import {
   type Thread,
 } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
+import { accountsSeparate } from "./claude-account-separation.js";
 import { AttachmentService } from "./attachments.js";
 import type { MemoryService } from "./memory.js";
 import { catchUp, orclingBrief, rolloverSeed, type OrclingPlace } from "./orcling-briefs.js";
@@ -64,8 +65,11 @@ export interface StartOptions {
   under?: string;
 }
 
-/** Who works on what an Orcling starts: itself, on its own settings and account, or the agent and account chosen. */
-function workerFor(orcling: Orcling, on: WorkSettings | undefined) {
+/**
+ * Who works on what an Orcling starts: itself, on its own settings and account, or the agent and account chosen. While
+ * accounts are kept separate, the chosen agent works on the Orcling's own account, as if it were handed down.
+ */
+function workerFor(db: Db, orcling: Orcling, on: WorkSettings | undefined) {
   if (!on) {
     const { agent, model, effort, fastMode } = orcling.settings;
     // An Orcling works on its own account, in a project that uses only some accounts too.
@@ -76,7 +80,9 @@ function workerFor(orcling: Orcling, on: WorkSettings | undefined) {
     };
   }
   const { agent, model, effort, fastMode, claudeAccountId } = on;
-  return { orclingId: null, settings: { agent, model, effort, fastMode }, account: { claudeAccountId, claudeAccountFrom: "chosen" as const } };
+  const settings = { agent, model, effort, fastMode };
+  if (accountsSeparate(db)) return { orclingId: null, settings, account: { claudeAccountId: orcling.claudeAccountId, claudeAccountFrom: "inherited" as const } };
+  return { orclingId: null, settings, account: { claudeAccountId, claudeAccountFrom: "chosen" as const } };
 }
 
 /** A start's settings without where it works, which a thread started under another takes from its parent. */
@@ -291,7 +297,7 @@ export class OrclingService {
     const orcling = this.get(id);
     if (input.projectId === WORKSPACE_ID) throw new Error(`Talk to ${orcling.name} in its own conversation, or start this in a project.`);
     const ceiling = orclingExecution(orcling);
-    const who = workerFor(orcling, options.on);
+    const who = workerFor(this.deps.db, orcling, options.on);
     let admitted: string | null = null;
     const onAdmitted = (thread: Thread) => {
       admitted = thread.id;
@@ -324,7 +330,7 @@ export class OrclingService {
     const orcling = this.get(id);
     const task = tasks.get(db, taskId);
     if (!task) throw new Error("No such task.");
-    const who = workerFor(orcling, options.on);
+    const who = workerFor(this.deps.db, orcling, options.on);
     const current = [task.executionThreadId, task.threadId].map((threadId) => (threadId ? threads.get(db, threadId) : null)).find(Boolean);
     if (current && (!who.orclingId || current.orclingId !== id)) throw new Error(`This task already has a conversation, "${current.title}". Message it with orcling_thread_send instead.`);
     const ceiling = orclingExecution(orcling);

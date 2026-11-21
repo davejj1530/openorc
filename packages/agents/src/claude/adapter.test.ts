@@ -908,6 +908,23 @@ describe("added Claude accounts", () => {
       expect((await started(folder, { connectorsOff: ["paper"] })).settings["deniedMcpServers"]).toEqual([{ serverName: "paper" }]);
       rmSync(folder, { recursive: true, force: true });
     });
+
+    it.each<[string, Partial<RunSpec>, string[]]>([
+      ["Autonomous", {}, []],
+      ["Accept edits", { permissionMode: "trusted" }, ["Agent", "Task"]],
+      ["Plan", { mode: "plan" }, ["Bash", "NotebookEdit", "Agent", "Task"]],
+    ])("keeps the file tools out of other accounts' folders in %s", async (_name, spec, denied) => {
+      const { folder } = shared();
+      const { settings } = await started(folder, { ...spec, offLimits: ["/accounts/client"] });
+      expect((settings["permissions"] as { deny: string[] }).deny).toEqual([
+        ...denied,
+        "Read(//accounts/client)",
+        "Read(//accounts/client/**)",
+        "Edit(//accounts/client)",
+        "Edit(//accounts/client/**)",
+      ]);
+      rmSync(folder, { recursive: true, force: true });
+    });
   });
 
   it("load the plugins the CLI login turns on, and the marker stays out of Claude's environment", async () => {

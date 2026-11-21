@@ -1,6 +1,7 @@
 import { claudeAccounts, orclingGroups, orclings, projects, type Db } from "@openorc/db";
 import type { OrclingTools } from "@openorc/mcp";
 import { percentLeft, STATUS_PRIORITY, threadStatus, WORKSPACE_ID, type AgentKind, type Orcling, type PlanLimits, type ThreadSummary } from "@openorc/protocol";
+import { accountReach, threadAccount } from "../services/claude-account-separation.js";
 import { newThreadAgent } from "../services/orcling-work.js";
 import type { RunService } from "../services/runs.js";
 import type { AppSettingsService } from "../services/settings.js";
@@ -72,7 +73,7 @@ export function overviewTools(deps: OverviewDependencies, speaker: (runId: strin
   const { db } = deps;
   return {
     activity: async (runId) => {
-      speaker(runId);
+      const reach = accountReach(db, speaker(runId).claudeAccountId);
       const chats = orclingChatIds(db);
       const waiting = new Map<string, string>();
       for (const pending of deps.runs.pending()) if (pending.threadId && !waiting.has(pending.threadId)) waiting.set(pending.threadId, pending.detail);
@@ -86,7 +87,7 @@ export function overviewTools(deps: OverviewDependencies, speaker: (runId: strin
       const rows = [...found.values()]
         .flatMap((thread) => {
           // An Orcling's chat is private, and so is the work running under it.
-          const status = chats.has(thread.id) || chats.has(thread.parentThreadId ?? "") ? null : threadStatus(thread);
+          const status = chats.has(thread.id) || chats.has(thread.parentThreadId ?? "") || !reach(threadAccount(thread)) ? null : threadStatus(thread);
           return status ? [{ thread, status }] : [];
         })
         .sort((a, b) => STATUS_PRIORITY.indexOf(a.status.kind) - STATUS_PRIORITY.indexOf(b.status.kind) || b.thread.lastActivityAt - a.thread.lastActivityAt)

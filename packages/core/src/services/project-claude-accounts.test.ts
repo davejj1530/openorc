@@ -3,6 +3,7 @@ import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID, type Project, type ProjectClaudeA
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { allowsAccount, NO_PROJECT_ACCOUNTS, projectAccountPolicy, startingAccount } from "./project-claude-accounts.js";
 import { ProjectService } from "./projects.js";
+import { AppSettingsService } from "./settings.js";
 
 let db: Db;
 let project: Project;
@@ -78,6 +79,24 @@ describe("startingAccount", () => {
     expect(() => startingAccount(db, project.id, client)).toThrow("This project only uses these Claude accounts: Work, Personal.");
     expect(startingAccount(db, project.id, client, "inherited")).toBe(personal);
     expect(startingAccount(db, project.id, client, "own")).toBe(client);
+  });
+
+  it("refuses to carry work over to another account while accounts are kept separate", () => {
+    choose(own());
+    new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+    expect(startingAccount(db, project.id, work, "inherited")).toBe(work);
+    expect(() => startingAccount(db, project.id, client, "inherited")).toThrow("This project doesn't use Client, and Settings keeps Claude accounts separate, so this can't start on another account.");
+    expect(startingAccount(db, project.id, undefined, "inherited")).toBe(personal);
+    expect(startingAccount(db, project.id, client, "own")).toBe(client);
+  });
+});
+
+describe("switching at usage limits", () => {
+  it("never switches while accounts are kept separate, whatever the app or the project says", () => {
+    expect(projectAccountPolicy(db, project.id, { claudeAccountAutoSwitch: true, claudeAccountsSeparate: true }).autoSwitch).toBe(false);
+    choose(own({ autoSwitch: true }));
+    expect(projectAccountPolicy(db, project.id, { claudeAccountAutoSwitch: true, claudeAccountsSeparate: true }).autoSwitch).toBe(false);
+    expect(projectAccountPolicy(db, project.id, { claudeAccountAutoSwitch: false, claudeAccountsSeparate: false }).autoSwitch).toBe(true);
   });
 });
 

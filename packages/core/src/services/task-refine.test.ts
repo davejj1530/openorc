@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
@@ -34,13 +34,13 @@ async function emit(runId: string, input: Omit<Extract<AgentEvent, { type: "turn
 const finish = (runId: string) => emit(runId, { type: "turn.completed", turnId: "1", durationMs: 1, status: "success", resultText: "Done." });
 
 beforeAll(async () => {
-  root = await mkdtemp(path.join(tmpdir(), "task-refine-test-"));
+  root = await realpath(await mkdtemp(path.join(tmpdir(), "task-refine-test-")));
   await git(root, ["init", "-b", "main"]);
   await git(root, ["config", "user.email", "test@example.com"]);
   await git(root, ["config", "user.name", "Fixture"]);
   await writeFile(path.join(root, "README.md"), "# Refine\n");
   await commitAll(root, "Initial");
-  dataRoot = await mkdtemp(path.join(tmpdir(), "task-refine-data-"));
+  dataRoot = await realpath(await mkdtemp(path.join(tmpdir(), "task-refine-data-")));
 });
 afterAll(async () => {
   await rm(root, { recursive: true, force: true });

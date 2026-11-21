@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
@@ -27,13 +27,13 @@ async function finished(threadId: string) {
 }
 
 beforeAll(async () => {
-  root = await mkdtemp(path.join(tmpdir(), "task-threads-test-"));
+  root = await realpath(await mkdtemp(path.join(tmpdir(), "task-threads-test-")));
   await git(root, ["init", "-b", "main"]);
   await git(root, ["config", "user.email", "test@example.com"]);
   await git(root, ["config", "user.name", "Fixture"]);
   await writeFile(path.join(root, "README.md"), "# Threads\n");
   await commitAll(root, "Initial");
-  dataRoot = await mkdtemp(path.join(tmpdir(), "task-threads-data-"));
+  dataRoot = await realpath(await mkdtemp(path.join(tmpdir(), "task-threads-data-")));
 });
 afterAll(async () => {
   await rm(root, { recursive: true, force: true });

@@ -48,7 +48,13 @@ it("upgrades a ledger, keeps one current refine per task, owns its runs, and goe
 
     const second = taskRefines.insert(db, { taskId: task.id, recipient, instruction: "Shorter", base });
     expect(taskRefines.current(db, task.id)?.id).toBe(second.id);
+    expect(taskRefines.earlierSuggestion(db, task.id, second.id)?.id).toBe(first.id);
     taskRefines.dismiss(db, second.id);
+    expect(taskRefines.current(db, task.id)?.id).toBe(first.id);
+    const third = taskRefines.insert(db, { taskId: task.id, recipient, instruction: "", base });
+    taskRefines.dismissOthers(db, task.id, third.id);
+    expect(taskRefines.earlierSuggestion(db, task.id, third.id)).toBeNull();
+    taskRefines.dismiss(db, third.id);
     expect(taskRefines.current(db, task.id)).toBeNull();
     expect(taskRefines.get(db, first.id)?.state).toBe("ready");
 

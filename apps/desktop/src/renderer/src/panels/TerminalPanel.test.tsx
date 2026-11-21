@@ -1,4 +1,4 @@
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { OpenOrcApi } from "../../../shared/types";
 import { runInTerminal } from "../lib/terminal-requests";
@@ -37,7 +37,7 @@ let output: (chunk: string) => void;
 const terminal = {
   attach: vi.fn(),
   detach: vi.fn(),
-  open: vi.fn(async () => ({ backlog: "", running: true, exitCode: null as number | null })),
+  open: vi.fn(async (_input: unknown): Promise<Awaited<ReturnType<OpenOrcApi["terminal"]["open"]>>> => ({ backlog: "", running: true, exitCode: null })),
   write: vi.fn(),
   resize: vi.fn(),
   kill: vi.fn(),
@@ -99,6 +99,18 @@ it("waits for a shell that never marks its prompt to go quiet", async () => {
     vi.advanceTimersByTime(800);
   });
   expect(terminal.write).toHaveBeenCalledWith("task:plain", "claude auth login\r");
+});
+
+it("says a shell running a command stayed in its folder, and restarts it in the panel's", async () => {
+  terminal.open.mockResolvedValueOnce({ backlog: "ready on :3000\r\n", running: true, exitCode: null, stayedIn: "/repo" });
+  render(<TerminalPanel id="thread:moved" cwd="/worktrees/openorc/chips" />);
+  await act(async () => {});
+  expect(screen.getByText(/A command was running, so this shell stayed in \/repo\./)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Restart it in …/openorc/chips" }));
+  expect(terminal.kill).toHaveBeenCalledWith("thread:moved");
+  await act(async () => {});
+  expect(screen.queryByText(/stayed in/)).toBeNull();
+  expect(terminal.open).toHaveBeenLastCalledWith({ id: "thread:moved", cwd: "/worktrees/openorc/chips", cols: 80, rows: 24 });
 });
 
 it("keeps the command for the next shell when this one has ended", async () => {

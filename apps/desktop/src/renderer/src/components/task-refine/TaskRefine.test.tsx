@@ -181,12 +181,12 @@ it("lets the person edit the suggestion first, keeps the edits across a remount,
   expect(replace).toHaveBeenCalledWith("## Goal\n\nOne at a time, with Backspace.");
   expect(patch).toHaveBeenCalledWith({ title: "Edit labels as chips", spec: "## Goal\n\nOne at a time, with Backspace.", labels: "tasks" });
   await waitFor(() => expect(calls("tasks.refine.dismiss")).toEqual([{ taskId: "task" }]));
-  expect(localStorage.getItem("openorc.draft.task-refine.refine")).toBeNull();
+  expect(localStorage.getItem("openorc.draft.task-refine.task")).toBeNull();
 });
 
-it("refines again from the person's edited version, and lets those edits go once the new run starts", async () => {
+it("refines again from the person's edited version, and keeps those edits until the new run has a suggestion of its own", async () => {
   refine = ready();
-  localStorage.setItem("openorc.draft.task-refine.refine", JSON.stringify({ title: "Edit labels as chips", spec: "## Goal\n\nMine.", labels: "tasks" }));
+  localStorage.setItem("openorc.draft.task-refine.task", JSON.stringify({ refineId: "refine", title: "Edit labels as chips", spec: "## Goal\n\nMine.", labels: "tasks" }));
   mount();
   fireEvent.click(await screen.findByRole("button", { name: "Refine again" }));
   const sheet = await screen.findByRole("dialog");
@@ -199,7 +199,24 @@ it("refines again from the person's edited version, and lets those edits go once
       { taskId: "task", recipient, instruction: "Shorter", again: true, edited: { title: "Edit labels as chips", description: "## Goal\n\nMine.", labels: ["tasks"] } },
     ]),
   );
-  await waitFor(() => expect(localStorage.getItem("openorc.draft.task-refine.refine")).toBeNull());
+  expect(localStorage.getItem("openorc.draft.task-refine.task")).toContain("Mine.");
+});
+
+it("shows the earlier suggestion with the person's edits and why when Refine again didn't finish", async () => {
+  refine = ready({ error: "Usage limit reached." });
+  localStorage.setItem("openorc.draft.task-refine.task", JSON.stringify({ refineId: "refine", title: "Edit labels as chips", spec: "## Goal\n\nMine.", labels: "tasks" }));
+  mount();
+  expect(await screen.findByText("Suggested by Test, with your edits")).toBeTruthy();
+  expect(screen.getByTestId("suggestion").textContent).toBe("## Goal\n\nMine.");
+  expect(screen.getByText(/Refining again didn’t finish: Usage limit reached\./)).toBeTruthy();
+});
+
+it("leaves out edits made to a suggestion a newer one replaced", async () => {
+  refine = ready({ id: "newer" });
+  localStorage.setItem("openorc.draft.task-refine.task", JSON.stringify({ refineId: "refine", title: "Edit labels as chips", spec: "## Goal\n\nMine.", labels: "tasks" }));
+  mount();
+  expect(await screen.findByText("Suggested by Test")).toBeTruthy();
+  expect(screen.getByTestId("suggestion").textContent).toBe(suggestion.description);
 });
 
 it("offers only the agents signed in here, starting on the person's default agent", async () => {

@@ -60,6 +60,8 @@ export interface TerminalAttachment {
   backlog: string;
   running: boolean;
   exitCode: number | null;
+  /** Where a shell that was running a command when its panel moved to another folder still is. */
+  stayedIn?: string;
 }
 
 /**
@@ -174,6 +176,8 @@ interface Session {
   exited: boolean;
   exitCode: number | null;
   readonly commands: CommandSettleWatcher;
+  /** Kept in its folder because a command was running when its panel moved on: only a restart moves it. */
+  stays: boolean;
 }
 
 /**
@@ -229,11 +233,12 @@ export class PtyHost {
     if (this.updating) throw new Error("OpenOrc is restarting to update. Please wait.");
     const size = clampSize(input.cols, input.rows);
     const live = this.sessions.get(input.id);
-    if (live?.cwd === input.cwd) {
+    if (live && live.cwd !== input.cwd && !live.exited && live.commands.running()) live.stays = true;
+    if (live && (live.cwd === input.cwd || live.stays)) {
       // The shell is where it is and may have cd'd since, so a re-attach
       // adopts it rather than arguing about where it is now.
       if (!live.exited) live.pty.resize(size.cols, size.rows);
-      return this.replay(live);
+      return this.replay(live, input.cwd);
     }
     // Checked before the lookup: as the right-hand side of a `??` this is
     // skipped on the branch that joins an in-flight start, which is exactly
@@ -247,7 +252,7 @@ export class PtyHost {
     // Killed before it ever ran. Nothing was installed, so there is nothing to
     // replay and nothing to draw beyond saying so.
     if (!session) return { backlog: "", running: false, exitCode: null };
-    return this.replay(session);
+    return this.replay(session, cwd);
   }
 
   /** Output for `id` goes to the sink from here until the viewer detaches. */
@@ -359,6 +364,7 @@ export class PtyHost {
       exitCode: null,
       listeners: [],
       commands: commandSettleWatcher(() => this.sink.settled(id), this.settleMs),
+      stays: false,
     };
     this.sessions.set(id, session);
     // Both handlers check that this session still holds the key. A kill lets
@@ -398,10 +404,11 @@ export class PtyHost {
    * the ring the caller is about to draw, and sending them as well would print
    * the tail of the session twice.
    */
-  private replay(session: Session): TerminalAttachment {
+  private replay(session: Session, requested: string): TerminalAttachment {
     this.stopTimer(session);
     session.pending = "";
-    return { backlog: session.scrollback.read(), running: !session.exited, exitCode: session.exitCode };
+    const attachment = { backlog: session.scrollback.read(), running: !session.exited, exitCode: session.exitCode };
+    return session.cwd === requested ? attachment : { ...attachment, stayedIn: session.cwd };
   }
 
   private flush(id: string, session: Session): void {

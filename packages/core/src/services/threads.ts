@@ -86,6 +86,7 @@ export class ThreadService {
       executionThreadFor: (id) => this.executionThreadFor(id),
       taskThreadForStart: (id, selected) => this.taskThreadForStart(id, selected),
       continueThread: (id, input) => this.continueThread(id, input),
+      delete: (id) => this.delete(id),
       handoffBrief: (thread, own) => this.agentTools.handoffBrief(thread, own),
       rejectRetiredThread: (id) => this.rejectRetiredThread(id),
     });

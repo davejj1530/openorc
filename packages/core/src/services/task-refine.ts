@@ -81,17 +81,33 @@ export class TaskRefineService {
   async stop(taskId: string): Promise<void> {
     const refine = taskRefines.current(this.db, taskId);
     if (refine?.state !== "running") return;
-    taskRefines.update(this.db, refine.id, { state: "cancelled", step: null });
+    this.end(refine, refine.suggestion ? suggestionEnd(refine.base, refine.suggestion) : { state: "cancelled", step: null });
     this.changed(taskId);
     if (refine.runId) await this.runService.closeAndWait(refine.runId);
   }
 
   async dismiss(taskId: string): Promise<void> {
+    if (taskRefines.current(this.db, taskId)?.state === "running") await this.stop(taskId);
     const refine = taskRefines.current(this.db, taskId);
     if (!refine) return;
-    if (refine.state === "running") await this.stop(taskId);
     taskRefines.dismiss(this.db, refine.id);
     this.changed(taskId);
+  }
+
+  /**
+   * A refine that ends with a suggestion puts away the one it was started from. One that ends without leaves that
+   * suggestion current again, with this one's error as its note.
+   */
+  private end(refine: TaskRefine, patch: RefinePatch): void {
+    taskRefines.update(this.db, refine.id, patch);
+    if (patch.state === "ready" || patch.state === "unchanged") {
+      taskRefines.dismissOthers(this.db, refine.taskId, refine.id);
+      return;
+    }
+    const earlier = taskRefines.earlierSuggestion(this.db, refine.taskId, refine.id);
+    if (!earlier) return;
+    taskRefines.dismiss(this.db, refine.id);
+    taskRefines.update(this.db, earlier.id, { error: patch.state === "error" ? (patch.error ?? null) : null });
   }
 
   /** task_suggest: keeps the run's latest suggestion. The task itself never changes here. */
@@ -116,11 +132,11 @@ export class TaskRefineService {
   settled(run: Run, outcome: TurnSettledOutcome) {
     const refine = taskRefines.forRun(this.db, run.id);
     if (refine?.state !== "running") return;
-    let patch: Parameters<typeof taskRefines.update>[2];
+    let patch: RefinePatch;
     if (refine.suggestion) patch = suggestionEnd(refine.base, refine.suggestion);
     else if (outcome.status === "cancelled") patch = { state: "cancelled", step: null };
     else patch = { state: "error", step: null, error: outcome.error ?? "The agent finished without suggesting anything." };
-    taskRefines.update(this.db, refine.id, patch);
+    this.end(refine, patch);
     this.changed(refine.taskId);
   }
 
@@ -131,7 +147,7 @@ export class TaskRefineService {
   /** Ends each running Refine as OpenOrc quits or after it crashed: with the suggestion it saved, else as an error. */
   endRunning(): TaskRefine[] {
     const running = taskRefines.running(this.db);
-    for (const refine of running) taskRefines.update(this.db, refine.id, refine.suggestion ? suggestionEnd(refine.base, refine.suggestion) : { state: "error", step: null, error: CLOSED });
+    for (const refine of running) this.end(refine, refine.suggestion ? suggestionEnd(refine.base, refine.suggestion) : { state: "error", step: null, error: CLOSED });
     return running;
   }
 
@@ -171,7 +187,7 @@ export class TaskRefineService {
         },
       });
     } catch (error) {
-      if (taskRefines.get(this.db, refine.id)?.state === "running") taskRefines.update(this.db, refine.id, { state: "error", step: null, error: message(error) });
+      if (taskRefines.get(this.db, refine.id)?.state === "running") this.end(refine, { state: "error", step: null, error: message(error) });
       this.changed(task.id);
     }
   }
@@ -214,13 +230,14 @@ export class TaskRefineService {
   }
 }
 
+type RefinePatch = Parameters<typeof taskRefines.update>[2];
 type Edited = NonNullable<RpcParams<"tasks.refine.start">["edited"]>;
 type RunOptions = { earlier: TaskRefine | null; resumeRunId: string | undefined; edited: Edited | undefined; claudeAccountId: string | undefined };
 
 const suggestedDocument = (suggestion: TaskSuggestion): TaskDocumentSnapshot => ({ title: suggestion.title, spec: suggestion.description, labels: suggestion.labels });
 
 /** How a Refine that saved a suggestion ends: `unchanged` when it suggests the document it started from. */
-function suggestionEnd(base: TaskDocumentSnapshot, suggestion: TaskSuggestion): Parameters<typeof taskRefines.update>[2] {
+function suggestionEnd(base: TaskDocumentSnapshot, suggestion: TaskSuggestion): RefinePatch {
   return { state: sameTaskDocument(base, suggestedDocument(suggestion)) ? "unchanged" : "ready", step: null, error: null };
 }
 

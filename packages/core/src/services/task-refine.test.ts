@@ -144,6 +144,36 @@ it("refuses a second refine while one runs, and stops on request", async () => {
   expect(() => core.refines.suggest(refine.runId!, suggestion)).toThrow("no longer active");
 });
 
+it("keeps a suggestion the agent saved before it was stopped", async () => {
+  const refine = await started();
+  core.refines.suggest(refine.runId!, suggestion);
+  await call("tasks.refine.stop", { taskId });
+  expect(await call("tasks.refine.get", { taskId })).toMatchObject({ id: refine.id, state: "ready", suggestion, step: null });
+});
+
+it("keeps the earlier suggestion when Refine again is stopped or fails, and puts it away once the new one has its own", async () => {
+  const first = await started();
+  core.refines.suggest(first.runId!, suggestion);
+  await finish(first.runId!);
+
+  await started("Shorter", true);
+  await call("tasks.refine.stop", { taskId });
+  expect(await call("tasks.refine.get", { taskId })).toMatchObject({ id: first.id, state: "ready", suggestion, error: null });
+
+  const failed = await started("Shorter", true);
+  sessions.get(failed.runId!)!.handle.emit("event", { type: "error", runId: failed.runId!, ts: Date.now(), message: "You've hit your usage limit.", fatal: true });
+  await emit(failed.runId!, { type: "turn.completed", turnId: "1", durationMs: 1, status: "error" });
+  expect(await call("tasks.refine.get", { taskId })).toMatchObject({ id: first.id, state: "ready", suggestion, error: "You've hit your usage limit." });
+
+  const next = await started("Shorter", true);
+  expect(sessions.get(next.runId!)!.spec.prompt).toContain(`Your previous suggestion, which the user hasn't used:\nTitle: ${suggestion.title}`);
+  core.refines.suggest(next.runId!, { ...suggestion, title: "Labels as chips" });
+  await finish(next.runId!);
+  expect(await call("tasks.refine.get", { taskId })).toMatchObject({ id: next.id, state: "ready", error: null });
+  await call("tasks.refine.dismiss", { taskId });
+  expect(await call("tasks.refine.get", { taskId })).toBeNull();
+});
+
 it("continues the same session when refining again on the same model", async () => {
   const first = await started();
   const sessionId = announceSession(first.runId!);

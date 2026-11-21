@@ -361,6 +361,24 @@ describe("pty host", () => {
     expect(spawned).toHaveLength(2);
   });
 
+  it("keeps a shell running a command where it is when its panel asks for another folder, until a restart", async () => {
+    const worktree = await mkdtemp(join(dir, "worktree-"));
+    await open("thread-a");
+    host.write("thread-a", "npm run dev\r");
+    first(spawned).say("\x1b[?2004l\r\r\nready on :3000\r\n");
+    expect(await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 })).toMatchObject({ running: true, stayedIn: dir });
+    first(spawned).say("^C\r\n~ % \x1b[?2004h");
+    expect(await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 })).toMatchObject({ running: true, stayedIn: dir });
+    expect(spawned.map((pty) => pty.killed)).toEqual([false]);
+
+    host.kill("thread-a");
+    expect(await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 })).toEqual({ backlog: "", running: true, exitCode: null });
+    expect(spawned.map((pty) => [pty.cwd, pty.killed])).toEqual([
+      [dir, true],
+      [worktree, false],
+    ]);
+  });
+
   it("ends a shell still starting when its panel asks for another folder, and keeps the one started there", async () => {
     const worktree = await mkdtemp(join(dir, "worktree-"));
     const release = holdSpawns();

@@ -619,6 +619,34 @@ it("refuses a button on an archived task, making no thread for it", async () => 
   expect(await call("tasks.threads", { taskId })).toEqual([]);
 });
 
+it("leaves a task in Review or Done where it is when a button runs in its thread", async () => {
+  const check: TaskButton = { id: "check", label: "Check", prompt: "Check the work.", runsIn: "task", mode: "plan" };
+  await call("projects.updateSettings", { id: projectId, settings: { taskButtons: [check] } });
+  tasks.update(core.db, taskId, { status: "review" });
+  const pressed = await call("tasks.runButton", { taskId, buttonId: "check" });
+  await vi.waitFor(() => expect(spec(pressed.threadId)?.prompt).toMatch(/^Check the work\./));
+  expect(tasks.get(core.db, taskId)?.status).toBe("review");
+
+  const done = (await call("tasks.create", { projectId, title: "Chips everywhere", spec: "In comments too.", workspaceMode: "current" })).id;
+  tasks.update(core.db, done, { status: "done", completedAt: 1_700_000_000_000 });
+  await call("tasks.runButton", { taskId: done, buttonId: "check" });
+  expect(tasks.get(core.db, done)).toMatchObject({ status: "done", completedAt: 1_700_000_000_000 });
+});
+
+it("removes a New thread button's thread when its message couldn't be sent, and opens an unsent one again instead of making another", async () => {
+  const draftReview: TaskButton = { ...review, id: "draft-review", autoSend: false };
+  await call("projects.updateSettings", { id: projectId, settings: { taskButtons: [review, draftReview] } });
+  vi.spyOn(core.threads, "continueThread").mockRejectedValueOnce(new Error("Couldn't make the worktree."));
+  await expect(call("tasks.runButton", { taskId, buttonId: "review" })).rejects.toThrow("Couldn't make the worktree.");
+  expect(await call("tasks.threads", { taskId })).toEqual([]);
+
+  const opened = await unsent(taskId, "draft-review");
+  expect(await call("tasks.runButton", { taskId, buttonId: "draft-review" })).toEqual({ threadId: opened.threadId });
+  threads.update(core.db, opened.threadId, { draft: "Review only the labels." });
+  expect((await unsent(taskId, "draft-review")).threadId).not.toBe(opened.threadId);
+  expect(await call("tasks.threads", { taskId })).toHaveLength(2);
+});
+
 it("continues in a new thread in the last thread's mode when the new thread's agent can run it", async () => {
   const opened = await call("tasks.openThread", { taskId });
   await call("projects.updateSettings", { id: projectId, settings: { taskButtons: [start] } });

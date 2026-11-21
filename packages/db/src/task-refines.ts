@@ -34,12 +34,12 @@ export const taskRefines = {
     const r = db.stmt("SELECT * FROM task_refines WHERE run_id=?").get(runId);
     return r ? refine(r) : null;
   },
-  /** Starting a refine puts away the task's earlier ones. */
+  /** Starting a refine puts away the task's earlier ones, except a suggestion, which stays until the new one has its own. */
   insert(db: Db, input: Pick<TaskRefine, "taskId" | "recipient" | "instruction" | "base">): TaskRefine {
     const id = randomUUID();
     const now = Date.now();
     db.transaction(() => {
-      db.stmt("UPDATE task_refines SET dismissed_at=? WHERE task_id=? AND dismissed_at IS NULL").run(now, input.taskId);
+      db.stmt("UPDATE task_refines SET dismissed_at=? WHERE task_id=? AND dismissed_at IS NULL AND state<>'ready'").run(now, input.taskId);
       db.stmt("INSERT INTO task_refines (id,task_id,recipient,instruction,base,state,created_at,updated_at) VALUES (?,?,?,?,?,'running',?,?)").run(
         id,
         input.taskId,
@@ -62,6 +62,14 @@ export const taskRefines = {
   },
   dismiss(db: Db, id: string): void {
     db.stmt("UPDATE task_refines SET dismissed_at=? WHERE id=? AND dismissed_at IS NULL").run(Date.now(), id);
+  },
+  /** The suggestion a newer refine of the task was started from, while it is still current behind it. */
+  earlierSuggestion(db: Db, taskId: string, id: string): TaskRefine | null {
+    const r = db.stmt("SELECT * FROM task_refines WHERE task_id=? AND id<>? AND state='ready' AND dismissed_at IS NULL ORDER BY created_at DESC, rowid DESC LIMIT 1").get(taskId, id);
+    return r ? refine(r) : null;
+  },
+  dismissOthers(db: Db, taskId: string, id: string): void {
+    db.stmt("UPDATE task_refines SET dismissed_at=? WHERE task_id=? AND id<>? AND dismissed_at IS NULL").run(Date.now(), taskId, id);
   },
   running(db: Db): TaskRefine[] {
     return db

@@ -212,11 +212,15 @@ function Asked({ refine }: { refine: TaskRefine }) {
   return refine.instruction ? <span className="task-refine-asked">You asked “{refine.instruction}”. </span> : null;
 }
 
-/** The suggestion as the person edits it before using it: kept with the suggestion, so it survives leaving the page. */
+/**
+ * The suggestion as the person edits it before using it: kept with the suggestion, so it survives leaving the page and
+ * a Refine again that doesn't finish. One per task, so a suggestion a newer one replaced leaves nothing behind.
+ */
 type Revision = { title: string; spec: string; labels: string };
-const revisionKey = (refineId: string) => `task-refine.${refineId}`;
-function storedRevision(refineId: string): Revision | null {
-  const value = readDraft<Partial<Revision>>(revisionKey(refineId), {});
+const revisionKey = (taskId: string) => `task-refine.${taskId}`;
+function storedRevision(taskId: string, refineId: string): Revision | null {
+  const value = readDraft<Partial<Revision & { refineId: string }>>(revisionKey(taskId), {});
+  if (value.refineId !== refineId) return null;
   return typeof value.title === "string" && typeof value.spec === "string" && typeof value.labels === "string" ? { title: value.title, spec: value.spec, labels: value.labels } : null;
 }
 
@@ -257,7 +261,7 @@ function RefineLabels({ before, after }: { before: string[]; after: string[] }) 
   );
 }
 
-type OpenSheet = (again: boolean, trigger: ReactElement, edited?: Revision | null, onStarted?: () => void) => ReactNode;
+type OpenSheet = (again: boolean, trigger: ReactElement, edited?: Revision | null) => ReactNode;
 
 function RefineButton({ unavailable, sheet }: { unavailable: boolean; sheet: OpenSheet }) {
   if (unavailable)
@@ -278,7 +282,7 @@ function RefineButton({ unavailable, sheet }: { unavailable: boolean; sheet: Ope
   );
 }
 
-function useSuggestionEdits() {
+function useSuggestionEdits(taskId: string) {
   const [editing, setEditing] = useState<string | null>(null);
   const [revision, setRevision] = useState<{ id: string; value: Revision } | null>(null);
   const [imagesReady, setImagesReady] = useState(true);
@@ -287,13 +291,14 @@ function useSuggestionEdits() {
     setImagesReady,
     isEditing: (refineId: string) => editing === refineId,
     toggle: (refineId: string) => setEditing(editing === refineId ? null : refineId),
-    revised: (refineId: string) => (revision?.id === refineId ? revision.value : storedRevision(refineId)),
+    revised: (refineId: string) => (revision?.id === refineId ? revision.value : storedRevision(taskId, refineId)),
     revise: (refineId: string, value: Revision) => {
-      writeDraft(revisionKey(refineId), value);
+      writeDraft(revisionKey(taskId), { ...value, refineId });
       setRevision({ id: refineId, value });
     },
-    forget: (refineId: string) => {
-      removeDraft(revisionKey(refineId));
+    forget: () => {
+      removeDraft(revisionKey(taskId));
+      setRevision(null);
       setEditing(null);
     },
   };
@@ -387,7 +392,6 @@ function suggestionView({ refine, suggestion, name, failure, sheet, closing, clo
               Refine again
             </Button>,
             revised,
-            () => edits.forget(refine.id),
           )}
           <Button size="sm" variant="ghost" onClick={() => edits.toggle(refine.id)}>
             {editing ? "Show changes" : "Edit"}
@@ -399,7 +403,7 @@ function suggestionView({ refine, suggestion, name, failure, sheet, closing, clo
             Use suggestion
           </Button>
         </RefineBar>
-        <RefineNote failure={failure}>
+        <RefineNote failure={failure ?? (refine.error ? `Refining again didn’t finish: ${refine.error}` : null)}>
           <Asked refine={refine} />
           {suggestion.note}
           {movedOn ? <span className="task-refine-asked"> Suggested from an earlier version. Changes to the task since aren’t in it.</span> : null}
@@ -422,17 +426,16 @@ export function useTaskRefine(taskId: string, document: TaskDocument, basePath?:
   const dismiss = useRpcMutation("tasks.refine.dismiss");
   // Put away at once: the refetch that confirms it would otherwise show the suggestion a moment longer.
   const [putAway, setPutAway] = useState<string | null>(null);
-  const edits = useSuggestionEdits();
+  const edits = useSuggestionEdits(taskId);
 
   const refine = query.data && query.data.state !== "cancelled" && query.data.id !== putAway ? query.data : null;
   // A new Refine starts without the last one's failure to stop or put away.
-  const started = (then?: () => void) => () => {
+  const started = () => {
     stop.reset();
     dismiss.reset();
-    then?.();
   };
-  const sheet: OpenSheet = (again, trigger, edited = null, onStarted) => (
-    <RefineSheet taskId={taskId} project={project} again={again} edited={edited} onStarted={started(onStarted)} document={document} options={options} models={models} trigger={trigger} />
+  const sheet: OpenSheet = (again, trigger, edited = null) => (
+    <RefineSheet taskId={taskId} project={project} again={again} edited={edited} onStarted={started} document={document} options={options} models={models} trigger={trigger} />
   );
   if (!refine) return { ...NONE, button: <RefineButton unavailable={Boolean(models && !options.length)} sheet={sheet} /> };
 
@@ -442,7 +445,7 @@ export function useTaskRefine(taskId: string, document: TaskDocument, basePath?:
     setPutAway(id);
     // Shown again with the person's edits when that fails, so its note says why.
     void dismiss.mutateAsync({ taskId }).then(
-      () => edits.forget(id),
+      () => edits.forget(),
       () => setPutAway(null),
     );
   };

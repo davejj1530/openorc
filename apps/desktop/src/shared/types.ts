@@ -79,7 +79,7 @@ export interface TerminalApi {
    * scrollback to replay, and for a shell that already ended, the code it
    * ended with: nobody was listening when it exited, so the push went nowhere.
    */
-  open(input: { id: string; cwd: string; cols: number; rows: number }): Promise<{ backlog: string; running: boolean; exitCode: number | null }>;
+  open(input: { id: string; cwd: string; cols: number; rows: number }): Promise<{ backlog: string; running: boolean; exitCode: number | null; stayedIn?: string }>;
   write(id: string, data: string): void;
   resize(id: string, cols: number, rows: number): void;
   /** End the shell and forget its scrollback. Hiding the panel must not call this. */

@@ -65,7 +65,7 @@ export function ClaudeAccountSettings({ active }: { active: boolean }) {
           </form>
         </details>
       </div>
-      {(accounts.data?.accounts.filter((account) => account.enabled).length ?? 0) > 1 ? <AccountPreferences /> : null}
+      <AccountPreferences several={(accounts.data?.accounts.filter((account) => account.enabled).length ?? 0) > 1} />
       {accounts.isPending ? <p className="settings-note">Checking accounts…</p> : null}
       {error ? (
         <p role="alert" className="text-sm text-bad mt-2">
@@ -76,15 +76,19 @@ export function ClaudeAccountSettings({ active }: { active: boolean }) {
   );
 }
 
-/** Whether work stays on its own account, and whether a thread at its account's usage limit goes on with another. */
-function AccountPreferences() {
+/**
+ * Whether work stays on its own account, and whether a thread at its account's usage limit goes on with another. Shown
+ * with two enabled accounts, and while accounts are kept separate, so the setting can always be turned off.
+ */
+function AccountPreferences({ several }: { several: boolean }) {
   const preference = usePreference("app.settings.set");
   const separate = preference.value.claudeAccountsSeparate ?? false;
+  if (!several && !separate) return null;
   return (
     <div className="settings-group settings-account-preferences">
       <Toggle
         label="Keep accounts separate"
-        hint="Threads, tasks and Orclings only see and reach work on their own account, and each account keeps its own Claude memory. You can still move a conversation yourself."
+        hint="Threads, tasks and Orclings only see and reach work on their own account, and each account keeps its own Claude memory from now on; memories saved earlier stay with the existing CLI login. You can still move a conversation yourself."
         checked={separate}
         disabled={preference.disabled}
         onChange={(claudeAccountsSeparate) => void preference.commit({ claudeAccountsSeparate })}

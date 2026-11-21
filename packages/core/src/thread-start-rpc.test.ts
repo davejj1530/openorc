@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
 import { claudeAccounts, projects, runs, settings, tasks, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import { THREAD_EXISTS, type ModelOption, type Project, type RpcParams, type RunSpec } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, THREAD_EXISTS, type ModelOption, type Project, type RpcParams, type RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
 import { pickModel } from "./services/thread-agent-tools.js";
 import { rpcClient } from "./rpc-test-client.js";
@@ -255,13 +255,31 @@ it("keeps the thread and task tools to the agent's own Claude account while acco
   expect(await listed()).toEqual([home.id, same.id, elsewhere.id].sort());
   expect(await taskIds()).toContain(theirs.id);
 
+  const retired = vi.spyOn(core.runs, "retireIdleClaudeSessions");
   await call("app.settings.set", { claudeAccountsSeparate: true });
+  expect(retired.mock.calls.map(([id]) => id).sort()).toEqual([DEFAULT_CLAUDE_ACCOUNT, client].sort());
+  retired.mockClear();
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  expect(retired).not.toHaveBeenCalled();
+  const later = Date.now() + 60_000;
+  for (let index = 0; index < 31; index++) core.db.stmt("UPDATE threads SET last_activity_at = ? WHERE id = ?").run(later + index, conversation(`Client ${index}`, client).id);
   expect(await listed()).toEqual([home.id, same.id].sort());
   expect(await core.threads.toolThreadRead(runId, elsewhere.id)).toBeNull();
   expect(await core.threads.toolThreadSend(runId, elsewhere.id, "Can you help?")).toEqual({ delivered: false, message: "No such thread in this project." });
   expect(await taskIds()).toEqual(expect.arrayContaining([anyones.id]));
   expect(await taskIds()).not.toContain(theirs.id);
   expect(await core.threads.toolGet(runId, theirs.id)).toBeNull();
+});
+
+it("keeps a Claude run's file tools out of the other accounts' folders while accounts are kept separate", async () => {
+  vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation(scripted);
+  vi.spyOn(core.runs, "models").mockResolvedValue([{ ...model("claude-fixture", "Claude fixture"), agent: "claude" }]);
+  const client = claudeAccounts.add(core.db, "Client").id;
+  const { thread: before } = await parent({ agent: "claude", model: "claude-fixture" });
+  expect((await firstSpec(before.id)).offLimits).toBeUndefined();
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  const { thread } = await parent({ agent: "claude", model: "claude-fixture" });
+  expect((await firstSpec(thread.id)).offLimits).toEqual([path.join(folder, "data", "claude-accounts", client)]);
 });
 
 /** A thread a person starts under `parentThreadId` from OpenOrc. */

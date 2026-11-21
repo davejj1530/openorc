@@ -15,8 +15,11 @@ const authStatus = z.object({ loggedIn: z.boolean(), email: z.string().nullable(
 const inheritedAuth = /^(ANTHROPIC_|CLAUDE_CODE_(OAUTH_TOKEN|OAUTH_TOKEN_FILE_DESCRIPTOR|API_KEY_FILE_DESCRIPTOR|USE_BEDROCK|USE_VERTEX|USE_FOUNDRY)|CLAUDE_CONFIG_DIR$)/;
 type Connection = Pick<ClaudeAccountConnection, "status" | "email" | "organization" | "message">;
 const disconnected: Connection = { status: "signed_out", email: null, organization: null, message: null };
-/** What of the existing CLI login's folder is its own: sessions, prompt history and sign-in. Its skills and plugins every account uses. */
-const CLI_LOGIN_PRIVATE = ["projects", "history.jsonl", ".credentials.json"];
+/**
+ * What of the existing CLI login's folder is its own: sessions and memory, prompt history, sign-in, plans, file
+ * snapshots, pasted text, to-dos and logs. Its skills and plugins every account uses.
+ */
+const CLI_LOGIN_PRIVATE = ["projects", "history.jsonl", ".credentials.json", "plans", "file-history", "paste-cache", "todos", "shell-snapshots", "session-env", "sessions", "debug"];
 
 /**
  * An added account uses the personal skills installed for the existing CLI login: each is linked into the

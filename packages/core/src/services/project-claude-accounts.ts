@@ -18,7 +18,7 @@ export interface ProjectAccountPolicy {
   autoSwitch: boolean;
 }
 
-type AccountSettings = Pick<AppSettings, "claudeAccountAutoSwitch"> & Partial<Pick<AppSettings, "claudeAccountsSeparate">>;
+type AccountSettings = Pick<AppSettings, "claudeAccountAutoSwitch" | "claudeAccountsSeparate">;
 
 /**
  * Where a starting thread's account came from, which decides what happens when the project does not use it. "unused"
@@ -78,7 +78,7 @@ function onlyTheseAccounts(db: Db, policy: ProjectAccountPolicy): string {
  */
 export function startingAccount(db: Db, projectId: string, requested: string | undefined, from: AccountSource = "chosen"): string {
   if (from === "own" && requested) return requested;
-  const policy = projectAccountPolicy(db, projectId, { claudeAccountAutoSwitch: false });
+  const policy = projectAccountPolicy(db, projectId, { claudeAccountAutoSwitch: false, claudeAccountsSeparate: false });
   if (from === "unused") return requested && allowsAccount(policy, requested) ? requested : policy.defaultId;
   if (!requested) return newThreadAccount(policy);
   if (allowsAccount(policy, requested)) return requested;

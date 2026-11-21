@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
-import { claudeAccounts, listEvents, orclingMessages, projects, runs, threads } from "@openorc/db";
+import { claudeAccounts, listEvents, orclingMessages, projects, pullReviews, runs, tasks, threads } from "@openorc/db";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { defaultOrclingLook, WORKSPACE_ID, type OrclingDraft } from "@openorc/protocol";
 import type { OrclingStartInput } from "@openorc/mcp";
@@ -128,22 +128,55 @@ it("keeps an Orcling to the Orclings, threads and accounts of its own Claude acc
   try {
     const client = claudeAccounts.add(core.db, "Client").id;
     const pip = await core.orclings.create(draft("Pip"));
-    await core.orclings.create({ ...draft("Bo"), claudeAccountId: client });
+    const bo = await core.orclings.create({ ...draft("Bo"), claudeAccountId: client });
     const project = projects.insert(core.db, { name: "Fixture", rootPath: join(root!, "project"), gitRemote: null, defaultBranch: "main", settings: {} });
+    const mine = threads.insert(core.db, { projectId: project.id, title: "On the CLI login", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
     const elsewhere = threads.insert(core.db, { projectId: project.id, title: "On the client account", agent: "codex", model: null, mode: "act", permissionMode: "trusted", claudeAccountId: client });
+    core.db.stmt("UPDATE threads SET last_activity_at = ? WHERE id = ?").run(Date.now() + 60_000, elsewhere.id);
+    const theirs = tasks.insert(core.db, {
+      projectId: project.id,
+      title: "Their task",
+      spec: null,
+      priority: "none",
+      labels: [],
+      workspaceMode: "current",
+      baseRef: null,
+      parentTaskId: null,
+      threadId: elsewhere.id,
+    });
+    pullReviews.open(core.db, { projectId: project.id, number: 8 }, "a".repeat(40));
+    pullReviews.update(core.db, { projectId: project.id, number: 8 }, { threadId: elsewhere.id });
     say("Pip", "on it");
     await core.threads.continueThread(pip.threadId, { ...turn, prompt: "check in with Bo" });
     await settled(pip.threadId, 1);
     const pipRun = runs.listForThread(core.db, pip.threadId)[0]!;
-    const listed = async () => (JSON.parse(await host().app(pipRun.id, "threads.list", { projectId: project.id })) as { id: string }[]).map((thread) => thread.id);
+    const listed = async (limit?: number) =>
+      (JSON.parse(await host().app(pipRun.id, "threads.list", { projectId: project.id, ...(limit ? { limit } : {}) })) as { id: string }[]).map((thread) => thread.id);
+    const chats = async () => (JSON.parse(await host().app(pipRun.id, "orclings.chats", {})) as { name: string }[]).map((chat) => chat.name);
+    const overview = async () => JSON.parse(await host().project(pipRun.id, project.id, undefined)) as { openTasks: { id: string }[]; threads: { id: string }[] };
+    const taskIds = async () => (JSON.parse(await host().app(pipRun.id, "tasks.list", { projectId: project.id })) as { id: string }[]).map((task) => task.id);
     expect(JSON.parse(await host().orclings(pipRun.id)).orclings).toEqual([{ name: "Bo", busy: false }]);
-    expect(await listed()).toEqual([elsewhere.id]);
+    expect((await listed()).sort()).toEqual([elsewhere.id, mine.id].sort());
+    expect(await chats()).toContain("Bo");
+    const before = await overview();
+    expect(before.openTasks.map((task) => task.id)).toEqual([theirs.id]);
+    expect(before.threads.map((thread) => thread.id)).toContain(elsewhere.id);
+    expect(await taskIds()).toEqual([theirs.id]);
 
     new AppSettingsService(core.db).set({ claudeAccountsSeparate: true });
     expect(JSON.parse(await host().orclings(pipRun.id)).orclings).toEqual([]);
     await expect(host().message(pipRun.id, { to: "bo", text: "is the review done?" })).rejects.toThrow("Bo works on another Claude account, and Settings keeps Claude accounts separate.");
     await expect(host().startGroup(pipRun.id, { with: ["bo"], text: "hello" })).rejects.toThrow(/another Claude account/);
-    expect(await listed()).toEqual([]);
+    expect(await listed()).toEqual([mine.id]);
+    expect(await listed(1)).toEqual([mine.id]);
+    expect(await chats()).toEqual(["Pip"]);
+    expect(await taskIds()).toEqual([]);
+    expect(await overview()).toMatchObject({ openTasks: [], threads: [{ id: mine.id }] });
+    await expect(host().app(pipRun.id, "orclings.profile", { id: bo.id })).rejects.toThrow("That belongs to another Claude account, and Settings keeps Claude accounts separate.");
+    await expect(host().app(pipRun.id, "orclings.create", { draft: { ...draft("Cy"), claudeAccountId: client } })).rejects.toThrow(/you keep Orclings on your own Claude account/);
+    const reviewer = { agent: "codex" as const, model: "fixture", effort: null, fastMode: false };
+    await expect(host().app(pipRun.id, "pulls.review.start", { projectId: project.id, number: 7, reviewer, orclingId: bo.id })).rejects.toThrow(/another Claude account/);
+    await expect(host().app(pipRun.id, "pulls.review.get", { projectId: project.id, number: 8 })).rejects.toThrow(/another Claude account/);
     await expect(host().app(pipRun.id, "threads.get", { id: elsewhere.id })).rejects.toThrow("That belongs to another Claude account, and Settings keeps Claude accounts separate.");
     await expect(host().app(pipRun.id, "threads.switchClaudeAccount", { id: pip.threadId, claudeAccountId: client })).rejects.toThrow(/only the person moves a conversation/);
     const work = (input: Partial<OrclingStartInput>) => host().startWork(pipRun.id, { prompt: "Fix the build", worker: { kind: "self" }, reportBack: false, ...input });

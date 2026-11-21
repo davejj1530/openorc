@@ -1,11 +1,5 @@
 /* Refine (components/task-refine): its bar in the editor's controls row, its sheet's own fields and the suggestion's
    marks. The sheet itself is task-threads.css's. Changed words take the soft fills diff runs use. */
-.task-editor-extra {
-  margin-left: auto;
-}
-.task-editor-extra + .task-editor-mode {
-  margin-left: 0;
-}
 .task-refine-bar {
   display: flex;
   flex-wrap: wrap;

@@ -3,15 +3,16 @@ import { harnessName, type Project, type Run, type Task, type TaskThreadLink, ty
 import { useImperativeHandle, type ReactNode, type Ref } from "react";
 import { TaskFooterActions } from "../components/task-buttons/TaskFooterActions";
 import { ContinueThreadChooser, OpenThreadChooser } from "../components/task-threads/TaskThreadChoosers";
-import { TaskThreadList, useTaskThreads } from "../components/task-threads/TaskThreadList";
+import { TaskThreadList } from "../components/task-threads/TaskThreadList";
 import { TaskDocumentFields } from "../components/task-list/TaskDocumentFields";
+import { useTaskRefine } from "../components/task-refine/TaskRefine";
 import { ArrowUpRight, Check, GitBranch, MessageSquare } from "../components/icons";
 import { StatusIcon } from "../components/status";
 import { TaskComments } from "../components/TaskComments";
 import { TaskDelete } from "../components/TaskDelete";
 import { TaskExecutionSettings, useTaskExecutionLocation } from "../components/TaskExecutionSettings";
 import { Button, TextButton } from "../components/ui";
-import { useRpcMutation } from "../lib/client";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { openTask, openThread } from "../lib/router";
 import { useTaskDocumentDraft } from "../lib/task-document-draft";
 
@@ -122,11 +123,13 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
   const document = useTaskDocumentDraft(task);
   const { draft, imagesReady, draftStored, dirty, saving, saveError, error: flushError, reportError: setFlushError, flush } = document;
   const conversation = useRpcMutation("tasks.openThread");
-  const threads = useTaskThreads(task.id);
+  const threads = useRpc("tasks.threads", { taskId: task.id }).data ?? [];
   const continuable = continuableThread(threads);
   const properties = useRpcMutation("tasks.update");
   const execution = useTaskExecutionLocation(task, flush);
   const { runs } = execution;
+  const basePath = task.worktreePath ?? project.rootPath;
+  const refine = useTaskRefine(task.id, document, basePath, project);
   const flushAll = async () => (await execution.wait()) && (await flush());
   useImperativeHandle(ref, () => ({ flush: flushAll }));
   const openConversation = async () => {
@@ -162,8 +165,8 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
             projectName={project.name}
             pending={properties.isPending}
             error={properties.error?.message ?? null}
-            basePath={task.worktreePath ?? project.rootPath}
-            refine={{ taskId: task.id, project }}
+            basePath={basePath}
+            refine={refine}
             onStatus={(status) => properties.mutate({ id: task.id, patch: { status } })}
             onPriority={(priority) => properties.mutate({ id: task.id, patch: { priority } })}
           />
@@ -192,7 +195,7 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
           <Button disabled={saving || conversation.isPending || execution.isPending} onClick={() => void openConversation()}>
             Open thread <ArrowUpRight size={13} />
           </Button>
-          <OpenThreadChooser task={task} project={project} runs={history} beforeOpen={flushAll} />
+          <OpenThreadChooser task={task} project={project} runs={history} beforeOpen={flushAll} open={conversation.mutateAsync} />
         </TaskFooterActions>
       </footer>
     </div>

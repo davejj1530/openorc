@@ -1,12 +1,25 @@
 import { orclings, projects, taskComments, taskRefines, tasks, runs, type Db } from "@openorc/db";
-import { DEFAULT_CLAUDE_ACCOUNT, sameTaskDocument, TaskSuggestion, type AgentEvent, type CommentRecipient, type RpcParams, type Run, type Task, type TaskRefine } from "@openorc/protocol";
+import {
+  bareToolName,
+  DEFAULT_CLAUDE_ACCOUNT,
+  sameTaskDocument,
+  TaskSuggestion,
+  type AgentEvent,
+  type CommentRecipient,
+  type RpcParams,
+  type Run,
+  type Task,
+  type TaskDocumentSnapshot,
+  type TaskRefine,
+} from "@openorc/protocol";
 import { AttachmentService } from "./attachments.js";
 import { claudeRunAccount } from "./claude-run-account.js";
 import { startingAccount } from "./project-claude-accounts.js";
 import { isSessionLost, type RunService, type TurnSettledOutcome } from "./runs.js";
-import { asOrcling, recipientCatalog, taskSideRunFolder, validateRecipient } from "./task-side-runs.js";
+import { asOrcling, BackgroundJobs, recipientCatalog, taskSideRunFolder, validateRecipient } from "./task-side-runs.js";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const CLOSED = "OpenOrc closed before the suggestion was ready.";
 
 const instructions = [
   "Refine the task so another agent can carry it out well. Read the project as you need to, so the task names the real files, behaviour and limits. Keep the author's intent, and keep wording, links and images that already work.",
@@ -16,8 +29,7 @@ const instructions = [
 ].join("\n\n");
 
 export class TaskRefineService {
-  private closing = false;
-  private readonly jobs = new Set<Promise<unknown>>();
+  private readonly jobs = new BackgroundJobs();
   constructor(
     private db: Db,
     private runService: RunService,
@@ -33,15 +45,10 @@ export class TaskRefineService {
     if (!task || task.retiredTeam) throw new Error("Task not found.");
     return task;
   }
-  private track<T>(promise: Promise<T>): Promise<T> {
-    this.jobs.add(promise);
-    void promise.finally(() => this.jobs.delete(promise)).catch(() => {});
-    return promise;
-  }
 
   /** The task's current refine, refused while one runs or OpenOrc closes. */
   private idle(taskId: string): TaskRefine | null {
-    if (this.closing) throw new Error("OpenOrc is closing.");
+    if (this.jobs.closing) throw new Error("OpenOrc is closing.");
     const current = taskRefines.current(this.db, taskId);
     if (current?.state === "running") throw new Error("This task is already being refined.");
     return current;
@@ -62,10 +69,12 @@ export class TaskRefineService {
     // A Claude model refines on the account chosen, when the project uses it; an Orcling keeps its own.
     const claudeAccountId = recipient.agent === "claude" && !recipient.orclingId && input.claudeAccountId ? startingAccount(this.db, task.projectId, input.claudeAccountId, "chosen") : undefined;
     const earlier = input.again && previous?.suggestion ? previous : null;
-    const resumeRunId = earlier ? this.resumable(earlier, task, recipient, claudeAccountId) : undefined;
-    const refine = taskRefines.insert(this.db, { taskId: task.id, recipient, instruction: input.instruction.trim(), base: { title: task.title, spec: task.spec ?? "", labels: task.labels } });
+    const base = { title: task.title, spec: task.spec ?? "", labels: task.labels };
+    // A session that read an earlier version of the task starts afresh, from the task as it is now.
+    const resumeRunId = earlier && sameTaskDocument(earlier.base, base) ? this.resumable(earlier, task, recipient, claudeAccountId) : undefined;
+    const refine = taskRefines.insert(this.db, { taskId: task.id, recipient, instruction: input.instruction.trim(), base });
     this.changed(task.id);
-    void this.track(this.run(refine, task, { earlier, resumeRunId, edited: earlier ? input.edited : undefined, claudeAccountId }));
+    void this.jobs.track(this.run(refine, task, { earlier, resumeRunId, edited: earlier ? input.edited : undefined, claudeAccountId }));
     return refine;
   }
 
@@ -108,7 +117,7 @@ export class TaskRefineService {
     const refine = taskRefines.forRun(this.db, run.id);
     if (refine?.state !== "running") return;
     let patch: Parameters<typeof taskRefines.update>[2];
-    if (refine.suggestion) patch = { state: sameTaskDocument(refine.base, refine.suggestion) ? "unchanged" : "ready", step: null, error: null };
+    if (refine.suggestion) patch = suggestionEnd(refine.base, refine.suggestion);
     else if (outcome.status === "cancelled") patch = { state: "cancelled", step: null };
     else patch = { state: "error", step: null, error: outcome.error ?? "The agent finished without suggesting anything." };
     taskRefines.update(this.db, refine.id, patch);
@@ -119,14 +128,21 @@ export class TaskRefineService {
     await this.stop(taskId);
   }
 
-  recover() {
-    for (const refine of taskRefines.running(this.db)) taskRefines.update(this.db, refine.id, { state: "error", step: null, error: "OpenOrc closed before the suggestion was ready." });
+  /** Ends each running Refine as OpenOrc quits or after it crashed: with the suggestion it saved, else as an error. */
+  endRunning(): TaskRefine[] {
+    const running = taskRefines.running(this.db);
+    for (const refine of running) taskRefines.update(this.db, refine.id, refine.suggestion ? suggestionEnd(refine.base, refine.suggestion) : { state: "error", step: null, error: CLOSED });
+    return running;
   }
 
+  /** A Refine OpenOrc quits during ends as one it crashed during does, so it still shows after the restart. */
   async close() {
-    this.closing = true;
-    for (const refine of taskRefines.running(this.db)) await this.stop(refine.taskId);
-    await Promise.allSettled([...this.jobs]);
+    this.jobs.closing = true;
+    for (const refine of this.endRunning()) {
+      this.changed(refine.taskId);
+      if (refine.runId) await this.runService.closeAndWait(refine.runId);
+    }
+    await this.jobs.settled();
   }
 
   private async run(refine: TaskRefine, task: Task, { earlier, resumeRunId, edited, claudeAccountId }: RunOptions) {
@@ -151,7 +167,7 @@ export class TaskRefineService {
           this.changed(task.id);
         },
         assertCanStart: () => {
-          if (this.closing || taskRefines.get(this.db, refine.id)?.state !== "running") throw new Error("Refine was stopped.");
+          if (this.jobs.closing || taskRefines.get(this.db, refine.id)?.state !== "running") throw new Error("Refine was stopped.");
         },
       });
     } catch (error) {
@@ -164,9 +180,11 @@ export class TaskRefineService {
   private prompt(task: Task, folder: string, instruction: string, start: string, resumed: boolean): string {
     const asked = instruction || "Nothing specific: make it a clear task an agent can carry out.";
     if (start && resumed) return [`The user read your suggestion and asks for another one.`, start, `What they want changed:\n${asked}`].join("\n\n");
+    // A request to discuss the description is canned text, not the user's words.
     const discussion = taskComments
       .list(this.db, task.id)
-      .comments.slice(-30)
+      .comments.filter((c) => c.source !== "description")
+      .slice(-30)
       .map((c) => `User: ${c.body}`)
       .join("\n\n");
     return [
@@ -199,6 +217,13 @@ export class TaskRefineService {
 type Edited = NonNullable<RpcParams<"tasks.refine.start">["edited"]>;
 type RunOptions = { earlier: TaskRefine | null; resumeRunId: string | undefined; edited: Edited | undefined; claudeAccountId: string | undefined };
 
+const suggestedDocument = (suggestion: TaskSuggestion): TaskDocumentSnapshot => ({ title: suggestion.title, spec: suggestion.description, labels: suggestion.labels });
+
+/** How a Refine that saved a suggestion ends: `unchanged` when it suggests the document it started from. */
+function suggestionEnd(base: TaskDocumentSnapshot, suggestion: TaskSuggestion): Parameters<typeof taskRefines.update>[2] {
+  return { state: sameTaskDocument(base, suggestedDocument(suggestion)) ? "unchanged" : "ready", step: null, error: null };
+}
+
 function startingPoint(earlier: TaskRefine | null, edited: Edited | undefined): string {
   if (edited)
     return `The user edited your previous suggestion. Start from their version and keep their edits unless what they ask now changes them:\nTitle: ${edited.title}\nLabels: ${edited.labels.join(", ") || "none"}\n\n${edited.description}`;
@@ -207,7 +232,7 @@ function startingPoint(earlier: TaskRefine | null, edited: Edited | undefined): 
 }
 
 export function refineStep(name: string, input: unknown): string | null {
-  const tool = name.replace(/^mcp__.*?__|^openorc\./, "");
+  const tool = bareToolName(name);
   if (tool === "task_suggest") return "Writing its suggestion";
   if (tool === "approve") return null;
   const fields = (input ?? {}) as Record<string, unknown>;
@@ -217,6 +242,6 @@ export function refineStep(name: string, input: unknown): string | null {
   if (/^(Grep|Glob|search|find|list_dir|LS)$/i.test(tool)) return "Searching the project";
   if (/shell|exec_command|Bash|run_command/i.test(tool)) return "Running a command";
   if (/WebFetch|WebSearch|fetch/i.test(tool)) return "Reading the web";
-  if (/Task|Agent/.test(tool)) return "Asking a subagent";
+  if (/^(Task|Agent)$/.test(tool)) return "Asking a subagent";
   return "Working";
 }

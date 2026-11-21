@@ -526,7 +526,7 @@ export class OpenOrc {
     // Runs the last instance left open get their ending before anyone sees them as alive.
     core.runs.recoverInterrupted();
     core.comments.recover();
-    core.refines.recover();
+    core.refines.endRunning();
     plans.recover(db);
     core.started = core.start();
     return core;

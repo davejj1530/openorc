@@ -1,9 +1,5 @@
-/* Task buttons: the project settings list and the row in a task's footer. The card sets Settings' measures itself,
-   as the Claude accounts card does, since the project page sits outside Settings. */
-.project-task-buttons {
-  --settings-card-fill: var(--well);
-  margin-top: 32px;
-}
+/* Task buttons: the project settings list and the row in a task's footer. The card's measures are the Claude accounts
+   card's, in settings-design.css. */
 .task-button-list {
   margin: 0;
   padding: 0;
@@ -112,27 +108,10 @@
   flex-shrink: 0;
 }
 
+/* A .typed-options list (styles/controls.css) under the prompt, each description on one line. */
 .task-button-skills {
-  max-height: 260px;
-  overflow: auto;
-  padding: 6px;
   border: var(--hairline) solid var(--line);
   border-radius: var(--radius-lg);
-}
-.task-button-skills button[role="option"] {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  width: 100%;
-  min-height: 36px;
-  padding: 10px;
-  border-radius: var(--radius-md);
-  text-align: left;
-  font-size: var(--text-sm);
-}
-.task-button-skills button[aria-selected="true"],
-.task-button-skills button[role="option"]:hover {
-  background: var(--surface-2);
 }
 .task-button-skills button[role="option"] span:first-child {
   flex-shrink: 0;
@@ -142,5 +121,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--ink-3);
 }

@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
-import type { AccountsProject } from "@openorc/client";
 import { TaskPriority, TaskStatus } from "@openorc/protocol";
 import type { useTaskDocumentDraft } from "../../lib/task-document-draft";
 import { DocumentEditor } from "../DocumentEditor";
-import { useTaskRefine } from "../task-refine/TaskRefine";
+import type { RefineView } from "../task-refine/TaskRefine";
 import { PriorityIcon, StatusIcon, priorityLabel, priorityOrder, statusLabel, statusOrder } from "../status";
 import { Select } from "../ui";
 import { TaskLabelsField, TaskTitleField } from "./TaskTextFields";
@@ -20,7 +19,7 @@ export function TaskDocumentFields({
   error,
   basePath,
   imageUnavailableReason,
-  refine: refinable,
+  refine,
   onStatus,
   onPriority,
 }: {
@@ -34,16 +33,15 @@ export function TaskDocumentFields({
   error: string | null;
   basePath?: string;
   imageUnavailableReason?: string;
-  /** Tasks on this Mac can be refined by an agent, on the Claude accounts their project uses. */
-  refine?: { taskId: string; project: AccountsProject };
+  /** Refine's parts, for a task on this Mac. */
+  refine?: RefineView;
   onStatus(value: TaskStatus): void;
   onPriority(value: TaskPriority): void;
 }) {
   const { draft, patch, flush } = document;
-  const refine = useTaskRefine(refinable?.taskId ?? null, document, basePath, refinable?.project);
   return (
     <>
-      {refine.title ?? <TaskTitleField label="Task title" value={draft.title} readOnly={disabled} onChange={(title) => patch({ title })} onBlur={() => void flush()} />}
+      {refine?.title ?? <TaskTitleField label="Task title" value={draft.title} readOnly={disabled} onChange={(title) => patch({ title })} onBlur={() => void flush()} />}
       <div className="task-properties" aria-label="Task properties">
         {assignee}
         <label className="property-chip">
@@ -83,11 +81,11 @@ export function TaskDocumentFields({
         basePath={basePath}
         disabled={disabled}
         imageUnavailableReason={imageUnavailableReason}
-        controls={refine.button}
-        bar={refine.bar}
-        replacement={refine.suggestion}
+        controls={refine?.button}
+        bar={refine?.bar}
+        replacement={refine?.suggestion}
       />
-      {refine.labels ?? <TaskLabelsField label="Labels" value={draft.labels} readOnly={disabled} onChange={(labels) => patch({ labels })} onBlur={() => void flush()} />}
+      {refine?.labels ?? <TaskLabelsField label="Labels" value={draft.labels} readOnly={disabled} onChange={(labels) => patch({ labels })} onBlur={() => void flush()} />}
     </>
   );
 }

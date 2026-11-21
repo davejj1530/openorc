@@ -3,7 +3,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import { documentExtensions } from "../editor/document-schema";
 import { TaskImage } from "../editor/TaskImage";
 import { ThreadMedia } from "../ThreadImages";
-import { alignGutters, refineDecorations, refineMarks, RefineMarks } from "./refine-marks";
+import { alignGutters, refineDecorations, refineMarksKey, RefineMarks } from "./refine-marks";
 
 export function RefineSuggestion({ base, suggestion, basePath }: { base: string; suggestion: string; basePath?: string }) {
   const [options] = useState(() => ({
@@ -19,7 +19,7 @@ export function RefineSuggestion({ base, suggestion, basePath }: { base: string;
   useEffect(() => {
     if (!editor || editor.isDestroyed || !editor.markdown) return;
     const baseDoc = base.trim() ? editor.schema.nodeFromJSON(editor.markdown.parse(base)) : editor.schema.topNodeType.createAndFill()!;
-    editor.view.dispatch(editor.state.tr.setMeta(refineMarks, refineDecorations(editor.state.doc, baseDoc)));
+    editor.view.dispatch(editor.state.tr.setMeta(refineMarksKey, refineDecorations(editor.state.doc, baseDoc)));
     const frame = requestAnimationFrame(() => alignGutters(editor.view.dom));
     return () => cancelAnimationFrame(frame);
   }, [editor, base]);

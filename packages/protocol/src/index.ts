@@ -20,7 +20,7 @@ export * from "./pull-requests.js";
 export * from "./review-comments.js";
 export * from "./rpc.js";
 export * from "./slack.js";
-export * from "./task-button-skills.js";
+export * from "./skill-calls.js";
 export * from "./task-checkout.js";
 export * from "./task-comments.js";
 export * from "./task-refine.js";

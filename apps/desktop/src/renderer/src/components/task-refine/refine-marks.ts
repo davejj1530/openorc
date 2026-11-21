@@ -8,7 +8,7 @@ type Textblock = DiffBlock & { pos: number; size: number; map: number[] };
 
 /** An image or other inline object holds one place in a block's text, so word positions still map back to the document. */
 const OBJECT = "\uFFFC";
-export const refineMarks = new PluginKey<DecorationSet>("refineMarks");
+export const refineMarksKey = new PluginKey<DecorationSet>("refineMarks");
 
 function textblocks(doc: DocumentNode): Textblock[] {
   const blocks: Textblock[] = [];
@@ -120,12 +120,12 @@ export const RefineMarks = Extension.create({
   name: "refineMarks",
   addProseMirrorPlugins: () => [
     new Plugin<DecorationSet>({
-      key: refineMarks,
+      key: refineMarksKey,
       state: {
         init: () => DecorationSet.empty,
-        apply: (tr, value) => tr.getMeta(refineMarks) ?? value.map(tr.mapping, tr.doc),
+        apply: (tr, value) => tr.getMeta(refineMarksKey) ?? value.map(tr.mapping, tr.doc),
       },
-      props: { decorations: (state) => refineMarks.getState(state) },
+      props: { decorations: (state) => refineMarksKey.getState(state) },
     }),
   ],
 });

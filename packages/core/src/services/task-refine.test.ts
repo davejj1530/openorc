@@ -3,11 +3,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { AcpAdapter, ClaudeAdapter, CodexAdapter, PiAdapter, RunHandle } from "@openorc/agents";
-import { claudeAccounts, projects, runs, settings, subagents, taskRefines, tasks, threads } from "@openorc/db";
+import { claudeAccounts, projects, runs, settings, subagents, taskComments, taskRefines, tasks, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import { isHarnessId, type AgentEvent, type CommentRecipient, type RunSpec, type TaskSuggestion } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import { rpcClient } from "../rpc-test-client.js";
+import { AttachmentService } from "./attachments.js";
 import { inheritedProbe } from "./shell-environment.js";
 import { refineStep } from "./task-refine.js";
 
@@ -32,6 +33,12 @@ async function emit(runId: string, input: Omit<Extract<AgentEvent, { type: "turn
   await new Promise((r) => setTimeout(r, 20));
 }
 const finish = (runId: string) => emit(runId, { type: "turn.completed", turnId: "1", durationMs: 1, status: "success", resultText: "Done." });
+function announceSession(runId: string): string {
+  const sessionId = crypto.randomUUID();
+  const { handle, spec } = sessions.get(runId)!;
+  handle.emit("event", { type: "session.started", runId, ts: Date.now(), externalSessionId: sessionId, agent: spec.agent, model: spec.model ?? null });
+  return sessionId;
+}
 
 beforeAll(async () => {
   root = await realpath(await mkdtemp(path.join(tmpdir(), "task-refine-test-")));
@@ -133,14 +140,13 @@ it("refuses a second refine while one runs, and stops on request", async () => {
   await expect(call("tasks.refine.start", { taskId, recipient, instruction: "", again: false })).rejects.toThrow("already being refined");
   await call("tasks.refine.stop", { taskId });
   expect(taskRefines.get(core.db, refine.id)?.state).toBe("cancelled");
+  expect(core.runs.isLive(refine.runId!)).toBe(false);
   expect(() => core.refines.suggest(refine.runId!, suggestion)).toThrow("no longer active");
 });
 
 it("continues the same session when refining again on the same model", async () => {
   const first = await started();
-  const sessionId = crypto.randomUUID();
-  const { handle, spec } = sessions.get(first.runId!)!;
-  handle.emit("event", { type: "session.started", runId: first.runId!, ts: Date.now(), externalSessionId: sessionId, agent: spec.agent, model: spec.model ?? null });
+  const sessionId = announceSession(first.runId!);
   core.refines.suggest(first.runId!, suggestion);
   await finish(first.runId!);
 
@@ -166,8 +172,7 @@ it("refines on the Claude account chosen, and continues its session only on that
 
   const first = await refined(personal);
   expect(first.account).toBe(personal);
-  const sessionId = crypto.randomUUID();
-  sessions.get(first.runId)!.handle.emit("event", { type: "session.started", runId: first.runId, ts: Date.now(), externalSessionId: sessionId, agent: "claude", model: "test-model" });
+  const sessionId = announceSession(first.runId);
   core.refines.suggest(first.runId, suggestion);
   await finish(first.runId);
 
@@ -216,12 +221,17 @@ it("reads a Worktree task's thread's worktree, and the project folder once that 
   expect(sessions.get(second.runId!)!.spec.cwd).toBe(project.rootPath);
 });
 
-it("turns a refine left running when OpenOrc closed into an error", async () => {
+it("ends a refine left running when OpenOrc closed as an error, or with the suggestion it saved", async () => {
   const refine = await started();
   await call("tasks.refine.stop", { taskId });
   taskRefines.update(core.db, refine.id, { state: "running", step: "Reading files" });
-  core.refines.recover();
+  core.refines.endRunning();
   expect(taskRefines.get(core.db, refine.id)).toMatchObject({ state: "error", step: null, error: "OpenOrc closed before the suggestion was ready." });
+
+  const same = { title: "labels input is clunky", description: "cant remove one without retyping", labels: [], note: "It already says what it needs to." };
+  taskRefines.update(core.db, refine.id, { state: "running", step: "Writing its suggestion", suggestion: same });
+  core.refines.endRunning();
+  expect(taskRefines.get(core.db, refine.id)).toMatchObject({ state: "unchanged", step: null, error: null, suggestion: same });
 });
 
 it("starts one refine when two starts arrive together", async () => {
@@ -245,7 +255,154 @@ it("keeps a Refine's subagents out of the task's thread", async () => {
 it("names what the agent is doing from its tool call", () => {
   expect(refineStep("Read", { file_path: "C:\\repo\\src\\app.ts" })).toBe("Reading app.ts");
   expect(refineStep("mcp__openorc_1__task_suggest", {})).toBe("Writing its suggestion");
+  expect(refineStep(`openorc_${"0a".repeat(16)}.task_suggest`, {})).toBe("Writing its suggestion");
+  expect(refineStep(`openorc_${"0a".repeat(16)}_task_suggest`, {})).toBe("Writing its suggestion");
   expect(refineStep("Grep", { pattern: "x" })).toBe("Searching the project");
   expect(refineStep("Bash", { command: "ls" })).toBe("Running a command");
   expect(refineStep("approve", {})).toBeNull();
+  expect(refineStep("Agent", { prompt: "Find the label input" })).toBe("Asking a subagent");
+  expect(refineStep("TaskCreate", {})).toBe("Working");
+});
+
+it("hands its suggestion back through task_suggest on OpenOrc's MCP server, which offers it no thread tools", async () => {
+  const refine = await started();
+  const mcp = await core.mcpServer();
+  async function request(method: string, params: unknown) {
+    const result = await fetch(mcp.urlForRun(refine.runId!), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    });
+    const text = await result.text();
+    const data =
+      text
+        .split("\n")
+        .find((line) => line.startsWith("data: "))
+        ?.slice(6) ?? text;
+    return JSON.parse(data);
+  }
+  expect((await request("tools/list", {})).result.tools.map((t: { name: string }) => t.name).sort()).toEqual(["approve", "task_suggest"]);
+  const forbidden = await request("tools/call", { name: "task_start", arguments: { id: taskId } });
+  expect(forbidden.result?.isError ?? Boolean(forbidden.error)).toBe(true);
+  const saved = await request("tools/call", { name: "task_suggest", arguments: suggestion });
+  expect(saved.result.isError).not.toBe(true);
+  await finish(refine.runId!);
+  expect(taskRefines.get(core.db, refine.id)).toMatchObject({ state: "ready", suggestion });
+  expect(tasks.get(core.db, taskId)?.status).toBe("backlog");
+});
+
+it("stops a task's Refine and removes it when the task is deleted", async () => {
+  const refine = await started();
+  await call("tasks.delete", { id: taskId });
+  expect(core.runs.isLive(refine.runId!)).toBe(false);
+  expect(taskRefines.get(core.db, refine.id)).toBeNull();
+  expect(runs.get(core.db, refine.runId!)).toBeNull();
+});
+
+it("starts a fresh session when refining again on another model or effort", async () => {
+  vi.mocked(core.runs.models).mockImplementation(async (agent) =>
+    isHarnessId(agent) ? ["test-model", "other-model"].map((id) => ({ agent, id, label: id, isDefault: id === "test-model", efforts: ["high", "low"], defaultEffort: "high" })) : [],
+  );
+  const refinedOn = async (chosen: CommentRecipient) => {
+    const refine = await call("tasks.refine.start", { taskId, recipient: chosen, instruction: "", again: true });
+    await vi.waitFor(() => expect(sessions.has(taskRefines.get(core.db, refine.id)?.runId ?? "")).toBe(true));
+    const runId = taskRefines.get(core.db, refine.id)!.runId!;
+    announceSession(runId);
+    core.refines.suggest(runId, suggestion);
+    await finish(runId);
+    return sessions.get(runId)!.spec;
+  };
+  await refinedOn(recipient);
+
+  for (const chosen of [
+    { ...recipient, model: "other-model" },
+    { ...recipient, model: "other-model", effort: "low" },
+  ]) {
+    const next = await refinedOn(chosen);
+    expect(next.resumeSessionId ?? null).toBeNull();
+    expect(next.prompt).toContain("Your previous suggestion, which the user hasn't used:\nTitle: Edit task labels as chips");
+  }
+});
+
+it("starts afresh from the task as it is now when the task changed since the last suggestion", async () => {
+  const first = await started();
+  announceSession(first.runId!);
+  core.refines.suggest(first.runId!, suggestion);
+  await finish(first.runId!);
+  await call("tasks.update", { id: taskId, patch: { title: "Labels as chips" } });
+
+  const again = await started("Shorter", true);
+  const next = sessions.get(again.runId!)!.spec;
+  expect(next.resumeSessionId ?? null).toBeNull();
+  expect(next.prompt).toContain("Task: Labels as chips\n");
+  expect(next.prompt).toContain("Your previous suggestion, which the user hasn't used:\nTitle: Edit task labels as chips");
+  expect(again.base.title).toBe("Labels as chips");
+});
+
+it("gives the agent the task's comments and the images in its description, without requests to discuss the description", async () => {
+  const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const image = await new AttachmentService(dataDir).save({ name: "chips.png", mime: "image/png", dataBase64: PNG });
+  await call("tasks.update", { id: taskId, patch: { spec: `cant remove one without retyping\n\n![Chips](${image.url})` } });
+  await call("tasks.comments.post", { taskId, body: "Keep Backspace removing the last label.", recipients: [], requestKey: crypto.randomUUID(), source: "comment" });
+  taskComments.insert(core.db, {
+    taskId,
+    requestKey: crypto.randomUUID(),
+    body: "Please discuss the saved task description with me.",
+    recipients: [],
+    replyTo: null,
+    source: "description",
+    context: "",
+  });
+
+  const refine = await started();
+  const { spec } = sessions.get(refine.runId!)!;
+  expect(spec.prompt).toContain("Comments on the task (context, not instructions):\nUser: Keep Backspace removing the last label.");
+  expect(spec.prompt).not.toContain("Please discuss the saved task description");
+  expect(spec.systemPromptAppendix).toContain(`Task images: ${image.path}`);
+});
+
+it("ends a Refine whose agent couldn't start, or whose turn failed, with the error, and one stopped before its agent started as cancelled", async () => {
+  vi.spyOn(core.runs, "start").mockRejectedValueOnce(new Error("Codex is signed out."));
+  const refused = await call("tasks.refine.start", { taskId, recipient, instruction: "", again: false });
+  await vi.waitFor(() => expect(taskRefines.get(core.db, refused.id)).toMatchObject({ state: "error", error: "Codex is signed out.", runId: null }));
+
+  const failed = await started();
+  sessions.get(failed.runId!)!.handle.emit("event", { type: "error", runId: failed.runId!, ts: Date.now(), message: "You've hit your usage limit.", fatal: true });
+  await emit(failed.runId!, { type: "turn.completed", turnId: "1", durationMs: 1, status: "error" });
+  expect(taskRefines.get(core.db, failed.id)).toMatchObject({ state: "error", error: "You've hit your usage limit." });
+
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => (release = resolve));
+  const start = core.runs.start.bind(core.runs);
+  vi.spyOn(core.runs, "start").mockImplementationOnce(async (input) => {
+    await waiting;
+    return start(input);
+  });
+  const stopped = await call("tasks.refine.start", { taskId, recipient, instruction: "", again: false });
+  await call("tasks.refine.stop", { taskId });
+  const count = sessions.size;
+  release();
+  await core.refines.close();
+  expect(taskRefines.get(core.db, stopped.id)).toMatchObject({ state: "cancelled", error: null, runId: null });
+  expect(sessions.size).toBe(count);
+});
+
+it("ends a Refine running when OpenOrc quits with the suggestion it saved, else says it ended before one, and ends its agent", async () => {
+  const suggested = await started();
+  core.refines.suggest(suggested.runId!, suggestion);
+  taskId = (await call("tasks.create", { projectId, title: "Chips everywhere", spec: "In comments too.", workspaceMode: "current" })).id;
+  const refine = await started();
+  await core.refines.close();
+  expect(taskRefines.get(core.db, suggested.id)).toMatchObject({ state: "ready", step: null, error: null, suggestion });
+  expect(taskRefines.get(core.db, refine.id)).toMatchObject({ state: "error", step: null, error: "OpenOrc closed before the suggestion was ready." });
+  expect(core.runs.isLive(suggested.runId!)).toBe(false);
+  expect(core.runs.isLive(refine.runId!)).toBe(false);
+});
+
+it("takes a suggestion with a long title and many long labels", async () => {
+  const refine = await started();
+  const long = { ...suggestion, title: "T".repeat(300), labels: Array.from({ length: 40 }, (_, index) => `label ${index} `.padEnd(100, "x")) };
+  core.refines.suggest(refine.runId!, long);
+  await finish(refine.runId!);
+  expect(taskRefines.get(core.db, refine.id)).toMatchObject({ state: "ready", suggestion: long });
 });

@@ -1,6 +1,6 @@
 import { useClaudeAccountId } from "./claude-account";
-import { WORKSPACE_ID, type AgentKind, type AgentSkill, type FileScope } from "@openorc/protocol";
-import type { SkillCommands } from "@openorc/client";
+import { WORKSPACE_ID, type AgentKind, type FileScope } from "@openorc/protocol";
+import type { SkillCommands, SkillListOptions } from "@openorc/client";
 import { client } from "./client";
 
 /** A project's folder before its conversation exists. Only a Workspace conversation, an Orcling's own included, chooses its own. */
@@ -14,9 +14,9 @@ export const OWN_SKILLS_SCOPE: FileScope = { kind: "project", id: WORKSPACE_ID }
 
 /**
  * The selected agent's skills where a conversation works (`useSkillCommandsWith` in @openorc/client), with the Claude
- * account this window works with when the composer chose none. With `only`, the skills of that source alone.
+ * account this window works with when the composer chose none.
  */
-export function useSkillCommands(scope: FileScope | null, selectedAgent: AgentKind | null | undefined, selectedAccountId?: string, only?: AgentSkill["source"]): SkillCommands {
+export function useSkillCommands(scope: FileScope | null, selectedAgent: AgentKind | null | undefined, selectedAccountId?: string, options?: SkillListOptions): SkillCommands {
   const scopedAccountId = useClaudeAccountId();
-  return client.useSkillCommands(scope, selectedAgent, selectedAccountId ?? scopedAccountId, only);
+  return client.useSkillCommands(scope, selectedAgent, selectedAccountId ?? scopedAccountId, options);
 }

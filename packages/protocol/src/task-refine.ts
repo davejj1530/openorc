@@ -8,9 +8,9 @@ import { CommentRecipient } from "./task-comments.js";
  */
 export const TaskSuggestion = z
   .object({
-    title: z.string().trim().min(1).max(200),
+    title: z.string().trim().min(1),
     description: z.string().max(200000),
-    labels: z.array(z.string().trim().min(1).max(80)).max(32).default([]),
+    labels: z.array(z.string().trim().min(1)).default([]),
     note: z.string().trim().min(1).max(600),
   })
   .strict();
@@ -52,15 +52,15 @@ export const TaskRefineStart = z
     again: z.boolean().default(false),
     /** Refine again after editing the suggestion: the person's version, which the next suggestion starts from. */
     edited: z
-      .object({ title: z.string().max(200), description: z.string().max(200000), labels: z.array(z.string().max(80)).max(32) })
+      .object({ title: z.string(), description: z.string().max(200000), labels: z.array(z.string()) })
       .strict()
       .optional(),
   })
   .strict();
 
-export function sameTaskDocument(a: TaskDocumentSnapshot, b: Pick<TaskDocumentSnapshot, "title" | "labels"> & { spec?: string; description?: string }): boolean {
+export function sameTaskDocument(a: TaskDocumentSnapshot, b: TaskDocumentSnapshot): boolean {
   const labels = (list: string[]) => [...new Set(list.map((label) => label.trim()).filter(Boolean))].sort().join("\n");
-  return a.title.trim() === b.title.trim() && a.spec.trim() === (b.spec ?? b.description ?? "").trim() && labels(a.labels) === labels(b.labels);
+  return a.title.trim() === b.title.trim() && a.spec.trim() === b.spec.trim() && labels(a.labels) === labels(b.labels);
 }
 
 /** Refine's methods, kept beside its types as projects.ts keeps its own. */

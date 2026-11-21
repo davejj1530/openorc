@@ -1,16 +1,9 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { ClaudeAccounts, ModelOption, TaskRefine } from "@openorc/protocol";
-import { core } from "../../lib/rpc";
+import type { ModelOption, TaskRefine } from "@openorc/protocol";
 import type { useTaskDocumentDraft } from "../../lib/task-document-draft";
+import { accounts, api, calls, enabledAccount, wrap } from "../test-fixtures/task-choices";
 import { useTaskRefine } from "./TaskRefine";
-
-/** The Account field once a Claude model makes it a choice; before that it shows disabled. */
-async function enabledAccount(scope: Pick<typeof screen, "getByRole">): Promise<HTMLSelectElement> {
-  await waitFor(() => expect(scope.getByRole<HTMLSelectElement>("combobox", { name: "Account" }).disabled).toBe(false));
-  return scope.getByRole<HTMLSelectElement>("combobox", { name: "Account" });
-}
 
 vi.mock("./RefineSuggestion", () => ({ RefineSuggestion: ({ suggestion }: { suggestion: string }) => <div data-testid="suggestion">{suggestion}</div> }));
 vi.mock("../DocumentEditor", () => ({
@@ -24,15 +17,13 @@ const models: ModelOption[] = [
   { id: "test-model", label: "Test", agent: "codex", efforts: ["high", "low"], defaultEffort: "high", isDefault: true },
   { id: "opus-test", label: "Opus Test", agent: "claude", efforts: ["high"], defaultEffort: "high", isDefault: false },
 ];
-const account = (id: string, name: string) => ({ id, name, kind: "managed", enabled: true, createdAt: 1, status: "ready", email: null, organization: null, message: null }) as const;
-const accounts: ClaudeAccounts = { accounts: [account("work", "Work"), account("personal", "Personal")], defaultId: "work" };
 const recipient = { agent: "codex" as const, model: "test-model", effort: "high" };
 const suggestion = { title: "Edit task labels as chips", description: "## Goal\n\nOne at a time.", labels: ["tasks", "ui"], note: "Based on TaskDocumentFields.tsx." };
 let refine: TaskRefine | null;
 let modelList = models;
 let availability: { id: string; state: string }[] | null = null;
 let defaultHarness: string | null = null;
-const api = vi.spyOn(core, "call");
+let dismissFails = false;
 const replace = vi.fn();
 const patch = vi.fn();
 const flush = vi.fn(async () => true);
@@ -64,6 +55,7 @@ beforeEach(() => {
   flush.mockClear();
   availability = null;
   defaultHarness = null;
+  dismissFails = false;
   api.mockReset().mockImplementation(async (method) => {
     if (method === "agents.models") return modelList as never;
     if (method === "agents.availability") return availability as never;
@@ -72,6 +64,7 @@ beforeEach(() => {
     if (method === "claude.accounts.list") return accounts as never;
     if (method === "tasks.refine.get") return refine as never;
     if (method === "tasks.refine.start") return ready({ state: "running", suggestion: null }) as never;
+    if (method === "tasks.refine.dismiss" && dismissFails) throw new Error("The suggestion couldn’t be put away.");
     return null as never;
   });
 });
@@ -89,19 +82,15 @@ function Harness({ value }: { value: TaskDocument }) {
     </div>
   );
 }
-const mount = (value = document()) =>
-  render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })}>
-      <Harness value={value} />
-    </QueryClientProvider>,
-  );
-const calls = (method: string) => api.mock.calls.filter(([name]) => name === method).map(([, params]) => params);
+const mount = (value = document()) => wrap(<Harness value={value} />);
 
 it("saves the draft, then refines with what the person typed and the model they chose", async () => {
   mount();
   fireEvent.click(await screen.findByRole("button", { name: "Refine" }));
   const sheet = await screen.findByRole("dialog");
-  fireEvent.change(within(sheet).getByRole("textbox", { name: "What should change?" }), { target: { value: "Add how to verify it" } });
+  const instruction = within(sheet).getByRole<HTMLTextAreaElement>("textbox", { name: "What should change?" });
+  expect(instruction.maxLength).toBe(4000);
+  fireEvent.change(instruction, { target: { value: "Add how to verify it" } });
   await waitFor(() => expect(within(sheet).getByRole<HTMLSelectElement>("combobox", { name: "Refine with" }).value).toContain("test-model"));
   fireEvent.click(within(sheet).getByRole("button", { name: "Refine" }));
   await waitFor(() => expect(calls("tasks.refine.start")).toEqual([{ taskId: "task", recipient, instruction: "Add how to verify it", again: false }]));
@@ -187,7 +176,6 @@ it("lets the person edit the suggestion first, keeps the edits across a remount,
 
   mount();
   expect(await screen.findByText("Suggested by Test, with your edits")).toBeTruthy();
-  expect(screen.getByText(/Includes your edits\./)).toBeTruthy();
   expect(screen.getByTestId("suggestion").textContent).toBe("## Goal\n\nOne at a time, with Backspace.");
   fireEvent.click(screen.getByRole("button", { name: "Use suggestion" }));
   expect(replace).toHaveBeenCalledWith("## Goal\n\nOne at a time, with Backspace.");
@@ -232,18 +220,26 @@ it("offers only the agents signed in here, starting on the person's default agen
   ).toBe(false);
 });
 
-it("starts on the person's default agent when more than one is signed in", async () => {
-  modelList = [models[0]!, { ...models[1]!, isDefault: true }];
+it("starts on the person's default agent at its model's default effort when more than one is signed in, else on the first agent OpenOrc lists", async () => {
+  modelList = [models[0]!, { ...models[1]!, efforts: ["low", "high"], defaultEffort: "high" }];
   availability = [
     { id: "codex", state: "ready" },
     { id: "claude", state: "ready" },
   ];
+  const startsOn = async () => {
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Refine" }));
+    return within(await screen.findByRole("dialog")).getByRole<HTMLSelectElement>("combobox", { name: "Refine with" });
+  };
   defaultHarness = "claude";
-  mount();
-  fireEvent.click(await screen.findByRole("button", { name: "Refine" }));
-  const refineWith = within(await screen.findByRole("dialog")).getByRole<HTMLSelectElement>("combobox", { name: "Refine with" });
+  const refineWith = await startsOn();
   await waitFor(() => expect(refineWith.value).toBe(JSON.stringify(["claude", "opus-test", "high"])));
-  expect(within(refineWith).getAllByRole("option")).toHaveLength(3);
+  expect(within(refineWith).getAllByRole("option")).toHaveLength(4);
+  cleanup();
+
+  defaultHarness = null;
+  const onDefault = await startsOn();
+  await waitFor(() => expect(onDefault.value).toBe(JSON.stringify(["codex", "test-model", "high"])));
 });
 
 it("says when the agent couldn't finish, and tries again from the sheet", async () => {
@@ -273,4 +269,56 @@ it("starts one Refine however often it is asked for while the task saves", async
   save(true);
   await waitFor(() => expect(calls("tasks.refine.start")).toHaveLength(1));
   expect(flush).toHaveBeenCalledOnce();
+});
+
+it("refines nothing and says why when the task's latest changes couldn't be saved", async () => {
+  flush.mockImplementationOnce(async () => false);
+  mount();
+  fireEvent.click(await screen.findByRole("button", { name: "Refine" }));
+  const sheet = await screen.findByRole("dialog");
+  await waitFor(() => expect(within(sheet).getByRole<HTMLSelectElement>("combobox", { name: "Refine with" }).value).toContain("test-model"));
+  fireEvent.click(within(sheet).getByRole("button", { name: "Refine" }));
+  expect((await within(sheet).findByRole("alert")).textContent).toBe("The task’s latest changes couldn’t be saved, so it can’t be refined yet.");
+  expect(calls("tasks.refine.start")).toEqual([]);
+});
+
+it("shows the suggestion again with the person's edits and why when it couldn't be dismissed, until another Refine starts", async () => {
+  refine = ready();
+  dismissFails = true;
+  mount();
+  fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Suggested title" }), { target: { value: "Edit labels as chips" } });
+  fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+  expect(await screen.findByText(/The suggestion couldn’t be put away\./)).toBeTruthy();
+  expect(screen.getByText("Editing Test’s suggestion")).toBeTruthy();
+  expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Suggested title" }).value).toBe("Edit labels as chips");
+
+  fireEvent.click(screen.getByRole("button", { name: "Refine again" }));
+  const sheet = await screen.findByRole("dialog");
+  await waitFor(() => expect(within(sheet).getByRole<HTMLSelectElement>("combobox", { name: "Refine with" }).value).toContain("test-model"));
+  fireEvent.click(within(sheet).getByRole("button", { name: "Refine" }));
+  await waitFor(() => expect(calls("tasks.refine.start")).toHaveLength(1));
+  await waitFor(() => expect(screen.queryByText(/couldn’t be put away/)).toBeNull());
+});
+
+it("offers Refine again once a Refine was cancelled", async () => {
+  refine = ready({ state: "cancelled", suggestion: null });
+  mount();
+  expect(await screen.findByRole("button", { name: "Refine" })).toHaveProperty("disabled", false);
+  expect(screen.queryByText(/Suggested by/)).toBeNull();
+});
+
+it("can't use a suggestion whose title is empty", async () => {
+  refine = ready({ suggestion: { ...suggestion, title: " " } });
+  mount();
+  expect(await screen.findByRole("button", { name: "Use suggestion" })).toHaveProperty("disabled", true);
+});
+
+it("can't refine with no agent signed in here", async () => {
+  availability = [
+    { id: "codex", state: "sign_in" },
+    { id: "claude", state: "sign_in" },
+  ];
+  mount();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Refine" })).toHaveProperty("disabled", true));
 });

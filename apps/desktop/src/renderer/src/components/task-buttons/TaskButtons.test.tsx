@@ -1,34 +1,22 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { cleanup, fireEvent, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AgentSkill, ClaudeAccounts, ModelOption, Project, Task, TaskButton } from "@openorc/protocol";
-import { core } from "../../lib/rpc";
+import { queryClient } from "../../lib/client";
 import * as router from "../../lib/router";
+import { account, accounts, api, calls, enabledAccount, models, opus, wrap, wrapper } from "../test-fixtures/task-choices";
 import { usePromptSkills } from "./TaskButtonPrompt";
 import { TaskButtonsSection } from "./TaskButtonsSection";
 import { TaskFooterActions } from "./TaskFooterActions";
 
-/** The Account field once a Claude model makes it a choice; before that it shows disabled. */
-async function enabledAccount(scope: Pick<typeof screen, "getByRole">): Promise<HTMLSelectElement> {
-  await waitFor(() => expect(scope.getByRole<HTMLSelectElement>("combobox", { name: "Account" }).disabled).toBe(false));
-  return scope.getByRole<HTMLSelectElement>("combobox", { name: "Account" });
-}
-
 const review: TaskButton = { id: "review", label: "Review", prompt: "Review this task's changes and list any risks.", runsIn: "new", mode: "plan" };
 const project = { id: "project", name: "openorc", settings: { setupScript: null, worktreeInclude: [], branchPrefix: "openorc", detectedConfigs: [], taskButtons: [review] } } as unknown as Project;
 const task = { id: "task", projectId: "project", title: "Edit labels as chips" } as Task;
-const api = vi.spyOn(core, "call");
 const openThread = vi.spyOn(router, "openThread").mockImplementation(() => {});
 const openProject = vi.spyOn(router, "openProject").mockImplementation(() => {});
 let failRun = false;
-const models: ModelOption[] = [
-  { id: "gpt-test", label: "GPT Test", agent: "codex", efforts: ["high"], defaultEffort: "high", isDefault: true },
-  { id: "opus-test", label: "Opus Test", agent: "claude", efforts: ["high"], defaultEffort: "high", isDefault: true },
-];
-const account = (id: string, name: string) => ({ id, name, kind: "managed", enabled: true, createdAt: 1, status: "ready", email: null, organization: null, message: null }) as const;
-const accounts: ClaudeAccounts = { accounts: [account("work", "Work"), account("personal", "Personal"), { ...account("old", "Old"), enabled: false }], defaultId: "work" };
-const opus = JSON.stringify(["claude", "opus-test", "high"]);
+let modelList = models;
+const withDisabled: ClaudeAccounts = { ...accounts, accounts: [...accounts.accounts, { ...account("old", "Old"), enabled: false }] };
+const openCode: ModelOption = { id: "opencode-test", label: "OpenCode Test", agent: "opencode", efforts: [], defaultEffort: null, isDefault: true };
 const skills: AgentSkill[] = [
   { name: "say-hello", description: "Greets the person by name, then says what this project is for in one short paragraph.", source: "project", path: "/repo/.claude/skills/say-hello/SKILL.md" },
   { name: "review-mine", description: "Reviews the changes.", source: "user", path: "/home/me/.claude/skills/review-mine/SKILL.md" },
@@ -36,6 +24,7 @@ const skills: AgentSkill[] = [
 
 beforeEach(() => {
   failRun = false;
+  modelList = models;
   openThread.mockClear();
   openProject.mockClear();
   api.mockReset().mockImplementation(async (method, params) => {
@@ -44,16 +33,14 @@ beforeEach(() => {
       return { threadId: "review-thread" } as never;
     }
     if (method === "projects.updateSettings") return { ...project, settings: { ...project.settings, ...(params as { settings: object }).settings } } as never;
-    if (method === "agents.models") return models as never;
-    if (method === "claude.accounts.list") return accounts as never;
+    if (method === "agents.models") return modelList as never;
+    if (method === "claude.accounts.list") return withDisabled as never;
     if (method === "skills.list") return skills as never;
     if (method === "app.settings.get") return { defaultHarness: "claude" } as never;
     return null as never;
   });
 });
 afterEach(cleanup);
-const wrap = (node: ReactNode) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })}>{node}</QueryClientProvider>);
-const calls = (method: string) => api.mock.calls.filter(([name]) => name === method).map(([, params]) => params);
 
 const footer = (beforeRun: () => Promise<boolean>, shown: Partial<Task> = {}, buttons = [review]) => (
   <TaskFooterActions task={{ ...task, ...shown }} buttons={buttons} disabled={false} beforeRun={beforeRun}>
@@ -264,9 +251,11 @@ it("leaves Archived out of a button's statuses, and reads one saved only for it 
   expect(savedButtons()).toEqual([{ ...review, statuses: ["review"] }]);
 });
 
+const unsentDraft = async (method: string) => (method === "tasks.runButton" ? { threadId: "review-thread", message: "Review this.", draft: "Earlier note\n\nReview this." } : null) as never;
+
 it("shows a button only on its statuses, and adds an unsent message to what the thread's box has", async () => {
-  const unsent: TaskButton = { ...review, autoSend: false, statuses: ["review"] };
-  api.mockImplementation(async (method) => ({ threadId: "review-thread", draft: method === "tasks.runButton" ? "Review this." : undefined }) as never);
+  const unsent: TaskButton = { ...review, runsIn: "task", autoSend: false, statuses: ["review"] };
+  api.mockImplementation(unsentDraft);
   const view = wrap(footer(async () => true, { status: "in_progress" }, [unsent]));
   expect(screen.queryByRole("button", { name: "Review" })).toBeNull();
   view.unmount();
@@ -279,13 +268,16 @@ it("shows a button only on its statuses, and adds an unsent message to what the 
   localStorage.clear();
 });
 
-it("leaves the thread's saved draft to bring an unsent message when nothing is typed here", async () => {
-  api.mockImplementation(async (method) => ({ threadId: "review-thread", draft: method === "tasks.runButton" ? "Review this." : undefined }) as never);
+it("opens the box on the thread's saved draft, which has the unsent message, keeping no copy here when nothing is typed here", async () => {
+  api.mockImplementation(unsentDraft);
   localStorage.clear();
-  wrap(footer(async () => true, {}, [{ ...review, autoSend: false }]));
+  queryClient.setQueryData(["threads.get", { id: "review-thread" }], { id: "review-thread", draft: "Earlier note" });
+  wrap(footer(async () => true, {}, [{ ...review, runsIn: "task", autoSend: false }]));
   fireEvent.click(screen.getByRole("button", { name: "Review" }));
   await waitFor(() => expect(openThread).toHaveBeenCalledWith("review-thread"));
-  expect(localStorage.length).toBe(0);
+  expect(localStorage.getItem("openorc.draft.conversation.review-thread")).toBeNull();
+  expect(queryClient.getQueryData(["threads.get", { id: "review-thread" }])).toMatchObject({ draft: "Earlier note\n\nReview this." });
+  queryClient.clear();
 });
 
 it("keeps a skill saved earlier while the prompt calls it, though the agent no longer lists it", async () => {
@@ -300,9 +292,48 @@ it("keeps a skill saved earlier while the prompt calls it, though the agent no l
 });
 
 it("lists Pi's skills by their names alone, as the prompt calls them", async () => {
-  const { result } = renderHook(() => usePromptSkills("project", { agent: "pi", model: "pi-test", effort: null }), {
-    wrapper: ({ children }) => <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{children}</QueryClientProvider>,
-  });
+  const { result } = renderHook(() => usePromptSkills("project", { agent: "pi", model: "pi-test", effort: null }), { wrapper });
   await waitFor(() => expect(result.current.skills.map((skill) => skill.name)).toEqual(["say-hello", "review-mine"]));
   expect(calls("skills.list")).toContainEqual({ scope: { kind: "project", id: "project" }, agent: "pi" });
+});
+
+it("reads a Codex button saved in the act mode of an earlier build as Default, and saves it so", async () => {
+  const actButton = { ...review, mode: "act", choice: { agent: "codex", model: "gpt-test", effort: "high" } } as unknown as TaskButton;
+  wrap(<TaskButtonsSection project={{ ...project, settings: { ...project.settings, taskButtons: [actButton] } }} />);
+  expect(await screen.findByText("New thread · GPT Test - High")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Edit Review button" }));
+  const dialog = within(await screen.findByRole("dialog", { name: "Edit button" }));
+  expect(dialog.getByRole<HTMLSelectElement>("combobox", { name: /^Mode\b/ }).value).toBe("thread");
+  fireEvent.click(dialog.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(calls("projects.updateSettings")).toHaveLength(1));
+  expect(savedButtons()).toEqual([{ ...actButton, mode: "thread" }]);
+});
+
+it("puts the mode back to Default when the model chosen is on an agent that can't run it", async () => {
+  modelList = [...models, openCode];
+  const { dialog } = await newButton();
+  const mode = dialog.getByRole("combobox", { name: /^Mode\b/ }) as HTMLSelectElement;
+  fireEvent.change(mode, { target: { value: "trusted" } });
+  const model = dialog.getByRole("combobox", { name: "Model" }) as HTMLSelectElement;
+  fireEvent.change(model, { target: { value: opus } });
+  expect(mode.value).toBe("trusted");
+  await waitFor(() => expect(within(model).queryByRole("option", { name: "OpenCode Test" })).toBeTruthy());
+  fireEvent.change(model, { target: { value: JSON.stringify(["opencode", "opencode-test", null]) } });
+  expect(mode.value).toBe("thread");
+});
+
+it("lists the project's skills for a button on an OpenCode model, which has no call for them, and saves the one picked", async () => {
+  modelList = [...models, openCode];
+  const { dialog, prompt } = await newButton();
+  const model = dialog.getByRole("combobox", { name: "Model" });
+  await waitFor(() => expect(within(model).queryByRole("option", { name: "OpenCode Test" })).toBeTruthy());
+  fireEvent.change(model, { target: { value: JSON.stringify(["opencode", "opencode-test", null]) } });
+  fireEvent.change(prompt, { target: { value: "/sa" } });
+  await dialog.findByRole("option", { name: /^\/say-hello Greets the person/ });
+  expect(calls("skills.list")).toContainEqual({ scope: { kind: "project", id: "project" }, agent: "opencode" });
+  fireEvent.keyDown(prompt, { key: "Enter" });
+  expect(prompt.value).toBe("/say-hello ");
+  fireEvent.click(dialog.getByRole("button", { name: "Add button" }));
+  await waitFor(() => expect(calls("projects.updateSettings")).toHaveLength(1));
+  expect(savedButtons().at(-1)).toMatchObject({ prompt: "/say-hello", skills: ["say-hello"], choice: { agent: "opencode", model: "opencode-test", effort: null } });
 });

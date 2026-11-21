@@ -1,5 +1,5 @@
 /* Shared controls: keyboard focus, the hover step, the segmented track, the switch, the
-   count badge and chips. */
+   count badge, chips and the options for a word being typed. */
 
 /* Keyboard focus on quiet controls is the strong fill and full ink, including selects with
    custom arrows. Filled controls (the ink pill, a pressed chip, a segmented choice) would turn
@@ -397,4 +397,30 @@ label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
 }
 .select-value > [aria-hidden="true"] {
   visibility: hidden;
+}
+
+/* The options for the word being typed in a text box, each a name and a quieter line: a task
+   comment's mentions and a task button prompt's skills. */
+.typed-options {
+  max-height: 260px;
+  overflow: auto;
+  padding: 6px;
+}
+.typed-options button[role="option"] {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  min-height: 36px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  text-align: left;
+  font-size: var(--text-sm);
+}
+.typed-options button[aria-selected="true"],
+.typed-options button[role="option"]:hover {
+  background: var(--surface-2);
+}
+.typed-options button[role="option"] span:last-child {
+  color: var(--ink-3);
 }

@@ -12,7 +12,7 @@ export function validateRecipient(recipient: CommentRecipient, catalog: ModelOpt
   const unavailable = executionModeUnavailable(recipient.agent, "plan");
   if (unavailable) throw new Error(unavailable);
   const model = catalog.find((m) => m.agent === recipient.agent && m.id === recipient.model);
-  if (!model || model.unavailable) throw new Error(model?.unavailable ?? `Model ${recipient.model} is unavailable. Choose another recipient.`);
+  if (!model || model.unavailable) throw new Error(model?.unavailable ?? `Model ${recipient.model} is unavailable. Choose another model.`);
   const efforts = modelEfforts(recipient.agent, recipient.model, model.efforts);
   if (recipient.effort !== null && !efforts.includes(recipient.effort)) throw new Error(`Unsupported effort for ${model.label}.`);
 }
@@ -21,7 +21,7 @@ export function validateRecipient(recipient: CommentRecipient, catalog: ModelOpt
 export function asOrcling(recipient: CommentRecipient, everyOrcling: Orcling[]): CommentRecipient {
   if (!recipient.orclingId) return recipient;
   const orcling = everyOrcling.find((o) => o.id === recipient.orclingId);
-  if (!orcling) throw new Error("That Orcling no longer exists. Mention another agent.");
+  if (!orcling) throw new Error("That Orcling no longer exists. Choose another agent.");
   return { agent: orcling.settings.agent, model: orcling.settings.model, effort: orcling.settings.effort, orclingId: orcling.id };
 }
 
@@ -38,4 +38,20 @@ export async function taskSideRunFolder(db: Db, task: Task, project: Project): P
     () => folder,
     () => project.rootPath,
   );
+}
+
+/** The background work a task's comments or Refines started, which OpenOrc waits for once it is closing. */
+export class BackgroundJobs {
+  closing = false;
+  private readonly running = new Set<Promise<unknown>>();
+
+  track<T>(promise: Promise<T>): Promise<T> {
+    this.running.add(promise);
+    void promise.finally(() => this.running.delete(promise)).catch(() => {});
+    return promise;
+  }
+
+  settled(): Promise<unknown> {
+    return Promise.allSettled([...this.running]);
+  }
 }

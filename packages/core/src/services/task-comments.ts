@@ -14,7 +14,7 @@ import {
 } from "@openorc/protocol";
 import { AttachmentService } from "./attachments.js";
 import { isSessionLost, type RunService, type TurnSettledOutcome } from "./runs.js";
-import { asOrcling, recipientCatalog, taskSideRunFolder, validateRecipient } from "./task-side-runs.js";
+import { asOrcling, BackgroundJobs, recipientCatalog, taskSideRunFolder, validateRecipient } from "./task-side-runs.js";
 import type { ThreadService } from "./threads.js";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -28,9 +28,8 @@ const prose = (text: string) =>
 
 /** Owns task discussion. The run service owns providers; the thread service owns all implementation. */
 export class TaskCommentService {
-  private closing = false;
+  private readonly jobs = new BackgroundJobs();
   private readonly queues = new Map<string, Promise<void>>();
-  private readonly jobs = new Set<Promise<unknown>>();
   private readonly releases = new Map<string, () => void>();
   private readonly executing = new Map<string, string>();
   private readonly questions = new Map<string, { runId: string; approvalId: string; input: unknown }>();
@@ -59,11 +58,6 @@ export class TaskCommentService {
     if (!item || item.taskId !== taskId) throw new Error("Response not found on this task.");
     return item;
   }
-  private track<T>(promise: Promise<T>): Promise<T> {
-    this.jobs.add(promise);
-    void promise.finally(() => this.jobs.delete(promise)).catch(() => {});
-    return promise;
-  }
   list(taskId: string): TaskDiscussion {
     this.task(taskId);
     const result = taskComments.list(this.db, taskId);
@@ -85,7 +79,7 @@ export class TaskCommentService {
     const initialTask = this.writableTask(input.taskId);
     const needsModels = input.recipients.length > 0 || /(?:^|\s)@/.test(input.source === "description" ? (initialTask.spec ?? "") : input.body);
     const catalog = needsModels ? await recipientCatalog(this.runService) : [];
-    if (this.closing) throw new Error("OpenOrc is closing.");
+    if (this.jobs.closing) throw new Error("OpenOrc is closing.");
     const task = this.task(input.taskId);
     const body = input.source === "description" ? "Please discuss the saved task description with me." : input.body.trim();
     if (!body) throw new Error("Write a comment first.");
@@ -137,7 +131,7 @@ export class TaskCommentService {
         this.changed(item.taskId);
       });
     this.queues.set(key, job);
-    this.track(job);
+    this.jobs.track(job);
     void job.finally(() => {
       if (this.queues.get(key) === job) this.queues.delete(key);
     });
@@ -154,7 +148,7 @@ export class TaskCommentService {
   }
   private async respond(id: string, fresh: boolean) {
     const item = taskComments.attempt(this.db, id);
-    if (!item || item.state !== "queued" || this.closing) return;
+    if (!item || item.state !== "queued" || this.jobs.closing) return;
     const task = this.task(item.taskId),
       project = projects.get(this.db, task.projectId)!;
     const comment = taskComments.get(this.db, item.commentId)!;
@@ -189,7 +183,7 @@ export class TaskCommentService {
           this.changed(task.id);
         },
         assertCanStart: () => {
-          if (this.closing || taskComments.attempt(this.db, id)?.state !== "running") throw new Error("Comment response was cancelled.");
+          if (this.jobs.closing || taskComments.attempt(this.db, id)?.state !== "running") throw new Error("Comment response was cancelled.");
         },
       });
       await done;
@@ -220,7 +214,7 @@ export class TaskCommentService {
       taskComments.update(this.db, item.id, { body: [...chunks.values()].join("\n\n") });
     }
     // Raw provider deltas can arrive faster than the UI can refetch its discussion.
-    if (!this.closing && !this.refreshTimers.has(item.taskId))
+    if (!this.jobs.closing && !this.refreshTimers.has(item.taskId))
       this.refreshTimers.set(
         item.taskId,
         setTimeout(() => this.changed(item.taskId), 80),
@@ -244,11 +238,11 @@ export class TaskCommentService {
       if (item.state !== "running") return;
       const success = outcome.status === "success";
       taskComments.update(this.db, item.id, { state: commentOutcomeState(outcome.status), error: outcome.error });
-      if (success && item.intent?.intent === "execution" && !this.closing) {
+      if (success && item.intent?.intent === "execution" && !this.jobs.closing) {
         const comment = taskComments.get(this.db, item.commentId)!;
         if (comment.recipients.length > 1 && !taskComments.list(this.db, item.taskId).attempts.some((a) => a.commentId === item.commentId && executionAccepted(a)))
           taskComments.update(this.db, item.id, { state: "choose_executor" });
-        else this.track(this.execute(item.taskId, item.id)).catch(() => {});
+        else this.jobs.track(this.execute(item.taskId, item.id)).catch(() => {});
       }
     }
     this.changed(item.taskId);
@@ -271,7 +265,7 @@ export class TaskCommentService {
     if (active.has(item.state)) throw new Error("Wait for this agent's reply before selecting it.");
     this.executing.set(taskId, item.commentId);
     try {
-      if (this.closing) throw new Error("OpenOrc is closing.");
+      if (this.jobs.closing) throw new Error("OpenOrc is closing.");
       const task = this.task(taskId);
       if (task.status === "archived" || task.status === "done") throw new Error("Reopen this task before starting work.");
       if (retiredTeams.hasTask(this.db, taskId) || (task.threadId && retiredTeams.isHidden(this.db, task.threadId))) throw new Error("This item is no longer available.");
@@ -315,7 +309,7 @@ export class TaskCommentService {
           this.changed(taskId);
         },
         assertCanStart: () => {
-          if (this.closing || !tasks.get(this.db, taskId)) throw new Error("Task execution was cancelled.");
+          if (this.jobs.closing || !tasks.get(this.db, taskId)) throw new Error("Task execution was cancelled.");
           const current = threads.get(this.db, thread.id);
           if (current?.mode !== "act" || current.archivedAt !== null || current.permissionMode !== thread.permissionMode)
             throw new Error("The linked thread is no longer available for implementation.");
@@ -371,11 +365,11 @@ export class TaskCommentService {
     }
   }
   async close() {
-    this.closing = true;
+    this.jobs.closing = true;
     for (const timer of this.refreshTimers.values()) clearTimeout(timer);
     this.refreshTimers.clear();
     for (const item of taskComments.unfinished(this.db)) if (item.state === "queued" || item.state === "running") await this.cancel(item.taskId, item.id);
-    await Promise.allSettled([...this.jobs]);
+    await this.jobs.settled();
   }
 }
 

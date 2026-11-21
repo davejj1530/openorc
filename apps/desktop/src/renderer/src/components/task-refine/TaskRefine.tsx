@@ -1,18 +1,19 @@
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
-import type { AccountsProject } from "@openorc/client";
+import { defaultChoice, type AccountsProject } from "@openorc/client";
 import {
   commentRecipientKey,
   orclingMentionOptions,
   sameTaskDocument,
   type CommentMentionOption,
   type CommentRecipient,
+  type HarnessId,
   type ModelOption,
   type Orcling,
   type TaskRefine,
   type TaskSuggestion,
 } from "@openorc/protocol";
 import { useRpc, useRpcMutation } from "../../lib/client";
-import { useDefaultHarness } from "../../lib/default-harness";
+import { useDefaultAgent } from "../../lib/default-harness";
 import { readDraft, removeDraft, writeDraft } from "../../lib/drafts";
 import { modelLabel } from "../../lib/model-effort-label";
 import { useOrclings } from "../../lib/orclings";
@@ -20,7 +21,8 @@ import type { useTaskDocumentDraft } from "../../lib/task-document-draft";
 import { labelList } from "../../lib/task-draft";
 import { DocumentEditor } from "../DocumentEditor";
 import { OpenOrcMark, WorkingCube } from "../OpenOrcMark";
-import { AccountSelect, NoAccount, useProjectClaudeAccounts, useThreadModels } from "../task-threads/ThreadChoiceFields";
+import { useProjectClaudeAccounts, useThreadModels } from "../../lib/thread-choice";
+import { AccountSelect, NoAccount } from "../task-threads/ThreadChoiceFields";
 import { TaskSheet, useTaskSheet } from "../task-threads/TaskSheet";
 import { TaskLabelsField, TaskTitleField } from "../task-list/TaskTextFields";
 import { Button, Select, Textarea, Tooltip } from "../ui";
@@ -57,18 +59,21 @@ function remember(key: string, value: string | undefined): void {
   }
 }
 
-/** The last choice, else the person's default agent's default model, else any agent's default model, else the first listed. */
-function initialChoice(options: CommentMentionOption[], models: ModelOption[] | undefined, defaultAgent: string | null | undefined): string {
+/** The last choice, else the default model a new thread offers, from those listed, else the first listed. */
+function initialChoice(options: CommentMentionOption[], models: ModelOption[] | undefined, defaultAgent: HarnessId | undefined): string {
   const keys = options.map((option) => commentRecipientKey(option.recipient));
   const last = remembered(REMEMBERED);
   if (last && keys.includes(last)) return last;
-  const isDefault = (option: CommentMentionOption) => !option.recipient.orclingId && Boolean(models?.some((m) => m.agent === option.recipient.agent && m.id === option.recipient.model && m.isDefault));
-  const fallback = options.find((option) => isDefault(option) && option.recipient.agent === defaultAgent) ?? options.find(isDefault);
-  return fallback ? commentRecipientKey(fallback.recipient) : (keys[0] ?? "");
+  const own = options.filter((option) => !option.recipient.orclingId);
+  const listed = (model: ModelOption) => own.some(({ recipient }) => recipient.agent === model.agent && recipient.model === model.id);
+  const preferred = defaultChoice((models ?? []).filter(listed), defaultAgent ?? null);
+  const atModel = own.filter(({ recipient }) => recipient.agent === preferred?.agent && recipient.model === preferred.model);
+  const option = atModel.find(({ recipient }) => recipient.effort === preferred?.effort) ?? atModel[0];
+  return option ? commentRecipientKey(option.recipient) : (keys[0] ?? "");
 }
 
 function useRefineRecipient(options: CommentMentionOption[], models: ModelOption[] | undefined, choice: string): CommentMentionOption | undefined {
-  const defaultAgent = useDefaultHarness();
+  const defaultAgent = useDefaultAgent();
   const key = (option: CommentMentionOption) => commentRecipientKey(option.recipient);
   const picked = options.find((option) => key(option) === choice);
   if (picked) return picked;
@@ -157,6 +162,7 @@ function RefineSheet({ taskId, project, again, edited, onStarted, document, opti
         aria-label="What should change?"
         className="task-refine-sheet-instruction"
         placeholder="What should change? Optional"
+        maxLength={4000}
         value={instruction}
         disabled={sheet.pending}
         autoFocus
@@ -257,22 +263,18 @@ function RefineButton({ unavailable, sheet }: { unavailable: boolean; sheet: Ope
   if (unavailable)
     return (
       <Tooltip label="Sign in to an agent to refine this task.">
-        <span className="task-editor-extra">
+        <span>
           <button type="button" className="task-editor-mode" disabled>
             Refine
           </button>
         </span>
       </Tooltip>
     );
-  return (
-    <span className="task-editor-extra">
-      {sheet(
-        false,
-        <button type="button" className="task-editor-mode">
-          Refine
-        </button>,
-      )}
-    </span>
+  return sheet(
+    false,
+    <button type="button" className="task-editor-mode">
+      Refine
+    </button>,
   );
 }
 
@@ -400,7 +402,6 @@ function suggestionView({ refine, suggestion, name, failure, sheet, closing, clo
         <RefineNote failure={failure}>
           <Asked refine={refine} />
           {suggestion.note}
-          {revised ? <span className="task-refine-asked"> Includes your edits.</span> : null}
           {movedOn ? <span className="task-refine-asked"> Suggested from an earlier version. Changes to the task since aren’t in it.</span> : null}
         </RefineNote>
       </>
@@ -413,8 +414,8 @@ function suggestionView({ refine, suggestion, name, failure, sheet, closing, clo
  * Refine's parts of the task page, for a task on this Mac. Using a suggestion is an edit like any other: autosave keeps
  * it and, in rich text, ⌘Z in the description undoes it.
  */
-export function useTaskRefine(taskId: string | null, document: TaskDocument, basePath?: string, project?: AccountsProject): RefineView {
-  const query = useRpc("tasks.refine.get", { taskId: taskId ?? "" }, { enabled: Boolean(taskId), refetchInterval: (q) => (q.state.data?.state === "running" ? 2000 : false) });
+export function useTaskRefine(taskId: string, document: TaskDocument, basePath?: string, project?: AccountsProject): RefineView {
+  const query = useRpc("tasks.refine.get", { taskId }, { refetchInterval: (q) => (q.state.data?.state === "running" ? 2000 : false) });
   const { models, options } = useRefineOptions();
   const orclings = useOrclings();
   const stop = useRpcMutation("tasks.refine.stop");
@@ -422,19 +423,28 @@ export function useTaskRefine(taskId: string | null, document: TaskDocument, bas
   // Put away at once: the refetch that confirms it would otherwise show the suggestion a moment longer.
   const [putAway, setPutAway] = useState<string | null>(null);
   const edits = useSuggestionEdits();
-  if (!taskId) return NONE;
 
   const refine = query.data && query.data.state !== "cancelled" && query.data.id !== putAway ? query.data : null;
-  const sheet: OpenSheet = (again, trigger, edited = null, onStarted = () => {}) => (
-    <RefineSheet taskId={taskId} project={project} again={again} edited={edited} onStarted={onStarted} document={document} options={options} models={models} trigger={trigger} />
+  // A new Refine starts without the last one's failure to stop or put away.
+  const started = (then?: () => void) => () => {
+    stop.reset();
+    dismiss.reset();
+    then?.();
+  };
+  const sheet: OpenSheet = (again, trigger, edited = null, onStarted) => (
+    <RefineSheet taskId={taskId} project={project} again={again} edited={edited} onStarted={started(onStarted)} document={document} options={options} models={models} trigger={trigger} />
   );
   if (!refine) return { ...NONE, button: <RefineButton unavailable={Boolean(models && !options.length)} sheet={sheet} /> };
 
   const barInput = { refine, name: refinerName(refine.recipient, models, orclings), failure: stop.error?.message ?? dismiss.error?.message ?? null };
   const close = () => {
-    edits.forget(refine.id);
-    setPutAway(refine.id);
-    dismiss.mutate({ taskId });
+    const { id } = refine;
+    setPutAway(id);
+    // Shown again with the person's edits when that fails, so its note says why.
+    void dismiss.mutateAsync({ taskId }).then(
+      () => edits.forget(id),
+      () => setPutAway(null),
+    );
   };
   if (refine.state === "running") return { ...NONE, bar: runningBar({ ...barInput, stopping: stop.isPending, onStop: () => stop.mutate({ taskId }) }) };
   if (refine.state === "error" || refine.state === "unchanged" || !refine.suggestion) return { ...NONE, bar: endedBar({ ...barInput, sheet, dismissing: dismiss.isPending, onDismiss: close }) };

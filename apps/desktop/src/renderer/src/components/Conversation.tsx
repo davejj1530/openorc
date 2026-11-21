@@ -293,7 +293,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const suggestScope = cloud.hosted ? null : conversation;
   // A cloud thread's turns get the person's own skills from this Mac where its server serves them, and no project's from here.
   const ownSkillsScope = useHostedSkills(thread) ? OWN_SKILLS_SCOPE : null;
-  const skillsAsked: Parameters<typeof useSkillCommands> = cloud.hosted ? [ownSkillsScope, choice?.agent, undefined, "user"] : [conversation, choice?.agent];
+  const skillsAsked: Parameters<typeof useSkillCommands> = cloud.hosted ? [ownSkillsScope, choice?.agent, undefined, { only: "user" }] : [conversation, choice?.agent];
   const skills = useSkillCommands(...skillsAsked);
   const connectorMentions = useConnectorMentions(suggestScope, choice?.agent, executionMode(mode, permission));
   const onFork = useFork(thread, forkConversation);

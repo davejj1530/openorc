@@ -378,7 +378,7 @@ export class RunLaunch {
     const { scope, agent } = input;
     if ((scope.thread && retiredTeams.isHidden(this.deps.db, scope.thread.id)) || (scope.task ?? scope.comment?.task)?.retiredTeam) throw new Error("This item is no longer available.");
     assertAdmission();
-    if (scope.comment && (input.mode !== "plan" || input.permissionMode !== "review" || input.resumeFrom)) throw new Error("Comment turns require a read-only discussion session.");
+    if (scope.comment && (input.mode !== "plan" || input.permissionMode !== "review" || input.resumeFrom)) throw new Error("Comments and Refine run only in a read-only session.");
     // Task images belong to the brief, not the user's message.
     const taskImages = input.collectTaskImages !== false && scope.task?.spec ? ((await this.deps.hooks.taskImages?.(scope.task.spec)) ?? []) : [];
     await this.deps.validateFastMode(agent, input.model, input.fastMode, environment, launch);
@@ -437,7 +437,7 @@ export class RunLaunch {
       commentRun.mode !== "plan" ||
       commentRun.permissionMode !== "review"
     ) {
-      throw new Error("Only this task's matching read-only comment session can be resumed.");
+      throw new Error("Only a read-only session of this task on the same model and account can be resumed.");
     }
   }
 }

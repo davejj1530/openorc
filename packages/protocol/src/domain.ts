@@ -61,13 +61,22 @@ export const TaskButton = z
     includeTask: z.boolean().optional(),
     /** Whether the message is sent when the thread opens. Absent means it is; false leaves it in the message box. */
     autoSend: z.boolean().optional(),
-    /** The task statuses the button shows on. Absent means every status. */
+    /** The task statuses the button shows on. Absent means every status but Archived, where no button shows. */
     statuses: z.array(TaskStatus).min(1).max(TaskStatus.options.length).optional(),
     /** The skills the prompt calls, which it writes `/name`; the agent running it gets each in its own form. */
     skills: z.array(z.string().min(1).max(120)).max(20).optional(),
   })
   .strict();
 export type TaskButton = z.infer<typeof TaskButton>;
+
+/**
+ * The execution mode a button runs in, or null for the task thread's. Saved settings are read without their schema, so
+ * a mode an earlier build saved, such as "act", reads as the thread's.
+ */
+export function buttonExecutionMode(button: Pick<TaskButton, "mode">): ExecutionMode | null {
+  const mode = ExecutionMode.safeParse(button.mode);
+  return mode.success ? mode.data : null;
+}
 export const MAX_TASK_BUTTONS = 12;
 
 export const ProjectSettings = z.object({

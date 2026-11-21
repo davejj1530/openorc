@@ -28,6 +28,7 @@ type Props = {
   imageUnavailableReason?: string;
   onReadyChange?: (ready: boolean) => void;
   ref?: Ref<DocumentEditorHandle>;
+  /** Placed at the controls row's end, before the mode switch. */
   controls?: ReactNode;
   /** Takes the controls row's place while something else has the document, such as a Refine at work. */
   bar?: ReactNode;
@@ -202,10 +203,12 @@ export function DocumentEditor({ value, onChange, basePath, disabled = false, on
                 </Tooltip>
               </>
             )}
-            {controls}
-            <button type="button" className="task-editor-mode" disabled={images.busy} onClick={switchMode}>
-              {source ? "Rich text" : "Markdown"}
-            </button>
+            <span className="task-editor-end">
+              {controls}
+              <button type="button" className="task-editor-mode" disabled={images.busy} onClick={switchMode}>
+                {source ? "Rich text" : "Markdown"}
+              </button>
+            </span>
           </div>
         )}
         {replacement}

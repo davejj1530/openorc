@@ -10,6 +10,7 @@ import { wslDistro } from "./wsl/distro";
 
 /** A shell that never existed. Every test here asserts on the host's bookkeeping, which is the half that has to be right before a real one is worth spawning. */
 class FakePty implements PtyProcess {
+  constructor(readonly cwd = "") {}
   readonly written: string[] = [];
   readonly sizes: { cols: number; rows: number }[] = [];
   killed = false;
@@ -253,9 +254,9 @@ describe("pty host", () => {
     exits = [];
     settles = [];
     gate = null;
-    const spawn: SpawnPty = async () => {
+    const spawn: SpawnPty = async ({ cwd }) => {
       if (gate) await gate;
-      const pty = new FakePty();
+      const pty = new FakePty(cwd);
       spawned.push(pty);
       return pty;
     };
@@ -356,6 +357,23 @@ describe("pty host", () => {
 
     await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 });
     expect(spawned.map((pty) => pty.killed)).toEqual([true, false]);
+    await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 });
+    expect(spawned).toHaveLength(2);
+  });
+
+  it("ends a shell still starting when its panel asks for another folder, and keeps the one started there", async () => {
+    const worktree = await mkdtemp(join(dir, "worktree-"));
+    const release = holdSpawns();
+    const first = open("thread-a");
+    const moved = host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 });
+    release();
+
+    expect(await first).toEqual({ backlog: "", running: false, exitCode: null });
+    expect(await moved).toEqual({ backlog: "", running: true, exitCode: null });
+    expect(spawned.map((pty) => [pty.cwd, pty.killed])).toEqual([
+      [dir, true],
+      [worktree, false],
+    ]);
     await host.open({ id: "thread-a", cwd: worktree, cols: 80, rows: 24 });
     expect(spawned).toHaveLength(2);
   });

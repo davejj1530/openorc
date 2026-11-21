@@ -36,7 +36,7 @@ export function useTaskSheet(onOpen?: () => void) {
   return { open, pending, error, run, onOpenChange, close: () => setOpen(false) };
 }
 
-export type TaskSheetState = ReturnType<typeof useTaskSheet>;
+type TaskSheetState = ReturnType<typeof useTaskSheet>;
 
 type Props = {
   sheet: TaskSheetState;

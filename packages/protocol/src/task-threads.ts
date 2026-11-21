@@ -12,6 +12,6 @@ export const taskThreadRpcParams = {
 export interface TaskThreadRpcResults {
   "tasks.threads": TaskThreadLink[];
   "tasks.newThread": Thread;
-  /** `draft`: the message a button set not to send left in the thread's message box. */
-  "tasks.runButton": { threadId: string; draft?: string };
+  /** For a button set not to send: `message` is what it added to the thread's message box, and `draft` the box's whole saved draft with it. */
+  "tasks.runButton": { threadId: string } | { threadId: string; message: string; draft: string };
 }

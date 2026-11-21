@@ -1,6 +1,6 @@
-import { defaultHarnessId, type HarnessId, type Project, type Run, type Task, type ThreadChoice, type ThreadSummary } from "@openorc/protocol";
+import type { HarnessId, Project, Run, Task, ThreadChoice, ThreadSummary } from "@openorc/protocol";
 import { useRpc, useRpcMutation } from "../../lib/client";
-import { useDefaultHarness } from "../../lib/default-harness";
+import { useDefaultAgent } from "../../lib/default-harness";
 import { openThread } from "../../lib/router";
 import { ChevronDown, Plus } from "../icons";
 import { IconButton, TextButton } from "../ui";
@@ -8,6 +8,8 @@ import { ThreadChoiceSheet, type InheritedSettings } from "./ThreadChoiceSheet";
 
 const CHOOSE_MODEL = "Choose model for the new thread";
 type BeforeOpen = () => Promise<boolean>;
+/** The task page's one `tasks.openThread`, so Open thread waits while this sheet opens the thread too. */
+type OpenTaskThread = ReturnType<typeof useRpcMutation<"tasks.openThread">>["mutateAsync"];
 
 /** A failure throws, so the sheet says why. */
 async function saveThenOpen(beforeOpen: BeforeOpen, thread: () => Promise<{ id: string }>): Promise<void> {
@@ -17,10 +19,15 @@ async function saveThenOpen(beforeOpen: BeforeOpen, thread: () => Promise<{ id: 
 
 const withChoice = (choice: ThreadChoice | undefined) => (choice ? { choice } : {});
 
-/** What Open thread gives a task's first thread, as the core picks it: its last run's settings, else its creator thread's, else the person's default agent's. */
-function openedSettings(last: Run | undefined, creator: ThreadSummary | null | undefined, defaultAgent: HarnessId): InheritedSettings {
+/**
+ * What Open thread gives a task's first thread, as the core picks it: its last run's settings, else its creator thread's,
+ * else the person's default agent's. Undefined while that agent is still unknown.
+ */
+function openedSettings(last: Run | undefined, creator: ThreadSummary | null | undefined, defaultAgent: HarnessId | undefined): InheritedSettings | undefined {
+  const agent = last?.agent ?? creator?.agent ?? defaultAgent;
+  if (!agent) return undefined;
   return {
-    agent: last?.agent ?? creator?.agent ?? defaultAgent,
+    agent,
     model: last?.model ?? creator?.model ?? null,
     effort: last?.effort ?? creator?.effort ?? null,
     claudeAccountId: last?.claudeAccountId ?? creator?.claudeAccountId ?? null,
@@ -28,10 +35,9 @@ function openedSettings(last: Run | undefined, creator: ThreadSummary | null | u
 }
 
 /** Beside Open thread until the task has a thread: opens its first one on the model and account chosen. */
-export function OpenThreadChooser({ task, project, runs, beforeOpen }: { task: Task; project: Project; runs: readonly Run[]; beforeOpen: BeforeOpen }) {
+export function OpenThreadChooser({ task, project, runs, beforeOpen, open }: { task: Task; project: Project; runs: readonly Run[]; beforeOpen: BeforeOpen; open: OpenTaskThread }) {
   const creator = useRpc("threads.get", { id: task.threadId ?? "" }, { enabled: Boolean(task.threadId) && !task.executionThreadId }).data;
-  const open = useRpcMutation("tasks.openThread");
-  const defaultAgent = useDefaultHarness() ?? defaultHarnessId;
+  const defaultAgent = useDefaultAgent();
   if (task.executionThreadId) return null;
   return (
     <ThreadChoiceSheet
@@ -46,7 +52,7 @@ export function OpenThreadChooser({ task, project, runs, beforeOpen }: { task: T
           <ChevronDown size={15} />
         </IconButton>
       }
-      onConfirm={(choice) => saveThenOpen(beforeOpen, () => open.mutateAsync({ taskId: task.id, ...withChoice(choice) }))}
+      onConfirm={(choice) => saveThenOpen(beforeOpen, () => open({ taskId: task.id, ...withChoice(choice) }))}
     />
   );
 }

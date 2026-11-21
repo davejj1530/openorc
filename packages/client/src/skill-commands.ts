@@ -56,10 +56,26 @@ function listNotice(prefix: SkillPrefix, reading: boolean, error: Error | null):
   return error ? { prefix, text: "Couldn’t load skills", reason: error.message } : null;
 }
 
+export interface SkillListOptions {
+  /** The skills of that source alone, as a conversation that runs elsewhere takes the person's own. */
+  only?: AgentSkill["source"];
+  /** Each by its name alone after `/`, for any agent, one with no call for skills too, as a task button's prompt saves them. */
+  byName?: boolean;
+}
+
+/** How a list names an agent's skills: its prefix and what goes before each name. Null when the agent is offered none. */
+function skillNaming(agent: AgentKind | null | undefined, byName: boolean): { prefix: SkillPrefix; before: string } | null {
+  if (!agent) return null;
+  if (byName) return { prefix: "/", before: "" };
+  const call = skillCallPrefix(agent);
+  if (call === null) return null;
+  return { prefix: call === "$" ? "$" : "/", before: call.slice(1) };
+}
+
 /**
  * The selected agent's skills where a conversation works, for any composer on any client, or with `only` the ones of
  * that source alone, as a conversation that runs elsewhere takes the person's own. An agent with no call for skills,
- * such as OpenCode, is offered none. Each goes by the name its call puts after `/` or `$`, which for Pi is `skill:name`.
+ * such as OpenCode, is offered none but `byName`. Each goes by what its call puts after `/` or `$`, for Pi `skill:name`.
  *
  * Reading the list starts the agent's CLI, so it is read when a composer opens and again when the composer asks, as a
  * `/` or `$` word starts: a skill installed while a conversation is open shows up the next time the picker opens, not
@@ -70,11 +86,13 @@ export function useSkillCommandsWith(
   scope: FileScope | null,
   selectedAgent: AgentKind | null | undefined,
   claudeAccountId: string | undefined,
-  only?: AgentSkill["source"],
+  { only, byName = false }: SkillListOptions = {},
 ): SkillCommands {
   const agent = selectedAgent === "acp" ? "opencode" : selectedAgent;
-  const call = agent ? skillCallPrefix(agent) : null;
-  const enabled = Boolean(scope && call !== null);
+  const naming = skillNaming(agent, byName);
+  const prefix = naming?.prefix ?? "/";
+  const before = naming?.before ?? null;
+  const enabled = Boolean(scope && naming);
   const skills = queries.useRpc(
     "skills.list",
     { ...(agent === "claude" && claudeAccountId ? { claudeAccountId } : {}), scope: scope ?? NO_SCOPE, agent: agent ?? "claude" },
@@ -82,20 +100,19 @@ export function useSkillCommandsWith(
   );
   const found = skills.data;
   const { dataUpdatedAt, isFetching, refetch } = skills;
-  const prefix: SkillPrefix = call === "$" ? "$" : "/";
   // By the clock, not `isStale`: a list going stale renders nothing, so the flag can still say fresh.
   const onCommandsWanted = useCallback(() => {
     if (enabled && !isFetching && Date.now() - dataUpdatedAt > FRESH_MS) void refetch();
   }, [enabled, isFetching, dataUpdatedAt, refetch]);
   const commands = useMemo(
     () =>
-      call === null
+      before === null
         ? []
         : (found ?? [])
             .filter((skill) => skill.enabled !== false && (!only || skill.source === only))
             .sort((a, b) => SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source])
             .map((skill) => ({
-              name: `${call.slice(1)}${skill.name}`,
+              name: `${before}${skill.name}`,
               hint: skill.description,
               insert: true as const,
               prefix,
@@ -103,7 +120,7 @@ export function useSkillCommandsWith(
               ...(skill.displayName ? { displayName: skill.displayName } : {}),
               ...(skill.icon ? { icon: skill.icon } : {}),
             })),
-    [call, found, prefix, only],
+    [before, found, prefix, only],
   );
   // A list read before keeps being offered while it is read again, and when that fails.
   const commandsNotice = enabled && !found ? listNotice(prefix, isFetching, skills.error) : null;

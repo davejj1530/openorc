@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { executionModePresentation, MAX_TASK_BUTTONS, type Project, type TaskButton } from "@openorc/protocol";
+import { buttonExecutionMode, executionModePresentation, MAX_TASK_BUTTONS, type Project, type TaskButton } from "@openorc/protocol";
 import { queryClient, useRpc, useRpcMutation } from "../../lib/client";
 import { modelEffortLabel } from "../../lib/model-effort-label";
+import { useProjectClaudeAccounts } from "../../lib/thread-choice";
 import { Plus, Trash2 } from "../icons";
 import { Button, IconButton, Tooltip } from "../ui";
 import { statusLabel } from "../status";
-import { shownOn, TaskButtonDialog } from "./TaskButtonDialog";
-import { useProjectClaudeAccounts } from "../task-threads/ThreadChoiceFields";
+import { TaskButtonDialog } from "./TaskButtonDialog";
+import { shownOn } from "./task-button-rules";
 import "./task-buttons.css";
 
 /** Laid out as Schedules lists schedules. Saving the dialog or removing a row saves the whole list. */
@@ -78,7 +79,8 @@ function useButtonSummary(button: TaskButton, project: Project): string {
   const accountId = button.choice?.claudeAccountId;
   const accounts = useProjectClaudeAccounts(project, accountId, Boolean(accountId));
   const where = button.runsIn === "task" ? "Current thread" : "New thread";
-  const mode = button.mode === "thread" ? null : executionModePresentation(button.choice?.agent, button.mode).label;
+  const executionMode = buttonExecutionMode(button);
+  const mode = executionMode && executionModePresentation(button.choice?.agent, executionMode).label;
   const model = button.choice ? modelEffortLabel(button.choice, models) : null;
   const account = accountId ? (accounts?.find((each) => each.id === accountId)?.name ?? null) : null;
   const sends = button.autoSend === false ? "Opens as a draft" : null;

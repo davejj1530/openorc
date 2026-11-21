@@ -794,9 +794,10 @@
   filter: blur(var(--arrive-blur));
 }
 
-/* A project's own Claude accounts, under its worktree card on the tile: a plane card with the
-   settings rows, outside Settings, so it sets Settings' measures itself. */
-.project-accounts {
+/* A project's own Claude accounts and its task buttons, under its worktree card on the tile: plane
+   cards with the settings rows, outside Settings, so they set Settings' measures themselves. */
+.project-accounts,
+.project-task-buttons {
   --settings-card-fill: var(--well);
   --settings-control-width: 240px;
   margin-top: 32px;

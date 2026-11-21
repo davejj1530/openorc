@@ -1,23 +1,23 @@
 import { useId, useState } from "react";
-import { ExecutionMode, executionModeAvailable, executionModePresentation, savedSkillPrompt, type Project, type TaskButton, type TaskStatus } from "@openorc/protocol";
-import { statusLabel, statusOrder } from "../status";
+import {
+  buttonExecutionMode,
+  ExecutionMode,
+  executionModeAvailable,
+  executionModePresentation,
+  savedSkillPrompt,
+  type Project,
+  type TaskButton,
+  type TaskStatus,
+  type ThreadChoice,
+} from "@openorc/protocol";
+import { statusLabel } from "../status";
 import { Button, Checkbox, Chip, Dialog, Field, Input, Select } from "../ui";
 import { PromptField, usePromptSkills, type PromptSkill } from "./TaskButtonPrompt";
+import { showable, shownOn } from "./task-button-rules";
 import { ThreadChoiceFields } from "../task-threads/ThreadChoiceFields";
 
 const modes = ["thread", ...ExecutionMode.options] as const;
 const buttonMode = (value: string): TaskButton["mode"] => modes.find((mode) => mode === value) ?? "thread";
-
-/** Every status a button can show on. Archived tasks show no buttons, since none can run there. */
-const showable = statusOrder.filter((status) => status !== "archived");
-
-/** The showable statuses a button shows on, or undefined for all of them, as it is saved. */
-export function shownOn(statuses: readonly TaskStatus[] | undefined): TaskStatus[] | undefined {
-  const shown = showable.filter((status) => !statuses || statuses.includes(status));
-  return shown.length === showable.length ? undefined : shown;
-}
-
-export const showsOn = (button: TaskButton, status: TaskStatus) => status !== "archived" && (!button.statuses || button.statuses.includes(status));
 
 /**
  * The button as it is saved, trimmed, with its calls of skills written `/name` and the skills it calls, when it calls
@@ -67,9 +67,13 @@ export function TaskButtonDialog({
   onSave: (button: TaskButton) => void;
   onClose: () => void;
 }) {
-  const [button, setButton] = useState<TaskButton>(() => initial ?? { id: crypto.randomUUID(), label: "", prompt: "", runsIn: "new", mode: "plan" });
+  const [button, setButton] = useState<TaskButton>(() =>
+    initial ? { ...initial, mode: buttonExecutionMode(initial) ?? "thread" } : { id: crypto.randomUUID(), label: "", prompt: "", runsIn: "new", mode: "plan" },
+  );
   const edit = (patch: Partial<TaskButton>) => setButton((current) => ({ ...current, ...patch }));
   const agent = button.choice?.agent;
+  // A mode the new model's agent can't run goes back to Default, as the list no longer shows it.
+  const chooseModel = (choice: ThreadChoice | undefined) => edit({ choice, ...(button.mode !== "thread" && !executionModeAvailable(choice?.agent, button.mode) ? { mode: "thread" as const } : {}) });
   const { skills, onSkillsWanted } = usePromptSkills(project.id, button.choice);
   const ready = Boolean(button.label.trim() && button.prompt.trim() && shownOn(button.statuses)?.length !== 0);
   const saveLabel = initial ? "Save" : "Add button";
@@ -121,7 +125,7 @@ export function TaskButtonDialog({
             </Select>
           </Field>
         </div>
-        <ThreadChoiceFields value={button.choice} onChange={(choice) => edit({ choice })} project={project} plan={button.mode === "plan"} sameLabel="Default" layout="card" disabled={pending} />
+        <ThreadChoiceFields value={button.choice} onChange={chooseModel} project={project} plan={button.mode === "plan"} sameLabel="Default" layout="card" disabled={pending} />
         {error ? (
           <p className="text-sm text-bad mb-3 break-words" role="alert">
             {error}

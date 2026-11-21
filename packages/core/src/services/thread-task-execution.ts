@@ -1,15 +1,19 @@
 import { audit, projects, retiredTeams, runs as runRepo, snapshots, taskThreads, tasks, threadQueue, threads, type Db } from "@openorc/db";
 import {
-  ExecutionMode,
   WORKSPACE_ID,
-  defaultHarnessId,
+  buttonExecutionMode,
+  executionMode,
+  executionModeAvailable,
+  executionModeLabel,
   executionModeSettings,
+  harnessName,
   skillPrompt,
   type Project,
   type Run,
   type Task,
   type TaskButton,
   type TaskThreadLink,
+  type TaskThreadRpcResults,
   type Thread,
   type ThreadChoice,
   type ThreadSummary,
@@ -26,6 +30,7 @@ import type { WorkspaceService } from "./workspace.js";
 import { startingAccount } from "./project-claude-accounts.js";
 
 type ContinueThreadInput = Parameters<ThreadService["continueThread"]>[1];
+type ButtonPress = TaskThreadRpcResults["tasks.runButton"];
 
 /**
  * How a task thread this makes starts beyond its model: an account already settled (the starter's own, or one a person
@@ -150,15 +155,10 @@ export class ThreadTaskExecution {
     return this.createTaskThread({ task, previous, creator, target, starting, retainedWorkspace, inherited, ...start });
   }
 
-  /** The agent the person chose to start new threads with, else the first one OpenOrc lists. */
-  private defaultAgent(): Thread["agent"] {
-    return new AppSettingsService(this.db).get().defaultHarness ?? defaultHarnessId;
-  }
-
   private taskAgentSettings(selected: Pick<Thread, "agent" | "model" | "effort"> | undefined, previous: Run | undefined, creator: Thread | null): Pick<Thread, "agent" | "model" | "effort"> {
     if (selected) return { agent: selected.agent, model: selected.model, effort: selected.effort };
     return {
-      agent: previous?.agent ?? creator?.agent ?? this.defaultAgent(),
+      agent: previous?.agent ?? creator?.agent ?? new AppSettingsService(this.db).defaultAgent(),
       model: previous?.model ?? creator?.model ?? null,
       effort: previous?.effort ?? creator?.effort ?? null,
     };
@@ -169,6 +169,7 @@ export class ThreadTaskExecution {
       ...this.taskAgentSettings(undefined, previous, creator),
       claudeAccountId: previous?.claudeAccountId ?? creator?.claudeAccountId ?? null,
       fastMode: previous?.fastMode ?? creator?.fastMode ?? false,
+      mode: previous?.mode ?? creator?.mode ?? "act",
       permissionMode: previous?.permissionMode ?? creator?.permissionMode ?? new AppSettingsService(this.db).get().defaultPermissionMode,
     };
   }
@@ -210,7 +211,8 @@ export class ThreadTaskExecution {
     const { task, previous, creator, target, starting, retainedWorkspace, inherited, account, fastMode } = input;
     let mode = creator?.mode ?? "act";
     if (retainedWorkspace) mode = previous?.mode ?? "act";
-    if (starting) mode = "act";
+    // Start insists on Act; a thread opened without starting keeps what it inherits where its agent can run it.
+    const modeSettings = starting ? { mode: "act" as const, permissionMode: inherited.permissionMode } : carriedMode(target.agent, { mode, permissionMode: inherited.permissionMode });
     const thread = this.db.transaction(() => {
       const created = threads.insert(this.db, {
         projectId: task.projectId,
@@ -219,8 +221,7 @@ export class ThreadTaskExecution {
         // The starter's own or a chosen one, or the account it ran on, or its creator's, unless the project no longer uses that.
         claudeAccountId: account ?? inheritedAccount(this.db, task.projectId, target.agent, inherited.claudeAccountId),
         fastMode: fastMode ?? inherited.fastMode,
-        mode,
-        permissionMode: inherited.permissionMode,
+        ...modeSettings,
         workspaceMode: task.workspaceMode,
         // A handoff provides context across providers without resuming a parent's
         // active session or pretending its files were copied into this workspace.
@@ -273,7 +274,7 @@ export class ThreadTaskExecution {
     const { task, thread } = this.prepareTaskThreadStart(taskId, workspaceMode, input);
     try {
       const run = await this.context.continueThread(thread.id, this.taskRunInput(task, thread, images, input, withTask));
-      this.acceptTaskThreadStart(task, thread);
+      this.acceptTaskThreadStart(task, thread, withTask);
       return run;
     } finally {
       this.queue.releaseTaskThread(thread.id);
@@ -360,8 +361,7 @@ export class ThreadTaskExecution {
         projectId: task.projectId,
         title: task.title,
         ...settings,
-        mode: previous.mode,
-        permissionMode: previous.permissionMode,
+        ...carriedMode(settings.agent, previous),
         workspaceMode: previous.workspaceMode,
         importedFrom: `task:${task.id}`,
       });
@@ -380,38 +380,40 @@ export class ThreadTaskExecution {
     return thread;
   }
 
-  async runTaskButton(taskId: string, button: TaskButton, images: string[]): Promise<{ threadId: string; draft?: string }> {
+  async runTaskButton(taskId: string, button: TaskButton, images: string[]): Promise<ButtonPress> {
     const task = tasks.get(this.db, taskId);
     if (!task) throw new Error("Task not found.");
     this.context.rejectRetiredThread(task.threadId);
     if (retiredTeams.hasTask(this.db, taskId)) throw new Error("This item is no longer available.");
+    if (task.status === "archived") throw new Error("Reopen this task before using its buttons.");
     const work = this.context.executionThreadFor(taskId);
     const creator = task.threadId ? threads.get(this.db, task.threadId) : null;
     const inherited = work ?? this.firstThreadSettings(runRepo.listForTask(this.db, taskId).at(-1), creator);
     const settings = followingSettings(this.db, task.projectId, inherited, button.choice);
-    const run = buttonRun(button, work?.mode, inherited.permissionMode);
+    // Sent with no thread yet, a Current thread button runs as Start does, which makes the thread in Act.
+    if (button.runsIn === "task") return this.pressInTaskThread(task, button, { work, settings, from: work ?? { ...inherited, mode: "act" } }, images);
+    const mode = buttonModeSettings(button, settings.agent, inherited);
+    const sent = button.autoSend !== false;
     const prompt = skillPrompt(button.prompt, button.skills, settings.agent);
-    const input = {
-      agent: settings.agent,
-      model: settings.model ?? undefined,
-      effort: settings.effort ?? undefined,
-      fastMode: settings.fastMode,
-      permissionMode: run.permissionMode,
-      mode: run.mode,
-      attachments: undefined,
-    };
     const message = button.includeTask === false ? prompt : taskPrompt(prompt, task, images);
-    const draft = button.autoSend === false ? message : null;
-    if (button.runsIn === "task") {
-      // The thread keeps its account unless the button chose one.
-      const account = button.choice?.claudeAccountId ? { claudeAccountId: settings.claudeAccountId } : {};
-      if (draft) return this.draftInTaskThread(task, button, work, { ...input, ...account }, draft);
-      return this.runInTaskThread(task, button, Boolean(work), images, { ...input, ...account, prompt });
-    }
-    const thread = this.buttonThread(task, button, { work, creator, settings, run, draft });
-    if (draft) return { threadId: thread.id, draft };
-    await this.context.continueThread(thread.id, { ...input, baseRef: task.baseRef ?? undefined, prompt: message });
+    const thread = this.buttonThread(task, button, { work, creator, settings, mode, draft: sent ? null : message });
+    if (!sent) return { threadId: thread.id, message, draft: message };
+    await this.context.continueThread(thread.id, { ...buttonInput(settings, mode), baseRef: task.baseRef ?? undefined, prompt: message });
     return { threadId: thread.id };
+  }
+
+  /** A button that runs in the task's thread: sent as Start sends it, or left in the message box for the thread's own agent. */
+  private async pressInTaskThread(
+    task: Task,
+    button: TaskButton,
+    { work, settings, from }: { work: ThreadSummary | null; settings: FollowingSettings; from: Pick<Thread, "mode" | "permissionMode"> },
+    images: string[],
+  ): Promise<ButtonPress> {
+    if (button.autoSend === false) return this.draftInTaskThread(task, button, work, settings, images);
+    const mode = buttonModeSettings(button, settings.agent, from);
+    // The thread keeps its account unless the button chose one.
+    const account = button.choice?.claudeAccountId ? { claudeAccountId: settings.claudeAccountId } : {};
+    return this.runInTaskThread(task, button, Boolean(work), images, { ...buttonInput(settings, mode), ...account, prompt: skillPrompt(button.prompt, button.skills, settings.agent) });
   }
 
   /**
@@ -431,15 +433,14 @@ export class ThreadTaskExecution {
   private buttonThread(
     task: Task,
     button: TaskButton,
-    { work, creator, settings, run, draft }: { work: ThreadSummary | null; creator: Thread | null; settings: FollowingSettings; run: ReturnType<typeof buttonRun>; draft: string | null },
+    { work, creator, settings, mode, draft }: { work: ThreadSummary | null; creator: Thread | null; settings: FollowingSettings; mode: Pick<Thread, "mode" | "permissionMode">; draft: string | null },
   ): Thread {
     const thread = this.db.transaction(() => {
       const created = threads.insert(this.db, {
         projectId: task.projectId,
         title: `${button.label}: ${task.title}`,
         ...settings,
-        mode: run.mode,
-        permissionMode: run.permissionMode,
+        ...mode,
         workspaceMode: work?.workspaceMode ?? task.workspaceMode,
       });
       // It works where the task's work is: the working thread's worktree, else the folder a new one would use.
@@ -457,22 +458,19 @@ export class ThreadTaskExecution {
   }
 
   /**
-   * An idle thread takes the button's mode, and its model when the agent is the same. Another agent or account is left
-   * to the message box's picker, since switching one hands the conversation over as the message is sent.
+   * An idle thread takes the button's own mode where its agent can run it, and its model on the same agent. Another agent
+   * or account is left to the message box's picker, since switching one hands the conversation over as the message is sent.
    */
-  private draftInTaskThread(task: Task, button: TaskButton, work: ThreadSummary | null, settings: Omit<ContinueThreadInput, "prompt">, draft: string): { threadId: string; draft: string } {
+  private draftInTaskThread(task: Task, button: TaskButton, work: ThreadSummary | null, settings: FollowingSettings, images: string[]): ButtonPress {
     const thread = work ?? this.openTaskThread(task.id, button.choice);
     // A conversation the task came from keeps what its box holds, as the task's thread does.
-    const existed = Boolean(work) || thread.id === task.threadId;
-    const before = existed ? threads.get(this.db, thread.id)?.draft : null;
+    const made = !work && thread.id !== task.threadId;
+    const prompt = skillPrompt(button.prompt, button.skills, thread.agent);
+    const { message, draft } = unsentBox(threads.get(this.db, thread.id)?.draft ?? "", made, { prompt, withTask: button.includeTask !== false, task, images });
     const idle = this.runs.threadActivity(thread.id) === "idle";
-    const model = settings.agent === thread.agent ? { model: settings.model ?? null, effort: settings.effort ?? null } : {};
-    threads.update(this.db, thread.id, {
-      ...(idle ? { mode: settings.mode, permissionMode: settings.permissionMode, ...model } : {}),
-      draft: before ? `${before}\n\n${draft}` : draft,
-    });
+    threads.update(this.db, thread.id, { ...(idle ? unsentSettings(thread, button, settings) : {}), draft });
     this.invalidate(["threads", `thread:${thread.id}`, "tasks", `task:${task.id}`]);
-    return { threadId: thread.id, draft };
+    return { threadId: thread.id, message, draft };
   }
 
   /** A button that runs as Start does. A task without a thread starts one on the button's choice, so it is made on the chosen account. */
@@ -486,10 +484,11 @@ export class ThreadTaskExecution {
     return { threadId: run.threadId! };
   }
 
-  private acceptTaskThreadStart(task: Task, thread: Thread): void {
+  /** A message sent with the task carried the handoff the thread's box held, so the box is cleared; a prompt alone leaves it. */
+  private acceptTaskThreadStart(task: Task, thread: Thread, withTask: boolean): void {
     // A fast provider or another window may already have advanced the record.
     if (tasks.get(this.db, task.id)?.status === task.status) tasks.update(this.db, task.id, { status: "in_progress", completedAt: null }, { explicitStatus: true });
-    if (thread.importedFrom === `task:${task.id}` && threads.get(this.db, thread.id)?.draft === thread.draft) threads.update(this.db, thread.id, { draft: null });
+    if (withTask && thread.importedFrom === `task:${task.id}` && threads.get(this.db, thread.id)?.draft === thread.draft) threads.update(this.db, thread.id, { draft: null });
     this.invalidate(["tasks", `task:${task.id}`, "threads", `thread:${thread.id}`]);
   }
 
@@ -540,7 +539,7 @@ export class ThreadTaskExecution {
         await this.runs.start({
           scope: { task: prepared, thread: null },
           project,
-          agent: thread?.agent ?? this.defaultAgent(),
+          agent: thread?.agent ?? new AppSettingsService(this.db).defaultAgent(),
           model: thread?.model ?? undefined,
           effort: thread?.effort ?? undefined,
           fastMode: thread?.fastMode ?? false,
@@ -615,7 +614,7 @@ function chosenAccount(db: Db, projectId: string, choice: ThreadChoice): string 
 }
 
 type ModelSettings = Pick<Thread, "agent" | "model" | "effort" | "fastMode"> & { claudeAccountId?: string | null | undefined };
-type FirstThreadSettings = ModelSettings & Pick<Thread, "permissionMode">;
+type FirstThreadSettings = ModelSettings & Pick<Thread, "mode" | "permissionMode">;
 type FollowingSettings = Omit<ModelSettings, "claudeAccountId"> & { claudeAccountId: string };
 
 /**
@@ -633,7 +632,7 @@ function followingSettings(db: Db, projectId: string, from: ModelSettings, choic
   };
 }
 
-function keptFastMode(from: Pick<ModelSettings, "agent" | "model" | "fastMode">, choice: ThreadChoice): boolean {
+function keptFastMode(from: Pick<ModelSettings, "agent" | "model" | "fastMode">, choice: Pick<ModelSettings, "agent" | "model">): boolean {
   return from.fastMode && from.agent === choice.agent && from.model === choice.model;
 }
 
@@ -642,10 +641,48 @@ function sameEffortAndAccount(thread: Thread, choice: ThreadChoice, account: str
   return thread.effort === choice.effort && (!account || thread.claudeAccountId === account);
 }
 
-function buttonRun(button: TaskButton, threadMode: Thread["mode"] | undefined, threadPermission: Thread["permissionMode"]): Pick<Thread, "mode" | "permissionMode"> {
-  // Settings are read without their schema, so a mode an earlier build saved, such as "act", reads as the thread's.
-  const mode = ExecutionMode.safeParse(button.mode);
-  return mode.success ? executionModeSettings(mode.data) : { mode: threadMode ?? "act", permissionMode: threadPermission };
+/** The mode a button runs in on `agent`: its own, refused when the agent can't run it, else the task thread's. */
+function buttonModeSettings(button: TaskButton, agent: Thread["agent"], from: Pick<Thread, "mode" | "permissionMode">): Pick<Thread, "mode" | "permissionMode"> {
+  const mode = buttonExecutionMode(button);
+  if (!mode) return carriedMode(agent, from);
+  if (!executionModeAvailable(agent, mode))
+    throw new Error(`${button.label} runs in ${executionModeLabel[mode]}, which ${harnessName(agent)} can't run. Change its Mode or Model in the project's settings.`);
+  return executionModeSettings(mode);
+}
+
+/** What an unsent button changes on an idle thread: its own mode where the thread's agent can run it, and its model on the same agent. */
+function unsentSettings(
+  thread: Pick<Thread, "agent" | "model" | "fastMode">,
+  button: TaskButton,
+  chosen: FollowingSettings,
+): Partial<Pick<Thread, "mode" | "permissionMode" | "model" | "effort" | "fastMode">> {
+  const mode = buttonExecutionMode(button);
+  const own = mode && executionModeAvailable(thread.agent, mode) ? executionModeSettings(mode) : {};
+  const model = chosen.agent === thread.agent ? { model: chosen.model, effort: chosen.effort, fastMode: keptFastMode(thread, chosen) } : {};
+  return { ...own, ...model };
+}
+
+/** Another thread's mode, on a thread whose agent can run it; else Plan, else Review everything. */
+function carriedMode(agent: Thread["agent"], from: Pick<Thread, "mode" | "permissionMode">): Pick<Thread, "mode" | "permissionMode"> {
+  if (executionModeAvailable(agent, executionMode(from.mode, from.permissionMode))) return { mode: from.mode, permissionMode: from.permissionMode };
+  return executionModeSettings(executionModeAvailable(agent, "plan") ? "plan" : "review");
+}
+
+function buttonInput(settings: FollowingSettings, mode: Pick<Thread, "mode" | "permissionMode">): Omit<ContinueThreadInput, "prompt"> {
+  return { agent: settings.agent, model: settings.model ?? undefined, effort: settings.effort ?? undefined, fastMode: settings.fastMode, ...mode, attachments: undefined };
+}
+
+/**
+ * The message an unsent button adds to a thread's box, and the box with it. A thread made for the press holds the
+ * task's handoff, which a message with the task carries as a sent one does; otherwise the message follows what's there.
+ */
+function unsentBox(held: string, made: boolean, { prompt, withTask, task, images }: { prompt: string; withTask: boolean; task: Task; images: string[] }): { message: string; draft: string } {
+  if (withTask && made) {
+    const message = taskPrompt(prompt, task, images, held);
+    return { message, draft: message };
+  }
+  const message = withTask ? taskPrompt(prompt, task, images) : prompt;
+  return { message, draft: held ? `${held}\n\n${message}` : message };
 }
 
 function taskPrompt(lead: string, task: Task, images: string[], draft = ""): string {

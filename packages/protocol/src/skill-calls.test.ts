@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { TaskButton } from "./domain.js";
-import { savedSkillPrompt, skillCall, skillPrompt } from "./task-button-skills.js";
+import { savedSkillPrompt, skillCall, skillPrompt } from "./skill-calls.js";
 
 const skills = ["review-mine"];
 

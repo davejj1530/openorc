@@ -1,33 +1,23 @@
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { commandWordAt, insertSkill, rankCommands, useCommandWord } from "@openorc/client";
-import { defaultHarnessId, skillCallPrefix, type ThreadChoice } from "@openorc/protocol";
-import { useDefaultHarness } from "../../lib/default-harness";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { commandWordAt, insertSkill, rankCommands, useCommandWord, type SkillCommand } from "@openorc/client";
+import type { ThreadChoice } from "@openorc/protocol";
+import { useDefaultAgent } from "../../lib/default-harness";
 import { projectScope, useSkillCommands } from "../../lib/skill-commands";
 import { Textarea } from "../ui";
 
 /** A skill a button's prompt can call, by the name it calls it with on any agent. */
-export interface PromptSkill {
-  name: string;
-  description: string;
-  aliases?: string[] | undefined;
-}
+export type PromptSkill = Pick<SkillCommand, "name" | "hint" | "aliases">;
 
 const LIST_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"]);
 
 /**
- * The project's skills for the agent a button runs on: its model's, else the one new threads start with. Pi and Oh My
- * Pi list theirs as `skill:name`; the prompt calls each by its name alone.
+ * The project's skills for the agent a button runs on: its model's, else the one new threads start with, each by its name
+ * alone as the prompt saves it. An agent with no call for skills lists them too; the button asks it for them by name.
  */
 export function usePromptSkills(projectId: string, choice: ThreadChoice | undefined): { skills: PromptSkill[]; onSkillsWanted: () => void } {
-  const defaultAgent = useDefaultHarness();
-  const agent = choice?.agent ?? (defaultAgent === undefined ? undefined : (defaultAgent ?? defaultHarnessId));
-  const { commands, onCommandsWanted } = useSkillCommands(projectScope(projectId), agent, choice?.claudeAccountId);
-  const piNames = agent !== undefined && skillCallPrefix(agent) === "/skill:";
-  const skills = useMemo(
-    () => commands.map((command) => ({ name: piNames ? command.name.replace(/^skill:/, "") : command.name, description: command.hint, aliases: command.aliases })),
-    [commands, piNames],
-  );
-  return { skills, onSkillsWanted: onCommandsWanted };
+  const defaultAgent = useDefaultAgent();
+  const { commands, onCommandsWanted } = useSkillCommands(projectScope(projectId), choice?.agent ?? defaultAgent, choice?.claudeAccountId, { byName: true });
+  return { skills: commands, onSkillsWanted: onCommandsWanted };
 }
 
 /**
@@ -103,7 +93,7 @@ export function PromptField({
         onKeyDown={onKeyDown}
       />
       {matches.length ? (
-        <div className="task-button-skills" role="listbox" id={`${id}-skills`} aria-label="Add a skill">
+        <div className="typed-options task-button-skills" role="listbox" id={`${id}-skills`} aria-label="Add a skill">
           {matches.map((skill, index) => (
             <button
               key={skill.name}
@@ -115,7 +105,7 @@ export function PromptField({
               onClick={() => choose(skill)}
             >
               <span>/{skill.name}</span>
-              <span>{skill.description}</span>
+              <span>{skill.hint}</span>
             </button>
           ))}
         </div>

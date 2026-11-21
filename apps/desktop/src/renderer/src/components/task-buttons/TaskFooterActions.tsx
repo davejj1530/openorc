@@ -1,22 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { WORKSPACE_ID, type Task, type TaskButton } from "@openorc/protocol";
 import { useRpcMutation } from "../../lib/client";
-import { conversationDraftKey, readDraft, writeDraft } from "../../lib/drafts";
+import { addToConversationDraft } from "../../lib/conversation-draft";
 import { openProject, openThread } from "../../lib/router";
 import { SlidersHorizontal } from "../icons";
 import { Button, IconButton, Tooltip } from "../ui";
-import { showsOn } from "./TaskButtonDialog";
+import { showsOn } from "./task-button-rules";
 import "./task-buttons.css";
-
-/**
- * Adds a button's unsent message to what this window has typed in the thread's message box. With nothing typed here, the
- * box starts from the thread's saved draft, which already has it.
- */
-function addToMessageBox(threadId: string, message: string) {
-  const key = conversationDraftKey(threadId);
-  const here = readDraft<{ text: string } | null>(key, null);
-  if (here) writeDraft(key, { ...here, text: here.text.trim() ? `${here.text}\n\n${message}` : message });
-}
 
 const pendingLabel = (button: TaskButton) => (button.autoSend === false ? "Opening…" : "Starting…");
 
@@ -42,9 +32,9 @@ export function TaskFooterActions({
     setError(null);
     try {
       if (!(await beforeRun())) return;
-      const { threadId, draft } = await run.mutateAsync({ taskId: task.id, buttonId: button.id });
-      if (draft) addToMessageBox(threadId, draft);
-      openThread(threadId);
+      const pressed = await run.mutateAsync({ taskId: task.id, buttonId: button.id });
+      if ("message" in pressed) addToConversationDraft(pressed.threadId, pressed.message, pressed.draft);
+      openThread(pressed.threadId);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
     } finally {

@@ -156,7 +156,23 @@ it("names the other accounts' own folders a run stays out of, only while account
   const cli = path.join(root, "original");
   expect(service.offLimits(work!.id)).toEqual([]);
   new AppSettingsService(db).set({ claudeAccountsSeparate: true });
-  const cliOwn = ["projects", "history.jsonl", ".credentials.json", "plans", "file-history", "paste-cache", "todos", "shell-snapshots", "session-env", "sessions", "debug"];
+  const cliOwn = [
+    "projects",
+    "history.jsonl",
+    ".credentials.json",
+    "plans",
+    "file-history",
+    "paste-cache",
+    "todos",
+    "shell-snapshots",
+    "session-env",
+    "sessions",
+    "debug",
+    "jobs",
+    "daemon",
+    "daemon.log",
+    "backups",
+  ];
   expect(service.offLimits(work!.id)).toEqual([...cliOwn.map((name) => path.join(cli, name)), folder(client!.id)]);
   expect(service.offLimits("claude-cli").sort()).toEqual([folder(work!.id), folder(client!.id)].sort());
 });

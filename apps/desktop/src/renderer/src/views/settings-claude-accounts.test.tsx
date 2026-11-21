@@ -100,12 +100,14 @@ it("keeps accounts separate, which turns switching at usage limits off", async (
   const switching = screen.getByRole<HTMLInputElement>("switch", { name: /Switch accounts at usage limits/ });
   await waitFor(() => expect(switching.checked).toBe(true));
   expect(keep.checked).toBe(false);
+  expect(screen.queryByText(/Turning this off moves each account's memories/)).toBeNull();
   fireEvent.click(keep);
   await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("app.settings.set", { claudeAccountsSeparate: true }));
   await waitFor(() => expect(keep.checked).toBe(true));
   expect(switching.checked).toBe(false);
   expect(switching.disabled).toBe(true);
   expect(screen.getByText("Off while accounts are kept separate.")).toBeTruthy();
+  expect(screen.getByText(/Turning this off moves each account's memories into the shared folder for good\./)).toBeTruthy();
 });
 
 it("turns on switching accounts at usage limits once a second account is enabled", async () => {

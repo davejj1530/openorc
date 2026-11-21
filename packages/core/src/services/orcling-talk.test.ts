@@ -169,6 +169,9 @@ it("keeps an Orcling to the Orclings, threads and accounts of its own Claude acc
     await expect(host().startGroup(pipRun.id, { with: ["bo"], text: "hello" })).rejects.toThrow(/another Claude account/);
     expect(await listed()).toEqual([mine.id]);
     expect(await listed(1)).toEqual([mine.id]);
+    await expect(host().app(pipRun.id, "threads.list", { projectId: project.id, claudeAccountId: client })).rejects.toThrow(
+      "That belongs to another Claude account, and Settings keeps Claude accounts separate.",
+    );
     expect(await chats()).toEqual(["Pip"]);
     expect(await taskIds()).toEqual([]);
     expect(await overview()).toMatchObject({ openTasks: [], threads: [{ id: mine.id }] });
@@ -184,6 +187,36 @@ it("keeps an Orcling to the Orclings, threads and accounts of its own Claude acc
       "Settings keeps Claude accounts separate, so Pip starts work only on its own Claude account.",
     );
     await expect(work({ under: elsewhere.id })).rejects.toThrow('"On the client account" works on another Claude account, and Settings keeps Claude accounts separate.');
+    await expect(work({ projectId: project.id, taskId: theirs.id })).rejects.toThrow("This task's conversation works on another Claude account, and Settings keeps Claude accounts separate.");
+  } finally {
+    await core.close();
+  }
+});
+
+it("keeps another Claude account's threads and their titles out of what an Orcling sees going on while accounts are kept separate", async () => {
+  const { core, say, settled, host } = await fixture();
+  try {
+    const client = claudeAccounts.add(core.db, "Client").id;
+    const pip = await core.orclings.create(draft("Pip"));
+    const project = projects.insert(core.db, { name: "Fixture", rootPath: join(root!, "project"), gitRemote: null, defaultBranch: "main", settings: {} });
+    const theirs = threads.insert(core.db, { projectId: project.id, title: "On the client account", agent: "codex", model: null, mode: "act", permissionMode: "trusted", claudeAccountId: client });
+    const mine = threads.insert(core.db, { projectId: project.id, title: "Mine, under theirs", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    threads.update(core.db, mine.id, { parentThreadId: theirs.id });
+    const later = Date.now() + 60_000;
+    for (const [index, thread] of [theirs, mine].entries()) core.db.stmt("UPDATE threads SET last_activity_at = ? WHERE id = ?").run(later + index, thread.id);
+    say("Pip", "on it");
+    await core.threads.continueThread(pip.threadId, { ...turn, prompt: "what is going on?" });
+    await settled(pip.threadId, 1);
+    const pipRun = runs.listForThread(core.db, pip.threadId)[0]!;
+    type Line = { id: string; under?: { id: string; title: string | null } };
+    const activity = async () => (JSON.parse(await host().activity(pipRun.id)) as { threads: Line[] }).threads;
+    const overview = async () => (JSON.parse(await host().project(pipRun.id, project.id, undefined)) as { threads: Line[] }).threads;
+    expect(await activity()).toMatchObject([{ id: mine.id, under: { id: theirs.id, title: "On the client account" } }, { id: theirs.id }]);
+
+    new AppSettingsService(core.db).set({ claudeAccountsSeparate: true });
+    const alone = [{ id: mine.id, under: { id: theirs.id, title: null } }];
+    expect(await activity()).toMatchObject(alone);
+    expect(await overview()).toMatchObject(alone);
   } finally {
     await core.close();
   }

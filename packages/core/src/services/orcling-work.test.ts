@@ -518,10 +518,45 @@ it("starts the work an Orcling hands on, and threads it starts for the person, o
     await expect(host().app(run, "threads.start", { ...opened, claudeAccountId: DEFAULT_CLAUDE_ACCOUNT })).rejects.toThrow("you start threads only on your own Claude account");
 
     const asked = vi.spyOn(core.runs, "authorizeAppAction");
-    await expect(host().startWork(run, { projectId: cliOnly.id, prompt: "Tidy up", worker: { kind: "agent", agent: "claude" }, reportBack: false })).rejects.toThrow(
-      "This project doesn't use Client, and Settings keeps Claude accounts separate",
-    );
+    for (const agent of ["claude", "codex"] as const) {
+      await expect(host().startWork(run, { projectId: cliOnly.id, prompt: "Tidy up", worker: { kind: "agent", agent }, reportBack: false })).rejects.toThrow(
+        "This project doesn't use Client, and Settings keeps Claude accounts separate",
+      );
+    }
     expect(asked).not.toHaveBeenCalled();
+  } finally {
+    await core.close();
+  }
+});
+
+it("keeps what an Orcling moves, takes up, makes and reviews through the app on its own account while accounts are kept separate", async () => {
+  const { core, host, idle } = await fixture();
+  try {
+    const client = claudeAccounts.add(core.db, "Client").id;
+    const bo = await core.orclings.create({ ...draft("Bo"), claudeAccountId: client });
+    await core.threads.continueThread(bo.threadId, { agent: "codex", model: "fixture", effort: undefined, attachments: undefined, mode: "act", permissionMode: "autonomous", prompt: "hi" });
+    await idle(bo.threadId);
+    const run = runs.listForThread(core.db, bo.threadId).at(-1)!.id;
+    const site = projects.insert(core.db, { name: "Site", rootPath: root!, gitRemote: null, defaultBranch: null, settings: {} });
+    const own = threads.insert(core.db, { projectId: site.id, title: "On the client account", agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted", claudeAccountId: client });
+    const loose = tasks.insert(core.db, { projectId: site.id, title: "Loose", spec: null, priority: "none", labels: [], workspaceMode: "current", baseRef: null, parentTaskId: null, threadId: null });
+    const turn = { agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted", prompt: "Go on" };
+    new AppSettingsService(core.db).set({ claudeAccountsSeparate: true });
+
+    await expect(host().app(run, "runs.start", { ...turn, threadId: own.id, claudeAccountId: DEFAULT_CLAUDE_ACCOUNT })).rejects.toThrow("only the person moves a conversation to another account");
+    expect(runs.listForThread(core.db, own.id)).toEqual([]);
+    await expect(host().app(run, "runs.start", { ...turn, taskId: loose.id })).rejects.toThrow("take up a task that has no conversation with orcling_thread_start");
+    expect(tasks.get(core.db, loose.id)?.executionThreadId).toBeNull();
+
+    const made = JSON.parse(await host().app(run, "orclings.create", { draft: draft("Cy") })) as { claudeAccountId: string };
+    expect(made.claudeAccountId).toBe(client);
+
+    // Site follows the app's accounts, whose default is the CLI login; a project this Mac doesn't have reviews in OpenOrc Cloud.
+    const reviewer = { agent: "codex", model: "fixture", effort: null, fastMode: false };
+    await expect(host().app(run, "pulls.review.start", { projectId: site.id, number: 7, reviewer })).rejects.toThrow(
+      "That review runs on another Claude account, and Settings keeps Claude accounts separate.",
+    );
+    await expect(host().app(run, "pulls.review.start", { projectId: "only-in-the-cloud", number: 7, reviewer })).rejects.toThrow("project only-in-the-cloud not found");
   } finally {
     await core.close();
   }

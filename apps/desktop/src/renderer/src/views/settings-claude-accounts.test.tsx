@@ -9,8 +9,10 @@ const mocks = vi.hoisted(() => ({ call: vi.fn() }));
 vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onReady: () => {}, onPush: () => () => {} } }));
 let data: ClaudeAccounts;
 let autoSwitch: boolean;
+let separate: boolean;
 beforeEach(() => {
   autoSwitch = false;
+  separate = false;
   queryClient.clear();
   data = {
     defaultId: "personal",
@@ -34,10 +36,11 @@ beforeEach(() => {
       return account;
     }
     if (method === "claude.accounts.login" || method === "claude.accounts.cancelLogin") return { started: true };
-    if (method === "app.settings.get") return { claudeAccountAutoSwitch: autoSwitch };
+    if (method === "app.settings.get") return { claudeAccountAutoSwitch: autoSwitch, claudeAccountsSeparate: separate };
     if (method === "app.settings.set") {
       autoSwitch = params.claudeAccountAutoSwitch ?? autoSwitch;
-      return { claudeAccountAutoSwitch: autoSwitch };
+      separate = params.claudeAccountsSeparate ?? separate;
+      return { claudeAccountAutoSwitch: autoSwitch, claudeAccountsSeparate: separate };
     }
     if (method === "claude.accounts.update") {
       if (params.makeDefault) data.defaultId = params.id;
@@ -88,6 +91,21 @@ it("changes the default and renames an account without changing its identity", a
   fireEvent.click(screen.getByRole("button", { name: "Save name" }));
   await screen.findByRole("heading", { name: "Company" });
   expect(mocks.call).toHaveBeenCalledWith("claude.accounts.update", { id: "work", name: "Company" });
+});
+
+it("keeps accounts separate, which turns switching at usage limits off", async () => {
+  autoSwitch = true;
+  mount();
+  const keep = await screen.findByRole<HTMLInputElement>("switch", { name: /Keep accounts separate/ });
+  const switching = screen.getByRole<HTMLInputElement>("switch", { name: /Switch accounts at usage limits/ });
+  await waitFor(() => expect(switching.checked).toBe(true));
+  expect(keep.checked).toBe(false);
+  fireEvent.click(keep);
+  await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("app.settings.set", { claudeAccountsSeparate: true }));
+  await waitFor(() => expect(keep.checked).toBe(true));
+  expect(switching.checked).toBe(false);
+  expect(switching.disabled).toBe(true);
+  expect(screen.getByText("Off while accounts are kept separate.")).toBeTruthy();
 });
 
 it("turns on switching accounts at usage limits once a second account is enabled", async () => {

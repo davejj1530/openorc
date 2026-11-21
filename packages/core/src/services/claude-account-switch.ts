@@ -61,7 +61,7 @@ const LOOK_AGAIN: LookAgain = { firstMs: 30_000, everyMs: 5 * 60_000, forMs: 6 *
 
 interface Dependencies {
   db: Db;
-  settings: { get(): Pick<AppSettings, "claudeAccountAutoSwitch"> };
+  settings: { get(): Pick<AppSettings, "claudeAccountAutoSwitch"> & Partial<Pick<AppSettings, "claudeAccountsSeparate">> };
   usage: Pick<ProviderUsageService, "recent">;
   runs: Pick<RunService, "threadSession">;
   threads: Pick<ThreadService, "continueThread">;

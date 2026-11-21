@@ -89,6 +89,7 @@ export function createAppearancePreviewRpc() {
     claudeConnectorsOff: [],
     cloudSkillsOff: {},
     claudeAccountAutoSwitch: false,
+    claudeAccountsSeparate: false,
   };
   const threads = ["Plan the first release", "Add project search", "Review the folder structure"].map((title, index) =>
     exampleThread(title, now - (index + 1) * 60000, `example-${index}`, project.id, models[0]!.id),

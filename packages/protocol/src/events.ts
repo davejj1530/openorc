@@ -374,5 +374,7 @@ export const RunSpec = z.object({
    * settings, hooks, plugins or MCP servers from it; only the user's own configuration applies.
    */
   untrustedCheckout: z.boolean().optional(),
+  /** Absolute paths the agent's file tools may not open: other Claude accounts' sessions and sign-in, while Settings keeps accounts separate. */
+  offLimits: z.array(z.string()).optional(),
 });
 export type RunSpec = z.infer<typeof RunSpec>;

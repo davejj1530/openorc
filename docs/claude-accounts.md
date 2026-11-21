@@ -16,11 +16,24 @@ Use **Make default** for new conversations. An explicitly selected account stays
 
 The **Existing CLI login** entry preserves the Claude login OpenOrc used before this feature. Existing conversations and imported CLI history stay attached to it. Rename this entry if useful.
 
-A thread keeps its account until you move it. With more than one account, the account name in the thread header opens a menu that moves the conversation to another account between turns. OpenOrc copies the newest Claude session into the other account's folder, and the next message resumes that copy; when there is no session to copy, the thread starts over there with a summary of the conversation. When a run stops on a usage limit, the conversation offers the other signed-in accounts and continues where it left off on the one you choose. Tasks keep the account they ran on, and an Orcling keeps its own.
+A thread keeps its account until you move it. With more than one account, the account name in the thread header opens a menu that moves the conversation to another account between turns. OpenOrc copies the newest Claude session into the other account's folder, and the next message resumes that copy; when there is no session to copy, the thread starts over there with a summary of the conversation. When a run stops on a usage limit, the conversation offers the other signed-in accounts and continues where it left off on the one you choose. With **Switch accounts at usage limits** turned on, it moves by itself to the account with the most 5-hour usage left; a project that uses only selected accounts has its own switch. Tasks keep the account they ran on, and an Orcling keeps its own.
 
 Disabling an account retains its history and credentials; enable it again to continue its conversations. OpenOrc reports an unavailable or disabled account instead of selecting a different login.
 
 **Sign in again** closes idle sessions for that account, preserving their conversation history. Finish active work first. Sign-in can be cancelled and times out after five minutes. If it fails, check the Claude Code installation, retry, and complete the browser flow.
+
+## Keep accounts separate
+
+**Keep accounts separate**, under **Settings → Connections → Claude accounts**, stops work on one account from seeing or reaching work on another, even in the same project:
+
+- An agent's thread tools list, read and message only threads on its own account, and its task tools see only tasks that run in, or were saved from, a thread on its account. A task with no thread stays visible to every account.
+- A subthread, fork, task thread or scheduled run carries its account over. Where the project no longer uses that account, it doesn't start, instead of moving to the project's default.
+- Nothing switches account at a usage limit, whatever the app or project setting says.
+- Each added account keeps its own Claude memory instead of the shared folder.
+- Claude's file tools can't open another added account's folder, or the existing CLI login's sessions, prompt history and sign-in. A shell command still can, since every account runs as you on the same computer, and OpenOrc running on Windows itself, rather than in WSL, doesn't set this yet. Claude Code's skills and plugins stay shared.
+- An Orcling starts work, messages other Orclings, and acts in OpenOrc only on its own account, and lists only what is on it.
+
+You can still move a conversation to another account yourself. The thread, task and Orcling rules follow the setting at once. Memory and the file rules apply when a session starts, so turning the setting on or off closes idle sessions; one already working keeps the old ones until it next starts.
 
 ## Credential ownership
 

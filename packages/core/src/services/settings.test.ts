@@ -37,6 +37,7 @@ describe("settings persistence", () => {
       claudeUserMcpServers: false,
       claudeConnectorsOff: ["paper"],
       claudeAccountAutoSwitch: true,
+      claudeAccountsSeparate: true,
       cloudSkillsOff: { claude: ["notes"] },
     };
     service.set(values);

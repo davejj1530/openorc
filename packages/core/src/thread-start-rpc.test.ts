@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
-import { projects, runs, settings, threads } from "@openorc/db";
+import { claudeAccounts, projects, runs, settings, tasks, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import { THREAD_EXISTS, type ModelOption, type Project, type RpcParams, type RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
@@ -237,6 +237,31 @@ it("lists messageable conversations before applying the agent's 30-thread limit"
   expect((await core.threads.toolThreadList(runId)).map((thread) => thread.id).sort()).toEqual([home.id, started.id].sort());
   expect((await call("threads.list", { projectId: project.id, excludeSubagents: true, limit: 1 })).length).toBe(1);
   expect((await call("threads.list", { projectId: project.id, excludeSubagents: true })).map((thread) => thread.id).sort()).toEqual([home.id, started.id].sort());
+});
+
+it("keeps the thread and task tools to the agent's own Claude account while accounts are kept separate", async () => {
+  const { thread: home, runId } = await parent();
+  const client = claudeAccounts.add(core.db, "Client").id;
+  const conversation = (title: string, claudeAccountId?: string) =>
+    threads.insert(core.db, { projectId: project.id, title, agent: "codex", model: null, mode: "act", permissionMode: "trusted", ...(claudeAccountId ? { claudeAccountId } : {}) });
+  const same = conversation("On the same account");
+  const elsewhere = conversation("On the client account", client);
+  const task = (title: string, threadId: string | null) =>
+    tasks.insert(core.db, { projectId: project.id, title, spec: null, priority: "none", labels: [], workspaceMode: "current", baseRef: null, parentTaskId: null, threadId });
+  const theirs = task("Their task", elsewhere.id);
+  const anyones = task("Anyone's task", null);
+  const listed = async () => (await core.threads.toolThreadList(runId)).map((thread) => thread.id).sort();
+  const taskIds = async () => (await core.threads.toolList(runId)).map((card) => card.id);
+  expect(await listed()).toEqual([home.id, same.id, elsewhere.id].sort());
+  expect(await taskIds()).toContain(theirs.id);
+
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  expect(await listed()).toEqual([home.id, same.id].sort());
+  expect(await core.threads.toolThreadRead(runId, elsewhere.id)).toBeNull();
+  expect(await core.threads.toolThreadSend(runId, elsewhere.id, "Can you help?")).toEqual({ delivered: false, message: "No such thread in this project." });
+  expect(await taskIds()).toEqual(expect.arrayContaining([anyones.id]));
+  expect(await taskIds()).not.toContain(theirs.id);
+  expect(await core.threads.toolGet(runId, theirs.id)).toBeNull();
 });
 
 /** A thread a person starts under `parentThreadId` from OpenOrc. */

@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { listEvents, orclingGroups, orclingMessages, orclings, runs as runRepo, threads, type Db } from "@openorc/db";
 import { orclingHandle, WORKSPACE_ID, type Orcling, type OrclingGroup, type OrclingMessageOrigin, type Run, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
+import { ACCOUNTS_KEPT_SEPARATE, accountReach } from "./claude-account-separation.js";
 import type { RunService } from "./runs.js";
 import type { ThreadService } from "./threads.js";
 import { executionProject } from "./workspace-home.js";
@@ -102,6 +103,14 @@ export class OrclingTalk {
     return found;
   }
 
+  /** Another Orcling this one may reach on its own: any, or only one on its Claude account while accounts are kept separate. */
+  reachable(fromId: string, toName: string): Orcling {
+    const from = this.orcling(fromId);
+    const to = this.byName(toName, fromId);
+    if (!accountReach(this.deps.db, from.claudeAccountId)(to.claudeAccountId)) throw new Error(`${to.name} works on another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`);
+    return to;
+  }
+
   origins(threadId: string): OrclingMessageOrigin[] {
     return orclingMessages.list(this.deps.db, threadId);
   }
@@ -117,10 +126,11 @@ export class OrclingTalk {
   directory(orclingId: string) {
     const { db } = this.deps;
     const name = (id: string) => orclings.get(db, id)?.name ?? "a deleted Orcling";
+    const reach = accountReach(db, this.orcling(orclingId).claudeAccountId);
     return {
       orclings: orclings
         .list(db)
-        .filter((other) => other.id !== orclingId)
+        .filter((other) => other.id !== orclingId && reach(other.claudeAccountId))
         .map((other) => ({ name: other.name, busy: this.deps.runs().threadActivity(other.threadId) !== "idle" })),
       groups: orclingGroups.of(db, orclingId).map((group) => ({ title: group.title, threadId: group.threadId, members: group.memberIds.map(name) })),
     };
@@ -132,7 +142,7 @@ export class OrclingTalk {
    */
   async direct(fromId: string, fromThreadId: string | null, toName: string, text: string): Promise<{ to: Orcling; messageId: string }> {
     const from = this.orcling(fromId);
-    const to = this.byName(toName, fromId);
+    const to = this.reachable(fromId, toName);
     const runs = this.deps.runs();
     const hops = (fromThreadId ? runs.agentChain(fromThreadId) : 0) + 1;
     if (hops > ORCLING_MESSAGE_CHAIN) throw new Error(`You and other Orclings have traded ${ORCLING_MESSAGE_CHAIN} messages with nobody writing in between. Wait until the person writes.`);
@@ -217,7 +227,7 @@ export class OrclingTalk {
 
   /** An Orcling opens a group with the Orclings it names and its first words, which go to each of them in turn. */
   async startGroup(fromId: string, names: readonly string[], title: string | undefined, text: string): Promise<OrclingGroup> {
-    const others = names.map((name) => this.byName(name, fromId));
+    const others = names.map((name) => this.reachable(fromId, name));
     const group = await this.createGroup([fromId, ...others.map((other) => other.id)], title, fromId);
     const messageId = `orcling-${randomUUID()}`;
     orclingMessages.record(this.deps.db, { messageId, threadId: group.threadId, fromOrclingId: fromId, toOrclingId: null });

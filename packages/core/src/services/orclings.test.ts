@@ -44,7 +44,13 @@ async function fixture() {
   };
   vi.spyOn(CodexAdapter.prototype, "start").mockImplementation(scripted("codex"));
   vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation(scripted("claude"));
-  const core = await OpenOrc.create({ dataDir: join(root, "data"), ephemeral: true, transport: { push() {} } });
+  const core = await OpenOrc.create({
+    dataDir: join(root, "data"),
+    ephemeral: true,
+    // An Orcling's memories are kept and searched without downloading an embedding model, which a slow network leaves a test waiting on as it closes.
+    embedder: { ready: async () => false, embed: async () => null, embedQuery: async () => null },
+    transport: { push() {} },
+  });
   // Scripted adapters still pass through real launch admission; the fixture needs no installed CLIs.
   const environment = core.environment.current();
   vi.spyOn(core.environment, "current").mockReturnValue({ ...environment, binaries: { ...environment.binaries, codex: "/fixture/codex", claude: "/fixture/claude" } });

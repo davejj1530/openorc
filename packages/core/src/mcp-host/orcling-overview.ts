@@ -113,9 +113,10 @@ export function overviewTools(deps: OverviewDependencies, speaker: (runId: strin
         })),
       );
       const fallback = claudeAccounts.defaultId(db);
+      const reach = accountReach(db, self.claudeAccountId);
       const accounts = claudeAccounts
         .list(db)
-        .filter((account) => account.enabled)
+        .filter((account) => account.enabled && reach(account.id))
         .map((account) => ({ name: account.name, ...(account.id === fallback ? { default: true } : {}) }));
       const own = self.claudeAccountId ? accountNames(db)(self.claudeAccountId) : undefined;
       return json({

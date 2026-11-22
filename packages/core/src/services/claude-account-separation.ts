@@ -1,5 +1,5 @@
 import { claudeAccounts, runs, threads, type Db } from "@openorc/db";
-import { DEFAULT_CLAUDE_ACCOUNT, type Task, type Thread } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, type Orcling, type Task, type Thread } from "@openorc/protocol";
 import { AppSettingsService } from "./settings.js";
 
 export const ACCOUNTS_KEPT_SEPARATE = "Settings keeps Claude accounts separate";
@@ -61,4 +61,10 @@ export function assertOnTaskAccount(db: Db, task: Pick<Task, "executionThreadId"
   if (!kept || kept === account) return;
   const name = claudeAccounts.list(db).find((candidate) => candidate.id === kept)?.name ?? "another Claude account";
   throw new Error(`This task is on ${name}, and ${ACCOUNTS_KEPT_SEPARATE}, so its work stays there.`);
+}
+
+/** Refuses an Orcling on another account than its task's, by name, while accounts are kept separate. */
+export function assertOrclingOnTaskAccount(db: Db, task: Pick<Task, "executionThreadId" | "threadId">, orcling: Pick<Orcling, "name" | "claudeAccountId">): void {
+  const kept = keptTaskAccount(db, task);
+  if (kept && kept !== orcling.claudeAccountId) throw new Error(`${orcling.name} works on another Claude account than this task's, and ${ACCOUNTS_KEPT_SEPARATE}.`);
 }

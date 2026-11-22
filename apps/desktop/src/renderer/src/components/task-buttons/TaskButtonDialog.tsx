@@ -128,7 +128,9 @@ export function TaskButtonDialog({
           </Field>
         </div>
         <ThreadChoiceFields value={button.choice} onChange={chooseModel} project={project} plan={button.mode === "plan"} sameLabel="Default" layout="card" disabled={pending} />
-        {separate && button.choice?.claudeAccountId ? <p className="text-sm text-ink-2 mb-3">Accounts are kept separate, so the button runs on its task&apos;s account.</p> : null}
+        {separate && button.choice?.claudeAccountId ? (
+          <p className="text-sm text-ink-2 mb-3">Accounts are kept separate, so on a task that has a thread the button runs on that thread&apos;s account.</p>
+        ) : null}
         {error ? (
           <p className="text-sm text-bad mb-3 break-words" role="alert">
             {error}

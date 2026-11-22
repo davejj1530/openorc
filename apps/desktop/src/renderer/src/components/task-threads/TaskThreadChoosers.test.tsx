@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { Project, Task, ThreadChoice, ThreadSummary } from "@openorc/protocol";
+import type { Project, Run, Task, ThreadChoice, ThreadSummary } from "@openorc/protocol";
 import { useRpcMutation } from "../../lib/client";
 import * as router from "../../lib/router";
 import { accounts, api, calls, enabledAccount, models, opus, wrap } from "../test-fixtures/task-choices";
@@ -17,6 +17,7 @@ let refuse: string | null = null;
 let availability: { id: string; state: string }[] | null = null;
 let defaultHarness: string | null = null;
 let separate = false;
+let creatorAccount: string | null = null;
 const current = { id: "current", agent: "claude", model: "opus-test", effort: "high", claudeAccountId: "personal" } as ThreadSummary;
 
 beforeEach(() => {
@@ -24,6 +25,7 @@ beforeEach(() => {
   availability = null;
   defaultHarness = null;
   separate = false;
+  creatorAccount = null;
   openThread.mockClear();
   beforeOpen.mockReset().mockImplementation(async () => true);
   api.mockReset().mockImplementation(async (method, params) => {
@@ -31,7 +33,7 @@ beforeEach(() => {
     if (method === "agents.availability") return availability as never;
     if (method === "app.settings.get") return { defaultHarness, claudeAccountsSeparate: separate } as never;
     if (method === "claude.accounts.list") return accounts as never;
-    if (method === "threads.get") return ((params as { id: string }).id === "current" ? current : creator) as never;
+    if (method === "threads.get") return ((params as { id: string }).id === "current" ? current : { ...creator, claudeAccountId: creatorAccount }) as never;
     if (method === "tasks.openThread" || method === "tasks.newThread") {
       if (refuse) throw new Error(refuse);
       return { id: method === "tasks.openThread" ? "opened" : "fresh" } as never;
@@ -111,6 +113,23 @@ it("continues in a new thread only on the task's account while accounts are kept
   fireEvent.click(within(sheet).getByRole("button", { name: "Continue" }));
   await waitFor(() => expect(openThread).toHaveBeenCalledWith("fresh"));
   expect(calls("tasks.newThread")).toEqual([{ taskId: "task" }]);
+});
+
+it("opens a task's first thread on the task's account, not its last run's, while accounts are kept separate", async () => {
+  separate = true;
+  creatorAccount = "work";
+  // The last run's effort is no longer offered, so the model standing in for it is asked for, with its account.
+  const lastRun = { agent: "claude", model: "opus-test", effort: "low", claudeAccountId: "personal" } as Run;
+  wrap(<OpenThreadChooser task={task} project={project} runs={[lastRun]} beforeOpen={beforeOpen} />);
+  fireEvent.click(screen.getByRole("button", { name: "Choose model for the new thread" }));
+  const sheet = await screen.findByRole("dialog", { name: "Open thread" });
+  await waitFor(() => expect(model(sheet).value).toBe(opus));
+  const field = () => within(sheet).getByRole<HTMLSelectElement>("combobox", { name: "Account" });
+  await waitFor(() => expect(field().textContent).toBe("Work (kept separate)"));
+  expect(field().disabled).toBe(true);
+  fireEvent.click(within(sheet).getByRole("button", { name: "Open thread" }));
+  await waitFor(() => expect(openThread).toHaveBeenCalledWith("opened"));
+  expect(calls("tasks.openThread")).toEqual([{ taskId: "task", choice: { agent: "claude", model: "opus-test", effort: "high", claudeAccountId: "work" } }]);
 });
 
 it("opens no thread when the task couldn't be saved first", async () => {

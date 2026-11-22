@@ -12,6 +12,7 @@ import {
 } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { defaultChoice, pickerCatalog, type ModelChoice } from "@openorc/client";
+import { useAccountsSeparate } from "../lib/accounts-separate";
 import { afterOrclingDeleted, groupsGoingWith, useOrclingGroups, useOrclings } from "../lib/orclings";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -115,7 +116,7 @@ function DesignerForm({ existing, initialModel }: { existing: Orcling | undefine
                 <ModelPicker value={model} onChange={setModel} ariaLabel="Model" />
               </ClaudeAccountScope>
             </div>
-            {model?.agent === "claude" ? <AccountField value={account} onChange={setAccount} /> : null}
+            {model?.agent === "claude" ? <AccountField value={account} onChange={setAccount} saved={Boolean(existing)} /> : null}
             <div className="orcling-designer-field">
               <span>Permission</span>
               <Segmented
@@ -142,18 +143,25 @@ function DesignerForm({ existing, initialModel }: { existing: Orcling | undefine
   );
 }
 
-/** Which Claude account a Claude Orcling runs on, once there is more than one to choose from. */
-function AccountField({ value, onChange }: { value: string | undefined; onChange: (id: string) => void }) {
+/**
+ * Which Claude account a Claude Orcling runs on, once there is more than one to choose from. While accounts are kept
+ * separate, a saved Orcling stays on the one it has.
+ */
+function AccountField({ value, onChange, saved }: { value: string | undefined; onChange: (id: string) => void; saved: boolean }) {
   const accounts = useRpc("claude.accounts.list", {}).data;
+  const kept = useAccountsSeparate() && saved;
   if (!accounts || accounts.accounts.length < 2) return null;
   const chosen = value ?? accounts.defaultId;
   return (
-    <div className="orcling-designer-field">
-      <span>Claude account</span>
-      <Select aria-label="Claude account" value={chosen} onChange={(event) => onChange(event.target.value)} className="h-7 max-w-48 rounded-full text-sm">
-        <ClaudeAccountOptions accounts={accounts.accounts} value={chosen} />
-      </Select>
-    </div>
+    <>
+      <div className="orcling-designer-field">
+        <span>Claude account</span>
+        <Select aria-label="Claude account" value={chosen} disabled={kept} onChange={(event) => onChange(event.target.value)} className="h-7 max-w-48 rounded-full text-sm">
+          <ClaudeAccountOptions accounts={accounts.accounts} value={chosen} />
+        </Select>
+      </div>
+      {kept ? <p className="text-sm text-ink-3">Accounts are kept separate, so an Orcling stays on its account.</p> : null}
+    </>
   );
 }
 

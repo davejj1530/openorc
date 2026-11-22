@@ -18,7 +18,7 @@ import {
   type Thread,
 } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
-import { ACCOUNTS_KEPT_SEPARATE, accountReach, accountsSeparate, reachableTitle } from "./claude-account-separation.js";
+import { ACCOUNTS_KEPT_SEPARATE, accountReach, accountsSeparate, reachableTitle, threadAccount } from "./claude-account-separation.js";
 import { AttachmentService } from "./attachments.js";
 import type { MemoryService } from "./memory.js";
 import { catchUp, orclingBrief, rolloverSeed, type OrclingPlace } from "./orcling-briefs.js";
@@ -162,6 +162,7 @@ export class OrclingService {
     const current = this.get(id);
     this.assertNameFree(draft.name, id);
     const claudeAccountId = this.account(draft.claudeAccountId, current.claudeAccountId);
+    if (claudeAccountId !== current.claudeAccountId && accountsSeparate(db)) throw new Error(`${ACCOUNTS_KEPT_SEPARATE}, so ${current.name} stays on its Claude account.`);
     const moving = claudeAccountId === current.claudeAccountId ? [] : this.conversations(current);
     if (moving.some((threadId) => this.deps.runs().threadActivity(threadId) !== "idle")) throw new Error(`Wait for ${current.name} to finish before changing its Claude account.`);
     const folder = await this.renameFolder(current, draft.name);
@@ -407,7 +408,13 @@ export class OrclingService {
     if (thread.orclingId === orcling.id) throw new Error(`${orcling.name} already works in this conversation. Message it without a mention.`);
     if (retiredTeams.isHidden(this.deps.db, threadId)) throw new Error("This item is no longer available.");
     if (orclings.forThread(this.deps.db, threadId)) throw new Error("Another Orcling's own conversation is only for that Orcling.");
+    if (this.onAnotherAccount(orcling, thread)) throw new Error(`${orcling.name} works on another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`);
     return thread;
+  }
+
+  /** Whether an Orcling works on another Claude account than a conversation's while accounts are kept separate, which keeps it out. */
+  private onAnotherAccount(orcling: Orcling, thread: Thread): boolean {
+    return accountsSeparate(this.deps.db) && orcling.claudeAccountId !== threadAccount(thread);
   }
 
   /** Gives a project conversation to an Orcling, which takes over its model and Claude account, or with null returns it to a plain model. */
@@ -419,6 +426,7 @@ export class OrclingService {
     }
     const orcling = orclingId ? this.get(orclingId) : null;
     if (orcling) {
+      if (this.onAnotherAccount(orcling, thread)) throw new Error(`${orcling.name} works on another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}, so this conversation stays on its account.`);
       const { agent, model, effort, fastMode } = orcling.settings;
       const ceiling = orclingExecution(orcling);
       this.deps.threads().update(threadId, {
@@ -526,7 +534,8 @@ export class OrclingService {
     const place = this.place(orcling, input);
     const group = place === "group" && input.scope.thread ? orclingGroups.get(this.deps.db, input.scope.thread.id) : null;
     const others = (group?.memberIds ?? []).filter((id) => id !== orcling.id).map((id) => this.name(id) ?? "an Orcling");
-    return orclingBrief(orcling, { instructions, memory: this.deps.memory.orclingBrief(orcling.id), place, tools: !input.scope.comment, others });
+    const separate = accountsSeparate(this.deps.db);
+    return orclingBrief(orcling, { instructions, memory: this.deps.memory.orclingBrief(orcling.id), place, tools: !input.scope.comment, others, separate });
   }
 
   private place(orcling: Orcling, input: StartRunInput): OrclingPlace {

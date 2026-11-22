@@ -32,7 +32,7 @@ type Dependencies = OverviewDependencies &
   Omit<AppDependencies, "db" | "runs"> & {
     orclings: Pick<OrclingService, "forRun" | "saveInstructions" | "startThread" | "startTask" | "react" | "talk">;
     memory: Pick<MemoryService, "assertEnabled" | "record" | "retrieveOrcling" | "retrieve" | "brief">;
-    runs: Pick<RunService, "authorizeAppAction">;
+    runs: Pick<RunService, "authorizeAppAction" | "models">;
     threads: Pick<ThreadService, "toolThreadRead">;
     send: NonNullable<McpHost["threads"]>["send"];
     invalidate: (keys: string[]) => void;
@@ -294,7 +294,8 @@ function projectTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, 
       const self = speaker(runId);
       const target = project(input.projectId);
       const title = input.title.trim();
-      const duplicate = tasks.list(db, { projectId: target.id, statuses: OPEN }).find((t) => t.title.trim().toLowerCase() === title.toLowerCase());
+      const reach = accountReach(db, self.claudeAccountId);
+      const duplicate = tasks.list(db, { projectId: target.id, statuses: OPEN }).find((t) => t.title.trim().toLowerCase() === title.toLowerCase() && reachesTask(db, reach, t));
       if (duplicate) return json({ task: { id: duplicate.id, title: duplicate.title, status: duplicate.status }, duplicate: true });
       const task = tasks.insert(db, {
         projectId: target.id,

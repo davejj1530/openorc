@@ -26,7 +26,10 @@ export interface PickerAccounts {
   project?: { id: string; name: string } | undefined;
   /** The person's accounts on OpenOrc Cloud, the only ones a cloud conversation offers; this Mac's when absent. */
   cloud?: true | undefined;
-  /** The picker section the accounts head, the agent's whose they are; Claude's when none. */
+  /**
+   * The picker section the accounts head; Claude's when none. A cloud thread's accounts are its agent's own. This Mac's
+   * are Claude's in any section, headed "Claude account" in another agent's, whose thread belongs to one of them.
+   */
   section?: string | undefined;
   /** How an account's usage is read; this Mac's Claude account's when none. */
   usage?: ((id: string) => RpcParams<"providers.usage">) | undefined;
@@ -117,9 +120,12 @@ function AccountRows({ accounts, disabled, moveRowFocus }: { accounts: PickerAcc
   const clearError = useRef(accounts.clearError);
   clearError.current = accounts.clearError;
   useEffect(() => () => clearError.current?.(), []);
+  const inClaude = (accounts.section ?? "claude") === "claude";
+  // This Mac's accounts are Claude's in any agent's section; a cloud thread's are its own agent's.
+  const name = inClaude || !accounts.cloud ? "Claude account" : "Account";
   return (
-    <div className="model-picker-group" role="group" aria-label={(accounts.section ?? "claude") === "claude" ? "Claude account" : "Account"}>
-      <div className="model-picker-group-label">Account</div>
+    <div className="model-picker-group" role="group" aria-label={name}>
+      <div className="model-picker-group-label">{inClaude ? "Account" : name}</div>
       {accounts.blocked ? (
         <p role="status" className="model-picker-message">
           {accounts.blocked}

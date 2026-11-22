@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from "react";
-import { WORKSPACE_ID, type Orcling, type Run, type ThreadSummary } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID, type Orcling, type Run, type ThreadSummary } from "@openorc/protocol";
 import type { OutgoingMessage } from "@openorc/client";
+import { STAYS_ON_ITS_ACCOUNT, useAccountsSeparate } from "../lib/accounts-separate";
 import type { MentionEntry } from "../lib/composer-mentions";
 import { mentionedOrcling, orclingById, orclingHome, orclingMentionEntries, useOrclingGroups, useOrclings } from "../lib/orclings";
 import type { ConversationVoice, OrclingChatSpec } from "../lib/turn-authors";
@@ -70,6 +71,19 @@ function groupParts(chat: OrclingChatSpec, runs: number, send: (params: { thread
 /** An Orcling at the tail of its conversation, thinking while a turn runs. */
 const face = (orcling: Orcling) => (working: boolean) => <OrclingPreview look={orcling.look} expression={working ? 1 : 0} size={44} />;
 
+/** What the model picker says of an Orcling it can't give the conversation to, and why. */
+const ON_ANOTHER_ACCOUNT = { label: "On another Claude account", reason: STAYS_ON_ITS_ACCOUNT };
+
+/**
+ * While accounts are kept separate, which Orclings can't join a conversation: those on another Claude account than its
+ * own. The Orcling already working in it stays.
+ */
+function useOnAnotherAccount(thread: ThreadSummary | null): (orcling: Orcling) => boolean {
+  const separate = useAccountsSeparate();
+  const account = thread?.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
+  return (orcling) => separate && orcling.id !== thread?.orclingId && orcling.claudeAccountId !== account;
+}
+
 /**
  * How Orclings join an ordinary conversation: asked by name with `@`, answering as guests, or chosen in the model
  * picker to work in a project conversation. An Orcling's own conversation and team conversations have their own ways.
@@ -95,15 +109,17 @@ export function useOrclingConversation({
   const askOrcling = useRpcMutation("orclings.ask");
   const assign = useRpcMutation("orclings.assign");
   const groupSend = useRpcMutation("orclings.groups.send");
+  const elsewhere = useOnAnotherAccount(thread);
   if (chat?.group) return { voice, ask: async () => false, ...groupParts(chat, runs.length, groupSend.mutateAsync) };
   const open = Boolean(thread && !home && !thread.teamInstanceId && orclings.length);
-  const guests = open ? orclings.filter((orcling) => orcling.id !== thread?.orclingId) : [];
+  const askable = orclings.filter((orcling) => !elsewhere(orcling));
+  const guests = open ? askable.filter((orcling) => orcling.id !== thread?.orclingId) : [];
   const assignable = open && thread?.projectId !== WORKSPACE_ID;
   return {
     voice,
     placeholder: speaker ? `Message ${speaker.name}…` : undefined,
     empty: home && runs.length === 0 ? <Empty title={`Say hi to ${home.name}`} icon={<OrclingPreview look={home.look} size={160} />} /> : undefined,
-    mentions: open ? orclingMentionEntries(orclings, thread?.orclingId) : undefined,
+    mentions: open ? orclingMentionEntries(askable, thread?.orclingId) : undefined,
     modelControl:
       assignable && thread ? (
         <ComposerModelPicker
@@ -114,7 +130,12 @@ export function useOrclingConversation({
             if (thread.orclingId) assign.mutate({ threadId: thread.id, orclingId: null });
             onModel(next);
           }}
-          orclings={{ options: orclings, selectedId: thread.orclingId ?? null, onSelect: (orcling) => assign.mutate({ threadId: thread.id, orclingId: orcling.id }) }}
+          orclings={{
+            options: orclings,
+            selectedId: thread.orclingId ?? null,
+            onSelect: (orcling) => assign.mutate({ threadId: thread.id, orclingId: orcling.id }),
+            blocked: (orcling) => (elsewhere(orcling) ? ON_ANOTHER_ACCOUNT : undefined),
+          }}
           accounts={thread.orclingId ? undefined : accounts}
         />
       ) : undefined,

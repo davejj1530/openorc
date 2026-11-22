@@ -11,17 +11,17 @@ import {
   type TaskComment,
 } from "@openorc/protocol";
 import { useMemo, useRef, useState } from "react";
+import { useTaskOrclings } from "../lib/accounts-separate";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { insertMention, mentionQueryAt } from "../lib/composer-mentions";
 import { modelEffortLabel } from "../lib/model-effort-label";
-import { useOrclings } from "../lib/orclings";
 import { TaskCommentDiscussion } from "./TaskCommentDiscussion";
 import { Button, TextButton } from "./ui";
 import { useTaskCommentDraft } from "./useTaskCommentDraft";
 
-/** Everyone a comment can mention: Orclings first, then every available model and effort. */
-function useMentionOptions(models: ModelOption[] | undefined) {
-  const orclings = useOrclings();
+/** Everyone a comment on the task can mention: the Orclings its work can go to first, then every available model and effort. */
+function useMentionOptions(taskId: string, models: ModelOption[] | undefined) {
+  const orclings = useTaskOrclings(taskId);
   return useMemo(() => [...orclingMentionOptions(orclings), ...commentMentionOptions((models ?? []).filter((m) => !m.unavailable))], [models, orclings]);
 }
 
@@ -45,7 +45,7 @@ export function TaskComments({ taskId, description, beforeSend }: TaskCommentsPr
   const [selected, setSelected] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const editor = useRef<HTMLTextAreaElement>(null);
-  const options = useMentionOptions(models.data);
+  const options = useMentionOptions(taskId, models.data);
   const names = useMemo(() => new Map(options.map((o) => [commentRecipientKey(o.recipient), o.name])), [options]);
   const recipientName = (r: CommentRecipient) => names.get(commentRecipientKey(r)) ?? modelEffortLabel(r, models.data);
   const query = dismissed ? null : mentionQueryAt(draft.body, caret);

@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ClaudeAccountConnection, Project, ProviderUsage, ThreadSummary } from "@openorc/protocol";
-import { queryClient } from "../lib/client";
+import { queryClient, useRpc } from "../lib/client";
 import { core } from "../lib/rpc";
 import { useThreadAccounts } from "../lib/use-thread-accounts";
 import { PickerAccountRows } from "./ModelPickerAccounts";
@@ -59,10 +59,15 @@ function Rows({ thread, inProject }: { thread: Partial<ThreadSummary>; inProject
   const accounts = useThreadAccounts(shown, inProject ?? project());
   return accounts ? <PickerAccountRows section={shown.agent} searching={false} accounts={accounts} moveRowFocus={() => {}} /> : null;
 }
+/** Says once the settings have reached the screen, so a test can tell rows that never show from rows not shown yet. */
+function SettingsLoaded() {
+  return useRpc("app.settings.get", {}).data ? <span>Settings loaded</span> : null;
+}
 const show = (thread: Partial<ThreadSummary> = {}, inProject?: Pick<Project, "id" | "name" | "settings">) =>
   render(
     <QueryClientProvider client={queryClient}>
       <Rows thread={thread} inProject={inProject} />
+      <SettingsLoaded />
     </QueryClientProvider>,
   );
 const row = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}`) });
@@ -121,8 +126,10 @@ it("moves no conversation to another account while accounts are kept separate", 
 
 it("shows another agent's thread the Claude account its work belongs to only while accounts are kept separate", async () => {
   show({ agent: "codex", claudeAccountId: "personal" });
-  await waitFor(() => expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "app.settings.get")).toBe(true));
+  await screen.findByText("Settings loaded");
   expect(screen.queryByRole("button", { name: /^Personal/ })).toBeNull();
+  // The accounts are read only for a thread that shows them.
+  expect(vi.mocked(core.call).mock.calls.filter(([method]) => method === "claude.accounts.list")).toEqual([]);
   cleanup();
   queryClient.clear();
   host.separate = true;
@@ -130,6 +137,8 @@ it("shows another agent's thread the Claude account its work belongs to only whi
   await waitFor(() => expect(row("Personal").getAttribute("aria-pressed")).toBe("true"));
   expect(row("Work").hasAttribute("disabled")).toBe(true);
   expect(screen.getByRole("status").textContent).toBe("Accounts are kept separate, so this conversation stays on its account.");
+  // Under another agent's models, "Account" alone would read as that agent's.
+  expect(within(screen.getByRole("group", { name: "Claude account" })).getByText("Claude account")).toBeTruthy();
 });
 
 it("offers only the accounts a project uses, keeps the thread's own apart, and opens the project's accounts", async () => {
@@ -137,6 +146,7 @@ it("offers only the accounts a project uses, keeps the thread's own apart, and o
   host.accounts = [account("work", "Work"), account("personal", "Personal"), account("client", "Client")];
   show({}, project(["personal", "client"]));
   const group = await screen.findByRole("group", { name: "Claude account" });
+  expect(within(group).getByText("Account")).toBeTruthy();
   await waitFor(() => expect(within(group).getAllByRole("button", { pressed: false }).length).toBeGreaterThan(0));
   expect(row("Work").textContent).toContain("Not in this project");
   expect([row("Personal"), row("Client"), row("Work")].every(Boolean)).toBe(true);

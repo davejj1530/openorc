@@ -94,6 +94,18 @@ describe("startingAccount", () => {
     expect(startingAccount(db, project.id, undefined, "inherited")).toBe(personal);
     expect(startingAccount(db, project.id, client, "own")).toBe(client);
   });
+
+  it("gives another agent's thread the project's default for an account the project does not use, and refuses it while accounts are kept separate", () => {
+    choose(own());
+    const started = () => [work, client, undefined].map((requested) => startingAccount(db, project.id, requested, "unused"));
+    expect(started()).toEqual([work, personal, personal]);
+    new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+    expect(() => started()).toThrow("This project doesn't use Client, and Settings keeps Claude accounts separate, so this can't start on another account.");
+    expect([startingAccount(db, project.id, work, "unused"), startingAccount(db, project.id, undefined, "unused")]).toEqual([work, personal]);
+    // With none of the project's accounts enabled it still starts when it asks for none.
+    for (const id of [work, personal]) claudeAccounts.update(db, { id, enabled: false });
+    expect(startingAccount(db, project.id, undefined, "unused")).toBe(DEFAULT_CLAUDE_ACCOUNT);
+  });
 });
 
 describe("switching at usage limits", () => {

@@ -1,7 +1,7 @@
 import { spaceNavigation } from "../lib/space-navigation";
 import { useSpaceThread } from "../lib/space-queries";
 import { offeredAccount, projectAccountChoice, type ModelChoice } from "@openorc/client";
-import { executionMode, placeOf, PLACES, type ThreadSummary } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, executionMode, placeOf, PLACES, type ThreadSummary } from "@openorc/protocol";
 import { useState } from "react";
 import { Composer } from "../components/Composer";
 import { DitherBackdrop } from "../components/DitherBackdrop";
@@ -10,6 +10,7 @@ import type { PickerAccounts } from "../components/ModelPickerAccounts";
 import { ProjectActivity } from "../components/ProjectActivity";
 import { TopBar } from "../components/TopBar";
 import { Button } from "../components/ui";
+import { useAccountsSeparate } from "../lib/accounts-separate";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { readDraft, writeDraft } from "../lib/drafts";
@@ -156,16 +157,30 @@ function useSubthreadPlace(parent: ThreadSummary, starting: boolean, onChoose: (
   return { files, picker, claudeAccountId, held, missing: cloud || list.data ? null : (list.error?.message ?? "Loading Claude accounts…") };
 }
 
+/** While accounts are kept separate, the account a subthread on this Mac stays on: its parent's. */
+function useParentAccount(parent: ThreadSummary, enabled: boolean): string | undefined {
+  const separate = useAccountsSeparate();
+  return separate && enabled ? (parent.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) : undefined;
+}
+
+/** Why the subthread's account can't be chosen now, when it can't. */
+function accountBlocked(kept: string | undefined, starting: boolean): string | undefined {
+  if (kept) return "Accounts are kept separate, so a subthread stays on its thread's account.";
+  return starting ? "Starting the thread…" : undefined;
+}
+
 /**
  * The Claude accounts a subthread can start on: the ones its project uses, starting on the parent's while the project
- * still uses it, else on the project's default.
+ * still uses it, else on the project's default. While accounts are kept separate it starts on the parent's, whatever
+ * the project uses.
  */
 function useSubthreadAccount(parent: ThreadSummary, enabled: boolean, starting: boolean, onChoose: () => void) {
   const list = useRpc("claude.accounts.list", {}, { enabled });
   const project = useRpc("projects.get", { id: parent.projectId }, { enabled });
+  const kept = useParentAccount(parent, enabled);
   const [chosen, setChosen] = useState(parent.claudeAccountId ?? undefined);
   const choice = list.data && (project.data !== undefined || project.error) ? projectAccountChoice(project.data, list.data) : undefined;
-  const claudeAccountId = offeredAccount(choice, chosen) ?? choice?.defaultId;
+  const claudeAccountId = kept ?? offeredAccount(choice, chosen) ?? choice?.defaultId;
   const picker: PickerAccounts | undefined =
     choice && claudeAccountId
       ? {
@@ -175,7 +190,7 @@ function useSubthreadAccount(parent: ThreadSummary, enabled: boolean, starting: 
             setChosen(id);
             onChoose();
           },
-          blocked: starting ? "Starting the thread…" : undefined,
+          blocked: accountBlocked(kept, starting),
           project: choice.restricted && project.data ? { id: project.data.id, name: project.data.name } : undefined,
         }
       : undefined;

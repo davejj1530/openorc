@@ -159,7 +159,8 @@ it("deduplicates submissions and recipients, streams replies, and does not dispa
   expect(taskComments.attempt(core.db, a.id)?.body).toContain("@claude");
 });
 
-it("lets no Orcling on another Claude account than the task's answer its comments while accounts are kept separate", async () => {
+/** Puts the task in a conversation on the Work account, and makes Pip, an Orcling on the CLI login. */
+async function taskOnWorkAndPip() {
   const work = claudeAccounts.add(core.db, "Work").id;
   const task = tasks.get(core.db, taskId)!;
   const conversation = threads.insert(core.db, {
@@ -173,10 +174,26 @@ it("lets no Orcling on another Claude account than the task's answer its comment
     permissionMode: "trusted",
   });
   tasks.update(core.db, taskId, { executionThreadId: conversation.id });
-  const pip = await core.orclings.create({ name: "Pip", look: defaultOrclingLook, settings: { agent: "codex", model: "test-model", effort: "high", fastMode: false }, permission: "allow" });
+  return core.orclings.create({ name: "Pip", look: defaultOrclingLook, settings: { agent: "codex", model: "test-model", effort: "high", fastMode: false }, permission: "allow" });
+}
+const PIP_ELSEWHERE = "Pip works on another Claude account than this task's, and Settings keeps Claude accounts separate.";
+
+it("lets no Orcling on another Claude account than the task's answer its comments while accounts are kept separate", async () => {
+  const pip = await taskOnWorkAndPip();
   await call("app.settings.set", { claudeAccountsSeparate: true });
-  await expect(post("Thoughts?", [{ ...recipient, orclingId: pip.id }])).rejects.toThrow("This task is on Work, and Settings keeps Claude accounts separate, so its work stays there.");
+  await expect(post("Thoughts?", [{ ...recipient, orclingId: pip.id }])).rejects.toThrow(PIP_ELSEWHERE);
   expect(taskComments.list(core.db, taskId).comments).toEqual([]);
+});
+
+it("asks no Orcling on another Claude account than the task's again, once accounts are kept separate", async () => {
+  const pip = await taskOnWorkAndPip();
+  const asked = await post("Thoughts?", [{ ...recipient, orclingId: pip.id }]);
+  const attempt = await response(asked.id);
+  await call("tasks.comments.cancel", { taskId, attemptId: attempt.id });
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  await expect(call("tasks.comments.retry", { taskId, attemptId: attempt.id })).rejects.toThrow(PIP_ELSEWHERE);
+  expect(taskComments.attempt(core.db, attempt.id)?.state).toBe("cancelled");
+  expect(sessions.size).toBe(1);
 });
 
 it("runs independent recipients and serializes subsequent requests to the same recipient", async () => {

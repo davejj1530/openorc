@@ -21,6 +21,7 @@ import {
   type Task,
   type Thread,
 } from "@openorc/protocol";
+import { accountReach, reachesTask } from "./claude-account-separation.js";
 import { ExtractionCredentials, type ExtractionCredential, type ProtectedSecretStore } from "./extraction-credentials.js";
 import type { Logger } from "../transport.js";
 
@@ -282,11 +283,13 @@ export class MemoryService {
     return this.extractor(run.agent, run.claudeAccountId ?? "claude-cli");
   }
 
-  /** The system-prompt brief for a run, or "" when the project has no memory yet. */
-  brief(project: Project): string {
+  /** The system-prompt brief for a run, or "" when the project has no memory yet. Its open tasks are the ones the run's Claude account reaches. */
+  brief(project: Project, claudeAccountId?: string): string {
     if (!this.enabled() || !hasBrief(this.db, project.id)) return "";
+    const reach = claudeAccountId ? accountReach(this.db, claudeAccountId) : () => true;
     const openTitles = tasks
       .list(this.db, { projectId: project.id, statuses: ["in_progress", "review"] })
+      .filter((t) => reachesTask(this.db, reach, t))
       .map((t) => t.title)
       .slice(0, 8);
     return buildBrief(this.db, project.id, openTitles);

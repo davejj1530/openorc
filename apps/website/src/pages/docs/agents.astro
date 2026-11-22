@@ -120,8 +120,8 @@ import { docHref } from "../../data/docs";
     <p>Each account's row has <strong>Make default</strong>, <strong>Sign in again</strong>, and <strong>Disable</strong>. The default account is the one new threads start with. Changing it doesn't move existing threads.</p>
     <ul>
       <li>To start a thread on another account, pick it at the end of the line under the New thread composer. The choice appears for Claude models.</li>
-      <li>To move a thread to another account, click the account's name in the thread's header and choose one. The switch waits until the current turn ends. Your next message continues the same conversation on the new account.</li>
-      <li>When a turn stops on a usage limit, the thread offers your other signed-in accounts. Choosing one sends <strong>Continue where you left off.</strong> from that account.</li>
+      <li>To move a thread to another account, click the account's name in the thread's header and choose one. The switch waits until the current turn ends. Your next message continues the same conversation on the new account. While <strong>Keep accounts separate</strong> is on, a thread stays on its account.</li>
+      <li>When a turn stops on a usage limit, the thread offers your other signed-in accounts. Choosing one sends <strong>Continue where you left off.</strong> from that account. While <strong>Keep accounts separate</strong> is on, it offers none.</li>
       <li>Schedules and <a href={docHref("orclings")}>Orclings</a> each keep the account you choose for them.</li>
     </ul>
   </section>

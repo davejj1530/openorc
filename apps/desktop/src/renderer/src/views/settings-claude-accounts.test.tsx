@@ -107,7 +107,7 @@ it("keeps accounts separate, which turns switching at usage limits off", async (
   expect(switching.checked).toBe(false);
   expect(switching.disabled).toBe(true);
   expect(screen.getByText("Off while accounts are kept separate.")).toBeTruthy();
-  expect(screen.getByText(/Turning this off moves each account's memories into the shared folder for good\./)).toBeTruthy();
+  expect(screen.getByText(/Turning this off moves each account's memories into the shared folder for good; one whose file name is already used there stays with its account\./)).toBeTruthy();
 });
 
 it("turns on switching accounts at usage limits once a second account is enabled", async () => {

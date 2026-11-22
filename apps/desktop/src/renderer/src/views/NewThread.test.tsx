@@ -76,7 +76,7 @@ vi.mock("../components/ModelPicker", () => ({
       <button type="button">Choose model</button>
       <span data-testid="agents-offered">{limits ? `${limits.harnesses.join(", ")}${limits.fast ? "" : ", no fast mode"}` : "this Mac's"}</span>
       {accounts ? (
-        <div role="group" aria-label="Claude account">
+        <div role="group" aria-label="Claude account" data-section={accounts.section ?? "claude"}>
           {accounts.accounts.map((account) => (
             <button key={account.id} type="button" aria-pressed={account.id === accounts.current} onClick={() => accounts.choose(account.id)}>
               {account.name}
@@ -610,6 +610,20 @@ it("offers only the Claude accounts its project uses, starting on the project's 
   writeNewThreadDraft({ ...readNewThreadDraft("p1"), claudeAccountId: "personal", prompt: "Use personal" });
   render(<NewThread projectId="p1" />);
   expect(chosenAccount()).toBe("personal");
+});
+
+it("offers a new thread on another agent its Claude accounts in that agent's section while accounts are kept separate", async () => {
+  const section = () => screen.getByRole("group", { name: "Claude account" }).getAttribute("data-section");
+  saveModelDraft("p1", "Fix the build");
+  const view = render(<NewThread projectId="p1" />);
+  expect(section()).toBe("claude");
+  settings = { ...settings, claudeAccountsSeparate: true };
+  view.rerender(<NewThread projectId="p1" />);
+  expect(section()).toBe("codex");
+  fireEvent.click(accountGroup().getByRole("button", { name: "client" }));
+  expect(chosenAccount()).toBe("client");
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ agent: "codex", claudeAccountId: "client", prompt: "Fix the build" })));
 });
 
 it.each([

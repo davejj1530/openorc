@@ -1,13 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { harnessName, type ModelOption, type TaskDiscussion } from "@openorc/protocol";
+import { harnessName, type ModelOption, type Orcling, type TaskDiscussion } from "@openorc/protocol";
 import { core } from "../lib/rpc";
 import { TaskComments } from "./TaskComments";
 vi.mock("./ThreadImages", () => ({ ThreadRichText: ({ children }: { children: string }) => <div>{children}</div> }));
 let discussion: TaskDiscussion;
 let models: ModelOption[];
 let failSend = false;
+let orclings: Orcling[];
+let separate: boolean;
 const beforeSend = vi.fn(async () => true);
 const api = vi.spyOn(core, "call");
 beforeEach(() => {
@@ -15,10 +17,16 @@ beforeEach(() => {
   discussion = { comments: [], attempts: [] };
   models = [{ id: "test-model", label: "Test", agent: "codex", efforts: ["high", "low"], defaultEffort: "high", isDefault: true }];
   failSend = false;
+  orclings = [];
+  separate = false;
   beforeSend.mockReset().mockResolvedValue(true);
   api.mockImplementation(async (method, params) => {
     if (method === "agents.models") return models as never;
     if (method === "tasks.comments.list") return discussion as never;
+    if (method === "orclings.list") return orclings as never;
+    if (method === "app.settings.get") return { claudeAccountsSeparate: separate } as never;
+    if (method === "tasks.get") return { id: "task", threadId: null, executionThreadId: "work-thread" } as never;
+    if (method === "threads.get") return { id: "work-thread", agent: "claude", claudeAccountId: "work" } as never;
     if (method === "tasks.comments.post") {
       if (failSend) throw new Error("Disconnected. Retry your comment.");
       return { id: "new", ...params } as never;
@@ -44,6 +52,24 @@ it("inserts the model's display name and effort with the keyboard without submit
   fireEvent.keyDown(input(), { key: "Enter" });
   expect(input().value).toBe("@Test - High ");
   expect(posted()).toHaveLength(0);
+});
+it("offers only the Orclings on the task's account to mention while accounts are kept separate", async () => {
+  const orcling = (id: string, name: string, claudeAccountId: string) => ({ id, name, claudeAccountId, settings: { agent: "claude", model: "opus", effort: null, fastMode: false } }) as Orcling;
+  orclings = [orcling("pip", "Pip", "work"), orcling("bo", "Bo", "personal")];
+  const offered = () =>
+    screen
+      .getAllByRole("option")
+      .map((option) => option.textContent)
+      .filter((name) => !name?.startsWith("@Test"));
+  mount();
+  fireEvent.change(input(), { target: { value: "@", selectionStart: 1 } });
+  await waitFor(() => expect(offered()).toEqual(["@PipClaude Code", "@BoClaude Code"]));
+  cleanup();
+  localStorage.clear();
+  separate = true;
+  mount();
+  fireEvent.change(input(), { target: { value: "@", selectionStart: 1 } });
+  await waitFor(() => expect(offered()).toEqual(["@PipClaude Code"]));
 });
 it.each(["omp", "cursor", "pi", "antigravity"] as const)("offers %s for task discussions", async (agent) => {
   models = models.map((model) => ({ ...model, agent }));

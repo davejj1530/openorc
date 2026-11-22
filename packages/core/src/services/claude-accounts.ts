@@ -232,6 +232,11 @@ export class ClaudeAccountService {
     return this.logins.has(id) || this.startingLogins.has(id);
   }
 
+  /** Closes every account's idle Claude sessions, so each starts again with what Settings now says. */
+  retireIdleSessions(): void {
+    for (const account of claudeAccounts.list(this.db)) void this.retireIdle(account.id).catch(() => undefined);
+  }
+
   async login(id: string): Promise<{ started: boolean }> {
     if (this.signingIn(id)) return { started: false };
     const starting = this.startLogin(id).finally(() => this.startingLogins.delete(id));

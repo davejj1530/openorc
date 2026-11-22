@@ -221,6 +221,8 @@ it("refines a task only on the Claude account it is on while accounts are kept s
   const [work, personal] = ["Work", "Personal"].map((name) => claudeAccounts.add(core.db, name).id) as [string, string];
   const conversation = threads.insert(core.db, { projectId, title: "Chat", agent: "claude", model: "test-model", effort: "high", claudeAccountId: work, mode: "act", permissionMode: "trusted" });
   const owned = (await call("tasks.create", { projectId, threadId: conversation.id, title: "From the chat", spec: "Do it.", workspaceMode: "current" })).id;
+  // The task last ran on Personal, before its conversation moved to Work: a Refine nothing kept to the task's account would follow that run.
+  runs.insert(core.db, { id: crypto.randomUUID(), taskId: owned, threadId: null, agent: "claude", model: "test-model", mode: "act", permissionMode: "trusted", claudeAccountId: personal });
   const pip = await core.orclings.create({
     name: "Pip",
     look: defaultOrclingLook,
@@ -233,7 +235,9 @@ it("refines a task only on the Claude account it is on while accounts are kept s
   const refusal = "This task is on Work, and Settings keeps Claude accounts separate, so its work stays there.";
 
   await expect(call("tasks.refine.start", { taskId: owned, recipient: claude, claudeAccountId: personal, instruction: "", again: false })).rejects.toThrow(refusal);
-  await expect(call("tasks.refine.start", { taskId: owned, recipient: { ...claude, orclingId: pip.id }, instruction: "", again: false })).rejects.toThrow(refusal);
+  await expect(call("tasks.refine.start", { taskId: owned, recipient: { ...claude, orclingId: pip.id }, instruction: "", again: false })).rejects.toThrow(
+    "Pip works on another Claude account than this task's, and Settings keeps Claude accounts separate.",
+  );
   const refine = await call("tasks.refine.start", { taskId: owned, recipient: claude, instruction: "", again: false });
   await vi.waitFor(() => expect(taskRefines.get(core.db, refine.id)?.runId).toBeTruthy());
   expect(runs.get(core.db, taskRefines.get(core.db, refine.id)!.runId!)?.claudeAccountId).toBe(work);

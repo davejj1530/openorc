@@ -1,4 +1,5 @@
 import { listEvents, runs as runRepo, summaries, type Db } from "@openorc/db";
+import { ACCOUNTS_KEPT_SEPARATE } from "./claude-account-separation.js";
 import { STAY_QUIET } from "./orcling-quiet.js";
 import { reactionsSince } from "./orcling-reactions.js";
 import type { Orcling, Run, SessionSummary, Thread } from "@openorc/protocol";
@@ -10,7 +11,7 @@ const flat = (text: string) => text.replace(/\s+/g, " ").trim();
 export type OrclingPlace = "home" | "group" | "thread" | "guest" | "elsewhere";
 
 /** Who the Orcling is, its instructions and memory: sent with every process it starts, wherever it works. */
-export function orclingBrief(orcling: Orcling, input: { instructions: string; memory: string; place: OrclingPlace; tools: boolean; others?: string[] }): string {
+export function orclingBrief(orcling: Orcling, input: { instructions: string; memory: string; place: OrclingPlace; tools: boolean; others?: string[]; separate?: boolean }): string {
   const lines = [
     `# You are ${orcling.name}`,
     `You are ${orcling.name}, an Orcling: the user's long-term companion in OpenOrc. You are the same ${orcling.name} everywhere: in your own conversation with them and wherever they bring you, such as project threads, task comments, pull request reviews and Slack. What you learn in one place stays with you in the others.`,
@@ -19,7 +20,7 @@ export function orclingBrief(orcling: Orcling, input: { instructions: string; me
     "## Your instructions",
     input.instructions.trim() || "(Empty. Write your own with orcling_instructions_update once you know how this person likes to work.)",
   ];
-  if (input.tools) lines.push(...TOOLS);
+  if (input.tools) lines.push(...TOOLS, ...(input.separate ? [OWN_ACCOUNT_ONLY] : []), ...TEAMWORK);
   if (input.memory) lines.push("", input.memory);
   return lines.join("\n");
 }
@@ -39,6 +40,12 @@ const TOOLS = [
   "- orcling_thread_read reads any thread and orcling_thread_send steers one, working or not. Set report_back when the person wants to know how it went, or when you'll take the next step yourself; you hear once when its turn ends.",
   "- orcling_usage shows what is left of each of their plans. Check it before large work, and pick an account or agent with room.",
   "- Anything else the person can do in OpenOrc, you can do for them: read and organize threads, answer approvals, commit, push and open pull requests, read, edit and comment on tasks, look after Orclings. To review a pull request, start a review conversation (pulls.review.start, with yourself as the reviewer or a model), read its draft, then post it when the person wants it posted. orcling_app_methods lists it and orcling_app does it. Your own tools come first where one fits.",
+];
+
+/** Ends "Acting for the person" while accounts are kept separate, since the lines above it offer any thread and account. */
+const OWN_ACCOUNT_ONLY = `- ${ACCOUNTS_KEPT_SEPARATE}: you see, start and steer only work on your own Claude account, and can't choose another.`;
+
+const TEAMWORK = [
   "",
   "## Orchestrating",
   "How work moves between threads in OpenOrc, so you hand it out like someone who knows the place:",

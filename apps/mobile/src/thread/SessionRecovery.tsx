@@ -3,6 +3,7 @@ import { DEFAULT_CLAUDE_ACCOUNT, harnessShortName, isHarnessId, type ThreadSumma
 import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { client, useRpc } from "../client";
+import { useAccountsSeparate } from "../composer/claude-account";
 import { failureMessage } from "../failure";
 import { UsageRing } from "../settings/UsageRing";
 import { cn } from "../ui/cn";
@@ -58,8 +59,8 @@ function AccountChoice({ choice, now, going, disabled, onPress }: { choice: Cont
 /**
  * Over the composer while a conversation cannot go on as it was: what stopped it, in the agent's words, and the way
  * back. A turn stopped on one Claude account goes on with another, the one with the most left first, and its session
- * goes with it; a lost session or a failed turn starts fresh with a handoff, as on the Mac. Typing a message still
- * resumes, so the card steps aside while the person writes.
+ * goes with it, unless the Mac keeps accounts separate; a lost session or a failed turn starts fresh with a handoff, as
+ * on the Mac. Typing a message still resumes, so the card steps aside while the person writes.
  */
 function Stopped({ thread, request, disabled, onSent }: RecoveryProps) {
   const [going, setGoing] = useState<string | null>(null);
@@ -67,7 +68,8 @@ function Stopped({ thread, request, disabled, onSent }: RecoveryProps) {
   const inFlight = useRef(false);
   const [failure, setFailure] = useState<string | null>(null);
   const submitter = client.useSubmit();
-  const offered = canContinueWithAnother(thread) && request.choice?.agent === "claude";
+  const separate = useAccountsSeparate(canContinueWithAnother(thread));
+  const offered = !separate && canContinueWithAnother(thread) && request.choice?.agent === "claude";
   const list = useRpc("claude.accounts.list", {}, { enabled: canContinueWithAnother(thread) });
   // From the cached list: a project that uses only some accounts goes on with one of those.
   const project = useRpc("projects.list", {}, { enabled: offered }).data?.find((each) => each.id === thread.projectId);

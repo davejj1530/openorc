@@ -12,7 +12,7 @@ import {
   type TaskRefine,
   type TaskSuggestion,
 } from "@openorc/protocol";
-import { useKeptTaskAccount } from "../../lib/accounts-separate";
+import { useKeptTaskAccount, useTaskOrclings } from "../../lib/accounts-separate";
 import { useRpc, useRpcMutation } from "../../lib/client";
 import { useDefaultAgent } from "../../lib/default-harness";
 import { readDraft, removeDraft, writeDraft } from "../../lib/drafts";
@@ -36,9 +36,9 @@ const NONE: RefineView = { button: null, bar: null, title: null, labels: null, s
 const REMEMBERED = "openorc.taskRefine.recipient";
 const REMEMBERED_ACCOUNT = "openorc.taskRefine.claudeAccount";
 
-/** The Orclings and models that can refine here, as a task's thread in Plan could start with them. */
-function useRefineOptions(): { models: ModelOption[] | undefined; options: CommentMentionOption[] } {
-  const orclings = useOrclings();
+/** The Orclings and models that can refine the task, as its thread in Plan could start with them. */
+function useRefineOptions(taskId: string): { models: ModelOption[] | undefined; options: CommentMentionOption[] } {
+  const orclings = useTaskOrclings(taskId);
   const first = useMemo(() => orclingMentionOptions(orclings), [orclings]);
   return useThreadModels(true, first);
 }
@@ -423,7 +423,7 @@ function suggestionView({ refine, suggestion, name, failure, sheet, closing, clo
  */
 export function useTaskRefine(taskId: string, document: TaskDocument, basePath?: string, project?: AccountsProject): RefineView {
   const query = useRpc("tasks.refine.get", { taskId }, { refetchInterval: (q) => (q.state.data?.state === "running" ? 2000 : false) });
-  const { models, options } = useRefineOptions();
+  const { models, options } = useRefineOptions(taskId);
   const orclings = useOrclings();
   const stop = useRpcMutation("tasks.refine.stop");
   const dismiss = useRpcMutation("tasks.refine.dismiss");

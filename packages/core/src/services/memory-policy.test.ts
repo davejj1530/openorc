@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Db, extractionJobs, LedgerWriter, memories, projects, runs, settings, summaries, tasks } from "@openorc/db";
+import { claudeAccounts, Db, extractionJobs, LedgerWriter, memories, projects, runs, settings, summaries, tasks, threads } from "@openorc/db";
 import { Embedder, Extractor, Retriever, type Extraction } from "@openorc/memory";
+import type { Thread } from "@openorc/protocol";
 import { MemoryService } from "./memory.js";
+import { RunBriefs } from "./run-briefs.js";
+import { AppSettingsService } from "./settings.js";
 
 const databases: Db[] = [];
 function deferred<T>() {
@@ -174,4 +177,33 @@ describe("OpenOrc memory master switch", () => {
     await closing;
     expect(memory.hasPendingWork).toBe(false);
   });
+});
+
+it("names only the tasks in progress on the run's own Claude account in its brief while accounts are kept separate", () => {
+  const { db, memory, project } = fixture();
+  const client = claudeAccounts.add(db, "Client").id;
+  // A thread on the account, working on a task of that title.
+  const working = (title: string, claudeAccountId?: string) => {
+    const thread = threads.insert(db, {
+      projectId: project.id,
+      title: `Thread for: ${title}`,
+      agent: "claude",
+      model: null,
+      mode: "act",
+      permissionMode: "trusted",
+      ...(claudeAccountId ? { claudeAccountId } : {}),
+    });
+    const task = tasks.insert(db, { projectId: project.id, title, spec: null, priority: "none", labels: [], workspaceMode: "current", baseRef: null, parentTaskId: null });
+    tasks.update(db, task.id, { status: "in_progress", executionThreadId: thread.id });
+    return thread;
+  };
+  const [onClient, onCliLogin] = [working("Ship the client report", client), working("Rotate the deploy keys")];
+  const briefs = new RunBriefs(db, { brief: (target, claudeAccountId) => memory.brief(target, claudeAccountId) });
+  const named = (thread: Thread) => ["Ship the client report", "Rotate the deploy keys"].filter((title) => briefs.threadBrief(thread, project, "act").includes(`- Task in progress: ${title}`));
+  expect([named(onClient), named(onCliLogin)]).toEqual([
+    ["Ship the client report", "Rotate the deploy keys"],
+    ["Ship the client report", "Rotate the deploy keys"],
+  ]);
+  new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+  expect([named(onClient), named(onCliLogin)]).toEqual([["Ship the client report"], ["Rotate the deploy keys"]]);
 });

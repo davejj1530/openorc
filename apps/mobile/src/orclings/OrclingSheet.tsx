@@ -5,6 +5,7 @@ import { Alert, Pressable, View } from "react-native";
 import Animated, { useAnimatedRef, useScrollOffset } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpc, useRpcMutation } from "../client";
+import { useAccountsSeparate } from "../composer/claude-account";
 import { useShareSettings } from "../composer/settings-bridge";
 import { Pencil, Trash2 } from "../generated/icons";
 import { Card, Divider, RowLines, rowClass, Section } from "../settings/parts";
@@ -204,16 +205,17 @@ function DeleteOrcling({ profile }: { profile: OrclingProfile }) {
 
 /**
  * The model sheet, opened from the Model row, changes this Orcling's model, effort, Fast mode and, for Claude, its
- * account, as it changes a composer's: each pick saves at once.
+ * account, as it changes a composer's: each pick saves at once. Its account stays while the Mac keeps accounts separate.
  */
 function useShareModel(composerId: string, profile: OrclingProfile | undefined, save: Save) {
+  const held = useAccountsSeparate() ? "Accounts are kept separate, so an Orcling stays on its account." : null;
   useShareSettings(composerId, {
     choice: profile ? profile.settings : null,
     selectModel: (choice) => {
       if (!isHarnessId(choice.agent)) return;
       void save({ settings: { agent: choice.agent, model: choice.model, effort: choice.effort, fastMode: Boolean(choice.fastMode) } });
     },
-    ...(profile ? { claudeAccount: { chosen: profile.claudeAccountId, select: (claudeAccountId: string) => void save({ claudeAccountId }) } } : {}),
+    ...(profile ? { claudeAccount: { chosen: profile.claudeAccountId, select: (claudeAccountId: string) => void save({ claudeAccountId }), held } } : {}),
   });
 }
 

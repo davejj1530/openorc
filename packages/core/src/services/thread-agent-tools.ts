@@ -16,7 +16,7 @@ import {
 } from "@openorc/protocol";
 import { createHash } from "node:crypto";
 import { checkoutBranch } from "./checkout-branch.js";
-import { accountReach, listedAccount, reachesTask, runAccount, threadAccount } from "./claude-account-separation.js";
+import { ACCOUNTS_KEPT_SEPARATE, accountReach, accountsSeparate, listedAccount, reachesTask, runAccount, threadAccount } from "./claude-account-separation.js";
 import { projectGit } from "./project-git.js";
 import type { RunService } from "./runs.js";
 import { titleFromPrompt, type StartThreadInput } from "./thread-inputs.js";
@@ -390,10 +390,10 @@ export class ThreadAgentTools {
     const parent = threads.get(this.db, parentId);
     if (!parent || retiredTeams.isHidden(this.db, parent.id)) throw new Error("Thread not found.");
     this.runs.subagents.assertExecutable({ threadId: parent.id });
-    // It goes on with its parent's account, which gives way to the project's default when the project does not use it,
-    // unless the starter says where its account came from, as an Orcling does.
+    // It goes on with its parent's account, which gives way to the project's default when the project does not use it, or
+    // is refused while accounts are kept separate, unless the starter says where its account came from, as an Orcling does.
     return this.context.start(
-      { claudeAccountFrom: "inherited", ...input, projectId: parent.projectId, ...childFolder(parent) },
+      { claudeAccountFrom: "inherited", ...input, ...this.parentAccount(parent, input), projectId: parent.projectId, ...childFolder(parent) },
       {
         assertCanAdmit: () => undefined,
         onAdmitted: (child) => {
@@ -402,6 +402,14 @@ export class ThreadAgentTools {
         },
       },
     );
+  }
+
+  /** While accounts are kept separate, a thread started under another stays on its parent's account; a starter's own, as an Orcling's, is left alone. */
+  private parentAccount(parent: Thread, input: Pick<StartThreadInput, "claudeAccountId" | "claudeAccountFrom">): Pick<StartThreadInput, "claudeAccountId" | "claudeAccountFrom"> {
+    if (input.claudeAccountFrom === "own" || !accountsSeparate(this.db)) return {};
+    const kept = threadAccount(parent);
+    if (input.claudeAccountId && input.claudeAccountId !== kept) throw new Error(`${ACCOUNTS_KEPT_SEPARATE}, so a subthread stays on its thread's account.`);
+    return { claudeAccountId: kept, claudeAccountFrom: "inherited" };
   }
 
   /** The thread a run starts a thread from, when it may. */

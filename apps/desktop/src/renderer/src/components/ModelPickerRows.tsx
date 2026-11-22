@@ -12,6 +12,8 @@ export interface OrclingPickerChoices {
   onSelect: (orcling: Orcling) => void;
   /** Why none can be chosen here, shown instead of the list. */
   unavailable?: string;
+  /** Why one of them can't be chosen here, when it can't: what its row says, and the reason under the pointer. */
+  blocked?: (orcling: Orcling) => { label: string; reason: string } | undefined;
 }
 
 export type RowProps = { disabled?: boolean | undefined; closeOnSelect: boolean; close: () => void; moveRowFocus: (event: KeyboardEvent<HTMLButtonElement>) => void };
@@ -33,6 +35,7 @@ export function OrclingRows({ orclings, models, disabled, closeOnSelect, close, 
       {options.map((orcling) => {
         const model = models.find((option) => option.agent === orcling.settings.agent && option.id === orcling.settings.model);
         const selected = orclings.selectedId === orcling.id;
+        const blocked = orclings.blocked?.(orcling);
         return (
           <button
             key={orcling.id}
@@ -40,8 +43,8 @@ export function OrclingRows({ orclings, models, disabled, closeOnSelect, close, 
             data-picker-row
             className="model-picker-row model-picker-orcling-row"
             aria-pressed={selected}
-            disabled={disabled}
-            data-tip={`${orcling.name} · ${model?.label ?? orcling.settings.model}`}
+            disabled={disabled || Boolean(blocked)}
+            data-tip={blocked?.reason ?? `${orcling.name} · ${model?.label ?? orcling.settings.model}`}
             onClick={() => {
               orclings.onSelect(orcling);
               if (closeOnSelect) close();
@@ -50,7 +53,7 @@ export function OrclingRows({ orclings, models, disabled, closeOnSelect, close, 
           >
             <OrclingAvatar orcling={orcling} size={20} />
             <span className="model-picker-row-name">{orcling.name}</span>
-            <span className="model-picker-row-meta">{model?.label ?? orcling.settings.model}</span>
+            <span className="model-picker-row-meta">{blocked?.label ?? model?.label ?? orcling.settings.model}</span>
             {selected ? <Check size={15} className="model-picker-check" aria-hidden="true" /> : null}
           </button>
         );

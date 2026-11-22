@@ -172,10 +172,13 @@ it("keeps an Orcling to the Orclings, threads and accounts of its own Claude acc
     expect(await listed()).toEqual([mine.id]);
 
     const cloudRefusal = "Settings keeps Claude accounts separate, so you don't reach OpenOrc Cloud's threads and tasks, which no account here holds.";
-    const inCloud: CloudHolds = (ref) => "thread" in ref && ref.thread === "cloud-thread";
+    const inCloud: CloudHolds = (ref) => ("thread" in ref ? ref.thread === "cloud-thread" : ref.run === "cloud-run");
     await expect(host(inCloud).app(pipRun.id, "threads.get", { id: "cloud-thread" })).rejects.toThrow(cloudRefusal);
     await expect(host(inCloud).app(pipRun.id, "runs.listForThread", { threadId: "cloud-thread" })).rejects.toThrow(cloudRefusal);
+    await expect(host(inCloud).app(pipRun.id, "events.page", { runId: "cloud-run" })).rejects.toThrow(cloudRefusal);
     await expect(host().app(pipRun.id, "threads.list", { spaceId: "space" })).rejects.toThrow(cloudRefusal);
+    const onCloud = { projectId: project.id, hosted: true, agent: "codex", mode: "act", permissionMode: "trusted", prompt: "Look around" };
+    await expect(host().app(pipRun.id, "threads.start", onCloud)).rejects.toThrow(cloudRefusal);
     const local = threads.get(core.db, mine.id)!;
     const rows = [local, { ...local, id: "cloud-thread", owner: { brain: "hosted", reach: "space", heardAt: 1 } }];
     expect((keptToOwnAccount(core.db, pip, "threads.list", rows) as { id: string }[]).map((row) => row.id)).toEqual([mine.id]);
@@ -269,6 +272,27 @@ it("keeps a group chat of Orclings on different Claude accounts quiet while acco
     );
     await expect(core.orclings.talk.createGroup([pip.id, bo.id], undefined, null)).rejects.toThrow("Those Orclings work on different Claude accounts, and Settings keeps Claude accounts separate.");
     expect(heard).toEqual([]);
+  } finally {
+    await core.close();
+  }
+});
+
+it("gives no other Orcling a turn when a reply lands in a group whose Orclings work on different Claude accounts, once accounts are kept separate", async () => {
+  const { core, say, heard, settled } = await fixture();
+  try {
+    const client = claudeAccounts.add(core.db, "Client").id;
+    const pip = await core.orclings.create(draft("Pip"));
+    const bo = await core.orclings.create({ ...draft("Bo"), claudeAccountId: client });
+    const group = await core.orclings.talk.createGroup([pip.id, bo.id], undefined, null);
+    say("Pip", "@Bo can you rerun CI?");
+    say("Bo", "on it");
+    // The setting goes on while Pip's turn is under way, so its reply lands in a group that now keeps quiet.
+    const sent = core.orclings.talk.sendToGroup(group.threadId, "@Pip how's CI?", {});
+    new AppSettingsService(core.db).set({ claudeAccountsSeparate: true });
+    await sent;
+    await settled(group.threadId, 1);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(heard.map((entry) => entry.who)).toEqual(["Pip"]);
   } finally {
     await core.close();
   }

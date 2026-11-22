@@ -8,6 +8,7 @@ import { WORKSPACE_ID, defaultOrclingLook, orclingExecution, type OrclingDraft, 
 import { createOrclingHost } from "../mcp-host/orcling.js";
 import { guardContext } from "../remote/policy.js";
 import { OpenOrc } from "../openorc.js";
+import { rpcClient } from "../rpc-test-client.js";
 
 let root: string | undefined;
 afterEach(async () => {
@@ -352,6 +353,72 @@ it("runs a Claude Orcling on its own account wherever it speaks, and moves its c
     const spare = core.claudeAccounts.add("Spare");
     core.claudeAccounts.update({ id: spare.id, enabled: false });
     await expect(core.orclings.update(rini.id, draft({ name: "Rini", settings: claude, claudeAccountId: spare.id }))).rejects.toThrow("Spare is disabled.");
+  } finally {
+    await core.close();
+  }
+});
+
+it("asks into a conversation, and gives it to, only an Orcling on the conversation's Claude account while accounts are kept separate", async () => {
+  const { core, idle } = await fixture();
+  try {
+    const call = rpcClient(() => core);
+    const project = projects.insert(core.db, { name: "Site", rootPath: root!, gitRemote: null, defaultBranch: null, settings: {} });
+    const client = core.claudeAccounts.add("Client");
+    const pip = await core.orclings.create(draft({ name: "Pip" }));
+    const bo = await core.orclings.create(draft({ name: "Bo", claudeAccountId: client.id }));
+    const { thread } = await core.threads.start({ ...turn, mode: "act", permissionMode: "autonomous", prompt: "Build the page", projectId: project.id, title: "Page" });
+    await idle(thread.id);
+    const own = core.claudeAccounts.defaultId();
+    const stored = () => threads.get(core.db, thread.id)!;
+    await call("app.settings.set", { claudeAccountsSeparate: true });
+
+    await expect(call("orclings.ask", { id: bo.id, threadId: thread.id, prompt: "@Bo what do you think?" })).rejects.toThrow(
+      "Bo works on another Claude account, and Settings keeps Claude accounts separate.",
+    );
+    expect(runs.listForThread(core.db, thread.id)).toHaveLength(1);
+    await call("orclings.ask", { id: pip.id, threadId: thread.id, prompt: "@Pip what do you think?" });
+    await idle(thread.id);
+    expect(runs.listForThread(core.db, thread.id).at(-1)!.orclingId).toBe(pip.id);
+
+    await expect(call("orclings.assign", { threadId: thread.id, orclingId: bo.id })).rejects.toThrow(
+      "Bo works on another Claude account, and Settings keeps Claude accounts separate, so this conversation stays on its account.",
+    );
+    expect(stored()).toMatchObject({ orclingId: null, claudeAccountId: own });
+    await call("orclings.assign", { threadId: thread.id, orclingId: pip.id });
+    expect(stored()).toMatchObject({ orclingId: pip.id, claudeAccountId: own });
+    await call("orclings.assign", { threadId: thread.id, orclingId: null });
+    expect(stored()).toMatchObject({ orclingId: null, claudeAccountId: own });
+
+    await call("app.settings.set", { claudeAccountsSeparate: false });
+    await call("orclings.assign", { threadId: thread.id, orclingId: bo.id });
+    expect(stored()).toMatchObject({ orclingId: bo.id, claudeAccountId: client.id });
+  } finally {
+    await core.close();
+  }
+});
+
+it("keeps an Orcling on its Claude account while accounts are kept separate, whatever else about it changes, and tells it so", async () => {
+  const { core, specs, idle } = await fixture();
+  try {
+    const call = rpcClient(() => core);
+    const work = core.claudeAccounts.add("Work");
+    const rini = await core.orclings.create(draft({ name: "Rini" }));
+    const told = "- Settings keeps Claude accounts separate: you see, start and steer only work on your own Claude account, and can't choose another.";
+    const briefed = async (prompt: string) => {
+      await core.threads.continueThread(rini.threadId, { ...turn, mode: "act", permissionMode: "autonomous", prompt });
+      await idle(rini.threadId);
+      return specs.at(-1)!.systemPromptAppendix;
+    };
+    expect(await briefed("Hi")).not.toContain(told);
+
+    await call("app.settings.set", { claudeAccountsSeparate: true });
+    await expect(call("orclings.update", { id: rini.id, draft: draft({ name: "Rini", claudeAccountId: work.id }) })).rejects.toThrow(
+      "Settings keeps Claude accounts separate, so Rini stays on its Claude account.",
+    );
+    const edited = draft({ name: "Rina", look: { ...defaultOrclingLook, glasses: 1 }, settings: { agent: "codex", model: "other", effort: null, fastMode: false } });
+    expect(await call("orclings.update", { id: rini.id, draft: edited })).toMatchObject({ ...edited, claudeAccountId: core.claudeAccounts.defaultId() });
+    expect(threads.get(core.db, rini.threadId)!.claudeAccountId).toBe(core.claudeAccounts.defaultId());
+    expect(await briefed("Still you?")).toContain(told);
   } finally {
     await core.close();
   }

@@ -651,7 +651,7 @@ export class ThreadTaskExecution {
   }
 }
 
-/** A thread made from another starts on its account, unless the project no longer uses it; only Claude's threads mind. */
+/** A thread made from another starts on its account; where the project no longer uses it, on the project's default, or not at all while accounts are kept separate. */
 function inheritedAccount(db: Db, projectId: string, agent: Thread["agent"], account: string | null | undefined): string {
   return startingAccount(db, projectId, account ?? undefined, agent === "claude" ? "inherited" : "unused");
 }
@@ -674,7 +674,8 @@ type FollowingSettings = Omit<ModelSettings, "claudeAccountId"> & { claudeAccoun
 
 /**
  * A thread's model and account as another thread had them, or the ones a person chose in their place, keeping its
- * account when they chose none. Fast mode stays on only for the same model; an account the project no longer uses goes.
+ * account when they chose none. Fast mode stays on only for the same model; an account the project no longer uses goes,
+ * or stops the thread while accounts are kept separate.
  */
 function followingSettings(db: Db, projectId: string, from: ModelSettings, choice: ThreadChoice | undefined): FollowingSettings {
   if (!choice) return { agent: from.agent, model: from.model, effort: from.effort, fastMode: from.fastMode, claudeAccountId: inheritedAccount(db, projectId, from.agent, from.claudeAccountId) };

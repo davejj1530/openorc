@@ -1,5 +1,6 @@
-import { claudeAccounts, orclings, runs, threads, type Db } from "@openorc/db";
+import { claudeAccounts, orclings, runs, type Db } from "@openorc/db";
 import { DEFAULT_CLAUDE_ACCOUNT, type Task } from "@openorc/protocol";
+import { taskOwnerAccount } from "./claude-account-separation.js";
 import { startingAccount } from "./project-claude-accounts.js";
 import type { StartRunInput } from "./run-types.js";
 
@@ -19,6 +20,5 @@ export function claudeRunAccount(db: Db, input: Pick<StartRunInput, "scope" | "o
 function taskAccount(db: Db, task: Task): string {
   const previous = runs.listForTask(db, task.id).findLast((run) => run.agent === "claude");
   if (previous) return previous.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
-  const threadId = task.executionThreadId ?? task.threadId;
-  return threadId ? (threads.get(db, threadId)?.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) : startingAccount(db, task.projectId, undefined);
+  return taskOwnerAccount(db, task) ?? startingAccount(db, task.projectId, undefined);
 }

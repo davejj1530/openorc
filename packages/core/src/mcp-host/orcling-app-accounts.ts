@@ -1,19 +1,39 @@
 import { orclings, projects, pullReviews, runs, tasks, threads, type Db } from "@openorc/db";
-import type { InboxList, Orcling, OrclingChatSummary, OrclingDraft, Task, ThreadSummary } from "@openorc/protocol";
+import { resolveCommentMentions, type InboxList, type Orcling, type OrclingChatSummary, type OrclingDraft, type Task, type ThreadSummary } from "@openorc/protocol";
 import { ACCOUNTS_KEPT_SEPARATE, STAYS_ON_ITS_ACCOUNT, accountReach, accountsSeparate, reachesTask, threadAccount } from "../services/claude-account-separation.js";
 import { projectAccountPolicy } from "../services/project-claude-accounts.js";
 import { reviewGoesOn } from "../services/pull-requests.js";
+import type { RunService } from "../services/runs.js";
+import { recipientCatalog } from "../services/task-side-runs.js";
 
 type Reach = (account: string) => boolean;
 /** Whether OpenOrc Cloud holds a thread or run. */
 export type CloudHolds = (ref: { thread: string } | { run: string }) => boolean;
 
 /**
+ * The Orclings a comment asks by @name, in its text or, when it asks about the description, in its task's description,
+ * read as the comment service reads them. A name it can't read fails here as it would there.
+ */
+export async function mentionedOrclings(db: Db, runService: Pick<RunService, "models">, method: string, params: Record<string, unknown>): Promise<string[]> {
+  if (method !== "tasks.comments.post" || !accountsSeparate(db)) return [];
+  const task = typeof params["taskId"] === "string" ? tasks.get(db, params["taskId"]) : null;
+  const text = params["source"] === "description" ? (task?.spec ?? "") : String(params["body"] ?? "");
+  if (!/(?:^|\s)@/.test(text)) return [];
+  return resolveCommentMentions(text, await recipientCatalog(runService), orclings.list(db)).flatMap((recipient) => recipient.orclingId ?? []);
+}
+
+/**
  * While accounts are kept separate, what an Orcling does for the person stays on its own Claude account: it acts on no
  * thread, run, task, Orcling or review of another account, starts threads, reviews and Orclings only on its own, and
  * moves no conversation to another.
  */
-export function separateAccountsRefusal(db: Db, self: Orcling, method: string, params: Record<string, unknown>, inCloud?: CloudHolds): string | null {
+export function separateAccountsRefusal(
+  db: Db,
+  self: Orcling,
+  method: string,
+  params: Record<string, unknown>,
+  { inCloud, mentioned = [] }: { inCloud?: CloudHolds; mentioned?: readonly string[] } = {},
+): string | null {
   if (!accountsSeparate(db)) return null;
   const named = namedAccountRefusal(self, method, params);
   if (named) return named;
@@ -25,7 +45,7 @@ export function separateAccountsRefusal(db: Db, self: Orcling, method: string, p
   if (drafted && !reach(drafted)) return `${ACCOUNTS_KEPT_SEPARATE}, so you keep Orclings on your own Claude account.`;
   const reviewOn = method === "pulls.review.start" ? reviewAccount(db, params) : null;
   if (reviewOn && !reach(reviewOn)) return `That review runs on another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`;
-  return reachesAll(db, reach, method, params) ? null : `That belongs to another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`;
+  return reachesAll(db, reach, method, params, mentioned) ? null : `That belongs to another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`;
 }
 
 /** Why a call that moves a conversation, or names a Claude account that is not the Orcling's own, is refused. */
@@ -55,14 +75,28 @@ function startsLooseTask(db: Db, params: Record<string, unknown>): boolean {
   return Boolean(task && !task.executionThreadId && !task.threadId);
 }
 
-/** Every thread, run, task, Orcling and review the call names, by the parameter names the methods use. */
-function reachesAll(db: Db, reach: Reach, method: string, params: Record<string, unknown>): boolean {
+/** The ids a call names inside an object or a list: the Orcling a start is handed to, a file scope's thread or task, and each Orcling a comment asks. */
+function nestedIds(params: Record<string, unknown>): { threadIds: string[]; taskIds: string[]; orclingIds: string[] } {
+  const target = params["executionTarget"] as { kind?: string; orclingId?: string } | null | undefined;
+  const scope = params["scope"] as { kind?: string; id?: string } | undefined;
+  const recipients = Array.isArray(params["recipients"]) ? (params["recipients"] as { orclingId?: string }[]) : [];
+  const scoped = (kind: "thread" | "task") => (scope?.kind === kind && scope.id ? [scope.id] : []);
+  return {
+    threadIds: scoped("thread"),
+    taskIds: scoped("task"),
+    orclingIds: [...(target?.kind === "orcling" && target.orclingId ? [target.orclingId] : []), ...recipients.flatMap((recipient) => recipient.orclingId ?? [])],
+  };
+}
+
+/** Every thread, run, task, Orcling and review the call names, by the parameter names the methods use, and each Orcling a comment asks by @name. */
+function reachesAll(db: Db, reach: Reach, method: string, params: Record<string, unknown>, mentioned: readonly string[]): boolean {
   const id = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : null);
   const run = id("runId") ? runs.get(db, id("runId")!) : null;
   const review = method.startsWith("pulls.review.") ? reviewConversation(db, params) : null;
-  const threadIds = [id("threadId"), id("parentThreadId"), method.startsWith("threads.") ? id("id") : null, run?.threadId ?? null, review?.id ?? null];
-  const taskIds = [id("taskId"), method.startsWith("tasks.") ? id("id") : null];
-  const orclingIds = [method.startsWith("orclings.") ? id("id") : null, id("orclingId")];
+  const nested = nestedIds(params);
+  const threadIds = [id("threadId"), id("parentThreadId"), method.startsWith("threads.") ? id("id") : null, run?.threadId ?? null, review?.id ?? null, ...nested.threadIds];
+  const taskIds = [id("taskId"), method.startsWith("tasks.") ? id("id") : null, ...nested.taskIds];
+  const orclingIds = [method.startsWith("orclings.") ? id("id") : null, id("orclingId"), ...nested.orclingIds, ...mentioned];
   const named = threadIds.flatMap((threadId) => (threadId ? [threads.get(db, threadId)] : [])).filter((thread) => thread !== null);
   const others = orclingIds.flatMap((orclingId) => (orclingId ? [orclings.get(db, orclingId)] : [])).filter((orcling) => orcling !== null);
   if (run && !run.threadId && run.claudeAccountId && !reach(run.claudeAccountId)) return false;

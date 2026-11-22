@@ -13,7 +13,7 @@ import {
   type TaskRefine,
 } from "@openorc/protocol";
 import { AttachmentService } from "./attachments.js";
-import { assertOnTaskAccount, keptTaskAccount } from "./claude-account-separation.js";
+import { assertOnTaskAccount, assertOrclingOnTaskAccount, keptTaskAccount } from "./claude-account-separation.js";
 import { claudeRunAccount } from "./claude-run-account.js";
 import { startingAccount } from "./project-claude-accounts.js";
 import { isSessionLost, type RunService, type TurnSettledOutcome } from "./runs.js";
@@ -202,8 +202,12 @@ export class TaskRefineService {
     const kept = keptTaskAccount(this.db, task);
     const orcling = recipient.orclingId ? orclings.get(this.db, recipient.orclingId) : null;
     if (!kept || (recipient.agent !== "claude" && !orcling)) return chosen;
-    assertOnTaskAccount(this.db, task, orcling?.claudeAccountId ?? chosen ?? kept);
-    return orcling ? undefined : startingAccount(this.db, task.projectId, kept, "inherited");
+    if (orcling) {
+      assertOrclingOnTaskAccount(this.db, task, orcling);
+      return undefined;
+    }
+    assertOnTaskAccount(this.db, task, chosen ?? kept);
+    return startingAccount(this.db, task.projectId, kept, "inherited");
   }
 
   /** A resumed session already holds the task and its discussion, so it is told only what's new. */

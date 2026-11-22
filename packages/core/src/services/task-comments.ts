@@ -14,7 +14,7 @@ import {
   type Thread,
 } from "@openorc/protocol";
 import { AttachmentService } from "./attachments.js";
-import { assertOnTaskAccount } from "./claude-account-separation.js";
+import { assertOrclingOnTaskAccount } from "./claude-account-separation.js";
 import { isSessionLost, type RunService, type TurnSettledOutcome } from "./runs.js";
 import { asOrcling, BackgroundJobs, recipientCatalog, taskSideRunFolder, validateRecipient } from "./task-side-runs.js";
 import type { ThreadService } from "./threads.js";
@@ -272,6 +272,7 @@ export class TaskCommentService {
       const task = this.task(taskId);
       if (task.status === "archived" || task.status === "done") throw new Error("Reopen this task before starting work.");
       if (retiredTeams.hasTask(this.db, taskId) || (task.threadId && retiredTeams.isHidden(this.db, task.threadId))) throw new Error("This item is no longer available.");
+      assertOrclingsOnTaskAccount(this.db, task, [item.recipient], orclings.list(this.db));
       const assigned = this.threadService.executionThreadFor(taskId);
       const owner = assigned ?? (task.threadId ? threads.get(this.db, task.threadId) : null);
       if (owner?.mode === "plan") throw new Error("Switch the linked thread to an implementation mode before starting work.");
@@ -337,10 +338,11 @@ export class TaskCommentService {
       if (sibling.commentId === commentId && sibling.id !== selectedId && sibling.state === "choose_executor") taskComments.update(this.db, sibling.id, { state: "success" });
   }
   retry(taskId: string, id: string) {
-    this.writableTask(taskId);
+    const task = this.writableTask(taskId);
     const item = this.attempt(taskId, id);
     if (item.executionRunId) throw new Error("Continue implementation in its linked thread; retry will not duplicate work.");
     if (item.state !== "error" && item.state !== "cancelled") return item;
+    assertOrclingsOnTaskAccount(this.db, task, [item.recipient], orclings.list(this.db));
     const next = taskComments.update(this.db, id, { state: "queued", error: null, runId: null, threadId: null })!;
     this.enqueue(next, isSessionLost(item.error));
     this.changed(taskId);
@@ -391,6 +393,6 @@ function commentOutcomeState(status: TurnSettledOutcome["status"]): "success" | 
 function assertOrclingsOnTaskAccount(db: Db, task: Task, recipients: readonly CommentRecipient[], everyOrcling: readonly Orcling[]): void {
   for (const recipient of recipients) {
     const orcling = recipient.orclingId ? everyOrcling.find((candidate) => candidate.id === recipient.orclingId) : undefined;
-    if (orcling) assertOnTaskAccount(db, task, orcling.claudeAccountId);
+    if (orcling) assertOrclingOnTaskAccount(db, task, orcling);
   }
 }

@@ -756,11 +756,7 @@ export class OpenOrc {
       createReviewerAppHandlers({ reviewerApp: this.reviewerApp }),
       createThreadQueriesHandlers({ threadService: this.threads, db: this.db, ledger: this.ledger, imports: this.imports }),
       createThreadLaunchHandlers({ threadService: this.threads, orclings: this.orclings, imports: this.imports }),
-      createThreadWorkspaceHandlers({
-        db: this.db,
-        threadService: this.threads,
-        upkeep: this.upkeep,
-      }),
+      createThreadWorkspaceHandlers({ db: this.db, threadService: this.threads, upkeep: this.upkeep }),
       createThreadMessagesHandlers({ db: this.db, threadService: this.threads }),
       createTaskQueriesHandlers({ db: this.db, comments: this.comments, threadService: this.threads, runService: this.runs }),
       createTaskWorkHandlers({ db: this.db, refines: this.refines, threadService: this.threads, dataDir: this.options.dataDir }),
@@ -786,14 +782,7 @@ export class OpenOrc {
       }),
       createCodeExplanationHandlers({ db: this.db, files: this.files, textGeneration: this.textGeneration, settings: this.settings, dataDir: this.options.dataDir }),
       createInstructionsHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
-      createSettingsHandlers({
-        settings: this.settings,
-        textGeneration: this.textGeneration,
-        invalidate,
-        accountsSeparateChanged: () => {
-          for (const account of storedClaudeAccounts.list(this.db)) void this.runs.retireIdleClaudeSessions(account.id).catch(() => undefined);
-        },
-      }),
+      createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate, claudeSessions: { db: this.db, runs: this.runs } }),
       createSchedulesHandlers({ schedules: this.schedules }),
       createCatalogHandlers({ runService: this.runs, invalidate }),
       createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files }),

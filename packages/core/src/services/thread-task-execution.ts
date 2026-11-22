@@ -27,6 +27,7 @@ import type { SpawnTaskInput, ThreadService } from "./threads.js";
 import { executionProject } from "./workspace-home.js";
 import type { WorkspaceWriters } from "./workspace-writers.js";
 import type { WorkspaceService } from "./workspace.js";
+import { assertOnTaskAccount, keptTaskAccount } from "./claude-account-separation.js";
 import { startingAccount } from "./project-claude-accounts.js";
 
 type ContinueThreadInput = Parameters<ThreadService["continueThread"]>[1];
@@ -217,13 +218,15 @@ export class ThreadTaskExecution {
     if (retainedWorkspace) mode = previous?.mode ?? "act";
     // Start insists on Act; a thread opened without starting keeps what it inherits where its agent can run it.
     const modeSettings = starting ? { mode: "act" as const, permissionMode: inherited.permissionMode } : carriedMode(target.agent, { mode, permissionMode: inherited.permissionMode });
+    // The starter's own or a chosen one, or the account it ran on, or its creator's, unless the project no longer uses that.
+    const claudeAccountId = account ?? inheritedAccount(this.db, task.projectId, target.agent, inherited.claudeAccountId);
+    if (target.agent === "claude") assertOnTaskAccount(this.db, task, claudeAccountId);
     const thread = this.db.transaction(() => {
       const created = threads.insert(this.db, {
         projectId: task.projectId,
         title: task.title,
         ...target,
-        // The starter's own or a chosen one, or the account it ran on, or its creator's, unless the project no longer uses that.
-        claudeAccountId: account ?? inheritedAccount(this.db, task.projectId, target.agent, inherited.claudeAccountId),
+        claudeAccountId,
         fastMode: fastMode ?? inherited.fastMode,
         ...modeSettings,
         workspaceMode: task.workspaceMode,
@@ -357,6 +360,7 @@ export class ThreadTaskExecution {
     if (this.startingTaskThreads.has(taskId) || this.runs.liveRunForTask(taskId) || this.runs.threadActivity(previous.id) !== "idle")
       throw new Error("Wait for the task's thread to finish before starting a new one.");
     const settings = followingSettings(this.db, task.projectId, previous, choice);
+    if (settings.agent === "claude") assertOnTaskAccount(this.db, task, settings.claudeAccountId);
     const thread = this.db.transaction(() => {
       const created = threads.insert(this.db, {
         projectId: task.projectId,
@@ -381,16 +385,18 @@ export class ThreadTaskExecution {
     return thread;
   }
 
-  async runTaskButton(taskId: string, button: TaskButton, images: string[]): Promise<ButtonPress> {
+  async runTaskButton(taskId: string, pressed: TaskButton, images: string[]): Promise<ButtonPress> {
     const task = tasks.get(this.db, taskId);
     if (!task) throw new Error("Task not found.");
     this.context.rejectRetiredThread(task.threadId);
     if (retiredTeams.hasTask(this.db, taskId)) throw new Error("This item is no longer available.");
     if (task.status === "archived") throw new Error("Reopen this task before using its buttons.");
+    const button = onTaskAccount(this.db, task, pressed);
     const work = this.context.executionThreadFor(taskId);
     const creator = task.threadId ? threads.get(this.db, task.threadId) : null;
     const inherited = work ?? this.firstThreadSettings(runRepo.listForTask(this.db, taskId).at(-1), creator);
     const settings = followingSettings(this.db, task.projectId, inherited, button.choice);
+    if (settings.agent === "claude") assertOnTaskAccount(this.db, task, settings.claudeAccountId);
     // Sent with no thread yet, a Current thread button runs as Start does, which makes the thread in Act.
     if (button.runsIn === "task") return this.pressInTaskThread(task, button, { work, settings, from: work ?? { ...inherited, mode: "act" } }, images);
     const mode = buttonModeSettings(button, settings.agent, inherited);
@@ -653,6 +659,13 @@ function inheritedAccount(db: Db, projectId: string, agent: Thread["agent"], acc
 /** The account a person chose for a Claude thread, refused when the project doesn't use it. Choosing none leaves the account the thread inherits. */
 function chosenAccount(db: Db, projectId: string, choice: ThreadChoice): string | undefined {
   return choice.agent === "claude" && choice.claudeAccountId ? startingAccount(db, projectId, choice.claudeAccountId, "chosen") : undefined;
+}
+
+/** While accounts are kept separate, a button runs on its task's account, whichever one it names. */
+function onTaskAccount(db: Db, task: Task, button: TaskButton): TaskButton {
+  if (!button.choice?.claudeAccountId || !keptTaskAccount(db, task)) return button;
+  const { agent, model, effort } = button.choice;
+  return { ...button, choice: { agent, model, effort } };
 }
 
 type ModelSettings = Pick<Thread, "agent" | "model" | "effort" | "fastMode"> & { claudeAccountId?: string | null | undefined };

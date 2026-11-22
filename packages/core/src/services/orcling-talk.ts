@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { listEvents, orclingGroups, orclingMessages, orclings, runs as runRepo, threads, type Db } from "@openorc/db";
 import { orclingHandle, WORKSPACE_ID, type Orcling, type OrclingGroup, type OrclingMessageOrigin, type Run, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
-import { ACCOUNTS_KEPT_SEPARATE, accountReach } from "./claude-account-separation.js";
+import { ACCOUNTS_KEPT_SEPARATE, accountReach, accountsSeparate } from "./claude-account-separation.js";
 import type { RunService } from "./runs.js";
 import type { ThreadService } from "./threads.js";
 import { executionProject } from "./workspace-home.js";
@@ -171,6 +171,7 @@ export class OrclingTalk {
     const { db } = this.deps;
     const members = [...new Set(memberIds)].map((id) => this.orcling(id));
     if (members.length < 2) throw new Error("A group needs at least two Orclings.");
+    if (this.acrossAccounts(members.map((member) => member.id))) throw new Error(`Those Orclings work on different Claude accounts, and ${ACCOUNTS_KEPT_SEPARATE}.`);
     const lead = members[0]!;
     const thread = threads.insert(db, {
       projectId: WORKSPACE_ID,
@@ -245,6 +246,7 @@ export class OrclingTalk {
   async sendToGroup(threadId: string, text: string, options: { messageId?: string; attachments?: string[] }): Promise<void> {
     const group = orclingGroups.get(this.deps.db, threadId);
     if (!group) throw new Error("This group chat no longer exists.");
+    if (this.acrossAccounts(group.memberIds)) throw new Error(`This group's Orclings work on different Claude accounts, and ${ACCOUNTS_KEPT_SEPARATE}, so it waits until that's off.`);
     const state = this.state(threadId);
     state.orclingTurns = 0;
     const named = namedIn(
@@ -291,7 +293,7 @@ export class OrclingTalk {
     const group = orclingGroups.get(this.deps.db, thread.id);
     if (!group) return;
     const state = this.state(thread.id);
-    if (run.orclingId && reply?.trim()) {
+    if (run.orclingId && reply?.trim() && !this.acrossAccounts(group.memberIds)) {
       state.orclingTurns += 1;
       const others = group.memberIds.filter((id) => id !== run.orclingId).map((id) => this.orcling(id));
       const cue: Cue = { kind: "named", by: this.orcling(run.orclingId).name };
@@ -303,6 +305,11 @@ export class OrclingTalk {
         );
     }
     void this.next(thread.id);
+  }
+
+  /** Whether a group's Orclings work on more than one Claude account while accounts are kept separate, which keeps it quiet. */
+  private acrossAccounts(memberIds: readonly string[]): boolean {
+    return accountsSeparate(this.deps.db) && new Set(memberIds.map((id) => this.orcling(id).claudeAccountId)).size > 1;
   }
 
   private nudge(orclingId: string, cue: Cue): Turn {

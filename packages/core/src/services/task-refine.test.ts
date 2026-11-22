@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vite
 import { AcpAdapter, ClaudeAdapter, CodexAdapter, PiAdapter, RunHandle } from "@openorc/agents";
 import { claudeAccounts, projects, runs, settings, subagents, taskComments, taskRefines, tasks, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import { isHarnessId, type AgentEvent, type CommentRecipient, type RunSpec, type TaskSuggestion } from "@openorc/protocol";
+import { defaultOrclingLook, isHarnessId, type AgentEvent, type CommentRecipient, type RunSpec, type TaskSuggestion } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import { rpcClient } from "../rpc-test-client.js";
 import { AttachmentService } from "./attachments.js";
@@ -215,6 +215,28 @@ it("refines on the Claude account chosen, and continues its session only on that
   expect(other.account).toBe(work);
   expect(other.spec.resumeSessionId ?? null).toBeNull();
   expect(other.spec.prompt).toContain("Your previous suggestion, which the user hasn't used");
+});
+
+it("refines a task only on the Claude account it is on while accounts are kept separate", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => claudeAccounts.add(core.db, name).id) as [string, string];
+  const conversation = threads.insert(core.db, { projectId, title: "Chat", agent: "claude", model: "test-model", effort: "high", claudeAccountId: work, mode: "act", permissionMode: "trusted" });
+  const owned = (await call("tasks.create", { projectId, threadId: conversation.id, title: "From the chat", spec: "Do it.", workspaceMode: "current" })).id;
+  const pip = await core.orclings.create({
+    name: "Pip",
+    look: defaultOrclingLook,
+    settings: { agent: "claude", model: "test-model", effort: "high", fastMode: false },
+    permission: "allow",
+    claudeAccountId: personal,
+  });
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  const claude: CommentRecipient = { agent: "claude", model: "test-model", effort: "high" };
+  const refusal = "This task is on Work, and Settings keeps Claude accounts separate, so its work stays there.";
+
+  await expect(call("tasks.refine.start", { taskId: owned, recipient: claude, claudeAccountId: personal, instruction: "", again: false })).rejects.toThrow(refusal);
+  await expect(call("tasks.refine.start", { taskId: owned, recipient: { ...claude, orclingId: pip.id }, instruction: "", again: false })).rejects.toThrow(refusal);
+  const refine = await call("tasks.refine.start", { taskId: owned, recipient: claude, instruction: "", again: false });
+  await vi.waitFor(() => expect(taskRefines.get(core.db, refine.id)?.runId).toBeTruthy());
+  expect(runs.get(core.db, taskRefines.get(core.db, refine.id)!.runId!)?.claudeAccountId).toBe(work);
 });
 
 it("turns Claude's Plan-mode ExitPlanMode back to task_suggest, so the plan doesn't swallow the suggestion", async () => {

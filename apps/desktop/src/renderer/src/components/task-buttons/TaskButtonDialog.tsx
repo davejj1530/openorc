@@ -15,6 +15,7 @@ import { Button, Checkbox, Chip, Dialog, Field, Input, Select } from "../ui";
 import { PromptField, usePromptSkills, type PromptSkill } from "./TaskButtonPrompt";
 import { showable, shownOn } from "./task-button-rules";
 import { ThreadChoiceFields } from "../task-threads/ThreadChoiceFields";
+import { useAccountsSeparate } from "../../lib/accounts-separate";
 
 const modes = ["thread", ...ExecutionMode.options] as const;
 const buttonMode = (value: string): TaskButton["mode"] => modes.find((mode) => mode === value) ?? "thread";
@@ -72,6 +73,7 @@ export function TaskButtonDialog({
   );
   const edit = (patch: Partial<TaskButton>) => setButton((current) => ({ ...current, ...patch }));
   const agent = button.choice?.agent;
+  const separate = useAccountsSeparate();
   // A mode the new model's agent can't run goes back to Default, as the list no longer shows it.
   const chooseModel = (choice: ThreadChoice | undefined) => edit({ choice, ...(button.mode !== "thread" && !executionModeAvailable(choice?.agent, button.mode) ? { mode: "thread" as const } : {}) });
   const { skills, onSkillsWanted } = usePromptSkills(project.id, button.choice);
@@ -126,6 +128,7 @@ export function TaskButtonDialog({
           </Field>
         </div>
         <ThreadChoiceFields value={button.choice} onChange={chooseModel} project={project} plan={button.mode === "plan"} sameLabel="Default" layout="card" disabled={pending} />
+        {separate && button.choice?.claudeAccountId ? <p className="text-sm text-ink-2 mb-3">Accounts are kept separate, so the button runs on its task&apos;s account.</p> : null}
         {error ? (
           <p className="text-sm text-bad mb-3 break-words" role="alert">
             {error}

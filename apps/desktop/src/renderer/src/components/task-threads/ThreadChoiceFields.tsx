@@ -41,6 +41,11 @@ export function NoAccount({ reason, variant, label }: { reason: string; variant:
   );
 }
 
+/** The account a task's work stays on while accounts are kept separate, by name. */
+export function keptAccountName(accounts: readonly ClaudeAccount[] | undefined, kept: string): string {
+  return `${accounts?.find((account) => account.id === kept)?.name ?? "The task's account"} (kept separate)`;
+}
+
 type FieldsProps = {
   value: ThreadChoice | undefined;
   onChange: (choice: ThreadChoice | undefined) => void;
@@ -52,11 +57,13 @@ type FieldsProps = {
   /** "card" labels each field above it, as a dialog does; "sheet" names them for screen readers only. */
   layout: "card" | "sheet";
   disabled?: boolean;
+  /** The account a Claude choice stays on, shown but not offered, while accounts are kept separate. */
+  keptAccount?: string | undefined;
 };
 
-export function ThreadChoiceFields({ value, onChange, project, plan = false, sameLabel, layout, disabled }: FieldsProps) {
+export function ThreadChoiceFields({ value, onChange, project, plan = false, sameLabel, layout, disabled, keptAccount }: FieldsProps) {
   const { models, options } = useThreadModels(plan);
-  const accounts = useProjectClaudeAccounts(project, value?.claudeAccountId, value?.agent === "claude");
+  const accounts = useProjectClaudeAccounts(project, keptAccount ?? value?.claudeAccountId, value?.agent === "claude");
   const variant: Variant = layout === "sheet" ? "sheet" : "inline";
   const chooseModel = (key: string) => {
     const option = options.find((candidate) => threadModelKey(candidate.recipient) === key);
@@ -86,7 +93,8 @@ export function ThreadChoiceFields({ value, onChange, project, plan = false, sam
   );
   const accountLabel = layout === "sheet" ? "Account" : undefined;
   let account = <NoAccount reason="Default" variant={variant} label={accountLabel} />;
-  if (value?.agent === "claude" && accounts)
+  if (value?.agent === "claude" && keptAccount) account = <NoAccount reason={keptAccountName(accounts, keptAccount)} variant={variant} label={accountLabel} />;
+  else if (value?.agent === "claude" && accounts)
     account = <AccountSelect accounts={accounts} value={value.claudeAccountId} onChange={chooseAccount} variant={variant} label={accountLabel} disabled={disabled} />;
   if (layout === "sheet")
     return (

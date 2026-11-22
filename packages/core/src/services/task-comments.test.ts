@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { CodexAdapter, ClaudeAdapter, AcpAdapter, PiAdapter, RunHandle } from "@openorc/agents";
-import { taskComments, runs, threads, tasks, settings } from "@openorc/db";
+import { claudeAccounts, taskComments, runs, threads, tasks, settings } from "@openorc/db";
 import { git, commitAll } from "@openorc/git";
-import { isHarnessId, type RunSpec, type CommentRecipient, type AgentEvent } from "@openorc/protocol";
+import { defaultOrclingLook, isHarnessId, type RunSpec, type CommentRecipient, type AgentEvent } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import { inheritedProbe } from "./shell-environment.js";
 import { rpcClient } from "../rpc-test-client.js";
@@ -157,6 +157,26 @@ it("deduplicates submissions and recipients, streams replies, and does not dispa
   await finish(a.runId!, "@claude:test-model-high might also have an opinion.");
   expect(sessions.size).toBe(1);
   expect(taskComments.attempt(core.db, a.id)?.body).toContain("@claude");
+});
+
+it("lets no Orcling on another Claude account than the task's answer its comments while accounts are kept separate", async () => {
+  const work = claudeAccounts.add(core.db, "Work").id;
+  const task = tasks.get(core.db, taskId)!;
+  const conversation = threads.insert(core.db, {
+    projectId: task.projectId,
+    title: "Chat",
+    agent: "claude",
+    model: "test-model",
+    effort: "high",
+    claudeAccountId: work,
+    mode: "act",
+    permissionMode: "trusted",
+  });
+  tasks.update(core.db, taskId, { executionThreadId: conversation.id });
+  const pip = await core.orclings.create({ name: "Pip", look: defaultOrclingLook, settings: { agent: "codex", model: "test-model", effort: "high", fastMode: false }, permission: "allow" });
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  await expect(post("Thoughts?", [{ ...recipient, orclingId: pip.id }])).rejects.toThrow("This task is on Work, and Settings keeps Claude accounts separate, so its work stays there.");
+  expect(taskComments.list(core.db, taskId).comments).toEqual([]);
 });
 
 it("runs independent recipients and serializes subsequent requests to the same recipient", async () => {

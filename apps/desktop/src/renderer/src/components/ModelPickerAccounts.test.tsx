@@ -7,7 +7,7 @@ import { core } from "../lib/rpc";
 import { useThreadAccounts } from "../lib/use-thread-accounts";
 import { PickerAccountRows } from "./ModelPickerAccounts";
 
-const host = vi.hoisted(() => ({ accounts: [] as ClaudeAccountConnection[], usage: {} as Record<string, Promise<unknown>> }));
+const host = vi.hoisted(() => ({ accounts: [] as ClaudeAccountConnection[], usage: {} as Record<string, Promise<unknown>>, separate: false }));
 vi.mock("../lib/rpc", () => ({
   core: {
     delivery: "all",
@@ -15,6 +15,7 @@ vi.mock("../lib/rpc", () => ({
     onPush: () => () => {},
     call: vi.fn(async (method: string, params: Record<string, unknown>) => {
       if (method === "claude.accounts.list") return { defaultId: "work", accounts: host.accounts };
+      if (method === "app.settings.get") return { claudeAccountsSeparate: host.separate };
       if (method === "providers.usage") return host.usage[String(params["claudeAccountId"])] ?? new Promise(() => {});
       return {};
     }),
@@ -54,8 +55,9 @@ const project = (accounts?: string[]) =>
   }) as Pick<Project, "id" | "name" | "settings">;
 
 function Rows({ thread, inProject }: { thread: Partial<ThreadSummary>; inProject?: Pick<Project, "id" | "name" | "settings"> }) {
-  const accounts = useThreadAccounts({ id: "thread", agent: "claude", activity: "idle", claudeAccountId: "work", ...thread } as ThreadSummary, inProject ?? project());
-  return accounts ? <PickerAccountRows section="claude" searching={false} accounts={accounts} moveRowFocus={() => {}} /> : null;
+  const shown = { id: "thread", agent: "claude", activity: "idle", claudeAccountId: "work", ...thread } as ThreadSummary;
+  const accounts = useThreadAccounts(shown, inProject ?? project());
+  return accounts ? <PickerAccountRows section={shown.agent} searching={false} accounts={accounts} moveRowFocus={() => {}} /> : null;
 }
 const show = (thread: Partial<ThreadSummary> = {}, inProject?: Pick<Project, "id" | "name" | "settings">) =>
   render(
@@ -69,6 +71,7 @@ const switches = () => vi.mocked(core.call).mock.calls.filter(([method]) => meth
 beforeEach(() => {
   host.accounts = [account("work", "Work"), account("personal", "Personal"), account("old", "Old", "signed_out")];
   host.usage = {};
+  host.separate = false;
 });
 afterEach(() => {
   cleanup();
@@ -107,6 +110,26 @@ it("waits for the turn to end, and leaves an Orcling on its own account", async 
   cleanup();
   show({ orclingId: "orcling" });
   expect((await screen.findByRole("status")).textContent).toBe("An Orcling keeps its own account.");
+});
+
+it("moves no conversation to another account while accounts are kept separate", async () => {
+  host.separate = true;
+  show();
+  expect((await screen.findByRole("status")).textContent).toBe("Accounts are kept separate, so this conversation stays on its account.");
+  expect(row("Personal").hasAttribute("disabled")).toBe(true);
+});
+
+it("shows another agent's thread the Claude account its work belongs to only while accounts are kept separate", async () => {
+  show({ agent: "codex", claudeAccountId: "personal" });
+  await waitFor(() => expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "app.settings.get")).toBe(true));
+  expect(screen.queryByRole("button", { name: /^Personal/ })).toBeNull();
+  cleanup();
+  queryClient.clear();
+  host.separate = true;
+  show({ agent: "codex", claudeAccountId: "personal" });
+  await waitFor(() => expect(row("Personal").getAttribute("aria-pressed")).toBe("true"));
+  expect(row("Work").hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("status").textContent).toBe("Accounts are kept separate, so this conversation stays on its account.");
 });
 
 it("offers only the accounts a project uses, keeps the thread's own apart, and opens the project's accounts", async () => {

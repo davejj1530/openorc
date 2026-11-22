@@ -12,6 +12,7 @@ import {
   type TaskRefine,
   type TaskSuggestion,
 } from "@openorc/protocol";
+import { useKeptTaskAccount } from "../../lib/accounts-separate";
 import { useRpc, useRpcMutation } from "../../lib/client";
 import { useDefaultAgent } from "../../lib/default-harness";
 import { readDraft, removeDraft, writeDraft } from "../../lib/drafts";
@@ -22,7 +23,7 @@ import { labelList } from "../../lib/task-draft";
 import { DocumentEditor } from "../DocumentEditor";
 import { OpenOrcMark, WorkingCube } from "../OpenOrcMark";
 import { useProjectClaudeAccounts, useThreadModels } from "../../lib/thread-choice";
-import { AccountSelect, NoAccount } from "../task-threads/ThreadChoiceFields";
+import { AccountSelect, keptAccountName, NoAccount } from "../task-threads/ThreadChoiceFields";
 import { TaskSheet, useTaskSheet } from "../task-threads/TaskSheet";
 import { TaskLabelsField, TaskTitleField } from "../task-list/TaskTextFields";
 import { Button, Select, Textarea, Tooltip } from "../ui";
@@ -88,20 +89,21 @@ function refinerName(recipient: CommentRecipient, models: ModelOption[] | undefi
 
 /**
  * The Claude account a Claude model refines on, from the ones the project uses; an Orcling keeps its own. The last one
- * chosen comes back while the project still uses it.
+ * chosen comes back while the project still uses it. While accounts are kept separate, the task's own is the only one.
  */
-function useRefineAccount(project: AccountsProject | undefined, recipient: CommentRecipient | undefined) {
+function useRefineAccount(project: AccountsProject | undefined, recipient: CommentRecipient | undefined, kept: string | undefined) {
   const claude = recipient?.agent === "claude" && !recipient.orclingId;
-  const accounts = useProjectClaudeAccounts(project, undefined, claude);
+  const accounts = useProjectClaudeAccounts(project, kept, claude);
   const [chosen, choose] = useState(() => remembered(REMEMBERED_ACCOUNT) ?? undefined);
+  if (claude && kept) return { offered: null, value: kept, choose, keptName: keptAccountName(accounts, kept) };
   const offered = claude && accounts ? accounts : null;
   const value = offered?.some((account) => account.id === chosen) ? chosen : undefined;
-  return { offered, value, choose };
+  return { offered, value, choose, keptName: undefined };
 }
 
 function RefineAccount({ account, recipient, disabled }: { account: ReturnType<typeof useRefineAccount>; recipient: CommentRecipient | undefined; disabled: boolean }) {
   if (account.offered) return <AccountSelect variant="sheet" label="Account" accounts={account.offered} value={account.value} disabled={disabled} onChange={account.choose} />;
-  return <NoAccount variant="sheet" label="Account" reason={recipient?.orclingId ? "Orcling’s own" : "Default"} />;
+  return <NoAccount variant="sheet" label="Account" reason={account.keptName ?? (recipient?.orclingId ? "Orcling’s own" : "Default")} />;
 }
 
 function rememberChoice(recipient: CommentRecipient, account: ReturnType<typeof useRefineAccount>): void {
@@ -127,7 +129,8 @@ function RefineSheet({ taskId, project, again, edited, onStarted, document, opti
   const [instruction, setInstruction] = useState("");
   const [choice, setChoice] = useState("");
   const selected = useRefineRecipient(options, models, choice);
-  const account = useRefineAccount(project, selected?.recipient);
+  const task = useRpc("tasks.get", { id: taskId }).data;
+  const account = useRefineAccount(project, selected?.recipient, useKeptTaskAccount(task));
   const submit = async () => {
     if (!selected) return;
     if (!(await document.flush())) throw new Error("The task’s latest changes couldn’t be saved, so it can’t be refined yet.");

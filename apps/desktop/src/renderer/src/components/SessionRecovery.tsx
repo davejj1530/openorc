@@ -1,6 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { accountsToContinueWith, canContinueWithAnother, projectAccountChoice } from "@openorc/client";
 import { harnessShortName, type ClaudeAccountConnection, type ThreadSummary } from "@openorc/protocol";
+import { useAccountsSeparate } from "../lib/accounts-separate";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/client";
 import { openProject } from "../lib/router";
@@ -12,7 +13,8 @@ import { useComposerControl } from "./composer-read-only";
 
 /**
  * A lost session or a failed last turn, with a fresh start that hands the conversation over. A turn stopped by a
- * Claude usage limit can go on with another signed-in account instead, which resumes the conversation's session.
+ * Claude usage limit can go on with another signed-in account instead, which resumes the conversation's session, unless
+ * accounts are kept separate.
  */
 export function SessionRecovery({ thread, disabled, onRestart, onContinueWith }: { thread: ThreadSummary; disabled: boolean; onRestart: () => void; onContinueWith: (accountId: string) => void }) {
   const { session } = thread;
@@ -52,10 +54,10 @@ export function SessionRecovery({ thread, disabled, onRestart, onContinueWith }:
  * the project uses only some accounts, and none of them is left to go on with. A signed-out account is not at its limit.
  */
 function useAccountsToContinueWith(thread: ThreadSummary): { accounts: ClaudeAccountConnection[]; exhausted: boolean } {
-  const offered = canContinueWithAnother(thread);
+  const offered = !useAccountsSeparate() && canContinueWithAnother(thread);
   const list = useRpc("claude.accounts.list", {}, { enabled: offered }).data;
   const project = useRpc("projects.get", { id: thread.projectId }, { enabled: offered }).data;
-  const accounts = accountsToContinueWith(thread, list?.accounts ?? [], project);
+  const accounts = offered ? accountsToContinueWith(thread, list?.accounts ?? [], project) : [];
   const atLimit = thread.session.recovery?.kind === "usage";
   return { accounts, exhausted: Boolean(offered && atLimit && list && project && projectAccountChoice(project, list).restricted && !accounts.length) };
 }

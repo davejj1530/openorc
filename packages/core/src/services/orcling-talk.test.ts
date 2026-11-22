@@ -7,6 +7,7 @@ import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { defaultOrclingLook, WORKSPACE_ID, type OrclingDraft } from "@openorc/protocol";
 import type { OrclingStartInput } from "@openorc/mcp";
 import { createOrclingHost } from "../mcp-host/orcling.js";
+import { keptToOwnAccount, type CloudHolds } from "../mcp-host/orcling-app-accounts.js";
 import { guardContext } from "../remote/policy.js";
 import { OpenOrc } from "../openorc.js";
 import { GROUP_TURNS, ORCLING_MESSAGE_CHAIN, askedIn, namedIn } from "./orcling-talk.js";
@@ -61,7 +62,7 @@ async function fixture() {
     await vi.waitFor(() => expect(turns).toBe(count), { timeout: 5000 });
     await vi.waitFor(() => expect(core.threads.get(threadId)?.activity).toBe("idle"));
   };
-  const host = () =>
+  const host = (inCloud?: CloudHolds) =>
     createOrclingHost({
       db: core.db,
       orclings: core.orclings,
@@ -73,6 +74,7 @@ async function fixture() {
       planLimits: async () => [],
       guard: guardContext(core.db, root!),
       call: (method, params) => core.handle({ type: "rpc", id: 0, method, params }).then((reply) => (reply.type === "rpc.result" ? reply.result : Promise.reject(new Error(reply.message)))),
+      ...(inCloud ? { inCloud } : {}),
       invalidate: () => {},
     }).orcling!;
   const said = (threadId: string) =>
@@ -168,6 +170,15 @@ it("keeps an Orcling to the Orclings, threads and accounts of its own Claude acc
     await expect(host().message(pipRun.id, { to: "bo", text: "is the review done?" })).rejects.toThrow("Bo works on another Claude account, and Settings keeps Claude accounts separate.");
     await expect(host().startGroup(pipRun.id, { with: ["bo"], text: "hello" })).rejects.toThrow(/another Claude account/);
     expect(await listed()).toEqual([mine.id]);
+
+    const cloudRefusal = "Settings keeps Claude accounts separate, so you don't reach OpenOrc Cloud's threads and tasks, which no account here holds.";
+    const inCloud: CloudHolds = (ref) => "thread" in ref && ref.thread === "cloud-thread";
+    await expect(host(inCloud).app(pipRun.id, "threads.get", { id: "cloud-thread" })).rejects.toThrow(cloudRefusal);
+    await expect(host(inCloud).app(pipRun.id, "runs.listForThread", { threadId: "cloud-thread" })).rejects.toThrow(cloudRefusal);
+    await expect(host().app(pipRun.id, "threads.list", { spaceId: "space" })).rejects.toThrow(cloudRefusal);
+    const local = threads.get(core.db, mine.id)!;
+    const rows = [local, { ...local, id: "cloud-thread", owner: { brain: "hosted", reach: "space", heardAt: 1 } }];
+    expect((keptToOwnAccount(core.db, pip, "threads.list", rows) as { id: string }[]).map((row) => row.id)).toEqual([mine.id]);
     expect(await listed(1)).toEqual([mine.id]);
     await expect(host().app(pipRun.id, "threads.list", { projectId: project.id, claudeAccountId: client })).rejects.toThrow(
       "That belongs to another Claude account, and Settings keeps Claude accounts separate.",
@@ -181,7 +192,7 @@ it("keeps an Orcling to the Orclings, threads and accounts of its own Claude acc
     await expect(host().app(pipRun.id, "pulls.review.start", { projectId: project.id, number: 7, reviewer, orclingId: bo.id })).rejects.toThrow(/another Claude account/);
     await expect(host().app(pipRun.id, "pulls.review.get", { projectId: project.id, number: 8 })).rejects.toThrow(/another Claude account/);
     await expect(host().app(pipRun.id, "threads.get", { id: elsewhere.id })).rejects.toThrow("That belongs to another Claude account, and Settings keeps Claude accounts separate.");
-    await expect(host().app(pipRun.id, "threads.switchClaudeAccount", { id: pip.threadId, claudeAccountId: client })).rejects.toThrow(/only the person moves a conversation/);
+    await expect(host().app(pipRun.id, "threads.switchClaudeAccount", { id: pip.threadId, claudeAccountId: client })).rejects.toThrow(/a conversation stays on the account it started on/);
     const work = (input: Partial<OrclingStartInput>) => host().startWork(pipRun.id, { prompt: "Fix the build", worker: { kind: "self" }, reportBack: false, ...input });
     await expect(work({ projectId: project.id, worker: { kind: "agent", claudeAccount: "Client" } })).rejects.toThrow(
       "Settings keeps Claude accounts separate, so Pip starts work only on its own Claude account.",
@@ -240,6 +251,24 @@ it("stops Orclings texting each other after a few in a row until the person writ
     }
     await expect(host().message(pipRun.id, { to: "Bo", text: "one more" })).rejects.toThrow(/Wait until the person writes/);
     expect(turns()).toBe(2 + ORCLING_MESSAGE_CHAIN);
+  } finally {
+    await core.close();
+  }
+});
+
+it("keeps a group chat of Orclings on different Claude accounts quiet while accounts are kept separate, and makes no new one", async () => {
+  const { core, heard } = await fixture();
+  try {
+    const client = claudeAccounts.add(core.db, "Client").id;
+    const pip = await core.orclings.create(draft("Pip"));
+    const bo = await core.orclings.create({ ...draft("Bo"), claudeAccountId: client });
+    const group = await core.orclings.talk.createGroup([pip.id, bo.id], undefined, null);
+    new AppSettingsService(core.db).set({ claudeAccountsSeparate: true });
+    await expect(core.orclings.talk.sendToGroup(group.threadId, "morning both", {})).rejects.toThrow(
+      "This group's Orclings work on different Claude accounts, and Settings keeps Claude accounts separate, so it waits until that's off.",
+    );
+    await expect(core.orclings.talk.createGroup([pip.id, bo.id], undefined, null)).rejects.toThrow("Those Orclings work on different Claude accounts, and Settings keeps Claude accounts separate.");
+    expect(heard).toEqual([]);
   } finally {
     await core.close();
   }

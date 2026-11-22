@@ -16,19 +16,22 @@ const beforeOpen = vi.fn(async () => true);
 let refuse: string | null = null;
 let availability: { id: string; state: string }[] | null = null;
 let defaultHarness: string | null = null;
+let separate = false;
+const current = { id: "current", agent: "claude", model: "opus-test", effort: "high", claudeAccountId: "personal" } as ThreadSummary;
 
 beforeEach(() => {
   refuse = null;
   availability = null;
   defaultHarness = null;
+  separate = false;
   openThread.mockClear();
   beforeOpen.mockReset().mockImplementation(async () => true);
-  api.mockReset().mockImplementation(async (method) => {
+  api.mockReset().mockImplementation(async (method, params) => {
     if (method === "agents.models") return models as never;
     if (method === "agents.availability") return availability as never;
-    if (method === "app.settings.get") return { defaultHarness } as never;
+    if (method === "app.settings.get") return { defaultHarness, claudeAccountsSeparate: separate } as never;
     if (method === "claude.accounts.list") return accounts as never;
-    if (method === "threads.get") return creator as never;
+    if (method === "threads.get") return ((params as { id: string }).id === "current" ? current : creator) as never;
     if (method === "tasks.openThread" || method === "tasks.newThread") {
       if (refuse) throw new Error(refuse);
       return { id: method === "tasks.openThread" ? "opened" : "fresh" } as never;
@@ -85,7 +88,6 @@ it("offers no choice once the task has a thread, which Open thread opens as it i
 });
 
 it("continues in a new thread on the current thread's model and account, or the ones chosen", async () => {
-  const current = { id: "current", agent: "claude", model: "opus-test", effort: "high", claudeAccountId: "personal" } as ThreadSummary;
   wrap(<ContinueThreadChooser task={{ ...task, executionThreadId: "current" }} thread={current} project={project} beforeOpen={beforeOpen} />);
   fireEvent.click(screen.getByRole("button", { name: "Continue in a new thread" }));
   const sheet = await screen.findByRole("dialog", { name: "Continue in a new thread" });
@@ -96,6 +98,19 @@ it("continues in a new thread on the current thread's model and account, or the 
   fireEvent.click(within(sheet).getByRole("button", { name: "Continue" }));
   await waitFor(() => expect(openThread).toHaveBeenCalledWith("fresh"));
   expect(calls("tasks.newThread")).toEqual([{ taskId: "task", choice: { agent: "claude", model: "opus-test", effort: "high", claudeAccountId: "work" } }]);
+});
+
+it("continues in a new thread only on the task's account while accounts are kept separate", async () => {
+  separate = true;
+  wrap(<ContinueThreadChooser task={{ ...task, executionThreadId: "current" }} thread={current} project={project} beforeOpen={beforeOpen} />);
+  fireEvent.click(screen.getByRole("button", { name: "Continue in a new thread" }));
+  const sheet = await screen.findByRole("dialog", { name: "Continue in a new thread" });
+  const field = () => within(sheet).getByRole<HTMLSelectElement>("combobox", { name: "Account" });
+  await waitFor(() => expect(field().textContent).toBe("Personal (kept separate)"));
+  expect(field().disabled).toBe(true);
+  fireEvent.click(within(sheet).getByRole("button", { name: "Continue" }));
+  await waitFor(() => expect(openThread).toHaveBeenCalledWith("fresh"));
+  expect(calls("tasks.newThread")).toEqual([{ taskId: "task" }]);
 });
 
 it("opens no thread when the task couldn't be saved first", async () => {

@@ -27,13 +27,15 @@ Disabling an account retains its history and credentials; enable it again to con
 **Keep accounts separate**, under **Settings → Connections → Claude accounts**, stops work on one account from seeing or reaching work on another, even in the same project:
 
 - An agent's thread tools list, read and message only threads on its own account, and its task tools see only tasks that run in, or were saved from, a thread on its account. A task with no thread stays visible to every account.
+- A thread on another agent, such as Codex, belongs to the Claude account it started under, which its model picker shows, and its agent sees only that account's work.
 - A subthread, fork, task thread or scheduled run carries its account over. Where the project no longer uses that account, it doesn't start, instead of moving to the project's default.
+- No conversation moves to another account, yours included: the account menu in the thread header is off, and a run stopped by a usage limit offers no other account to continue with. A task's new threads, Refines and buttons stay on the account the task is on, whatever account a button names. A new thread can still start on any account the project uses.
 - Nothing switches account at a usage limit, whatever the app or project setting says.
 - Each added account keeps its own Claude memory instead of the shared folder. Memories saved before you turn the setting on stay in the existing CLI login's folder, where its threads still read them, and turning it off moves each account's memories into that shared folder for good.
 - Claude's file tools can't open another added account's folder, or the existing CLI login's sessions, memory, prompt history, sign-in, plans, file snapshots, pasted text, to-dos, background jobs, backups and logs. A shell command still can, since every account runs as you on the same computer, and OpenOrc running on Windows itself, rather than in WSL, doesn't set this yet. Claude Code's skills and plugins stay shared.
-- An Orcling starts work, messages other Orclings, and acts in OpenOrc only on its own account, and lists only what is on it.
+- An Orcling starts work, messages other Orclings, and acts in OpenOrc only on its own account, and lists only what is on it. It doesn't answer the comments on, or refine, a task on another account, and it doesn't reach OpenOrc Cloud's threads and tasks, which no account here holds. A group chat of Orclings on different accounts can't be made, and one made before stays quiet until the setting is off.
 
-You can still move a conversation to another account yourself. The thread, task and Orcling rules follow the setting at once. Memory and the file rules apply when a session starts, so turning the setting on or off closes idle sessions; one already working keeps the old ones until it next starts.
+The thread, task and Orcling rules follow the setting at once. Memory and the file rules apply when a session starts, so turning the setting on or off closes idle sessions; one already working keeps the old ones until it next starts.
 
 ## Credential ownership
 

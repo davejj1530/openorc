@@ -1,8 +1,10 @@
-import { runs, threads, type Db } from "@openorc/db";
+import { claudeAccounts, runs, threads, type Db } from "@openorc/db";
 import { DEFAULT_CLAUDE_ACCOUNT, type Task, type Thread } from "@openorc/protocol";
 import { AppSettingsService } from "./settings.js";
 
 export const ACCOUNTS_KEPT_SEPARATE = "Settings keeps Claude accounts separate";
+/** Why no one, the person included, moves a conversation to another account while accounts are kept separate. */
+export const STAYS_ON_ITS_ACCOUNT = `${ACCOUNTS_KEPT_SEPARATE}, so a conversation stays on the account it started on.`;
 
 /** Whether Settings keeps Claude accounts separate, so work on one never sees or reaches work on another. */
 export function accountsSeparate(db: Db): boolean {
@@ -35,9 +37,28 @@ export function listedAccount(db: Db, from: string): { claudeAccountId?: string 
   return accountsSeparate(db) ? { claudeAccountId: from } : {};
 }
 
-/** A task belongs to the account of the thread it runs in, else of the thread that saved it; one with neither is anyone's. */
-export function reachesTask(db: Db, reach: (account: string) => boolean, task: Pick<Task, "executionThreadId" | "threadId">): boolean {
+/** The account a task belongs to: the one of the thread it runs in, else of the thread that saved it; none with neither. */
+export function taskOwnerAccount(db: Db, task: Pick<Task, "executionThreadId" | "threadId">): string | null {
   const owner = task.executionThreadId ?? task.threadId;
   const thread = owner ? threads.get(db, owner) : null;
-  return !thread || reach(threadAccount(thread));
+  return thread ? threadAccount(thread) : null;
+}
+
+/** A task belongs to the account of the thread it runs in, else of the thread that saved it; one with neither is anyone's. */
+export function reachesTask(db: Db, reach: (account: string) => boolean, task: Pick<Task, "executionThreadId" | "threadId">): boolean {
+  const account = taskOwnerAccount(db, task);
+  return account === null || reach(account);
+}
+
+/** The account a task's new threads and Refines stay on while accounts are kept separate; none when any will do. */
+export function keptTaskAccount(db: Db, task: Pick<Task, "executionThreadId" | "threadId">): string | null {
+  return accountsSeparate(db) ? taskOwnerAccount(db, task) : null;
+}
+
+/** Refuses work on a task on another account than the one it belongs to, while accounts are kept separate. */
+export function assertOnTaskAccount(db: Db, task: Pick<Task, "executionThreadId" | "threadId">, account: string): void {
+  const kept = keptTaskAccount(db, task);
+  if (!kept || kept === account) return;
+  const name = claudeAccounts.list(db).find((candidate) => candidate.id === kept)?.name ?? "another Claude account";
+  throw new Error(`This task is on ${name}, and ${ACCOUNTS_KEPT_SEPARATE}, so its work stays there.`);
 }

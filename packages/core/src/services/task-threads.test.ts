@@ -226,6 +226,42 @@ it("continues in a new thread on the model and account chosen, and refuses an ac
   expect(tasks.get(core.db, taskId)?.executionThreadId).toBe(fresh.id);
 });
 
+it("keeps a task's new threads and buttons on its account while accounts are kept separate, and moves no conversation", async () => {
+  const { work, personal, claude } = await accounts();
+  const opened = await call("tasks.openThread", { taskId, choice: claude(work) });
+  await call("projects.updateSettings", {
+    id: projectId,
+    settings: { taskButtons: [start, { ...review, choice: claude(personal) }, { ...start, id: "elsewhere", choice: claude(personal) }] },
+  });
+  await call("tasks.runButton", { taskId, buttonId: "start" });
+  await finished(opened.id);
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+
+  await expect(call("tasks.newThread", { taskId, choice: claude(personal) })).rejects.toThrow("This task is on Work, and Settings keeps Claude accounts separate, so its work stays there.");
+  expect(tasks.get(core.db, taskId)?.executionThreadId).toBe(opened.id);
+  await expect(call("threads.switchClaudeAccount", { id: opened.id, claudeAccountId: personal })).rejects.toThrow(
+    "Settings keeps Claude accounts separate, so a conversation stays on the account it started on.",
+  );
+
+  const side = await call("tasks.runButton", { taskId, buttonId: "review" });
+  expect(threads.get(core.db, side.threadId)?.claudeAccountId).toBe(work);
+  await call("tasks.runButton", { taskId, buttonId: "elsewhere" });
+  await vi.waitFor(() => expect(runs.listForThread(core.db, opened.id)).toHaveLength(2));
+  expect(threads.get(core.db, opened.id)?.claudeAccountId).toBe(work);
+  expect(runs.listForThread(core.db, opened.id).at(-1)?.claudeAccountId).toBe(work);
+});
+
+it("opens no first thread on another account for a task made in a conversation while accounts are kept separate", async () => {
+  const { work, personal, claude } = await accounts();
+  const conversation = threads.insert(core.db, { projectId, title: "Chat", agent: "claude", model: "test-model", effort: "high", claudeAccountId: work, mode: "act", permissionMode: "trusted" });
+  const fromChat = (await call("tasks.create", { projectId, threadId: conversation.id, title: "From the chat", spec: "Do it.", workspaceMode: "current" })).id;
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+
+  await expect(call("tasks.openThread", { taskId: fromChat, choice: claude(personal) })).rejects.toThrow("This task is on Work, and Settings keeps Claude accounts separate, so its work stays there.");
+  expect(tasks.get(core.db, fromChat)?.executionThreadId).toBeNull();
+  expect((await call("tasks.openThread", { taskId: fromChat, choice: { ...claude(work), effort: "low" } })).claudeAccountId).toBe(work);
+});
+
 it("starts a task's first thread on the agent the person chose for new threads", async () => {
   await call("app.settings.set", { defaultHarness: "claude" });
   const opened = await call("tasks.openThread", { taskId });

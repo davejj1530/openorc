@@ -1,20 +1,23 @@
 import { orclings, projects, pullReviews, runs, tasks, threads, type Db } from "@openorc/db";
-import type { InboxList, Orcling, OrclingChatSummary, OrclingDraft, Task } from "@openorc/protocol";
-import { ACCOUNTS_KEPT_SEPARATE, accountReach, accountsSeparate, reachesTask, threadAccount } from "../services/claude-account-separation.js";
+import type { InboxList, Orcling, OrclingChatSummary, OrclingDraft, Task, ThreadSummary } from "@openorc/protocol";
+import { ACCOUNTS_KEPT_SEPARATE, STAYS_ON_ITS_ACCOUNT, accountReach, accountsSeparate, reachesTask, threadAccount } from "../services/claude-account-separation.js";
 import { projectAccountPolicy } from "../services/project-claude-accounts.js";
 import { reviewGoesOn } from "../services/pull-requests.js";
 
 type Reach = (account: string) => boolean;
+/** Whether OpenOrc Cloud holds a thread or run. */
+export type CloudHolds = (ref: { thread: string } | { run: string }) => boolean;
 
 /**
  * While accounts are kept separate, what an Orcling does for the person stays on its own Claude account: it acts on no
  * thread, run, task, Orcling or review of another account, starts threads, reviews and Orclings only on its own, and
  * moves no conversation to another.
  */
-export function separateAccountsRefusal(db: Db, self: Orcling, method: string, params: Record<string, unknown>): string | null {
+export function separateAccountsRefusal(db: Db, self: Orcling, method: string, params: Record<string, unknown>, inCloud?: CloudHolds): string | null {
   if (!accountsSeparate(db)) return null;
   const named = namedAccountRefusal(self, method, params);
   if (named) return named;
+  if (reachesCloud(method, params, inCloud)) return `${ACCOUNTS_KEPT_SEPARATE}, so you don't reach OpenOrc Cloud's threads and tasks, which no account here holds.`;
   if (method === "runs.start" && startsLooseTask(db, params))
     return `${ACCOUNTS_KEPT_SEPARATE}, so take up a task that has no conversation with orcling_thread_start, which starts it on your own Claude account.`;
   const reach = accountReach(db, self.claudeAccountId);
@@ -29,10 +32,19 @@ export function separateAccountsRefusal(db: Db, self: Orcling, method: string, p
 function namedAccountRefusal(self: Orcling, method: string, params: Record<string, unknown>): string | null {
   const chosen = params["claudeAccountId"];
   const elsewhere = typeof chosen === "string" && chosen !== self.claudeAccountId;
-  if (method === "threads.switchClaudeAccount" || (method === "runs.start" && elsewhere)) return `${ACCOUNTS_KEPT_SEPARATE}, so only the person moves a conversation to another account.`;
+  if (method === "threads.switchClaudeAccount" || (method === "runs.start" && elsewhere)) return STAYS_ON_ITS_ACCOUNT;
   if (method === "threads.start" && elsewhere) return `${ACCOUNTS_KEPT_SEPARATE}, so you start threads only on your own Claude account.`;
   if (method === "threads.list" && elsewhere) return `That belongs to another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`;
   return null;
+}
+
+/** Whether a call reaches OpenOrc Cloud: a space's threads or tasks, a cloud thread started, or a thread or run the cloud holds. */
+function reachesCloud(method: string, params: Record<string, unknown>, inCloud: CloudHolds | undefined): boolean {
+  if (typeof params["spaceId"] === "string" || (method === "threads.start" && params["hosted"])) return true;
+  const id = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : null);
+  const threadIds = [id("threadId"), id("parentThreadId"), method.startsWith("threads.") ? id("id") : null];
+  const runId = id("runId");
+  return Boolean(inCloud && (threadIds.some((thread) => thread && inCloud({ thread })) || (runId && inCloud({ run: runId }))));
 }
 
 /** Whether the call starts a task that has no conversation yet: its thread would go on its project's default account. */
@@ -92,15 +104,17 @@ export function onOwnAccount<P>(db: Db, self: Orcling, method: string, params: P
   return params;
 }
 
-/** The rows of another account left out of the lists an Orcling reads while accounts are kept separate. */
+/** The rows of another account, and OpenOrc Cloud's, left out of the lists an Orcling reads while accounts are kept separate. */
 export function keptToOwnAccount(db: Db, self: Orcling, method: string, result: unknown): unknown {
   if (!accountsSeparate(db)) return result;
   const reach = accountReach(db, self.claudeAccountId);
+  const local = (thread: Pick<ThreadSummary, "owner" | "claudeAccountId">) => thread.owner?.brain !== "hosted" && reach(threadAccount(thread));
+  if (method === "threads.list") return (result as ThreadSummary[]).filter(local);
   if (method === "tasks.list") return (result as Task[]).filter((task) => reachesTask(db, reach, task));
   if (method === "orclings.chats") return (result as OrclingChatSummary[]).filter((chat) => reach(orclings.get(db, chat.id)?.claudeAccountId ?? ""));
   if (method === "inbox.list") {
     const inbox = result as InboxList;
-    return { ...inbox, items: inbox.items.filter((item) => (item.kind === "thread" ? reach(threadAccount(item.thread)) : reachesTask(db, reach, item.task))) };
+    return { ...inbox, items: inbox.items.filter((item) => (item.kind === "thread" ? local(item.thread) : reachesTask(db, reach, item.task))) };
   }
   return result;
 }

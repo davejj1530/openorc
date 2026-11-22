@@ -543,7 +543,7 @@ it("keeps what an Orcling moves, takes up, makes and reviews through the app on 
     const turn = { agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted", prompt: "Go on" };
     new AppSettingsService(core.db).set({ claudeAccountsSeparate: true });
 
-    await expect(host().app(run, "runs.start", { ...turn, threadId: own.id, claudeAccountId: DEFAULT_CLAUDE_ACCOUNT })).rejects.toThrow("only the person moves a conversation to another account");
+    await expect(host().app(run, "runs.start", { ...turn, threadId: own.id, claudeAccountId: DEFAULT_CLAUDE_ACCOUNT })).rejects.toThrow("a conversation stays on the account it started on");
     expect(runs.listForThread(core.db, own.id)).toEqual([]);
     await expect(host().app(run, "runs.start", { ...turn, taskId: loose.id })).rejects.toThrow("take up a task that has no conversation with orcling_thread_start");
     expect(tasks.get(core.db, loose.id)?.executionThreadId).toBeNull();

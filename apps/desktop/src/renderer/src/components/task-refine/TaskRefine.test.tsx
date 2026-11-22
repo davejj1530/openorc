@@ -24,6 +24,7 @@ let modelList = models;
 let availability: { id: string; state: string }[] | null = null;
 let defaultHarness: string | null = null;
 let dismissFails = false;
+let separate = false;
 const replace = vi.fn();
 const patch = vi.fn();
 const flush = vi.fn(async () => true);
@@ -56,10 +57,13 @@ beforeEach(() => {
   availability = null;
   defaultHarness = null;
   dismissFails = false;
+  separate = false;
   api.mockReset().mockImplementation(async (method) => {
     if (method === "agents.models") return modelList as never;
     if (method === "agents.availability") return availability as never;
-    if (method === "app.settings.get") return { defaultHarness } as never;
+    if (method === "app.settings.get") return { defaultHarness, claudeAccountsSeparate: separate } as never;
+    if (method === "tasks.get") return { id: "task", threadId: null, executionThreadId: "work-thread" } as never;
+    if (method === "threads.get") return { id: "work-thread", agent: "claude", claudeAccountId: "work" } as never;
     if (method === "orclings.list") return [] as never;
     if (method === "claude.accounts.list") return accounts as never;
     if (method === "tasks.refine.get") return refine as never;
@@ -123,6 +127,22 @@ it("refines a Claude model on the account chosen, and offers that account next t
   sheet = await screen.findByRole("dialog");
   await waitFor(() => expect(within(sheet).getByRole<HTMLSelectElement>("combobox", { name: "Refine with" }).value).toContain("opus-test"));
   expect((await enabledAccount(within(sheet))).value).toBe("personal");
+});
+
+it("refines a Claude model only on the task's account while accounts are kept separate", async () => {
+  separate = true;
+  mount();
+  fireEvent.click(await screen.findByRole("button", { name: "Refine" }));
+  const sheet = await screen.findByRole("dialog");
+  const refineWith = within(sheet).getByRole<HTMLSelectElement>("combobox", { name: "Refine with" });
+  await waitFor(() => expect(refineWith.value).toContain("test-model"));
+  fireEvent.change(refineWith, { target: { value: JSON.stringify(["claude", "opus-test", "high"]) } });
+  const field = () => within(sheet).getByRole<HTMLSelectElement>("combobox", { name: "Account" });
+  await waitFor(() => expect(field().textContent).toBe("Work (kept separate)"));
+  expect(field().disabled).toBe(true);
+  fireEvent.click(within(sheet).getByRole("button", { name: "Refine" }));
+  const claude = { agent: "claude", model: "opus-test", effort: "high" };
+  await waitFor(() => expect(calls("tasks.refine.start")).toEqual([{ taskId: "task", recipient: claude, claudeAccountId: "work", instruction: "", again: false }]));
 });
 
 it("shows the agent at work and stops it", async () => {

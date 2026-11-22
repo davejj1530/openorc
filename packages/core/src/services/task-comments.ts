@@ -6,6 +6,7 @@ import {
   type CommentAttempt,
   type CommentIntent,
   type CommentRecipient,
+  type Orcling,
   type RpcParams,
   type Run,
   type Task,
@@ -13,6 +14,7 @@ import {
   type Thread,
 } from "@openorc/protocol";
 import { AttachmentService } from "./attachments.js";
+import { assertOnTaskAccount } from "./claude-account-separation.js";
 import { isSessionLost, type RunService, type TurnSettledOutcome } from "./runs.js";
 import { asOrcling, BackgroundJobs, recipientCatalog, taskSideRunFolder, validateRecipient } from "./task-side-runs.js";
 import type { ThreadService } from "./threads.js";
@@ -89,6 +91,7 @@ export class TaskCommentService {
     if (recipients.length > 8) throw new Error("Mention up to eight agents at a time.");
     if (input.source === "description" && !recipients.length) throw new Error("Tag an available model in the description first.");
     for (const recipient of recipients) validateRecipient(recipient, catalog);
+    assertOrclingsOnTaskAccount(this.db, task, recipients, everyOrcling);
     const history = taskComments.list(this.db, task.id);
     const parentComment = input.replyTo ? history.comments.find((c) => c.id === input.replyTo) : null;
     const parentAttempt = input.replyTo ? history.attempts.find((a) => a.id === input.replyTo) : null;
@@ -382,4 +385,12 @@ function commentOutcomeState(status: TurnSettledOutcome["status"]): "success" | 
   if (status === "success") return "success";
   if (status === "cancelled") return "cancelled";
   return "error";
+}
+
+/** While accounts are kept separate, an Orcling on another Claude account than the task's doesn't answer its comments. */
+function assertOrclingsOnTaskAccount(db: Db, task: Task, recipients: readonly CommentRecipient[], everyOrcling: readonly Orcling[]): void {
+  for (const recipient of recipients) {
+    const orcling = recipient.orclingId ? everyOrcling.find((candidate) => candidate.id === recipient.orclingId) : undefined;
+    if (orcling) assertOnTaskAccount(db, task, orcling.claudeAccountId);
+  }
 }

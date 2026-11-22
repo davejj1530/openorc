@@ -195,6 +195,17 @@ it("offers the other signed-in Claude accounts after a usage limit, and goes on 
   );
 });
 
+it("offers no other account to continue with after a usage limit while accounts are kept separate", async () => {
+  const account = (id: string, name: string) => ({ id, name, kind: "managed", enabled: true, createdAt: 1, status: "ready", email: null, organization: null, message: null });
+  queries.set("claude.accounts.list", { defaultId: "work", accounts: [account("work", "Work"), account("personal", "Personal")] });
+  queries.set("app.settings.get", { claudeAccountsSeparate: true });
+  const session = { status: "error", message: "You've hit your 5-hour limit", recovery: { kind: "usage", provider: "claude" } } as const;
+  await open({ thread: { agent: "claude", model: "opus", claudeAccountId: "work", session }, runs: [{ id: "A", agent: "claude", live: false }] });
+  expect(screen.queryByRole("button", { name: /Continue with/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Retry with a fresh session" })).toBeTruthy();
+  expect(screen.queryByText(/Every account this project uses/)).toBeNull();
+});
+
 it("offers only the accounts the thread's project uses after a usage limit, and says when every one of them is at its limit", async () => {
   const { useRouter } = await import("../lib/router");
   const account = (id: string, name: string, status: string) => ({ id, name, kind: "managed", enabled: true, createdAt: 1, status, email: null, organization: null, message: null });

@@ -16,6 +16,7 @@ const defaults: AppSettings = {
   claudeUserMcpServers: true,
   claudeConnectorsOff: [],
   claudeAccountAutoSwitch: false,
+  claudeAccountsSeparate: false,
   cloudSkillsOff: {},
 };
 

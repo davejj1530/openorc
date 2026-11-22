@@ -66,11 +66,11 @@ import { docHref } from "../../data/docs";
     <h2 id="model">Let a model review</h2>
     <ol class="docs-steps">
       <li>Set <strong>Reviewer</strong> to <strong>Model</strong>.</li>
-      <li>Pick a model, or an <a href={docHref("orclings")}>Orcling</a> to review with its own model.</li>
+      <li>Pick a model, or an <a href={docHref("orclings")}>Orcling</a> to review with its own model. For a Claude model, in a project that uses more than one Claude account, the picker also lists the accounts, and the review runs on the one you pick.</li>
       <li>Choose <strong>Start review</strong>.</li>
     </ol>
     <p>The model reviews in a thread of its own, named <code>Review #&lt;number&gt;: &lt;title&gt;</code>, in Plan mode. It works on a separate copy of the pull request on no branch, so your checkout isn't touched. It records each finding as a draft comment on the changed line and finishes with a summary. Its comments join your draft, labeled with the model's name. A link beside <strong>Reviewer</strong> opens the review thread. It says the model is reviewing while it works, and reads <strong>Review conversation</strong> once it is done.</p>
-    <p>After the author pushes again, choose <strong>Review again</strong>. The same thread continues on the new commits, checks whether its earlier findings were addressed and comments only on what is left or new. A draft with comments on the older commits has to be posted or discarded first. If you resolved the review thread, the next review starts a fresh one.</p>
+    <p>After the author pushes again, choose <strong>Review again</strong>. The same thread continues on the new commits, checks whether its earlier findings were addressed and comments only on what is left or new. A draft with comments on the older commits has to be posted or discarded first. If you resolved the review thread, the next review starts a fresh one. So does a review on another Claude account than the thread's, which starts its thread on that account; while <strong>Keep accounts separate</strong> is on, post or discard a draft written on the thread's account first.</p>
     <p>The model can't post, push or change files. You edit or remove its comments and decide what to submit.</p>
     <p>For a project that is only on OpenOrc Cloud, with no folder on this computer, the review runs in a cloud thread, and the picker offers the models OpenOrc Cloud runs. OpenOrc Cloud keeps the draft. An Orcling can't review there.</p>
   </section>

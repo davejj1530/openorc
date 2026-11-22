@@ -33,8 +33,8 @@ export interface StartThreadInput {
   claudeAccountId?: string;
   /**
    * Where claudeAccountId came from, when the project uses only some accounts: a person's choice, refused when it is not
-   * one of them (the default); a parent's, a task's or a schedule's, which gives way to the project's default; or the
-   * starter's own, as an Orcling's, left alone.
+   * one of them (the default); a parent's, a task's or a schedule's, which gives way to the project's default, or is
+   * refused while accounts are kept separate; or the starter's own, as an Orcling's, left alone.
    */
   claudeAccountFrom?: AccountSource;
   projectId: string;
@@ -58,8 +58,8 @@ export interface StartThreadInput {
 
 /**
  * The Claude account a start runs on in its project (see startingAccount). Only a Claude thread's account is a choice;
- * any other agent's goes along unseen, so one the project does not use gives way quietly, and a project with none of
- * its accounts enabled still starts it.
+ * any other agent's only goes along, so one the project does not use gives way to the project's default, or is refused
+ * while accounts are kept separate, and a project with none of its accounts enabled still starts it.
  */
 export function startAccount(db: Db, input: Pick<StartThreadInput, "projectId" | "claudeAccountId" | "claudeAccountFrom" | "agent">): string {
   const from = input.agent === "claude" || input.claudeAccountFrom === "own" ? input.claudeAccountFrom : "unused";

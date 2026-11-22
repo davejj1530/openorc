@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from "react";
-import { WORKSPACE_ID, type Orcling, type Run, type ThreadSummary } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, GROUP_ACROSS_ACCOUNTS, WORKSPACE_ID, type Orcling, type Run, type ThreadSummary } from "@openorc/protocol";
 import type { OutgoingMessage } from "@openorc/client";
+import { ON_ANOTHER_ACCOUNT, useAccountsSeparate } from "../lib/accounts-separate";
 import type { MentionEntry } from "../lib/composer-mentions";
 import { mentionedOrcling, orclingById, orclingHome, orclingMentionEntries, useOrclingGroups, useOrclings } from "../lib/orclings";
 import type { ConversationVoice, OrclingChatSpec } from "../lib/turn-authors";
@@ -26,6 +27,8 @@ interface OrclingConversation {
   empty: ReactNode;
   /** How a group chat's messages go out: to its Orclings, not to one agent. */
   route?: ((message: OutgoingMessage) => Promise<void>) | undefined;
+  /** Why nothing can be sent here: a group whose Orclings work on different accounts, while accounts are kept separate. */
+  disabledReason?: string | undefined;
 }
 
 /** The Orcling chat a conversation is, if any: an Orcling's own or a group's, with which Orcling spoke in each run. */
@@ -54,9 +57,11 @@ function useVoice(runs: readonly Run[], orclings: readonly Orcling[], speaker: O
 }
 
 /** A group chat's own parts: who it is with in the composer and before the first message, and where its messages go. */
-function groupParts(chat: OrclingChatSpec, runs: number, send: (params: { threadId: string; text: string; attachments?: string[]; messageId?: string }) => Promise<unknown>) {
+function groupParts(chat: OrclingChatSpec, runs: number, send: (params: { threadId: string; text: string; attachments?: string[]; messageId?: string }) => Promise<unknown>, separate: boolean) {
   const names = memberNames(chat.members);
+  const across = separate && new Set(chat.members.map((member) => member.claudeAccountId)).size > 1;
   return {
+    disabledReason: across ? GROUP_ACROSS_ACCOUNTS : undefined,
     placeholder: `Message ${names}…`,
     empty: runs === 0 ? <Empty title={`Say hi to ${names}`} icon={<OrclingGathering members={chat.members} />} /> : undefined,
     mentions: orclingMentionEntries(chat.members, null),
@@ -69,6 +74,11 @@ function groupParts(chat: OrclingChatSpec, runs: number, send: (params: { thread
 
 /** An Orcling at the tail of its conversation, thinking while a turn runs. */
 const face = (orcling: Orcling) => (working: boolean) => <OrclingPreview look={orcling.look} expression={working ? 1 : 0} size={44} />;
+
+function onAnotherAccount(thread: ThreadSummary | null, separate: boolean): (orcling: Orcling) => boolean {
+  const account = thread?.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
+  return (orcling) => separate && orcling.id !== thread?.orclingId && orcling.claudeAccountId !== account;
+}
 
 /**
  * How Orclings join an ordinary conversation: asked by name with `@`, answering as guests, or chosen in the model
@@ -95,15 +105,18 @@ export function useOrclingConversation({
   const askOrcling = useRpcMutation("orclings.ask");
   const assign = useRpcMutation("orclings.assign");
   const groupSend = useRpcMutation("orclings.groups.send");
-  if (chat?.group) return { voice, ask: async () => false, ...groupParts(chat, runs.length, groupSend.mutateAsync) };
+  const separate = useAccountsSeparate();
+  const elsewhere = onAnotherAccount(thread, separate);
+  if (chat?.group) return { voice, ask: async () => false, ...groupParts(chat, runs.length, groupSend.mutateAsync, separate) };
   const open = Boolean(thread && !home && !thread.teamInstanceId && orclings.length);
-  const guests = open ? orclings.filter((orcling) => orcling.id !== thread?.orclingId) : [];
+  const askable = orclings.filter((orcling) => !elsewhere(orcling));
+  const guests = open ? askable.filter((orcling) => orcling.id !== thread?.orclingId) : [];
   const assignable = open && thread?.projectId !== WORKSPACE_ID;
   return {
     voice,
     placeholder: speaker ? `Message ${speaker.name}…` : undefined,
     empty: home && runs.length === 0 ? <Empty title={`Say hi to ${home.name}`} icon={<OrclingPreview look={home.look} size={160} />} /> : undefined,
-    mentions: open ? orclingMentionEntries(orclings, thread?.orclingId) : undefined,
+    mentions: open ? orclingMentionEntries(askable, thread?.orclingId) : undefined,
     modelControl:
       assignable && thread ? (
         <ComposerModelPicker
@@ -114,7 +127,12 @@ export function useOrclingConversation({
             if (thread.orclingId) assign.mutate({ threadId: thread.id, orclingId: null });
             onModel(next);
           }}
-          orclings={{ options: orclings, selectedId: thread.orclingId ?? null, onSelect: (orcling) => assign.mutate({ threadId: thread.id, orclingId: orcling.id }) }}
+          orclings={{
+            options: orclings,
+            selectedId: thread.orclingId ?? null,
+            onSelect: (orcling) => assign.mutate({ threadId: thread.id, orclingId: orcling.id }),
+            blocked: (orcling) => (elsewhere(orcling) ? ON_ANOTHER_ACCOUNT : undefined),
+          }}
           accounts={thread.orclingId ? undefined : accounts}
         />
       ) : undefined,

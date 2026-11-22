@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScheduleService } from "./schedules.js";
+import { AppSettingsService } from "./settings.js";
 import type { ThreadService } from "./threads.js";
 
 const leadSettings = { agent: "codex" as const, model: "fixture-astra", effort: "high", fastMode: true };
@@ -224,12 +225,12 @@ it("starts a schedule by hand during its agent's update", async () => {
 });
 
 describe("a project's own Claude accounts", () => {
-  const claudeSchedule = (claudeAccountId?: string) =>
+  const claudeSchedule = (claudeAccountId?: string, agent: "claude" | "codex" = "claude") =>
     service.create({
       projectId: project.id,
       title: "Scheduled Claude",
       prompt: "Check the project",
-      agent: "claude",
+      agent,
       model: null,
       effort: null,
       mode: "plan",
@@ -263,4 +264,24 @@ describe("a project's own Claude accounts", () => {
     expect(modelStart).toHaveBeenCalledTimes(2);
     expect(warnings.mock.calls.filter(([message]) => message.includes("default Claude account"))).toHaveLength(1);
   });
+
+  it.each(["claude", "codex"] as const)(
+    "fails a %s schedule's firing while accounts are kept separate once the project stops using its account, and fires on the default with the setting off",
+    async (agent) => {
+      const [work, personal] = ["Work", "Personal"].map((name) => claudeAccounts.add(db, name).id) as [string, string];
+      const schedule = claudeSchedule(work, agent);
+      onlyUse([personal], personal);
+      const settings = new AppSettingsService(db);
+      settings.set({ claudeAccountsSeparate: true });
+      const reason = "This project doesn't use Work, and Settings keeps Claude accounts separate, so this can't start on another account.";
+      expect(await service.trigger(schedule.id, "kept-separate")).toMatchObject({ status: "failed", reason });
+      expect(modelStart).not.toHaveBeenCalled();
+      expect(scheduleFirings.list(db, schedule.id)).toEqual([expect.objectContaining({ state: "failed", reason })]);
+      expect(threads.list(db, { projectId: project.id })).toHaveLength(0);
+
+      settings.set({ claudeAccountsSeparate: false });
+      expect((await service.trigger(schedule.id, "together-again")).status).toBe("started");
+      expect(modelStart).toHaveBeenCalledWith(expect.objectContaining({ agent, claudeAccountId: personal }), expect.anything());
+    },
+  );
 });

@@ -77,7 +77,7 @@ export class ScheduleService {
   }
   /**
    * A Claude account a person chose for a schedule must be one its project uses; with none chosen, the project's default.
-   * Another agent's schedule only carries one along.
+   * Another agent's schedule only carries one along, which must be one its project uses while accounts are kept separate.
    */
   private chosenAccount(input: Pick<ScheduleInput, "projectId" | "claudeAccountId">, agent: string | undefined): string {
     return startingAccount(this.db, input.projectId, input.claudeAccountId, agent === "claude" ? "chosen" : "unused");
@@ -209,7 +209,7 @@ export class ScheduleService {
   /**
    * The account a firing starts on: the one the schedule was saved with, or its project's default once the project no
    * longer uses that one, so the schedule goes on firing. The log says so the first time, and again only if the accounts
-   * involved change.
+   * involved change. While accounts are kept separate the firing fails instead, saying why.
    */
   private firingAccount({ scheduleId, snapshot }: ScheduleFiringRecord): string {
     const saved = snapshot.claudeAccountId ?? "claude-cli";

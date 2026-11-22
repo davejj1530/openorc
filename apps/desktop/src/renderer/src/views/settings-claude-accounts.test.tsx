@@ -9,8 +9,10 @@ const mocks = vi.hoisted(() => ({ call: vi.fn() }));
 vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onReady: () => {}, onPush: () => () => {} } }));
 let data: ClaudeAccounts;
 let autoSwitch: boolean;
+let separate: boolean;
 beforeEach(() => {
   autoSwitch = false;
+  separate = false;
   queryClient.clear();
   data = {
     defaultId: "personal",
@@ -34,10 +36,11 @@ beforeEach(() => {
       return account;
     }
     if (method === "claude.accounts.login" || method === "claude.accounts.cancelLogin") return { started: true };
-    if (method === "app.settings.get") return { claudeAccountAutoSwitch: autoSwitch };
+    if (method === "app.settings.get") return { claudeAccountAutoSwitch: autoSwitch, claudeAccountsSeparate: separate };
     if (method === "app.settings.set") {
       autoSwitch = params.claudeAccountAutoSwitch ?? autoSwitch;
-      return { claudeAccountAutoSwitch: autoSwitch };
+      separate = params.claudeAccountsSeparate ?? separate;
+      return { claudeAccountAutoSwitch: autoSwitch, claudeAccountsSeparate: separate };
     }
     if (method === "claude.accounts.update") {
       if (params.makeDefault) data.defaultId = params.id;
@@ -90,6 +93,28 @@ it("changes the default and renames an account without changing its identity", a
   expect(mocks.call).toHaveBeenCalledWith("claude.accounts.update", { id: "work", name: "Company" });
 });
 
+it("keeps accounts separate, which turns switching at usage limits off", async () => {
+  autoSwitch = true;
+  mount();
+  const keep = await screen.findByRole<HTMLInputElement>("switch", { name: /Keep accounts separate/ });
+  const switching = screen.getByRole<HTMLInputElement>("switch", { name: /Switch accounts at usage limits/ });
+  await waitFor(() => expect(switching.checked).toBe(true));
+  expect(keep.checked).toBe(false);
+  expect(
+    screen.getByText(
+      /^Agents and Orclings only see and reach work on their own account, .* Claude's file tools can't open other accounts' folders \(unless OpenOrc runs on Windows itself rather than in WSL\), /,
+    ),
+  ).toBeTruthy();
+  expect(screen.queryByText(/Turning this off moves each account's memories/)).toBeNull();
+  fireEvent.click(keep);
+  await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("app.settings.set", { claudeAccountsSeparate: true }));
+  await waitFor(() => expect(keep.checked).toBe(true));
+  expect(switching.checked).toBe(false);
+  expect(switching.disabled).toBe(true);
+  expect(screen.getByText("Off while accounts are kept separate.")).toBeTruthy();
+  expect(screen.getByText(/Turning this off moves each account's memories into the shared folder for good; one whose file name is already used there stays with its account\./)).toBeTruthy();
+});
+
 it("turns on switching accounts at usage limits once a second account is enabled", async () => {
   mount();
   const toggle = await screen.findByRole<HTMLInputElement>("switch", { name: /Switch accounts at usage limits/ });
@@ -105,6 +130,17 @@ it("turns on switching accounts at usage limits once a second account is enabled
   mount();
   await screen.findByRole("heading", { name: "Client" });
   expect(screen.queryByRole("switch", { name: /Switch accounts at usage limits/ })).toBeNull();
+});
+
+it("keeps accounts separate in reach while it is on, even with one account enabled", async () => {
+  separate = true;
+  data.accounts = data.accounts.map((account, index) => ({ ...account, enabled: index === 0 }));
+  mount();
+  const keep = await screen.findByRole<HTMLInputElement>("switch", { name: /Keep accounts separate/ });
+  await waitFor(() => expect(keep.checked).toBe(true));
+  fireEvent.click(keep);
+  await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("app.settings.set", { claudeAccountsSeparate: false }));
+  await waitFor(() => expect(screen.queryByRole("switch", { name: /Keep accounts separate/ })).toBeNull());
 });
 
 it("keeps sign-in recovery visible and manages enabled accounts from their menu", async () => {

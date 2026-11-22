@@ -22,6 +22,8 @@ export const ThreadListParams = z.object({
   includeChildren: z.boolean().optional(),
   selectedId: z.string().optional(),
   childLimits: z.record(z.string(), z.number().int().min(THREAD_CHILD_PAGE)).optional(),
+  /** Only threads on this Claude account, before pagination; a thread with none is the existing CLI login's. */
+  claudeAccountId: z.string().optional(),
   limit: z.number().int().positive().optional(),
   offset: z.number().int().nonnegative().optional(),
 });

@@ -63,6 +63,7 @@ export function startCoreMcp(core: CoreTools): Promise<OpenOrcMcpServer> {
       planLimits: () => core.planLimits(),
       guard: guardContext(core.db, core.dataDir),
       call: (method, params) => core.call(method, params),
+      inCloud: (ref) => Boolean(core.account()?.threads?.active && core.account()?.threads?.holds(ref)),
       invalidate: (keys) => core.invalidate(keys),
     }),
     pullReview: core.pullRequests.agentTools(),

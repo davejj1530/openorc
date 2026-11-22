@@ -28,6 +28,7 @@ const parent = {
 const mac = vi.hoisted(() => ({
   phone: null as FakeMac | null,
   shares: true,
+  separate: false,
   parentMore: null as Partial<ThreadSummary> | null,
   catalog: null as unknown,
   start: null as unknown as ReturnType<typeof vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>>,
@@ -45,8 +46,23 @@ vi.mock("../client", async () => {
     "projects.list": [{ id: "openorc", name: "openorc", defaultBranch: "main" }],
     "agents.models": [{ id: "opus", label: "Opus", agent: "claude", isDefault: true, efforts: ["high"], defaultEffort: "high" }],
     "agents.availability": [{ id: "claude", state: "ready" }],
-    "app.settings.get": { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review", defaultHarness: null },
-    "claude.accounts.list": [{ id: "work", name: "Work", state: "ready" }],
+    get "app.settings.get"() {
+      return { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review", defaultHarness: null, claudeAccountsSeparate: mac.separate };
+    },
+    "claude.accounts.list": {
+      defaultId: "personal",
+      accounts: ["personal", "work"].map((id) => ({
+        id,
+        name: id === "work" ? "Work" : "Personal",
+        kind: "managed",
+        enabled: true,
+        createdAt: 1,
+        status: "ready",
+        email: null,
+        organization: null,
+        message: null,
+      })),
+    },
   };
   mac.phone = fakeMac((method, params) => (method === "threads.start" ? mac.start(params as RpcParams<"threads.start">) : Promise.resolve(reads[method])));
   Object.assign(mac.phone.module.link.connection, { shares: async () => mac.shares });
@@ -55,17 +71,20 @@ vi.mock("../client", async () => {
 vi.mock("react-native-keyboard-controller", () => ({ KeyboardStickyView: ({ children }: { children: ReactNode }) => <>{children}</> }));
 vi.mock("expo-router", () => ({
   router: { replace: vi.fn(), push: vi.fn(), back: vi.fn() },
-  useLocalSearchParams: () => ({ threadId: "parent-1" }),
+  useLocalSearchParams: () => ({ threadId: "parent-1", composerId: "new-subthread:parent-1" }),
   useNavigation: () => ({ isFocused: () => true }),
 }));
 vi.mock("../composer/attachments", () => ({ pickImages: vi.fn(), attachImage: vi.fn() }));
+vi.mock("../thread/Markdown", () => ({ Markdown: ({ text }: { text: string }) => <div>{text}</div> }));
 
 const { NewSubthreadScreen } = await import("./NewSubthreadScreen");
+const { ModelSheet } = await import("../composer/ModelSheet");
 
 beforeEach(() => {
   mac.phone!.saved.clear();
   mac.phone!.module.queryClient.clear();
   mac.shares = true;
+  mac.separate = false;
   mac.parentMore = null;
   mac.catalog = null;
   mac.start = vi.fn();
@@ -98,6 +117,48 @@ it("asks what to work on under the parent and where, and starts there on the par
     attachments: [],
     claudeAccountId: "work",
   });
+});
+
+it("holds a subthread on its parent's account while the Mac keeps accounts separate, and names that account in the start", async () => {
+  mac.separate = true;
+  render(
+    <>
+      <NewSubthreadScreen />
+      <ModelSheet />
+    </>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  await screen.findByText("Accounts are kept separate, so a subthread stays on its thread's account.");
+  const menu = screen.getByRole<HTMLButtonElement>("button", { name: "Claude account, Work" });
+  expect(menu.disabled).toBe(true);
+  fireEvent.click(menu);
+  expect(screen.queryByRole("menuitemradio")).toBeNull();
+  write("Check the payment SDK changelog");
+  await waitFor(() => expect(start().getAttribute("aria-disabled")).toBe("false"));
+  mac.start.mockResolvedValue({ thread: { id: "child-1" } });
+  await act(async () => fireEvent.click(start()));
+  await waitFor(() => expect(mac.start).toHaveBeenCalledTimes(1));
+  expect(mac.start.mock.calls[0]![0]).toMatchObject({ parentThreadId: "parent-1", agent: "claude", prompt: "Check the payment SDK changelog" });
+  expect(mac.start.mock.calls[0]![0]).toHaveProperty("claudeAccountId", "work");
+});
+
+it("lets a subthread's account change while the Mac's setting to keep accounts separate is off", async () => {
+  render(
+    <>
+      <NewSubthreadScreen />
+      <ModelSheet />
+    </>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Claude account, Work" }));
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Personal" }));
+  await screen.findByRole("button", { name: "Claude account, Personal" });
+  expect(screen.queryByText(/kept separate/)).toBeNull();
+  write("Use the personal account");
+  await waitFor(() => expect(start().getAttribute("aria-disabled")).toBe("false"));
+  mac.start.mockResolvedValue({ thread: { id: "child-1" } });
+  await act(async () => fireEvent.click(start()));
+  await waitFor(() => expect(mac.start).toHaveBeenCalledWith(expect.objectContaining({ parentThreadId: "parent-1", claudeAccountId: "personal" })));
 });
 
 it("keeps the prompt and says why when the Mac refuses the start", async () => {

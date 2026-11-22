@@ -1,4 +1,4 @@
-import { extractionJobs, listEvents, memories, settings, summaries, tasks, vectors, type Db, type MemoryFilter, type MemoryInput } from "@openorc/db";
+import { extractionJobs, listEvents, memories, settings, summaries, tasks, threads, vectors, type Db, type MemoryFilter, type MemoryInput } from "@openorc/db";
 import type { AgentLaunchEnvironment } from "@openorc/agents";
 import { buildBrief, buildOrclingBrief, DIGEST_EVENT_KINDS, digestRun, Embedder, Extractor, hasBrief, Retriever, type RetrievedMemory, type TextEmbedder } from "@openorc/memory";
 import {
@@ -21,6 +21,7 @@ import {
   type Task,
   type Thread,
 } from "@openorc/protocol";
+import { accountReach, accountsSeparate, reachesTask, threadAccount } from "./claude-account-separation.js";
 import { ExtractionCredentials, type ExtractionCredential, type ProtectedSecretStore } from "./extraction-credentials.js";
 import type { Logger } from "../transport.js";
 
@@ -282,14 +283,20 @@ export class MemoryService {
     return this.extractor(run.agent, run.claudeAccountId ?? "claude-cli");
   }
 
-  /** The system-prompt brief for a run, or "" when the project has no memory yet. */
-  brief(project: Project): string {
+  /**
+   * The system-prompt brief for a run, or "" when the project has no memory yet. Its tasks in progress are the ones the
+   * run's Claude account reaches; while accounts are kept separate, so is what earlier sessions left open.
+   */
+  brief(project: Project, claudeAccountId: string): string {
     if (!this.enabled() || !hasBrief(this.db, project.id)) return "";
+    const reach = accountReach(this.db, claudeAccountId);
     const openTitles = tasks
       .list(this.db, { projectId: project.id, statuses: ["in_progress", "review"] })
+      .filter((t) => reachesTask(this.db, reach, t))
       .map((t) => t.title)
       .slice(0, 8);
-    return buildBrief(this.db, project.id, openTitles);
+    const reachedSession = accountsSeparate(this.db) ? (summary: SessionSummary) => reachesSession(this.db, reach, summary) : undefined;
+    return buildBrief(this.db, project.id, openTitles, reachedSession);
   }
 
   /**
@@ -525,6 +532,14 @@ export class MemoryService {
     }
     return this.enabled() && revision === this.policyRevision ? lines.join("\n") : taskOnly;
   }
+}
+
+/** Whether an account reaches a session's work: its thread's account, else its task's; a session with neither is everyone's. */
+function reachesSession(db: Db, reach: (account: string) => boolean, summary: SessionSummary): boolean {
+  const thread = summary.threadId ? threads.get(db, summary.threadId) : null;
+  if (thread) return reach(threadAccount(thread));
+  const task = summary.taskId ? tasks.get(db, summary.taskId) : null;
+  return !task || reachesTask(db, reach, task);
 }
 
 /** Cache keys for a memory's list: its project's, or its Orcling's. */

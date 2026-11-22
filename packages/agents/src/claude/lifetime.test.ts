@@ -55,11 +55,12 @@ it.skipIf(process.platform === "win32")(
     const childFile = path.join(directory, "child.cjs");
     const pidFile = path.join(directory, "child.pid");
     const marker = path.join(directory, "writes.txt");
-    // The child ignores SIGTERM on purpose. A run interrupted before `finally` (a timeout, or a sandbox that refuses
+    // The child ignores SIGTERM on purpose, and before it writes its pid: the wrapper exits on that file, and the
+    // adapter then signals the group. A run interrupted before `finally` (a timeout, or a sandbox that refuses
     // process-group signals) cannot stop it, so it ends itself rather than writing for days.
     await writeFile(
       childFile,
-      `const fs=require('node:fs'); fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid)); process.on('SIGTERM',()=>{}); setInterval(()=>fs.appendFileSync(${JSON.stringify(marker)},'write\\n'),20); setTimeout(()=>process.exit(0),60000);`,
+      `const fs=require('node:fs'); process.on('SIGTERM',()=>{}); fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid)); setInterval(()=>fs.appendFileSync(${JSON.stringify(marker)},'write\\n'),20); setTimeout(()=>process.exit(0),60000);`,
     );
     await writeFile(
       wrapper,

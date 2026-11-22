@@ -1,5 +1,5 @@
 import type { Project, RpcResults, Thread } from "@openorc/protocol";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useRouter } from "../lib/router";
@@ -9,6 +9,7 @@ let accounts: RpcResults["claude.accounts.list"] | undefined;
 let project: Project | null;
 let parent: Thread;
 let capabilities: RpcResults["hosted.capabilities"] | undefined;
+let separate: boolean;
 const codexParent = {
   id: "home",
   projectId: "p1",
@@ -28,7 +29,13 @@ const codexParent = {
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
   useRpc: (method: string) => {
-    const data: Record<string, unknown> = { "threads.get": parent, "claude.accounts.list": accounts, "projects.get": project, "hosted.capabilities": capabilities };
+    const data: Record<string, unknown> = {
+      "threads.get": parent,
+      "claude.accounts.list": accounts,
+      "projects.get": project,
+      "hosted.capabilities": capabilities,
+      "app.settings.get": { claudeAccountsSeparate: separate },
+    };
     return { data: data[method], error: null, isPending: false, refetch: vi.fn() };
   },
   useRpcMutation: () => ({ mutateAsync: start, reset: vi.fn(), isPending: false, error: null }),
@@ -44,8 +51,15 @@ vi.mock("../components/ModelPicker", () => ({
       <button type="button">Choose model</button>
       {accounts ? (
         <div role="group" aria-label="Claude account">
+          {accounts.blocked ? <p role="status">{accounts.blocked}</p> : null}
           {accounts.accounts.map((account) => (
-            <button key={account.id} type="button" aria-pressed={account.id === accounts.current} onClick={() => accounts.choose(account.id)}>
+            <button
+              key={account.id}
+              type="button"
+              aria-pressed={account.id === accounts.current}
+              data-outside={account.id === accounts.outside ? "" : undefined}
+              onClick={() => accounts.choose(account.id)}
+            >
               {account.name}
             </button>
           ))}
@@ -76,6 +90,7 @@ beforeEach(() => {
   localStorage.clear();
   parent = codexParent;
   capabilities = undefined;
+  separate = false;
   project = { id: "p1", name: "Landing", settings: {} } as Project;
   accounts = {
     defaultId: "personal",
@@ -133,8 +148,37 @@ it("offers only the accounts the project uses, starting on its default when the 
   render(<NewSubthread parentId="home" />);
   expect(offeredAccounts()).toEqual(["personal", "client"]);
   expect(chosenAccount()).toBe("client");
+  expect(accountGroup().queryByRole("status")).toBeNull();
   send("Use the project's account");
   await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ claudeAccountId: "client" })));
+});
+
+it("keeps a subthread on its parent's account while accounts are kept separate", async () => {
+  separate = true;
+  parent = claudeParent;
+  render(<NewSubthread parentId="home" />);
+  expect(accountGroup().getByRole("status").textContent).toBe("Accounts are kept separate, so a subthread stays on its thread's account.");
+  fireEvent.click(accountGroup().getByRole("button", { name: "client" }));
+  expect(chosenAccount()).toBe("work");
+  send("Stay on the parent's account");
+  await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ parentThreadId: "home", agent: "claude", claudeAccountId: "work" })));
+});
+
+it("says before Send why a subthread can't start while accounts are kept separate and the project stopped using the parent's account", async () => {
+  separate = true;
+  parent = claudeParent;
+  project = { ...project!, settings: { claudeAccounts: { only: true, accountIds: ["personal", "client"], defaultId: "client", autoSwitch: false } } } as Project;
+  render(<NewSubthread parentId="home" />);
+  expect(offeredAccounts()).toEqual(["personal", "client", "work"]);
+  expect(chosenAccount()).toBe("work");
+  expect(accountGroup().getByRole("button", { name: "work" }).hasAttribute("data-outside")).toBe(true);
+  expect(accountGroup().getByRole("status").textContent).toBe("Accounts are kept separate, so a subthread stays on its thread's account.");
+  send("Stay on the parent's account");
+  expect(screen.getByRole("button", { name: "Send" }).getAttribute("data-tip")).toBe(
+    "This project doesn't use work, and Settings keeps Claude accounts separate, so this can't start on another account.",
+  );
+  await act(async () => {});
+  expect(start).not.toHaveBeenCalled();
 });
 
 it("holds a subthread under a cloud thread in its server's words until it starts one there", async () => {

@@ -65,7 +65,7 @@ export function ClaudeAccountSettings({ active }: { active: boolean }) {
           </form>
         </details>
       </div>
-      {(accounts.data?.accounts.filter((account) => account.enabled).length ?? 0) > 1 ? <AutoSwitch /> : null}
+      <AccountPreferences several={(accounts.data?.accounts.filter((account) => account.enabled).length ?? 0) > 1} />
       {accounts.isPending ? <p className="settings-note">Checking accounts…</p> : null}
       {error ? (
         <p role="alert" className="text-sm text-bad mt-2">
@@ -76,15 +76,25 @@ export function ClaudeAccountSettings({ active }: { active: boolean }) {
   );
 }
 
-function AutoSwitch() {
+/** Shown with two enabled accounts, and while accounts are kept separate so the setting can always be turned off. */
+function AccountPreferences({ several }: { several: boolean }) {
   const preference = usePreference("app.settings.set");
+  const separate = preference.value.claudeAccountsSeparate ?? false;
+  if (!several && !separate) return null;
   return (
     <div className="settings-group settings-account-preferences">
       <Toggle
-        label="Switch accounts at usage limits"
-        hint="Continue with the account that has the most 5-hour usage left. Projects with their own accounts use their own setting."
-        checked={preference.value.claudeAccountAutoSwitch ?? false}
+        label="Keep accounts separate"
+        hint={`Agents and Orclings only see and reach work on their own account, no conversation or task moves to another account, Claude's file tools can't open other accounts' folders (unless OpenOrc runs on Windows itself rather than in WSL), and each account keeps its own Claude memory from now on; memories saved earlier stay with the existing CLI login.${separate ? " Turning this off moves each account's memories into the shared folder for good; one whose file name is already used there stays with its account." : ""}`}
+        checked={separate}
         disabled={preference.disabled}
+        onChange={(claudeAccountsSeparate) => void preference.commit({ claudeAccountsSeparate })}
+      />
+      <Toggle
+        label="Switch accounts at usage limits"
+        hint={separate ? "Off while accounts are kept separate." : "Continue with the account that has the most 5-hour usage left. Projects with their own accounts use their own setting."}
+        checked={!separate && (preference.value.claudeAccountAutoSwitch ?? false)}
+        disabled={preference.disabled || separate}
         onChange={(claudeAccountAutoSwitch) => void preference.commit({ claudeAccountAutoSwitch })}
       />
     </div>

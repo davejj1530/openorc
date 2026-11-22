@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, expect, it, vi } from "vitest";
 import { AcpAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
+import { claudeAccounts, runs, threads } from "@openorc/db";
 import { git } from "@openorc/git";
-import { SlackClientConfig, WORKSPACE_ID } from "@openorc/protocol";
+import { SlackClientConfig, WORKSPACE_ID, defaultOrclingLook } from "@openorc/protocol";
+import { AppSettingsService } from "../settings.js";
 import { configureWorkspace } from "../workspace-home.js";
 import type { CorePush, RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "../../openorc.js";
@@ -568,6 +570,49 @@ it("recovers a failed model switch through the default model in the same convers
   expect(started[4]!.spec.prompt).toContain("use the openrouter version");
   expect(core.threads.list()).toHaveLength(1);
   complete(started[4]!.handle, "demo-app explained with OpenRouter GLM.");
+});
+
+/** Bo, an Orcling on the Client account, and Cy, one on the CLI login, where a Slack conversation starts. */
+async function bothOrclings(core: OpenOrc) {
+  const settings = { agent: "codex" as const, model: "gpt-6-astra", effort: null, fastMode: false };
+  const bo = await core.orclings.create({ name: "Bo", look: defaultOrclingLook, settings, permission: "allow", claudeAccountId: claudeAccounts.add(core.db, "Client").id });
+  const cy = await core.orclings.create({ name: "Cy", look: defaultOrclingLook, settings, permission: "allow" });
+  return { bo, cy };
+}
+
+it("offers and hands the conversation to no Orcling on another Claude account than its own while accounts are kept separate", async () => {
+  const started = providers();
+  const { core, send } = await connected();
+  const { bo, cy } = await bothOrclings(core);
+  new AppSettingsService(core.db).set({ claudeAccountsSeparate: true });
+  send("ORCLING", "Ask Bo to take this");
+  await vi.waitFor(() => expect(started).toHaveLength(1), { timeout: 3000 });
+  const runId = started[0]!.spec.runId;
+  const offered = (await core.slack.executionContext(runId)).orclings;
+  expect(offered.find((o) => o.id === bo.id)).toMatchObject({ unavailable: "On another Claude account" });
+  expect(offered.find((o) => o.id === cy.id)).not.toHaveProperty("unavailable");
+  await expect(core.slack.switchToOrcling(runId, bo.id, "Take this")).rejects.toThrow(
+    "Bo works on another Claude account, and Settings keeps Claude accounts separate, so choose an Orcling on this conversation's account; the request has not switched.",
+  );
+  await expect(core.slack.switchToOrcling(runId, cy.id, "Take this")).resolves.toMatchObject({ queued: true, orcling: "Cy" });
+  complete(started[0]!.handle, "Cy takes it from here.");
+  await vi.waitFor(() => expect(started).toHaveLength(2), { timeout: 3000 });
+  expect(threads.get(core.db, runs.get(core.db, runId)!.threadId!)?.orclingId).toBe(cy.id);
+});
+
+it("offers and hands the conversation to an Orcling on another Claude account with the setting off", async () => {
+  const started = providers();
+  const { core, send } = await connected();
+  const { bo } = await bothOrclings(core);
+  send("ORCLING", "Ask Bo to take this");
+  await vi.waitFor(() => expect(started).toHaveLength(1), { timeout: 3000 });
+  const runId = started[0]!.spec.runId;
+  expect((await core.slack.executionContext(runId)).orclings.find((o) => o.id === bo.id)).not.toHaveProperty("unavailable");
+  await expect(core.slack.switchToOrcling(runId, bo.id, "Take this")).resolves.toMatchObject({ queued: true, orcling: "Bo" });
+  complete(started[0]!.handle, "Bo takes it from here.");
+  await vi.waitFor(() => expect(started).toHaveLength(2), { timeout: 3000 });
+  expect(threads.get(core.db, runs.get(core.db, runId)!.threadId!)?.orclingId).toBe(bo.id);
+  expect(runs.get(core.db, started[1]!.spec.runId)?.orclingId).toBe(bo.id);
 });
 
 it("delivers assistant text to Slack before completion without exposing reasoning", async () => {

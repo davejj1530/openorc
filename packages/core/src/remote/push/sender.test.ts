@@ -197,13 +197,28 @@ describe("the push sender", () => {
 
   it("reads the Mac as away when presence is slower than 250 ms or fails", async () => {
     const to = phone();
-    inUse = () => new Promise((resolve) => setTimeout(() => resolve(true), 400));
-    const started = Date.now();
-    await send(notice({ kind: "finished" }));
-    expect(Date.now() - started).toBeLessThan(400);
+    const answersIn = (ms: number) => () => new Promise<boolean>((resolve) => setTimeout(() => resolve(true), ms));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      // In use by 249 ms holds the outcome back.
+      inUse = answersIn(249);
+      const held = send(notice({ kind: "finished", threadId: "thread-1" }));
+      await vi.advanceTimersByTimeAsync(249);
+      await held;
+      // An answer still 10 s off reads as away at 250 ms, and the alert goes without waiting for it.
+      inUse = answersIn(10_000);
+      const away = send(notice({ kind: "finished", threadId: "thread-2" }));
+      await vi.advanceTimersByTimeAsync(250);
+      await away;
+    } finally {
+      vi.useRealTimers();
+    }
     inUse = async () => Promise.reject(new Error("main is gone"));
-    await send(notice({ kind: "finished", threadId: "thread-2" }));
-    expect(sentTo(to).map((delivery) => delivery.priority)).toEqual([10, 10]);
+    await send(notice({ kind: "finished", threadId: "thread-3" }));
+    expect(sentTo(to).map((delivery) => [open(delivery, to)?.threadId, delivery.priority])).toEqual([
+      ["thread-2", 10],
+      ["thread-3", 10],
+    ]);
   });
 
   it("clips long text and fits the worst case into 4096 bytes", async () => {

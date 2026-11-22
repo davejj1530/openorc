@@ -13,14 +13,14 @@ An Orcling is a long-term companion: a saved identity with its own look, name, m
 
 Every run records who spoke in `runs.orcling_id`; a thread records the Orcling working in it in `threads.orcling_id`. Whenever a process starts, its system prompt carries the Orcling's brief: who it is, where it is, its current instructions and its memory. That happens in:
 
-| Place                  | How the Orcling joins                                                                                                                                    |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Its own conversation   | Always the Orcling. Changing the model there changes the Orcling's model.                                                                                |
-| A new project thread   | Chosen in the model picker (`ExecutionTarget` kind `orcling`), or started by the Orcling with `orcling_thread_start`. A plain model later takes it back. |
-| Any other conversation | `@Name` in a message asks it as a guest. It answers in that thread; the thread's own agent keeps its session and hears the answer next turn.             |
-| Task comments          | Mentioned by name. It replies read-only like any comment reply; work it agrees to runs as the Orcling in a thread made for the task.                     |
-| Pull request reviews   | Chosen as the reviewer. Its draft comments are named after it and the model it ran on (`author_orcling_id`).                                             |
-| Slack                  | The Slack conversation can hand itself to an Orcling with `execution_switch` and `orclingId`; later replies in that Slack thread stay with it.           |
+| Place                  | How the Orcling joins                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Its own conversation   | Always the Orcling. Changing the model there changes the Orcling's model.                                                                                                                                                                                                                                                                                             |
+| A new project thread   | Chosen in the model picker (`ExecutionTarget` kind `orcling`), or started by the Orcling with `orcling_thread_start`. A plain model later takes it back.                                                                                                                                                                                                              |
+| Any other conversation | `@Name` in a message asks it as a guest. It answers in that thread; the thread's own agent keeps its session and hears the answer next turn.                                                                                                                                                                                                                          |
+| Task comments          | Mentioned by name. It replies read-only like any comment reply; work it agrees to runs as the Orcling in a thread made for the task. While accounts are kept separate, it can't ask a model in a comment to do work that would run on another account.                                                                                                                |
+| Pull request reviews   | Chosen as the reviewer. Its draft comments are named after it and the model it ran on (`author_orcling_id`). While accounts are kept separate, it reviews on its own account: a review conversation on another account isn't continued, a new one starts on the Orcling's, and a draft holding what was written on another account must be posted or discarded first. |
+| Slack                  | The Slack conversation can hand itself to an Orcling with `execution_switch` and `orclingId`; later replies in that Slack thread stay with it. While accounts are kept separate, it can't hand itself to an Orcling on another account.                                                                                                                               |
 
 Sessions are keyed by thread, harness and speaker, so a guest never resumes the thread agent's session or the other way round. Anyone who starts a process in a thread where others spoke since hears what they said.
 
@@ -34,7 +34,7 @@ An Orcling's permission is **Approve** (Review everything: it asks before every 
 
 ## Its model is part of who it is
 
-An Orcling brings its own model, effort, Fast mode and, on Claude, its own Claude account wherever it works. Edit the Orcling to change these settings everywhere at once. The editor shows the Claude account field only when the Orcling runs on Claude and you have more than one account.
+An Orcling brings its own model, effort, Fast mode and, on Claude, its own Claude account wherever it works. Edit the Orcling to change these settings everywhere at once. The editor shows the Claude account field only when the Orcling runs on Claude and you have more than one account. While **Keep accounts separate** is on, a saved Orcling's Claude account can't be changed.
 
 ## Its own conversation is a private chat
 

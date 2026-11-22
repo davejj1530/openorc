@@ -1,13 +1,22 @@
-import { cloudAccountChoices, projectAccountChoice } from "@openorc/client";
+import { cloudAccountChoices, KEPT_SEPARATE, projectAccountChoice } from "@openorc/client";
 import { isHarnessId, type AccountStatus, type Project, type ThreadSummary, type TurnAccountSettings } from "@openorc/protocol";
 import type { PickerAccounts } from "../components/ModelPickerAccounts";
+import { useAccountsSeparate } from "./accounts-separate";
 import { useClaudeAccountId } from "./claude-account";
 import { useRpc, useRpcMutation } from "./client";
 
-const hasLocalClaudeAccount = (thread: ThreadSummary | null) => thread?.agent === "claude" && thread.owner?.brain !== "hosted";
+/**
+ * Which threads here show their Claude account: Claude's, and while accounts are kept separate any agent's, whose work
+ * belongs to the account it started under, shown in that agent's section.
+ */
+function shownAccount(thread: ThreadSummary | null, separate: boolean): "claude" | "other" | null {
+  if (!thread || thread.owner?.brain === "hosted") return null;
+  if (thread.agent === "claude") return "claude";
+  return separate ? "other" : null;
+}
 
 /**
- * A Claude conversation's accounts for its model picker: the project's choices, plus the thread's own when the project
+ * A conversation's Claude accounts for its model picker: the project's choices, plus the thread's own when the project
  * stopped using it, so it stays listed until the thread moves. Choosing one moves the conversation between turns; the
  * next message resumes its session there. An Orcling keeps its own account.
  */
@@ -19,29 +28,34 @@ export function useThreadAccounts(thread: ThreadSummary | null, project: Pick<Pr
 
 function useMacThreadAccounts(thread: ThreadSummary | null, project: Pick<Project, "id" | "name" | "settings"> | null): PickerAccounts | undefined {
   const scoped = useClaudeAccountId();
-  const claude = hasLocalClaudeAccount(thread);
-  const list = useRpc("claude.accounts.list", {}, { enabled: claude }).data;
+  const separate = useAccountsSeparate();
+  const shown = shownAccount(thread, separate);
+  const list = useRpc("claude.accounts.list", {}, { enabled: Boolean(shown) }).data;
   const switching = useRpcMutation("threads.switchClaudeAccount");
-  if (!thread || !claude || !list || thread.teamInstanceId) return undefined;
+  if (!thread || !shown || !list || thread.teamInstanceId) return undefined;
   const current = scoped ?? thread.claudeAccountId ?? list.defaultId;
   const choice = projectAccountChoice(project, list);
   const outside = choice.restricted && !choice.accounts.some((account) => account.id === current) ? list.accounts.find((account) => account.id === current) : undefined;
-  let blocked: string | undefined;
-  if (thread.orclingId) blocked = "An Orcling keeps its own account.";
-  else if (thread.activity !== "idle") blocked = "Switch accounts when this turn ends.";
-  else if (switching.isPending) blocked = "Switching accounts…";
   return {
     accounts: outside ? [...choice.accounts, outside] : choice.accounts,
     current,
     choose: (id) => {
       if (id !== current) switching.mutate({ id: thread.id, claudeAccountId: id });
     },
-    blocked,
+    blocked: switchBlocked(thread, separate, switching.isPending),
     error: switching.error?.message,
     clearError: switching.reset,
     outside: outside?.id,
     project: choice.restricted && project ? { id: project.id, name: project.name } : undefined,
+    ...(shown === "other" ? { section: thread.agent } : {}),
   };
+}
+
+function switchBlocked(thread: ThreadSummary, separate: boolean, switching: boolean): string | undefined {
+  if (thread.orclingId) return "An Orcling keeps its own account.";
+  if (separate) return KEPT_SEPARATE.conversation;
+  if (thread.activity !== "idle") return "Switch accounts when this turn ends.";
+  return switching ? "Switching accounts…" : undefined;
 }
 
 /**

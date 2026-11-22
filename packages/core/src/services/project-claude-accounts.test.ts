@@ -3,6 +3,7 @@ import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID, type Project, type ProjectClaudeA
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { allowsAccount, NO_PROJECT_ACCOUNTS, projectAccountPolicy, startingAccount } from "./project-claude-accounts.js";
 import { ProjectService } from "./projects.js";
+import { AppSettingsService } from "./settings.js";
 
 let db: Db;
 let project: Project;
@@ -30,16 +31,21 @@ describe("projectAccountPolicy", () => {
   it("follows the app's accounts, default and switch for a project without its own, one that turned them off, and the Workspace", () => {
     claudeAccounts.update(db, { id: client, makeDefault: true });
     const app = { restricted: false, allowed: [DEFAULT_CLAUDE_ACCOUNT, work, personal, client], defaultId: client, autoSwitch: true };
-    expect(projectAccountPolicy(db, project.id, { claudeAccountAutoSwitch: true })).toEqual(app);
+    expect(projectAccountPolicy(db, project.id, { claudeAccountAutoSwitch: true, claudeAccountsSeparate: false })).toEqual(app);
     choose(own({ only: false, autoSwitch: false }));
-    expect(projectAccountPolicy(db, project.id, { claudeAccountAutoSwitch: true })).toEqual(app);
-    expect(projectAccountPolicy(db, WORKSPACE_ID, { claudeAccountAutoSwitch: false })).toEqual({ ...app, autoSwitch: false });
-    expect(projectAccountPolicy(db, "missing-project", { claudeAccountAutoSwitch: false }).restricted).toBe(false);
+    expect(projectAccountPolicy(db, project.id, { claudeAccountAutoSwitch: true, claudeAccountsSeparate: false })).toEqual(app);
+    expect(projectAccountPolicy(db, WORKSPACE_ID, { claudeAccountAutoSwitch: false, claudeAccountsSeparate: false })).toEqual({ ...app, autoSwitch: false });
+    expect(projectAccountPolicy(db, "missing-project", { claudeAccountAutoSwitch: false, claudeAccountsSeparate: false }).restricted).toBe(false);
   });
 
   it("allows only the project's enabled accounts, in the app's order, with its own default and switch", () => {
     choose(own({ accountIds: [personal, work], autoSwitch: false }));
-    expect(projectAccountPolicy(db, project.id, { claudeAccountAutoSwitch: true })).toEqual({ restricted: true, allowed: [work, personal], defaultId: personal, autoSwitch: false });
+    expect(projectAccountPolicy(db, project.id, { claudeAccountAutoSwitch: true, claudeAccountsSeparate: false })).toEqual({
+      restricted: true,
+      allowed: [work, personal],
+      defaultId: personal,
+      autoSwitch: false,
+    });
   });
 
   it("drops disabled and removed accounts as it reads, without rewriting the selection, and falls back to the first allowed", () => {
@@ -78,6 +84,36 @@ describe("startingAccount", () => {
     expect(() => startingAccount(db, project.id, client)).toThrow("This project only uses these Claude accounts: Work, Personal.");
     expect(startingAccount(db, project.id, client, "inherited")).toBe(personal);
     expect(startingAccount(db, project.id, client, "own")).toBe(client);
+  });
+
+  it("refuses to carry work over to another account while accounts are kept separate", () => {
+    choose(own());
+    new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+    expect(startingAccount(db, project.id, work, "inherited")).toBe(work);
+    expect(() => startingAccount(db, project.id, client, "inherited")).toThrow("This project doesn't use Client, and Settings keeps Claude accounts separate, so this can't start on another account.");
+    expect(startingAccount(db, project.id, undefined, "inherited")).toBe(personal);
+    expect(startingAccount(db, project.id, client, "own")).toBe(client);
+  });
+
+  it("gives another agent's thread the project's default for an account the project does not use, and refuses it while accounts are kept separate", () => {
+    choose(own());
+    const started = () => [work, client, undefined].map((requested) => startingAccount(db, project.id, requested, "unused"));
+    expect(started()).toEqual([work, personal, personal]);
+    new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+    expect(() => started()).toThrow("This project doesn't use Client, and Settings keeps Claude accounts separate, so this can't start on another account.");
+    expect([startingAccount(db, project.id, work, "unused"), startingAccount(db, project.id, undefined, "unused")]).toEqual([work, personal]);
+    // With none of the project's accounts enabled it still starts when it asks for none.
+    for (const id of [work, personal]) claudeAccounts.update(db, { id, enabled: false });
+    expect(startingAccount(db, project.id, undefined, "unused")).toBe(DEFAULT_CLAUDE_ACCOUNT);
+  });
+});
+
+describe("switching at usage limits", () => {
+  it("never switches while accounts are kept separate, whatever the app or the project says", () => {
+    expect(projectAccountPolicy(db, project.id, { claudeAccountAutoSwitch: true, claudeAccountsSeparate: true }).autoSwitch).toBe(false);
+    choose(own({ autoSwitch: true }));
+    expect(projectAccountPolicy(db, project.id, { claudeAccountAutoSwitch: true, claudeAccountsSeparate: true }).autoSwitch).toBe(false);
+    expect(projectAccountPolicy(db, project.id, { claudeAccountAutoSwitch: false, claudeAccountsSeparate: false }).autoSwitch).toBe(true);
   });
 });
 

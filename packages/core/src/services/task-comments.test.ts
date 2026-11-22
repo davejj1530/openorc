@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { CodexAdapter, ClaudeAdapter, AcpAdapter, PiAdapter, RunHandle } from "@openorc/agents";
-import { taskComments, runs, threads, tasks, settings } from "@openorc/db";
+import { claudeAccounts, taskComments, runs, threads, tasks, settings } from "@openorc/db";
 import { git, commitAll } from "@openorc/git";
-import { isHarnessId, type RunSpec, type CommentRecipient, type AgentEvent } from "@openorc/protocol";
+import { defaultOrclingLook, isHarnessId, type RunSpec, type CommentRecipient, type AgentEvent } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import { inheritedProbe } from "./shell-environment.js";
 import { rpcClient } from "../rpc-test-client.js";
@@ -159,6 +159,97 @@ it("deduplicates submissions and recipients, streams replies, and does not dispa
   expect(taskComments.attempt(core.db, a.id)?.body).toContain("@claude");
 });
 
+/** Puts the task in a conversation on the Work account, and makes Pip, an Orcling on the CLI login. */
+async function taskOnWorkAndPip() {
+  const work = claudeAccounts.add(core.db, "Work").id;
+  const task = tasks.get(core.db, taskId)!;
+  const conversation = threads.insert(core.db, {
+    projectId: task.projectId,
+    title: "Chat",
+    agent: "claude",
+    model: "test-model",
+    effort: "high",
+    claudeAccountId: work,
+    mode: "act",
+    permissionMode: "trusted",
+  });
+  tasks.update(core.db, taskId, { executionThreadId: conversation.id });
+  return core.orclings.create({ name: "Pip", look: defaultOrclingLook, settings: { agent: "codex", model: "test-model", effort: "high", fastMode: false }, permission: "allow" });
+}
+const PIP_ELSEWHERE = "Pip works on another Claude account than this task's, and Settings keeps Claude accounts separate.";
+
+it("lets no Orcling on another Claude account than the task's answer its comments while accounts are kept separate", async () => {
+  const pip = await taskOnWorkAndPip();
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  await expect(post("Thoughts?", [{ ...recipient, orclingId: pip.id }])).rejects.toThrow(PIP_ELSEWHERE);
+  expect(taskComments.list(core.db, taskId).comments).toEqual([]);
+});
+
+it("asks no Orcling on another Claude account than the task's again, once accounts are kept separate", async () => {
+  const pip = await taskOnWorkAndPip();
+  const asked = await post("Thoughts?", [{ ...recipient, orclingId: pip.id }]);
+  const attempt = await response(asked.id);
+  await call("tasks.comments.cancel", { taskId, attemptId: attempt.id });
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  await expect(call("tasks.comments.retry", { taskId, attemptId: attempt.id })).rejects.toThrow(PIP_ELSEWHERE);
+  expect(taskComments.attempt(core.db, attempt.id)?.state).toBe("cancelled");
+  expect(sessions.size).toBe(1);
+});
+
+it("starts no work for an Orcling on another Claude account than the task's once accounts are kept separate, though it was asked before", async () => {
+  const work = claudeAccounts.add(core.db, "Work").id;
+  const task = tasks.get(core.db, taskId)!;
+  const conversation = threads.insert(core.db, {
+    projectId: task.projectId,
+    title: "Chat",
+    agent: "codex",
+    model: "test-model",
+    effort: "high",
+    claudeAccountId: work,
+    mode: "act",
+    permissionMode: "trusted",
+  });
+  tasks.update(core.db, taskId, { threadId: conversation.id });
+  const pip = await core.orclings.create({ name: "Pip", look: defaultOrclingLook, settings: { agent: "codex", model: "test-model", effort: "high", fastMode: false }, permission: "allow" });
+  const asked = await post("Implement this", [
+    { ...recipient, orclingId: pip.id },
+    { ...recipient, effort: "low" },
+  ]);
+  for (const index of [0, 1]) await response(asked.id, index);
+  const replies = taskComments.list(core.db, taskId).attempts.filter((attempt) => attempt.commentId === asked.id);
+  const fromPip = replies.find((attempt) => attempt.recipient.orclingId === pip.id)!;
+  await core.comments.intent(fromPip.runId!, { intent: "execution", quote: "Implement this" });
+  for (const reply of replies) await finish(reply.runId!);
+  expect(taskComments.attempt(core.db, fromPip.id)?.state).toBe("choose_executor");
+
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  await expect(call("tasks.comments.execute", { taskId, attemptId: fromPip.id })).rejects.toThrow(PIP_ELSEWHERE);
+  expect(tasks.get(core.db, taskId)?.executionThreadId).toBeNull();
+  expect(runs.listForThread(core.db, conversation.id)).toEqual([]);
+  expect(sessions.size).toBe(2);
+});
+
+it.each([true, false])("starts an Orcling's work on a task with no thread on its own Claude account only while accounts are kept separate (separate: %s)", async (separate) => {
+  const work = claudeAccounts.add(core.db, "Work").id;
+  const bo = await core.orclings.create({
+    name: "Bo",
+    look: defaultOrclingLook,
+    settings: { agent: "claude", model: "test-model", effort: "high", fastMode: false },
+    permission: "allow",
+    claudeAccountId: work,
+  });
+  await call("app.settings.set", { claudeAccountsSeparate: separate });
+  const asked = await post("Can you implement this?", [{ agent: "claude", model: "test-model", effort: "high", orclingId: bo.id }]);
+  const reply = await response(asked.id);
+  await core.comments.intent(reply.runId!, { intent: "execution", quote: "Can you implement this?" });
+  await finish(reply.runId!);
+  const launched = await executionStarted(reply.id);
+  // With the setting off the work goes on the project's default, as before accounts could be kept separate.
+  const account = separate ? work : claudeAccounts.defaultId(core.db);
+  expect(threads.get(core.db, launched.threadId!)).toMatchObject({ claudeAccountId: account, orclingId: bo.id });
+  expect(runs.get(core.db, launched.executionRunId!)?.claudeAccountId).toBe(account);
+});
+
 it("runs independent recipients and serializes subsequent requests to the same recipient", async () => {
   const c = await post("Compare approaches", [recipient, { agent: "claude", model: "test-model", effort: "low" }]);
   const a = await response(c.id, 0),
@@ -184,6 +275,26 @@ it.each(["claude"] as const)("resumes %s's existing session when replying to its
   const b = await response(next.id);
   expect(sessions.get(b.runId!)!.spec).toMatchObject({ resumeSessionId: sessionId, mode: "plan", permissionMode: "review" });
   expect(sessions.get(b.runId!)!.spec.internalMcp?.toolNames).toEqual(["ask_user", "approve", "task_comment_intent"]);
+  await finish(b.runId!);
+});
+
+it.each([true, false])("resumes Claude's reply on another account than the task's only while accounts aren't kept separate (separate: %s)", async (separate) => {
+  const target = { ...recipient, agent: "claude" as const };
+  const c = await post("How would you implement this?", [target]);
+  const a = await response(c.id);
+  const sessionId = announceSession(a.runId!);
+  await finish(a.runId!);
+  // The task has since been given a conversation on Work, while its first reply ran on the CLI login.
+  const work = claudeAccounts.add(core.db, "Work").id;
+  const task = tasks.get(core.db, taskId)!;
+  const conversation = threads.insert(core.db, { projectId: task.projectId, title: "Chat", agent: "claude", model: "test-model", claudeAccountId: work, mode: "act", permissionMode: "trusted" });
+  tasks.update(core.db, taskId, { executionThreadId: conversation.id });
+  await call("app.settings.set", { claudeAccountsSeparate: separate });
+
+  const next = await post("What about the alternative?", [target], crypto.randomUUID(), a.id);
+  const b = await response(next.id);
+  expect(sessions.get(b.runId!)!.spec.resumeSessionId).toBe(separate ? undefined : sessionId);
+  expect(runs.get(core.db, b.runId!)?.claudeAccountId).toBe(separate ? work : runs.get(core.db, a.runId!)?.claudeAccountId);
   await finish(b.runId!);
 });
 

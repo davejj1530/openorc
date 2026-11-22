@@ -15,7 +15,13 @@ type Prefill = { choice: ThreadChoice; inherited: boolean };
  * The inherited settings as a choice the fields offer: the model, or the agent's default, at its effort or the model's
  * default, else the nearest one listed. The account stays while the project uses it; otherwise the project's default.
  */
-function prefill(inherited: InheritedSettings, options: readonly CommentMentionOption[], models: readonly ModelOption[] | undefined, accounts: readonly ClaudeAccount[]): Prefill | undefined {
+function prefill(
+  inherited: InheritedSettings,
+  options: readonly CommentMentionOption[],
+  models: readonly ModelOption[] | undefined,
+  accounts: readonly ClaudeAccount[],
+  kept: string | undefined,
+): Prefill | undefined {
   const model = inherited.model ?? models?.find((candidate) => candidate.agent === inherited.agent && candidate.isDefault)?.id;
   const effort = inherited.effort ?? models?.find((candidate) => candidate.agent === inherited.agent && candidate.id === model)?.defaultEffort ?? null;
   const key = model ? threadModelKey({ agent: inherited.agent as ThreadChoice["agent"], model, effort }) : null;
@@ -27,7 +33,7 @@ function prefill(inherited: InheritedSettings, options: readonly CommentMentionO
     options[0];
   if (!option) return undefined;
   const { agent, model: chosen, effort: chosenEffort } = option.recipient;
-  const account = agent === "claude" ? accounts.find((candidate) => candidate.id === inherited.claudeAccountId)?.id : undefined;
+  const account = agent === "claude" ? (kept ?? accounts.find((candidate) => candidate.id === inherited.claudeAccountId)?.id) : undefined;
   return { choice: { agent, model: chosen, effort: chosenEffort, ...(account ? { claudeAccountId: account } : {}) }, inherited: option === exact };
 }
 
@@ -47,20 +53,24 @@ type SheetProps = {
   align: "start" | "end";
   /** Called with the choice, or with none when the person kept what the thread would inherit. Throws to say why it failed. */
   onConfirm: (choice: ThreadChoice | undefined) => Promise<void>;
+  /** The account a Claude choice stays on, while accounts are kept separate. */
+  keptAccount?: string | undefined;
 };
+
+const onAccount = (choice: ThreadChoice, kept: string | undefined): ThreadChoice => (kept && choice.agent === "claude" ? { ...choice, claudeAccountId: kept } : choice);
 
 /**
  * A sheet that starts a task's thread on the model and account chosen, prefilled with the ones it would inherit. Keeping
  * those asks for nothing, so the thread starts exactly as it would without the sheet; a stand-in for them is asked for.
  */
-export function ThreadChoiceSheet({ title, confirm, inherited, project, trigger, side, align, onConfirm }: SheetProps) {
+export function ThreadChoiceSheet({ title, confirm, inherited, project, trigger, side, align, onConfirm, keptAccount }: SheetProps) {
   const [edited, setEdited] = useState<ThreadChoice | undefined>();
   const sheet = useTaskSheet(() => setEdited(undefined));
   const { models, options } = useThreadModels(false);
   const accounts = useProjectClaudeAccounts(project, undefined, sheet.open);
-  // Until the accounts arrive, the choice keeps no account, so confirming leaves the account to the one the thread would inherit.
-  const prefilled = inherited && prefill(inherited, options, models, accounts ?? []);
-  const choice = edited ?? prefilled?.choice;
+  // Until the accounts arrive, the choice keeps no account but a kept one, so confirming leaves the account to the one the thread would inherit.
+  const prefilled = inherited && prefill(inherited, options, models, accounts ?? [], keptAccount);
+  const choice = edited ? onAccount(edited, keptAccount) : prefilled?.choice;
   return (
     <TaskSheet
       sheet={sheet}
@@ -73,7 +83,7 @@ export function ThreadChoiceSheet({ title, confirm, inherited, project, trigger,
       ready={Boolean(choice && prefilled)}
       onConfirm={() => onConfirm(choice && prefilled ? asked(choice, prefilled) : undefined)}
     >
-      <ThreadChoiceFields value={choice} onChange={setEdited} project={project} layout="sheet" disabled={sheet.pending || !choice} />
+      <ThreadChoiceFields value={choice} onChange={setEdited} project={project} layout="sheet" disabled={sheet.pending || !choice} keptAccount={keptAccount} />
     </TaskSheet>
   );
 }

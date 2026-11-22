@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { SubmitRequest } from "@openorc/client";
-import { harnessShortName, type ClaudeAccountConnection, type PlanLimits, type RpcMethod, type ThreadSession, type ThreadSummary } from "@openorc/protocol";
+import { harnessShortName, type AppSettings, type ClaudeAccountConnection, type PlanLimits, type RpcMethod, type ThreadSession, type ThreadSummary } from "@openorc/protocol";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { FakeMac } from "../test-fixtures/fake-mac";
@@ -15,6 +15,8 @@ const mac = vi.hoisted(() => ({
   refuse: null as string | null,
   calls: [] as string[],
   projects: [] as unknown[],
+  /** The Mac's settings; one from before accounts could be kept separate says nothing of it. */
+  settings: {} as Partial<AppSettings>,
 }));
 
 vi.mock("../client", async () => {
@@ -24,6 +26,7 @@ vi.mock("../client", async () => {
     if (method === "claude.accounts.list") return Promise.resolve({ accounts: mac.accounts, defaultId: "claude-cli" });
     if (method === "providers.limits") return Promise.resolve(mac.limits);
     if (method === "projects.list") return Promise.resolve(mac.projects);
+    if (method === "app.settings.get") return Promise.resolve(mac.settings);
     if (method !== "runs.start") return Promise.reject(new Error(`no ${method}`));
     if (mac.refuse) return Promise.reject(new Error(mac.refuse));
     mac.starts.push(params as Record<string, unknown>);
@@ -88,6 +91,7 @@ beforeEach(() => {
   mac.refuse = null;
   mac.calls = [];
   mac.projects = [];
+  mac.settings = {};
   felt.length = 0;
 });
 afterEach(() => {
@@ -185,6 +189,43 @@ it("sends a signed-out account's thread on to another, and says where to sign ba
   expect(await screen.findByRole("button", { name: "Continue with Primary" })).toBeTruthy();
   expect(screen.getByRole("header").textContent).toBe("Secondary is signed out");
   expect(screen.getByText("Sign in again on your Mac.")).toBeTruthy();
+});
+
+const signedOut: ThreadSession = { status: "error", message: "Not logged in", recovery: { kind: "sign_in", provider: "claude" } };
+
+const cached = (settings: Partial<AppSettings>) => mac.phone!.module.queryClient.setQueryData(["app.settings.get", {}], settings);
+
+it.each([
+  { stop: "a usage limit", session: limited, title: "Secondary reached its limit" },
+  { stop: "a sign-out", session: signedOut, title: "Secondary is signed out" },
+])("offers no other account after $stop while the Mac keeps accounts separate, says why, and reads no usage for one", async ({ session, title }) => {
+  cached({ claudeAccountsSeparate: true });
+  mac.limits = [share("backup", 62)];
+  show(session);
+  await waitFor(() => expect(screen.getByRole("header").textContent).toBe(title));
+  expect(screen.getByText("Accounts are kept separate, so this conversation stays on its account.")).toBeTruthy();
+  expect(screen.queryAllByRole("button")).toEqual([]);
+  expect(mac.calls).toEqual(["claude.accounts.list"]);
+});
+
+it("keeps the fresh start of a lost session while the Mac keeps accounts separate", async () => {
+  cached({ claudeAccountsSeparate: true });
+  show({ status: "lost", message: null });
+  expect(screen.queryByText(/kept separate/)).toBeNull();
+  await act(async () => screen.getByRole("button", { name: "Start a fresh session with a handoff" }).click());
+  expect(mac.starts[0]).toMatchObject({ resume: false, prompt: "Continue where you left off. Check the working tree first." });
+});
+
+it.each([
+  { mac: "has the setting off", settings: { claudeAccountsSeparate: false } },
+  { mac: "is from before the setting", settings: {} },
+])("offers the other accounts where the Mac $mac", async ({ settings }) => {
+  mac.settings = settings;
+  mac.limits = [share("main", 12), share("backup", 62)];
+  show(limited);
+  await waitFor(() => expect(offered()).toEqual(["Continue with Backup, 62% left", "Continue with Primary, 12% left"]));
+  expect(mac.calls).toContain("app.settings.get");
+  expect(screen.queryByText(/kept separate/)).toBeNull();
 });
 
 it("words Codex's limit the same, with no accounts to offer", async () => {

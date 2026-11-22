@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { Orcling, OrclingGroup } from "@openorc/protocol";
+import { ON_ANOTHER_ACCOUNT, useAccountsSeparate } from "../lib/accounts-separate";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
@@ -44,13 +45,19 @@ export function OrclingGroupRow({ group, orclings, active }: { group: OrclingGro
   );
 }
 
-/** Starts a group chat with Orclings you choose, named after them unless you name it. */
+/**
+ * Starts a group chat with Orclings you choose, named after them unless you name it. While accounts are kept separate,
+ * only Orclings on the first one's Claude account can join it.
+ */
 export function NewOrclingGroupButton({ orclings }: { orclings: readonly Orcling[] }) {
   const [open, setOpen] = useState(false);
   const [chosen, setChosen] = useState<string[]>([]);
   const [title, setTitle] = useState("");
   const create = useRpcMutation("orclings.groups.create");
+  const reasonId = useId();
   const members = chosen.flatMap((id) => orclingById(orclings, id) ?? []);
+  const first = useAccountsSeparate() ? members[0] : undefined;
+  const elsewhere = (orcling: Orcling) => first !== undefined && orcling.claudeAccountId !== first.claudeAccountId && !chosen.includes(orcling.id);
   const toggle = (id: string, on: boolean) => setChosen((current) => (on ? [...current, id] : current.filter((other) => other !== id)));
   const close = (next: boolean) => {
     setOpen(next);
@@ -71,15 +78,30 @@ export function NewOrclingGroupButton({ orclings }: { orclings: readonly Orcling
       <Dialog open={open} onOpenChange={close} title="New group chat" width={400}>
         <div className="grid gap-3">
           <ul className="grid" aria-label="Orclings">
-            {orclings.map((orcling) => (
-              <li key={orcling.id}>
-                <label className="orcling-group-choice">
-                  <OrclingAvatar orcling={orcling} size={24} />
-                  <span className="flex-1 min-w-0 truncate">{orcling.name}</span>
-                  <Checkbox checked={chosen.includes(orcling.id)} onChange={(event) => toggle(orcling.id, event.target.checked)} aria-label={orcling.name} />
-                </label>
-              </li>
-            ))}
+            {orclings.map((orcling) => {
+              const away = elsewhere(orcling);
+              const reason = `${reasonId}-${orcling.id}`;
+              return (
+                <li key={orcling.id}>
+                  <label className="orcling-group-choice">
+                    <OrclingAvatar orcling={orcling} size={24} />
+                    <span className={cn("flex-1 min-w-0 truncate", away && "text-ink-4")}>{orcling.name}</span>
+                    {away ? (
+                      <span id={reason} className="text-sm text-ink-4">
+                        {ON_ANOTHER_ACCOUNT.label}
+                      </span>
+                    ) : null}
+                    <Checkbox
+                      checked={chosen.includes(orcling.id)}
+                      disabled={away}
+                      onChange={(event) => toggle(orcling.id, event.target.checked)}
+                      aria-label={orcling.name}
+                      aria-describedby={away ? reason : undefined}
+                    />
+                  </label>
+                </li>
+              );
+            })}
           </ul>
           <Input aria-label="Name" placeholder={members.length >= 2 ? memberNames(members) : "Name"} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={60} />
           {create.error ? (

@@ -15,6 +15,8 @@ const mac = vi.hoisted(() => ({
   refuse: null as string | null,
   /** While set, each update waits here until the test releases it. */
   held: null as (() => void)[] | null,
+  /** Whether the Mac keeps Claude accounts separate; one from before the setting says nothing of it. */
+  separate: false,
 }));
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
@@ -44,7 +46,7 @@ vi.mock("../client", async () => {
     if (method === "orclings.delete") return null;
     if (method === "orclings.chats") return [{ id: "rex", name: "Rex", look: defaultOrclingLook, threadId: "home-rex", thread: null, last: null }];
     if (method === "agents.availability") return [{ id: "codex", state: "ready" }];
-    if (method === "app.settings.get") return { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review", defaultHarness: "codex" };
+    if (method === "app.settings.get") return { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review", defaultHarness: "codex", ...(mac.separate ? { claudeAccountsSeparate: true } : {}) };
     if (method === "orclings.create") {
       const { draft } = params as { draft: OrclingDraft };
       return { ...draft, id: "new", claudeAccountId: "personal", threadId: "home-new", wakes: [], createdAt: 1, updatedAt: 1 } satisfies Orcling;
@@ -88,6 +90,7 @@ beforeEach(() => {
   mac.calls = [];
   mac.refuse = null;
   mac.held = null;
+  mac.separate = false;
   alerts.length = 0;
   mac.phone.module.queryClient.clear();
   vi.mocked(router.push).mockClear();
@@ -163,6 +166,24 @@ describe("changing an Orcling on the phone", () => {
     fireEvent.click(screen.getByRole("menuitemradio", { name: "Work" }));
     await waitFor(() => expect(updates()).toEqual([{ name: "Pip", look: defaultOrclingLook, settings: pip.settings, permission: "approve", claudeAccountId: "work" }]));
     expect(await screen.findByRole("button", { name: "Claude account, Work" })).toBeTruthy();
+  });
+
+  it("keeps it on its account while the Mac keeps accounts separate, and says why", async () => {
+    mac.separate = true;
+    render(
+      <>
+        <OrclingSheet />
+        <ModelSheet />
+      </>,
+      { wrapper: mac.phone.wrapper },
+    );
+    fireEvent.click(await screen.findByRole("tab", { name: "Claude" }));
+    await screen.findByText("Accounts are kept separate, so an Orcling stays on its account.");
+    const menu = screen.getByRole("button", { name: "Claude account, Personal" }) as HTMLButtonElement;
+    expect(menu.disabled).toBe(true);
+    fireEvent.click(menu);
+    expect(screen.queryByRole("menuitemradio")).toBeNull();
+    expect(updates()).toEqual([]);
   });
 
   it("sends a change only once the one before it has answered, and builds on what that one saved", async () => {

@@ -3,17 +3,38 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, readl
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { SHARED_CLAUDE_CONFIG_DIR, captureLaunchEnvironment, claudeConfigDir, launchCommand, stopProcess, stopProcessFromCallback } from "@openorc/agents";
+import { SHARED_CLAUDE_CONFIG_DIR, captureLaunchEnvironment, claudeConfigDir, claudeStateFile, launchCommand, stopProcess, stopProcessFromCallback } from "@openorc/agents";
 import { chromeExecutable, chromeIncognitoFlags } from "@openorc/agents/chrome-incognito";
-import { claudeAccounts, type Db } from "@openorc/db";
+import { claudeAccounts, orclings, type Db } from "@openorc/db";
 import { DEFAULT_CLAUDE_ACCOUNT, type ClaudeAccount, type ClaudeAccountConnection, type ClaudeAccounts } from "@openorc/protocol";
 import { z } from "zod";
+import { DATABASE_FILES, PROVIDER_LOGS } from "../data-dir.js";
+import { accountsSeparate } from "./claude-account-separation.js";
+import { OrclingFolders } from "./orcling-folders.js";
 import type { EnvSnapshot } from "./shell-environment.js";
 
 const authStatus = z.object({ loggedIn: z.boolean(), email: z.string().nullable().optional(), orgName: z.string().nullable().optional() });
 const inheritedAuth = /^(ANTHROPIC_|CLAUDE_CODE_(OAUTH_TOKEN|OAUTH_TOKEN_FILE_DESCRIPTOR|API_KEY_FILE_DESCRIPTOR|USE_BEDROCK|USE_VERTEX|USE_FOUNDRY)|CLAUDE_CONFIG_DIR$)/;
 type Connection = Pick<ClaudeAccountConnection, "status" | "email" | "organization" | "message">;
 const disconnected: Connection = { status: "signed_out", email: null, organization: null, message: null };
+/** The existing CLI login's own part of its folder; its skills and plugins, which every account uses, are left out. */
+const CLI_LOGIN_PRIVATE = [
+  "projects",
+  "history.jsonl",
+  ".credentials.json",
+  "plans",
+  "file-history",
+  "paste-cache",
+  "todos",
+  "shell-snapshots",
+  "session-env",
+  "sessions",
+  "debug",
+  "jobs",
+  "daemon",
+  "daemon.log",
+  "backups",
+];
 
 /**
  * An added account uses the personal skills installed for the existing CLI login: each is linked into the
@@ -150,12 +171,14 @@ export class ClaudeAccountService {
       for (const key of Object.keys(env)) if (inheritedAuth.test(key)) delete env[key];
       env["CLAUDE_CONFIG_DIR"] = this.directory(account);
       env[SHARED_CLAUDE_CONFIG_DIR] = shared;
-      // Claude Code keeps auto-memory under this folder instead of the account's, naming each project's memory folder
-      // the way it does for the CLI login, so every account reads and saves the same memories. autoMemoryDirectory
-      // would need OpenOrc to repeat that naming, and Claude asks permission to use memory through a folder link.
-      env["CLAUDE_CODE_REMOTE_MEMORY_DIR"] = shared;
       linkSharedSkills(shared, env["CLAUDE_CONFIG_DIR"]);
-      moveAccountMemory(shared, env["CLAUDE_CONFIG_DIR"]);
+      // Kept separate, each account keeps its memories in its own folder, as Claude Code does by default.
+      if (!accountsSeparate(this.db)) {
+        // Every account's auto-memory lives here, in folders named as the CLI login's. autoMemoryDirectory would need
+        // OpenOrc to repeat that naming, and Claude asks permission to use memory through a folder link.
+        env["CLAUDE_CODE_REMOTE_MEMORY_DIR"] = shared;
+        moveAccountMemory(shared, env["CLAUDE_CONFIG_DIR"]);
+      }
     }
     return { ...snapshot, env: Object.freeze(env), claudeAccountId: id, scope: `${id}:${this.generations.get(id) ?? 0}` };
   }
@@ -206,6 +229,11 @@ export class ClaudeAccountService {
 
   private signingIn(id: string): boolean {
     return this.logins.has(id) || this.startingLogins.has(id);
+  }
+
+  /** Closes every account's idle Claude sessions, so each starts again with what Settings now says. */
+  retireIdleSessions(): void {
+    for (const account of claudeAccounts.list(this.db)) void this.retireIdle(account.id).catch(() => undefined);
   }
 
   async login(id: string): Promise<{ started: boolean }> {
@@ -280,6 +308,31 @@ export class ClaudeAccountService {
   /** The account's Claude folder on this Mac, where Claude Code keeps its login, settings and sessions. */
   configDirectory(id: string): string {
     return this.directory(claudeAccounts.get(this.db, id));
+  }
+
+  /**
+   * While accounts are kept separate, the paths a run on this account keeps its file tools out of: the other accounts'
+   * own, the folders of their Orclings, and OpenOrc's database and provider logs, which hold every account's work.
+   */
+  offLimits(id: string): string[] {
+    if (!accountsSeparate(this.db)) return [];
+    const accountsOwn = claudeAccounts
+      .list(this.db)
+      .filter((account) => account.id !== id)
+      .flatMap((account) => {
+        const folder = this.directory(account);
+        return account.kind === "managed" ? [folder] : [...CLI_LOGIN_PRIVATE.map((name) => path.join(folder, name)), claudeStateFile(folder)];
+      });
+    // A folder the person chose for an Orcling elsewhere is theirs, and stays open. So does the group chats' folder,
+    // which an Orcling named Groups shares, since every account's groups work in it.
+    const folders = new OrclingFolders(this.dataDir);
+    const orclingFolders = orclings
+      .list(this.db)
+      .filter((orcling) => orcling.claudeAccountId !== id)
+      .map((orcling) => folders.desk(orcling.name))
+      .filter((folder) => folder !== folders.groupChats);
+    const everyAccountsWork = [...DATABASE_FILES, PROVIDER_LOGS].map((name) => path.join(this.dataDir, name));
+    return [...accountsOwn, ...orclingFolders, ...everyAccountsWork];
   }
 
   private directory(account: ClaudeAccount): string {

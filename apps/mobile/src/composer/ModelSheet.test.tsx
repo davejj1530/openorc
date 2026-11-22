@@ -62,14 +62,20 @@ vi.mock("expo-router", () => ({
 vi.mock("./attachments", () => ({ pickImages: vi.fn(), attachImage: vi.fn() }));
 vi.mock("../thread/Markdown", () => ({ Markdown: ({ text }: { text: string }) => <div>{text}</div> }));
 
-function macState({ harness = "claude", accounts }: { harness?: "claude" | "codex"; accounts: ClaudeAccountConnection[] }) {
+function macState({ harness = "claude", accounts, separate }: { harness?: "claude" | "codex"; accounts: ClaudeAccountConnection[]; separate?: boolean }) {
   mac.reads["projects.list"] = [{ id: "openorc", name: "openorc", defaultBranch: "main" }];
   mac.reads["agents.models"] = [mac.claude, mac.codex];
   mac.reads["agents.availability"] = [
     { id: "claude", state: "ready" },
     { id: "codex", state: "ready" },
   ];
-  mac.reads["app.settings.get"] = { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review", defaultHarness: harness };
+  // A Mac from before accounts could be kept separate says nothing of it.
+  mac.reads["app.settings.get"] = {
+    defaultWorkspaceMode: "worktree",
+    defaultPermissionMode: "review",
+    defaultHarness: harness,
+    ...(separate === undefined ? {} : { claudeAccountsSeparate: separate }),
+  };
   mac.reads["claude.accounts.list"] = { defaultId: "claude-cli", accounts };
   mac.reads["cloud.offer"] = { offered: false, provider: null };
 }
@@ -336,6 +342,48 @@ it("holds an open thread's account while its turn runs", async () => {
   fireEvent.click(menu);
   expect(screen.queryByRole("menuitemradio")).toBeNull();
   expect(mac.switchAccount).not.toHaveBeenCalled();
+});
+
+it.each(["idle", "running"] as const)("holds an open thread on its account while the Mac keeps accounts separate, its turn %s", async (activity) => {
+  macState({ accounts: accounts(), separate: true });
+  render(
+    <>
+      <OpenThread activity={activity} />
+      <ModelSheet />
+    </>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  await screen.findByText("Accounts are kept separate, so this conversation stays on its account.");
+  expect(screen.queryByText("Switch accounts when this turn ends.")).toBeNull();
+  const menu = screen.getByRole("button", { name: "Claude account, Work" }) as HTMLButtonElement;
+  expect(menu.disabled).toBe(true);
+  fireEvent.click(menu);
+  expect(screen.queryByRole("menuitemradio")).toBeNull();
+  expect(mac.switchAccount).not.toHaveBeenCalled();
+});
+
+it("moves an open thread to another account while the Mac's setting to keep them separate is off", async () => {
+  macState({ accounts: accounts(), separate: false });
+  render(
+    <>
+      <OpenThread />
+      <ModelSheet />
+    </>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Claude account, Work" }));
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Existing CLI login" }));
+  await waitFor(() => expect(mac.switchAccount.mock.calls.map(([params]) => params)).toEqual([{ id: "open", claudeAccountId: "claude-cli" }]));
+  expect(screen.queryByText(/kept separate/)).toBeNull();
+});
+
+it("leaves a new thread's account free to choose while the Mac keeps accounts separate", async () => {
+  macState({ accounts: [mac.account("claude-cli", "Existing CLI login"), mac.account("work", "Work")], separate: true });
+  await open();
+  fireEvent.click(await screen.findByRole("button", { name: "Claude account, Existing CLI login" }));
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Work" }));
+  await screen.findByRole("button", { name: "Claude account, Work" });
+  expect(screen.queryByText(/kept separate/)).toBeNull();
 });
 
 /** The project uses only these accounts, as the Mac's project list says. */

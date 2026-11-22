@@ -1,11 +1,13 @@
 import { orclings, projects, retiredTeams, runs, taskComments, tasks, threads, type Db } from "@openorc/db";
 import {
+  DEFAULT_CLAUDE_ACCOUNT,
   commentRecipientKey,
   resolveCommentMentions,
   type AgentEvent,
   type CommentAttempt,
   type CommentIntent,
   type CommentRecipient,
+  type Orcling,
   type RpcParams,
   type Run,
   type Task,
@@ -13,6 +15,8 @@ import {
   type Thread,
 } from "@openorc/protocol";
 import { AttachmentService } from "./attachments.js";
+import { accountsSeparate, assertOrclingOnTaskAccount } from "./claude-account-separation.js";
+import { commentReplyAccount } from "./claude-run-account.js";
 import { isSessionLost, type RunService, type TurnSettledOutcome } from "./runs.js";
 import { asOrcling, BackgroundJobs, recipientCatalog, taskSideRunFolder, validateRecipient } from "./task-side-runs.js";
 import type { ThreadService } from "./threads.js";
@@ -89,6 +93,7 @@ export class TaskCommentService {
     if (recipients.length > 8) throw new Error("Mention up to eight agents at a time.");
     if (input.source === "description" && !recipients.length) throw new Error("Tag an available model in the description first.");
     for (const recipient of recipients) validateRecipient(recipient, catalog);
+    assertOrclingsOnTaskAccount(this.db, task, recipients, everyOrcling);
     const history = taskComments.list(this.db, task.id);
     const parentComment = input.replyTo ? history.comments.find((c) => c.id === input.replyTo) : null;
     const parentAttempt = input.replyTo ? history.attempts.find((a) => a.id === input.replyTo) : null;
@@ -136,23 +141,13 @@ export class TaskCommentService {
       if (this.queues.get(key) === job) this.queues.delete(key);
     });
   }
-  /** Reply follows its explicit parent, never an unrelated comment's latest session. */
-  private replyRun(item: CommentAttempt, replyTo: string | null): string | undefined {
-    if (!replyTo) return;
-    const discussion = taskComments.list(this.db, item.taskId);
-    const parent = discussion.attempts.find((a) => a.id === replyTo);
-    const candidate = parent ?? discussion.attempts.find((a) => a.commentId === replyTo && commentRecipientKey(a.recipient) === commentRecipientKey(item.recipient));
-    if (!candidate?.runId || candidate.state === "queued" || candidate.state === "running" || commentRecipientKey(candidate.recipient) !== commentRecipientKey(item.recipient)) return;
-    const run = runs.get(this.db, candidate.runId);
-    return run?.externalSessionId && !isSessionLost(run.error) ? run.id : undefined;
-  }
   private async respond(id: string, fresh: boolean) {
     const item = taskComments.attempt(this.db, id);
     if (!item || item.state !== "queued" || this.jobs.closing) return;
     const task = this.task(item.taskId),
       project = projects.get(this.db, task.projectId)!;
     const comment = taskComments.get(this.db, item.commentId)!;
-    const resumeRunId = fresh ? undefined : this.replyRun(item, comment.replyTo);
+    const resumeRunId = fresh ? undefined : replyRun(this.db, task, item.recipient, comment.replyTo);
     taskComments.update(this.db, id, { state: "running", error: null, body: "", intent: null });
     this.changed(task.id);
     const done = new Promise<void>((resolve) => this.releases.set(id, resolve));
@@ -269,6 +264,7 @@ export class TaskCommentService {
       const task = this.task(taskId);
       if (task.status === "archived" || task.status === "done") throw new Error("Reopen this task before starting work.");
       if (retiredTeams.hasTask(this.db, taskId) || (task.threadId && retiredTeams.isHidden(this.db, task.threadId))) throw new Error("This item is no longer available.");
+      assertOrclingsOnTaskAccount(this.db, task, [item.recipient], orclings.list(this.db));
       const assigned = this.threadService.executionThreadFor(taskId);
       const owner = assigned ?? (task.threadId ? threads.get(this.db, task.threadId) : null);
       if (owner?.mode === "plan") throw new Error("Switch the linked thread to an implementation mode before starting work.");
@@ -291,7 +287,11 @@ export class TaskCommentService {
         this.changed(taskId);
         return;
       }
-      const thread = this.carryOrcling(item.recipient, task, this.threadService.taskThreadForStart(taskId, { ...item.recipient, effort: item.recipient.effort }));
+      const thread = this.carryOrcling(
+        item.recipient,
+        task,
+        this.threadService.taskThreadForStart(taskId, { ...item.recipient, effort: item.recipient.effort }, orclingAccount(this.db, item.recipient)),
+      );
       if (thread.mode !== "act") throw new Error("Switch the linked thread to an implementation mode before starting work.");
       taskComments.update(this.db, item.id, { state: "starting_work", error: null, threadId: thread.id });
       this.changed(taskId);
@@ -334,10 +334,11 @@ export class TaskCommentService {
       if (sibling.commentId === commentId && sibling.id !== selectedId && sibling.state === "choose_executor") taskComments.update(this.db, sibling.id, { state: "success" });
   }
   retry(taskId: string, id: string) {
-    this.writableTask(taskId);
+    const task = this.writableTask(taskId);
     const item = this.attempt(taskId, id);
     if (item.executionRunId) throw new Error("Continue implementation in its linked thread; retry will not duplicate work.");
     if (item.state !== "error" && item.state !== "cancelled") return item;
+    assertOrclingsOnTaskAccount(this.db, task, [item.recipient], orclings.list(this.db));
     const next = taskComments.update(this.db, id, { state: "queued", error: null, runId: null, threadId: null })!;
     this.enqueue(next, isSessionLost(item.error));
     this.changed(taskId);
@@ -373,6 +374,28 @@ export class TaskCommentService {
   }
 }
 
+/** While accounts are kept separate, an Orcling's work starts on its own account, as work it takes up itself does. */
+function orclingAccount(db: Db, recipient: CommentRecipient): string | undefined {
+  return recipient.orclingId && accountsSeparate(db) ? orclings.get(db, recipient.orclingId)?.claudeAccountId : undefined;
+}
+
+/** Reply follows its explicit parent, never an unrelated comment's latest session. */
+function replyRun(db: Db, task: Task, recipient: CommentRecipient, replyTo: string | null): string | undefined {
+  if (!replyTo) return;
+  const discussion = taskComments.list(db, task.id);
+  const parent = discussion.attempts.find((a) => a.id === replyTo);
+  const candidate = parent ?? discussion.attempts.find((a) => a.commentId === replyTo && commentRecipientKey(a.recipient) === commentRecipientKey(recipient));
+  if (!candidate?.runId || candidate.state === "queued" || candidate.state === "running" || commentRecipientKey(candidate.recipient) !== commentRecipientKey(recipient)) return;
+  const run = runs.get(db, candidate.runId);
+  return run?.externalSessionId && !isSessionLost(run.error) && resumesOnReplyAccount(db, task, recipient, run) ? run.id : undefined;
+}
+
+/** A resumed Claude session keeps its account, so while accounts are kept separate one on another account than a fresh reply's starts over. */
+function resumesOnReplyAccount(db: Db, task: Task, recipient: CommentRecipient, run: Run): boolean {
+  if (run.agent !== "claude" || !accountsSeparate(db)) return true;
+  return (run.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) === commentReplyAccount(db, task, recipient.orclingId);
+}
+
 function workOutcomeLabel(status: TurnSettledOutcome["status"]): string {
   if (status === "success") return "completed";
   if (status === "cancelled") return "cancelled";
@@ -382,4 +405,11 @@ function commentOutcomeState(status: TurnSettledOutcome["status"]): "success" | 
   if (status === "success") return "success";
   if (status === "cancelled") return "cancelled";
   return "error";
+}
+
+function assertOrclingsOnTaskAccount(db: Db, task: Task, recipients: readonly CommentRecipient[], everyOrcling: readonly Orcling[]): void {
+  for (const recipient of recipients) {
+    const orcling = recipient.orclingId ? everyOrcling.find((candidate) => candidate.id === recipient.orclingId) : undefined;
+    if (orcling) assertOrclingOnTaskAccount(db, task, orcling);
+  }
 }

@@ -3,9 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
-import { projects, runs, settings, threads } from "@openorc/db";
+import { claudeAccounts, memories, projects, runs, settings, tasks, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import { THREAD_EXISTS, type ModelOption, type Project, type RpcParams, type RunSpec } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, THREAD_EXISTS, type ModelOption, type Project, type RpcParams, type RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
 import { pickModel } from "./services/thread-agent-tools.js";
 import { rpcClient } from "./rpc-test-client.js";
@@ -239,6 +239,104 @@ it("lists messageable conversations before applying the agent's 30-thread limit"
   expect((await call("threads.list", { projectId: project.id, excludeSubagents: true })).map((thread) => thread.id).sort()).toEqual([home.id, started.id].sort());
 });
 
+/** A saved conversation in the project, on the CLI login unless it names another Claude account. */
+const conversation = (title: string, claudeAccountId?: string) =>
+  threads.insert(core.db, { projectId: project.id, title, agent: "codex", model: null, mode: "act", permissionMode: "trusted", ...(claudeAccountId ? { claudeAccountId } : {}) });
+
+const task = (title: string, threadId: string | null) =>
+  tasks.insert(core.db, { projectId: project.id, title, spec: null, priority: "none", labels: [], workspaceMode: "current", baseRef: null, parentTaskId: null, threadId });
+
+/** Lets a test start Claude threads as well, on the scripted provider. */
+async function scriptClaude() {
+  vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation(scripted);
+  const codexModels = await core.runs.models("codex");
+  vi.spyOn(core.runs, "models").mockImplementation(async (agent) => (agent === "claude" ? [{ ...model("claude-fixture", "Claude fixture"), agent: "claude" }] : codexModels));
+  return { agent: "claude", model: "claude-fixture" } as const;
+}
+
+it("keeps the thread and task tools to the agent's own Claude account while accounts are kept separate", async () => {
+  const { thread: home, runId } = await parent();
+  const client = claudeAccounts.add(core.db, "Client").id;
+  const same = conversation("On the same account");
+  const elsewhere = conversation("On the client account", client);
+  const ours = task("Our task", same.id);
+  const theirs = task("Their task", elsewhere.id);
+  const anyones = task("Anyone's task", null);
+  const listed = async () => (await core.threads.toolThreadList(runId)).map((thread) => thread.id).sort();
+  const taskIds = async () => (await core.threads.toolList(runId)).map((card) => card.id);
+  expect(await listed()).toEqual([home.id, same.id, elsewhere.id].sort());
+  expect(await taskIds()).toContain(theirs.id);
+
+  const retired = vi.spyOn(core.runs, "retireIdleClaudeSessions");
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  expect(retired.mock.calls.map(([id]) => id).sort()).toEqual([DEFAULT_CLAUDE_ACCOUNT, client].sort());
+  retired.mockClear();
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  expect(retired).not.toHaveBeenCalled();
+  const later = Date.now() + 60_000;
+  for (let index = 0; index < 31; index++) core.db.stmt("UPDATE threads SET last_activity_at = ? WHERE id = ?").run(later + index, conversation(`Client ${index}`, client).id);
+  expect(await listed()).toEqual([home.id, same.id].sort());
+  expect((await core.threads.toolThreadRead(runId, same.id))?.thread.id).toBe(same.id);
+  expect(await core.threads.toolThreadRead(runId, elsewhere.id)).toBeNull();
+  expect(await core.threads.toolThreadSend(runId, elsewhere.id, "Can you help?")).toEqual({ delivered: false, message: "No such thread in this project." });
+  expect(await taskIds()).toEqual(expect.arrayContaining([anyones.id, ours.id]));
+  expect(await taskIds()).not.toContain(theirs.id);
+  expect(await core.threads.toolGet(runId, theirs.id)).toBeNull();
+
+  retired.mockClear();
+  await call("app.settings.set", { claudeAccountsSeparate: false });
+  expect(retired.mock.calls.map(([id]) => id).sort()).toEqual([DEFAULT_CLAUDE_ACCOUNT, client].sort());
+  expect(await taskIds()).toContain(theirs.id);
+});
+
+it.each(["codex", "claude"] as const)("keeps a %s agent on an added Claude account to that account's threads and tasks, and away from the CLI login's", async (agent) => {
+  const claude = await scriptClaude();
+  const client = claudeAccounts.add(core.db, "Client").id;
+  const { thread: home, runId } = await parent({ ...(agent === "claude" ? claude : {}), claudeAccountId: client });
+  expect(threads.get(core.db, home.id)).toMatchObject({ agent, claudeAccountId: client });
+  const own = conversation("On the client account", client);
+  const cli = conversation("On the CLI login");
+  const mine = task("Its own task", own.id);
+  const theirs = task("The CLI login's task", cli.id);
+  const anyones = task("Anyone's task", null);
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+
+  expect((await core.threads.toolThreadList(runId)).map((thread) => thread.id).sort()).toEqual([home.id, own.id].sort());
+  expect((await core.threads.toolThreadRead(runId, own.id))?.thread.id).toBe(own.id);
+  expect(await core.threads.toolThreadRead(runId, cli.id)).toBeNull();
+  expect(await core.threads.toolThreadSend(runId, cli.id, "Can you help?")).toEqual({ delivered: false, message: "No such thread in this project." });
+  expect((await core.threads.toolList(runId)).map((card) => card.id).sort()).toEqual([anyones.id, mine.id].sort());
+  expect((await core.threads.toolGet(runId, mine.id))?.id).toBe(mine.id);
+  expect(await core.threads.toolGet(runId, theirs.id)).toBeNull();
+});
+
+it("keeps a Claude run's file tools out of the other accounts' folders while accounts are kept separate", async () => {
+  vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation(scripted);
+  vi.spyOn(core.runs, "models").mockResolvedValue([{ ...model("claude-fixture", "Claude fixture"), agent: "claude" }]);
+  const client = claudeAccounts.add(core.db, "Client").id;
+  const { thread: before } = await parent({ agent: "claude", model: "claude-fixture" });
+  expect((await firstSpec(before.id)).offLimits).toBeUndefined();
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  const { thread } = await parent({ agent: "claude", model: "claude-fixture" });
+  const database = ["openorc.sqlite", "openorc.sqlite-wal", "openorc.sqlite-shm"].map((name) => path.join(folder, "data", name));
+  expect((await firstSpec(thread.id)).offLimits).toEqual([path.join(folder, "data", "claude-accounts", client), ...database, path.join(folder, "data", "logs", "provider")]);
+});
+
+it("names in a Claude thread's memory brief only the tasks in progress on its own Claude account while accounts are kept separate", async () => {
+  const claude = await scriptClaude();
+  const client = claudeAccounts.add(core.db, "Client").id;
+  settings.set(core.db, "memory.enabled", "true");
+  memories.upsert(core.db, { projectId: project.id, type: "lesson", title: "Run the linter first", body: "CI stops at lint before the tests run.", source: "user" });
+  const inProgress = (title: string, thread: { id: string }) => tasks.update(core.db, task(title, null).id, { status: "in_progress", executionThreadId: thread.id });
+  inProgress("Send the client the invoice", conversation("On the client account", client));
+  inProgress("Rotate the deploy keys", conversation("On the CLI login"));
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  const { thread } = await parent({ ...claude, claudeAccountId: client });
+  const brief = (await firstSpec(thread.id)).systemPromptAppendix ?? "";
+  expect(brief).toContain("- Task in progress: Send the client the invoice");
+  expect(brief).not.toContain("Rotate the deploy keys");
+});
+
 /** A thread a person starts under `parentThreadId` from OpenOrc. */
 const subthread = (parentThreadId: string, input: Partial<RpcParams<"threads.start">> = {}) =>
   call("threads.start", { projectId: project.id, parentThreadId, agent: "codex", model: "fixture-codex", mode: "act", permissionMode: "trusted", prompt: "Look into the flaky test", ...input });
@@ -284,4 +382,24 @@ it("refuses a subthread under a subagent, under a missing thread, or in a place 
   await expect(subthread("missing")).rejects.toThrow(/not found/);
   await expect(subthread(home.id, { workspaceMode: "worktree" })).rejects.toThrow(/works in its folder/);
   expect(threads.children(core.db, home.id).map((each) => each.id)).toEqual([child.id]);
+});
+
+it.each(["codex", "claude"] as const)("keeps a person's %s subthread on its parent's Claude account while accounts are kept separate", async (agent) => {
+  const on = agent === "claude" ? await scriptClaude() : {};
+  const [work, client] = ["Work", "Client"].map((name) => claudeAccounts.add(core.db, name).id) as [string, string];
+  const { thread: home } = await parent({ ...on, claudeAccountId: client });
+  claudeAccounts.update(core.db, { id: work, makeDefault: true });
+  // With the setting off it starts where the window says, or on the default.
+  expect((await subthread(home.id, on)).thread.claudeAccountId).toBe(work);
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+
+  await expect(subthread(home.id, { ...on, claudeAccountId: work })).rejects.toThrow("Settings keeps Claude accounts separate, so a subthread stays on its thread's account.");
+  expect((await subthread(home.id, on)).thread.claudeAccountId).toBe(client);
+  expect((await subthread(home.id, { ...on, claudeAccountId: client })).thread.claudeAccountId).toBe(client);
+
+  projects.updateSettings(core.db, project.id, { claudeAccounts: { only: true, accountIds: [work], defaultId: work, autoSwitch: false } });
+  const dropped = "This project doesn't use Client, and Settings keeps Claude accounts separate, so this can't start on another account.";
+  await expect(subthread(home.id, on)).rejects.toThrow(dropped);
+  await expect(subthread(home.id, { ...on, claudeAccountId: client })).rejects.toThrow(dropped);
+  expect(threads.children(core.db, home.id)).toHaveLength(3);
 });

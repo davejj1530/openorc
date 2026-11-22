@@ -16,6 +16,7 @@ import {
 } from "@openorc/protocol";
 import { createHash } from "node:crypto";
 import { checkoutBranch } from "./checkout-branch.js";
+import { ACCOUNTS_KEPT_SEPARATE, accountReach, accountsSeparate, listedAccount, reachesTask, runAccount, threadAccount } from "./claude-account-separation.js";
 import { projectGit } from "./project-git.js";
 import type { RunService } from "./runs.js";
 import { titleFromPrompt, type StartThreadInput } from "./thread-inputs.js";
@@ -84,6 +85,10 @@ const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0
  * that Orcling's alone and a group chat its members', whoever asks: other Orclings reach them with their own messages.
  */
 export function reachesThread(db: Db, runId: string, source: Thread, target: Thread): boolean {
+  return withinReach(db, runId, source, target) && accountReach(db, runAccount(db, runId, source))(threadAccount(target));
+}
+
+function withinReach(db: Db, runId: string, source: Thread, target: Thread): boolean {
   const speaker = runRepo.get(db, runId)?.orclingId ?? null;
   const home = orclings.forThread(db, target.id);
   if (home) return home.id === speaker;
@@ -207,8 +212,12 @@ export class ThreadAgentTools {
   private taskInScope(runId: string, id: string): { task: Task; currentTaskId: string | null } | null {
     const scope = this.taskScope(runId);
     const task = tasks.get(this.db, id);
-    if (!scope || !task || task.retiredTeam || task.projectId !== scope.projectId) return null;
+    if (!scope || !task || task.retiredTeam || task.projectId !== scope.projectId || !reachesTask(this.db, this.accountReach(runId), task)) return null;
     return { task, currentTaskId: scope.currentTaskId };
+  }
+
+  private accountReach(runId: string): (account: string) => boolean {
+    return accountReach(this.db, runAccount(this.db, runId, this.scopeOf(runId).thread));
   }
 
   async toolCreate(runId: string, input: SpawnTaskInput): Promise<{ task: TaskCard; duplicate: boolean; started: boolean; message: string }> {
@@ -261,9 +270,10 @@ export class ThreadAgentTools {
   async toolList(runId: string): Promise<TaskCard[]> {
     const scope = this.taskScope(runId);
     if (!scope) return [];
+    const reach = this.accountReach(runId);
     return tasks
       .list(this.db, { projectId: scope.projectId })
-      .filter((t) => t.status !== "archived")
+      .filter((t) => t.status !== "archived" && reachesTask(this.db, reach, t))
       .map((t) => this.card(t, scope.currentTaskId));
   }
 
@@ -308,7 +318,8 @@ export class ThreadAgentTools {
   async toolThreadList(runId: string): Promise<ThreadCard[]> {
     const { thread } = this.scopeOf(runId);
     if (!thread) return [];
-    const rows = await this.context.withCheckoutBranches(threads.list(this.db, { projectId: thread.projectId, filter: "active", excludeSubagents: true, limit: 30 }));
+    const only = listedAccount(this.db, runAccount(this.db, runId, thread));
+    const rows = await this.context.withCheckoutBranches(threads.list(this.db, { projectId: thread.projectId, filter: "active", excludeSubagents: true, limit: 30, ...only }));
     return rows.map((t) => this.threadCard(t, thread.id));
   }
 
@@ -377,10 +388,10 @@ export class ThreadAgentTools {
     const parent = threads.get(this.db, parentId);
     if (!parent || retiredTeams.isHidden(this.db, parent.id)) throw new Error("Thread not found.");
     this.runs.subagents.assertExecutable({ threadId: parent.id });
-    // It goes on with its parent's account, which gives way to the project's default when the project does not use it,
-    // unless the starter says where its account came from, as an Orcling does.
+    // It goes on with its parent's account, which gives way to the project's default when the project does not use it, or
+    // is refused while accounts are kept separate, unless the starter says where its account came from, as an Orcling does.
     return this.context.start(
-      { claudeAccountFrom: "inherited", ...input, projectId: parent.projectId, ...childFolder(parent) },
+      { claudeAccountFrom: "inherited", ...input, ...this.parentAccount(parent, input), projectId: parent.projectId, ...childFolder(parent) },
       {
         assertCanAdmit: () => undefined,
         onAdmitted: (child) => {
@@ -389,6 +400,13 @@ export class ThreadAgentTools {
         },
       },
     );
+  }
+
+  private parentAccount(parent: Thread, input: Pick<StartThreadInput, "claudeAccountId" | "claudeAccountFrom">): Pick<StartThreadInput, "claudeAccountId" | "claudeAccountFrom"> {
+    if (input.claudeAccountFrom === "own" || !accountsSeparate(this.db)) return {};
+    const kept = threadAccount(parent);
+    if (input.claudeAccountId && input.claudeAccountId !== kept) throw new Error(`${ACCOUNTS_KEPT_SEPARATE}, so a subthread stays on its thread's account.`);
+    return { claudeAccountId: kept, claudeAccountFrom: "inherited" };
   }
 
   /** The thread a run starts a thread from, when it may. */

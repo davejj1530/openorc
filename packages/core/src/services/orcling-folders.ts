@@ -9,14 +9,22 @@ import { orclingHandle } from "@openorc/protocol";
  */
 export class OrclingFolders {
   private readonly root: string;
+  /** Where each group chat of Orclings keeps its own folder. An Orcling named Groups works in it too. */
+  readonly groupChats: string;
 
   constructor(dataDir: string) {
     this.root = path.join(dataDir, "orclings");
+    this.groupChats = path.join(this.root, "groups");
+  }
+
+  /** The folder the app makes for an Orcling of this name. */
+  desk(name: string): string {
+    return path.join(this.root, orclingHandle(name));
   }
 
   /** Makes a new Orcling's folder. One left behind by a deleted Orcling of the same name is reused. */
   async create(name: string): Promise<string> {
-    const folder = path.join(this.root, orclingHandle(name));
+    const folder = this.desk(name);
     await mkdir(folder, { recursive: true });
     return realpath(folder);
   }

@@ -85,6 +85,7 @@ import { composeHandlers, type Handlers } from "./handlers/types.js";
 import { createWorkspaceHandlers } from "./handlers/workspace.js";
 import { createWorktreeHandlers } from "./handlers/worktrees.js";
 import type { OpenOrcOptions } from "./options.js";
+import { DATABASE_FILE, PROVIDER_LOGS } from "./data-dir.js";
 import { phoneCloudPlace } from "./remote/cloud-policy.js";
 import { NO_CLOUD_SESSION, RemoteAccess } from "./remote/remote-access.js";
 import { requestOrigin, type RequestOrigin } from "./request-origin.js";
@@ -219,7 +220,7 @@ export class OpenOrc {
     };
     this.db = db;
     this.log = transportLogger(options.transport);
-    this.providerLog = new ProviderLog(path.join(options.dataDir, "logs", "provider"));
+    this.providerLog = new ProviderLog(path.join(options.dataDir, PROVIDER_LOGS));
     this.toolImages = new ToolImageStore(options.dataDir);
     this.ledger = new LedgerWriter(db, { native: (ev) => this.providerLog.write(ev) });
     this.upkeep = new LedgerUpkeep(db, { log: this.log, toolImages: this.toolImages });
@@ -451,11 +452,12 @@ export class OpenOrc {
       },
       claudeUserMcpServers: () => this.settings.get().claudeUserMcpServers,
       claudeConnectorsOff: () => this.settings.get().claudeConnectorsOff,
+      claudeOffLimits: (accountId) => this.claudeAccounts.offLimits(accountId),
       orclings: this.orclings.runHooks,
       taskImages: (spec) => new AttachmentService(options.dataDir).forTask(spec),
       inlineToolImages: (output) => this.toolImages.inline(output),
       storeToolImages: (ev) => this.toolImages.withStoredImages(ev),
-      brief: (project) => this.memory.brief(project),
+      brief: (project, claudeAccountId) => this.memory.brief(project, claudeAccountId),
       threadContext: (thread) => this.pullRequests.brief(thread),
       untrustedCheckout: (thread) => inUnvettedCopy(db, thread),
       memoryEnabled: () => this.memory.enabled(),
@@ -513,7 +515,7 @@ export class OpenOrc {
       options.transport.push({ type: "startup", message: `Agent recovery needs attention: ${error instanceof Error ? error.message : String(error)}` });
       throw error;
     }
-    const file = path.join(options.dataDir, "openorc.sqlite");
+    const file = path.join(options.dataDir, DATABASE_FILE);
     const db = options.ephemeral ? Db.memory() : Db.open(file);
     if (!options.ephemeral && LedgerUpkeep.needsCompaction(db, options.dataDir)) {
       options.transport.push({ type: "startup", message: "Tidying up saved history. This happens once and can take a minute." });
@@ -755,11 +757,7 @@ export class OpenOrc {
       createReviewerAppHandlers({ reviewerApp: this.reviewerApp }),
       createThreadQueriesHandlers({ threadService: this.threads, db: this.db, ledger: this.ledger, imports: this.imports }),
       createThreadLaunchHandlers({ threadService: this.threads, orclings: this.orclings, imports: this.imports }),
-      createThreadWorkspaceHandlers({
-        db: this.db,
-        threadService: this.threads,
-        upkeep: this.upkeep,
-      }),
+      createThreadWorkspaceHandlers({ db: this.db, threadService: this.threads, upkeep: this.upkeep }),
       createThreadMessagesHandlers({ db: this.db, threadService: this.threads }),
       createTaskQueriesHandlers({ db: this.db, comments: this.comments, threadService: this.threads, runService: this.runs }),
       createTaskWorkHandlers({ db: this.db, refines: this.refines, threadService: this.threads, dataDir: this.options.dataDir }),
@@ -785,7 +783,7 @@ export class OpenOrc {
       }),
       createCodeExplanationHandlers({ db: this.db, files: this.files, textGeneration: this.textGeneration, settings: this.settings, dataDir: this.options.dataDir }),
       createInstructionsHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
-      createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate }),
+      createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate, claudeSessions: this.claudeAccounts }),
       createSchedulesHandlers({ schedules: this.schedules }),
       createCatalogHandlers({ runService: this.runs, invalidate }),
       createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files }),

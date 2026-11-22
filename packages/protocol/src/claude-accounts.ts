@@ -1,6 +1,18 @@
 import { z } from "zod";
 
 export const DEFAULT_CLAUDE_ACCOUNT = "claude-cli";
+
+/** The reason the core and the apps give for what they hold back while accounts are kept separate. */
+export const ACCOUNTS_KEPT_SEPARATE = "Settings keeps Claude accounts separate";
+
+/** Why a group chat of Orclings on different Claude accounts takes no message while accounts are kept separate. */
+export const GROUP_ACROSS_ACCOUNTS = `This group's Orclings work on different Claude accounts, and ${ACCOUNTS_KEPT_SEPARATE}, so it waits until that's off.`;
+
+/** Why work can't start on the Claude account it carries over, `name`, once its project no longer uses it while accounts are kept separate. */
+export function notCarriedOver(name: string): string {
+  return `This project doesn't use ${name}, and ${ACCOUNTS_KEPT_SEPARATE}, so this can't start on another account.`;
+}
+
 export const ClaudeAccountId = z.string().min(1).max(100);
 export const ClaudeAccount = z.object({
   id: ClaudeAccountId,

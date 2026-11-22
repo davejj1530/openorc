@@ -13,6 +13,7 @@ import {
   type TaskRefine,
 } from "@openorc/protocol";
 import { AttachmentService } from "./attachments.js";
+import { assertOnTaskAccount, assertOrclingOnTaskAccount, keptTaskAccount } from "./claude-account-separation.js";
 import { claudeRunAccount } from "./claude-run-account.js";
 import { startingAccount } from "./project-claude-accounts.js";
 import { isSessionLost, type RunService, type TurnSettledOutcome } from "./runs.js";
@@ -67,7 +68,8 @@ export class TaskRefineService {
     const task = this.task(input.taskId);
     const previous = this.idle(task.id);
     // A Claude model refines on the account chosen, when the project uses it; an Orcling keeps its own.
-    const claudeAccountId = recipient.agent === "claude" && !recipient.orclingId && input.claudeAccountId ? startingAccount(this.db, task.projectId, input.claudeAccountId, "chosen") : undefined;
+    const chosen = recipient.agent === "claude" && !recipient.orclingId && input.claudeAccountId ? startingAccount(this.db, task.projectId, input.claudeAccountId, "chosen") : undefined;
+    const claudeAccountId = this.keptAccount(task, recipient, chosen);
     const earlier = input.again && previous?.suggestion ? previous : null;
     const base = { title: task.title, spec: task.spec ?? "", labels: task.labels };
     // A session that read an earlier version of the task starts afresh, from the task as it is now.
@@ -190,6 +192,22 @@ export class TaskRefineService {
       if (taskRefines.get(this.db, refine.id)?.state === "running") this.end(refine, { state: "error", step: null, error: message(error) });
       this.changed(task.id);
     }
+  }
+
+  /**
+   * While accounts are kept separate, a Claude Refine runs on the account its task is on: another chosen, or an Orcling
+   * on another, whatever its agent, is refused.
+   */
+  private keptAccount(task: Task, recipient: CommentRecipient, chosen: string | undefined): string | undefined {
+    const kept = keptTaskAccount(this.db, task);
+    const orcling = recipient.orclingId ? orclings.get(this.db, recipient.orclingId) : null;
+    if (!kept || (recipient.agent !== "claude" && !orcling)) return chosen;
+    if (orcling) {
+      assertOrclingOnTaskAccount(this.db, task, orcling);
+      return undefined;
+    }
+    assertOnTaskAccount(this.db, task, chosen ?? kept);
+    return startingAccount(this.db, task.projectId, kept, "inherited");
   }
 
   /** A resumed session already holds the task and its discussion, so it is told only what's new. */

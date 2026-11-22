@@ -1,6 +1,6 @@
 import { useSpaceProjects } from "../lib/space-queries";
 import { newThreadWorkspaceMode, offeredAccount, projectAccountChoice, targetModel, type NewThreadDraft } from "@openorc/client";
-import { WORKSPACE_ID, executionMode, type ClaudeAccounts, type ModelOption, type Project, type SystemInfo } from "@openorc/protocol";
+import { WORKSPACE_ID, executionMode, type AppSettings, type ClaudeAccounts, type ModelOption, type Project, type SystemInfo } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Composer } from "../components/Composer";
 import { FolderPlus } from "../components/icons";
@@ -117,8 +117,16 @@ function useNewThreadAccount(projects: Project[] | undefined, projectId: string,
 }
 
 /** A new thread's Claude accounts for its model picker: the ones its project uses, the chosen one checked. An Orcling brings its own. */
-function newThreadAccounts(choices: ClaudeAccounts | undefined, current: string, blocked: string | undefined, choose: (id: string) => void): PickerAccounts | undefined {
-  return choices ? { accounts: choices.accounts, current, choose, blocked } : undefined;
+function newThreadAccounts(choices: ClaudeAccounts | undefined, current: string, blocked: string | undefined, choose: (id: string) => void, section: string | undefined): PickerAccounts | undefined {
+  return choices ? { accounts: choices.accounts, current, choose, blocked, section } : undefined;
+}
+
+/**
+ * While accounts are kept separate, a thread on another agent belongs to a Claude account too, so its picker offers
+ * them in that agent's section.
+ */
+function otherAgentSection(settings: AppSettings | undefined, choice: ModelChoice | null): string | undefined {
+  return settings?.claudeAccountsSeparate && choice && choice.agent !== "claude" ? choice.agent : undefined;
 }
 
 /** The Orclings the model picker offers, the one chosen marked. */
@@ -217,7 +225,7 @@ function NewThreadProject({
   const starting = start.isPending ? "Starting the thread…" : undefined;
   const cloudAccounts =
     onCloud && choice ? cloudPicker(account, { agent: choice.agent, model: choice.model, accountId: draft.cloudAccountId }, (id) => changeDraft({ cloudAccountId: id }), starting) : undefined;
-  const macAccounts = orcling ? undefined : newThreadAccounts(accountChoices, claudeAccountId, starting, (id) => changeDraft({ claudeAccountId: id }));
+  const macAccounts = orcling ? undefined : newThreadAccounts(accountChoices, claudeAccountId, starting, (id) => changeDraft({ claudeAccountId: id }), otherAgentSection(settings.data, choice));
   const pickerAccounts = onCloud ? cloudAccounts : macAccounts;
   const localReason = usesClaude && !accounts.data ? (accounts.error?.message ?? "Loading Claude accounts…") : targetDisabledReason;
   // A cloud start from this Mac's folder carries its work, said on the line above Start before anything leaves.

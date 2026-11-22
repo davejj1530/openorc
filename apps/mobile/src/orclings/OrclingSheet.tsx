@@ -1,3 +1,4 @@
+import { KEPT_SEPARATE } from "@openorc/client";
 import { isHarnessId, type OrclingProfile } from "@openorc/protocol";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
@@ -5,6 +6,7 @@ import { Alert, Pressable, View } from "react-native";
 import Animated, { useAnimatedRef, useScrollOffset } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpc, useRpcMutation } from "../client";
+import { useAccountsSeparate } from "../composer/claude-account";
 import { useShareSettings } from "../composer/settings-bridge";
 import { Pencil, Trash2 } from "../generated/icons";
 import { Card, Divider, RowLines, rowClass, Section } from "../settings/parts";
@@ -207,13 +209,14 @@ function DeleteOrcling({ profile }: { profile: OrclingProfile }) {
  * account, as it changes a composer's: each pick saves at once.
  */
 function useShareModel(composerId: string, profile: OrclingProfile | undefined, save: Save) {
+  const held = useAccountsSeparate() ? KEPT_SEPARATE.orcling : null;
   useShareSettings(composerId, {
     choice: profile ? profile.settings : null,
     selectModel: (choice) => {
       if (!isHarnessId(choice.agent)) return;
       void save({ settings: { agent: choice.agent, model: choice.model, effort: choice.effort, fastMode: Boolean(choice.fastMode) } });
     },
-    ...(profile ? { claudeAccount: { chosen: profile.claudeAccountId, select: (claudeAccountId: string) => void save({ claudeAccountId }) } } : {}),
+    ...(profile ? { claudeAccount: { chosen: profile.claudeAccountId, select: (claudeAccountId: string) => void save({ claudeAccountId }), held } } : {}),
   });
 }
 

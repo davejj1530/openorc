@@ -4,7 +4,8 @@ import path from "node:path";
 import { claudeAccounts, runs, threads, type Db } from "@openorc/db";
 import { DEFAULT_CLAUDE_ACCOUNT, type AgentKind, type Run, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
-import { allowsAccount, NOT_A_PROJECT_ACCOUNT, projectAccountPolicy } from "./project-claude-accounts.js";
+import { accountsSeparate, STAYS_ON_ITS_ACCOUNT } from "./claude-account-separation.js";
+import { allowsAccount, NO_SWITCHING, NOT_A_PROJECT_ACCOUNT, projectAccountPolicy } from "./project-claude-accounts.js";
 import type { RunService, StartRunInput } from "./runs.js";
 
 /** The folder where an account's Claude keeps its login, settings and sessions on this Mac. */
@@ -17,8 +18,9 @@ export type ClaudeFolder = (accountId: string) => string;
 export function switchedClaudeAccount(db: Db, thread: Thread, agent: AgentKind, requested: string | undefined): string | null {
   if (agent !== "claude" || !requested || requested === (thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT)) return null;
   if (thread.orclingId) throw new Error("An Orcling's conversation runs on the Orcling's Claude account.");
+  if (accountsSeparate(db)) throw new Error(STAYS_ON_ITS_ACCOUNT);
   if (!claudeAccounts.get(db, requested).enabled) throw new Error("This Claude account is disabled. Enable it in Settings → Connections.");
-  if (!allowsAccount(projectAccountPolicy(db, thread.projectId, { claudeAccountAutoSwitch: false }), requested)) throw new Error(NOT_A_PROJECT_ACCOUNT);
+  if (!allowsAccount(projectAccountPolicy(db, thread.projectId, NO_SWITCHING), requested)) throw new Error(NOT_A_PROJECT_ACCOUNT);
   return requested;
 }
 

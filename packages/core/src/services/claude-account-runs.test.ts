@@ -13,6 +13,7 @@ import { ClaudeSignInRetry } from "./claude-sign-in-retry.js";
 import { claudeRunAccount } from "./claude-run-account.js";
 import type { RunHooks } from "./run-types.js";
 import { RunService } from "./runs.js";
+import { AppSettingsService } from "./settings.js";
 import { ShellEnvironment } from "./shell-environment.js";
 import { ThreadService } from "./threads.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
@@ -249,7 +250,14 @@ it("moves a conversation stopped at its usage limit to the enabled account with 
   const reports: Record<string, ProviderUsage> = { [personal]: fiveHourReport(70), [client]: fiveHourReport(40), [spare]: fiveHourReport(0, 100), [off]: fiveHourReport(0) };
   const recent = vi.fn(async (_provider: string, id: string | undefined) => reports[id!] ?? signedOut());
   let enabled = true;
-  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: enabled }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: enabled, claudeAccountsSeparate: false }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
   turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
 
   const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
@@ -291,7 +299,14 @@ it("leaves a stopped conversation alone when no account has 5-hour usage left, o
     await answered;
     return reports[id!] ?? signedOut();
   });
-  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
   turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
   const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
   const ts = Date.now();
@@ -309,7 +324,7 @@ it("leaves a stopped conversation alone when no account has 5-hour usage left, o
   reports[client] = fiveHourReport(30);
   const again = new ClaudeAccountSwitch({
     db,
-    settings: { get: () => ({ claudeAccountAutoSwitch: true }) },
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
     usage: { recent: async (_provider, id) => (await conversations.switchClaudeAccount(thread.id, personal), reports[id!] ?? signedOut()) },
     runs: service,
     threads: conversations,
@@ -330,7 +345,14 @@ it("goes on with an account that has no 5-hour window when its week has room, af
   const [work, personal, weekly, spent] = ["Work", "Personal", "Weekly", "Spent"].map((name) => accounts.add(name).id) as [string, string, string, string];
   const reports: Record<string, ProviderUsage> = { [personal]: fiveHourReport(100), [weekly]: weekOnlyReport(3), [spent]: weekOnlyReport(100) };
   const recent = vi.fn(async (_provider: string, id: string | undefined) => reports[id!] ?? signedOut());
-  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
   turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
   const limit = (handle: RunHandle, runId: string) => {
     const ts = Date.now();
@@ -360,7 +382,7 @@ it("keeps looking when no account has anything left, says why once, and goes on 
   const warn = vi.fn();
   const switcher = new ClaudeAccountSwitch({
     db,
-    settings: { get: () => ({ claudeAccountAutoSwitch: true }) },
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
     usage: { recent },
     runs: service,
     threads: conversations,
@@ -395,7 +417,7 @@ it("goes on with its own account once a reading taken after the stop says its li
   const warn = vi.fn();
   const switcher = new ClaudeAccountSwitch({
     db,
-    settings: { get: () => ({ claudeAccountAutoSwitch: true }) },
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
     usage: { recent },
     runs: service,
     threads: conversations,
@@ -529,6 +551,50 @@ it("keeps an existing thread on an account its project stopped using, while its 
   await expect(conversations.continueThread(thread.id, { ...input, claudeAccountId: personal })).resolves.toMatchObject({ claudeAccountId: personal });
 });
 
+it.each(["claude", "codex"] as const)(
+  "refuses a %s thread's sub threads, forks and task threads while accounts are kept separate once its project stopped using its account, and starts them on the default with the setting off",
+  async (agent) => {
+    const [work, personal, client] = ["Work", "Personal", "Client"].map((name) => accounts.add(name).id) as [string, string, string];
+    const { thread, run } = await conversations.start({ ...input, agent, mode: "act", projectId: project.id, claudeAccountId: client });
+    onlyUse([work, personal], personal);
+    const target = { agent, model: "fixture", effort: null };
+    // A task saved from the thread on Client and last run there, with no thread of its own yet.
+    const ranOnClient = (runId: string) => {
+      const task = tasks.insert(db, {
+        projectId: project.id,
+        threadId: thread.id,
+        title: "Ship it",
+        spec: null,
+        priority: "none",
+        labels: [],
+        workspaceMode: "current",
+        baseRef: null,
+        parentTaskId: null,
+      });
+      runs.insert(db, { id: runId, taskId: task.id, threadId: null, agent, model: "fixture", mode: "act", permissionMode: "review", claudeAccountId: client });
+      return task.id;
+    };
+    const settings = new AppSettingsService(db);
+    settings.set({ claudeAccountsSeparate: true });
+    const refusal = "This project doesn't use Client, and Settings keeps Claude accounts separate, so this can't start on another account.";
+    const launches = start.mock.calls.length;
+    await expect(conversations.startUnder(thread.id, { ...input, agent, claudeAccountId: client })).rejects.toThrow(refusal);
+    await expect(conversations.startUnder(thread.id, { ...input, agent })).rejects.toThrow(refusal);
+    await expect(conversations.toolThreadStart(run!.id, { prompt: "Check the tests" })).rejects.toThrow(refusal);
+    expect(() => conversations.fork(thread.id)).toThrow(refusal);
+    expect(() => conversations.taskThreadForStart(ranOnClient("kept-separate"), target)).toThrow(refusal);
+    expect(start).toHaveBeenCalledTimes(launches);
+    expect(threads.list(db, { projectId: project.id }).map((each) => each.id)).toEqual([thread.id]);
+
+    settings.set({ claudeAccountsSeparate: false });
+    expect((await conversations.startUnder(thread.id, { ...input, agent, claudeAccountId: client })).thread.claudeAccountId).toBe(personal);
+    const started = await conversations.toolThreadStart(run!.id, { prompt: "Check the tests" });
+    expect(threads.get(db, started.thread.id)?.claudeAccountId).toBe(personal);
+    expect(conversations.fork(thread.id).claudeAccountId).toBe(personal);
+    expect(conversations.taskThreadForStart(ranOnClient("together"), target).claudeAccountId).toBe(personal);
+  },
+);
+
 it("forks a thread onto its project's default account carrying the parent's session there, once the project stopped using the parent's", async () => {
   const [personal, client] = ["Personal", "Client"].map((name) => accounts.add(name).id) as [string, string];
   const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: client });
@@ -546,6 +612,37 @@ it("forks a thread onto its project's default account carrying the parent's sess
   expect([spec.resumeSessionId, spec.forkSession, path.basename(launch.env.CLAUDE_CONFIG_DIR!)]).toEqual(["client-session", true, personal]);
   expect(await readFile(path.join(folder(personal), "projects", "-fixture", "client-session.jsonl"), "utf8")).toBe('{"type":"user"}\n');
   expect(threads.get(db, thread.id)?.claudeAccountId).toBe(client);
+});
+
+it("goes on with a task on the account it is on, not an older task run's, while accounts are kept separate", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
+  const conversation = threads.insert(db, { projectId: project.id, title: "Chat", agent: "claude", model: "fixture", mode: "act", permissionMode: "review", claudeAccountId: work });
+  /** A task saved from the conversation on Work that last ran on Personal, before tasks ran in threads. */
+  const ranOnPersonal = () => {
+    const task = tasks.insert(db, {
+      projectId: project.id,
+      threadId: conversation.id,
+      title: "Ship it",
+      spec: null,
+      priority: "none",
+      labels: [],
+      workspaceMode: "current",
+      baseRef: null,
+      parentTaskId: null,
+    });
+    runs.insert(db, { id: crypto.randomUUID(), taskId: task.id, threadId: null, agent: "claude", model: "fixture", mode: "act", permissionMode: "review", claudeAccountId: personal });
+    return task;
+  };
+  const reply = (task: ReturnType<typeof ranOnPersonal>) => claudeRunAccount(db, { scope: { task: null, thread: null, comment: { id: "reply", task } } });
+  const target = { agent: "claude" as const, model: "fixture", effort: null };
+
+  const together = ranOnPersonal();
+  expect(reply(together)).toBe(personal);
+  expect(conversations.taskThreadForStart(together.id, target).claudeAccountId).toBe(personal);
+  new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+  const separate = ranOnPersonal();
+  expect(reply(separate)).toBe(work);
+  expect(conversations.taskThreadForStart(separate.id, target).claudeAccountId).toBe(work);
 });
 
 it("starts a task's thread on its starter's own account, as an Orcling's, even when none of the project's accounts is enabled", async () => {
@@ -581,7 +678,14 @@ it("switches a project's threads among its own accounts by its own setting, with
   // Client has the most left, but the project does not use it.
   const reports: Record<string, ProviderUsage> = { [personal]: fiveHourReport(70), [client]: fiveHourReport(10) };
   const recent = vi.fn(async (_provider: string, id: string | undefined) => reports[id!] ?? signedOut());
-  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: false }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: false, claudeAccountsSeparate: false }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
   turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
   onlyUse([work, personal], work, true);
   const { thread, run } = await conversations.start({ ...input, projectId: project.id });
@@ -595,7 +699,14 @@ it("switches a project's threads among its own accounts by its own setting, with
 it("leaves a project's threads where they stopped when its own setting is off, or turns off while usage is read, with the app's on", async () => {
   const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
   const recent = vi.fn(async (_provider: string, id: string | undefined) => (id === personal ? fiveHourReport(10) : signedOut()));
-  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
   turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
   onlyUse([work, personal], work, false);
   const { thread, run } = await conversations.start({ ...input, projectId: project.id });
@@ -616,10 +727,41 @@ it("leaves a project's threads where they stopped when its own setting is off, o
   expect([start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([1, work]);
 });
 
+it("leaves a thread where it stopped at its usage limit while accounts are kept separate, with the app's switch and its project's on", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
+  const recent = vi.fn(async (_provider: string, id: string | undefined) => (id === personal ? fiveHourReport(10) : signedOut()));
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: true }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
+  turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  stopAtLimit(start.mock.results[0]!.value, run!.id);
+  await vi.waitFor(() => expect(service.threadSession(thread.id).recovery?.kind).toBe("usage"));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect([recent.mock.calls.length, start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([0, 1, work]);
+
+  onlyUse([work, personal], work, true);
+  switcher.settled(runs.get(db, run!.id)!, { task: null, thread: threads.get(db, thread.id)! }, { status: "error", snapshotId: null, error: "You've hit your 5-hour limit" });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect([recent.mock.calls.length, start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([0, 1, work]);
+});
+
 it("switches a project that follows the app's accounts by the app's setting, as before", async () => {
   const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
   const recent = vi.fn(async (_provider: string, id: string | undefined) => (id === personal ? fiveHourReport(10) : signedOut()));
-  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
+    usage: { recent },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
   turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
   // Turned off, the project's own switch no longer counts.
   projects.updateSettings(db, project.id, { claudeAccounts: { only: false, accountIds: [work], defaultId: work, autoSwitch: false } });

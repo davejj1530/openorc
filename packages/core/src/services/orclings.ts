@@ -18,6 +18,7 @@ import {
   type Thread,
 } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
+import { ACCOUNTS_KEPT_SEPARATE, accountReach, accountsSeparate, orclingOnAnotherAccount, reachableTitle } from "./claude-account-separation.js";
 import { AttachmentService } from "./attachments.js";
 import type { MemoryService } from "./memory.js";
 import { catchUp, orclingBrief, rolloverSeed, type OrclingPlace } from "./orcling-briefs.js";
@@ -64,8 +65,11 @@ export interface StartOptions {
   under?: string;
 }
 
-/** Who works on what an Orcling starts: itself, on its own settings and account, or the agent and account chosen. */
-function workerFor(orcling: Orcling, on: WorkSettings | undefined) {
+/**
+ * Who works on what an Orcling starts: itself, on its own settings and account, or the agent chosen, on the account
+ * chosen or, while accounts are kept separate, on the Orcling's own.
+ */
+function workerFor(db: Db, orcling: Orcling, on: WorkSettings | undefined) {
   if (!on) {
     const { agent, model, effort, fastMode } = orcling.settings;
     // An Orcling works on its own account, in a project that uses only some accounts too.
@@ -76,7 +80,9 @@ function workerFor(orcling: Orcling, on: WorkSettings | undefined) {
     };
   }
   const { agent, model, effort, fastMode, claudeAccountId } = on;
-  return { orclingId: null, settings: { agent, model, effort, fastMode }, account: { claudeAccountId, claudeAccountFrom: "chosen" as const } };
+  const settings = { agent, model, effort, fastMode };
+  if (accountsSeparate(db)) return { orclingId: null, settings, account: { claudeAccountId: orcling.claudeAccountId, claudeAccountFrom: "inherited" as const } };
+  return { orclingId: null, settings, account: { claudeAccountId, claudeAccountFrom: "chosen" as const } };
 }
 
 /** A start's settings without where it works, which a thread started under another takes from its parent. */
@@ -156,6 +162,7 @@ export class OrclingService {
     const current = this.get(id);
     this.assertNameFree(draft.name, id);
     const claudeAccountId = this.account(draft.claudeAccountId, current.claudeAccountId);
+    if (claudeAccountId !== current.claudeAccountId && accountsSeparate(db)) throw new Error(`${ACCOUNTS_KEPT_SEPARATE}, so ${current.name} stays on its Claude account.`);
     const moving = claudeAccountId === current.claudeAccountId ? [] : this.conversations(current);
     if (moving.some((threadId) => this.deps.runs().threadActivity(threadId) !== "idle")) throw new Error(`Wait for ${current.name} to finish before changing its Claude account.`);
     const folder = await this.renameFolder(current, draft.name);
@@ -291,7 +298,7 @@ export class OrclingService {
     const orcling = this.get(id);
     if (input.projectId === WORKSPACE_ID) throw new Error(`Talk to ${orcling.name} in its own conversation, or start this in a project.`);
     const ceiling = orclingExecution(orcling);
-    const who = workerFor(orcling, options.on);
+    const who = workerFor(this.deps.db, orcling, options.on);
     let admitted: string | null = null;
     const onAdmitted = (thread: Thread) => {
       admitted = thread.id;
@@ -324,9 +331,16 @@ export class OrclingService {
     const orcling = this.get(id);
     const task = tasks.get(db, taskId);
     if (!task) throw new Error("No such task.");
-    const who = workerFor(orcling, options.on);
+    const who = workerFor(this.deps.db, orcling, options.on);
     const current = [task.executionThreadId, task.threadId].map((threadId) => (threadId ? threads.get(db, threadId) : null)).find(Boolean);
-    if (current && (!who.orclingId || current.orclingId !== id)) throw new Error(`This task already has a conversation, "${current.title}". Message it with orcling_thread_send instead.`);
+    if (current && (!who.orclingId || current.orclingId !== id)) {
+      const title = reachableTitle(accountReach(db, orcling.claudeAccountId), current);
+      throw new Error(
+        title
+          ? `This task already has a conversation, "${title}". Message it with orcling_thread_send instead.`
+          : `This task's conversation works on another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`,
+      );
+    }
     const ceiling = orclingExecution(orcling);
     const { agent, model, effort, fastMode } = who.settings;
     const thread = this.deps.threads().taskThreadForStart(taskId, { agent, model: model ?? null, effort: effort ?? null }, taskAccount(db, task.projectId, who));
@@ -394,6 +408,7 @@ export class OrclingService {
     if (thread.orclingId === orcling.id) throw new Error(`${orcling.name} already works in this conversation. Message it without a mention.`);
     if (retiredTeams.isHidden(this.deps.db, threadId)) throw new Error("This item is no longer available.");
     if (orclings.forThread(this.deps.db, threadId)) throw new Error("Another Orcling's own conversation is only for that Orcling.");
+    if (orclingOnAnotherAccount(this.deps.db, orcling, thread)) throw new Error(`${orcling.name} works on another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`);
     return thread;
   }
 
@@ -406,6 +421,8 @@ export class OrclingService {
     }
     const orcling = orclingId ? this.get(orclingId) : null;
     if (orcling) {
+      if (orclingOnAnotherAccount(this.deps.db, orcling, thread))
+        throw new Error(`${orcling.name} works on another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}, so this conversation stays on its account.`);
       const { agent, model, effort, fastMode } = orcling.settings;
       const ceiling = orclingExecution(orcling);
       this.deps.threads().update(threadId, {
@@ -477,10 +494,14 @@ export class OrclingService {
   };
 
   private identity(input: StartRunInput): string | null {
+    if (input.orclingId) return orclings.get(this.deps.db, input.orclingId) ? input.orclingId : null;
     // The stored row, not the caller's copy: a conversation may have been given its Orcling while it was admitted.
     const thread = input.scope.thread ? threads.get(this.deps.db, input.scope.thread.id) : null;
-    const wanted = input.orclingId ?? thread?.orclingId ?? null;
-    return wanted && orclings.get(this.deps.db, wanted) ? wanted : null;
+    const orcling = thread?.orclingId ? orclings.get(this.deps.db, thread.orclingId) : null;
+    // A Slack hand-off or a review round gave it the conversation without moving it, before accounts were kept separate.
+    if (thread && orcling && orclingOnAnotherAccount(this.deps.db, orcling, thread))
+      throw new Error(`${orcling.name} works on another Claude account than this conversation, and ${ACCOUNTS_KEPT_SEPARATE}, so give the conversation to a model or an Orcling on its account.`);
+    return orcling?.id ?? null;
   }
 
   private prepare(input: StartRunInput): StartRunInput {
@@ -513,7 +534,8 @@ export class OrclingService {
     const place = this.place(orcling, input);
     const group = place === "group" && input.scope.thread ? orclingGroups.get(this.deps.db, input.scope.thread.id) : null;
     const others = (group?.memberIds ?? []).filter((id) => id !== orcling.id).map((id) => this.name(id) ?? "an Orcling");
-    return orclingBrief(orcling, { instructions, memory: this.deps.memory.orclingBrief(orcling.id), place, tools: !input.scope.comment, others });
+    const separate = accountsSeparate(this.deps.db);
+    return orclingBrief(orcling, { instructions, memory: this.deps.memory.orclingBrief(orcling.id), place, tools: !input.scope.comment, others, separate });
   }
 
   private place(orcling: Orcling, input: StartRunInput): OrclingPlace {

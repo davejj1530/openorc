@@ -1,5 +1,5 @@
 import { memories, summaries, type Db } from "@openorc/db";
-import type { Memory, MemorySource, MemoryType } from "@openorc/protocol";
+import type { Memory, MemorySource, MemoryType, SessionSummary } from "@openorc/protocol";
 
 const MAX_CHARS = 5000;
 const HALF_LIFE_MS = 90 * 24 * 60 * 60 * 1000;
@@ -28,7 +28,7 @@ const AGE_LABEL = (ts: number): string => {
  * durable memory plus open threads, capped so it never crowds the context.
  * Ranked within each section by confidence and recency.
  */
-export function buildBrief(db: Db, projectId: string, openTaskTitles: string[]): string {
+export function buildBrief(db: Db, projectId: string, openTaskTitles: string[], keepSession?: (summary: SessionSummary) => boolean): string {
   const all = memories.list(db, { projectId, statuses: ["active"], limit: 400 });
   const byType = new Map<MemoryType, Memory[]>();
   for (const m of all) {
@@ -48,10 +48,9 @@ export function buildBrief(db: Db, projectId: string, openTaskTitles: string[]):
     for (const m of items) lines.push(`- ${m.title} (${AGE_LABEL(m.lastConfirmedAt)}, ${SOURCE_LABEL[m.source]}): ${m.body}`);
   }
 
-  const recentOpen = summaries
-    .recent(db, projectId, 5)
-    .flatMap((s) => s.openItems)
-    .slice(0, 6);
+  // Reads further back when it keeps only some sessions, so newer ones it leaves out don't crowd out the ones it keeps.
+  const sessions = keepSession ? summaries.recent(db, projectId, 50).filter(keepSession).slice(0, 5) : summaries.recent(db, projectId, 5);
+  const recentOpen = sessions.flatMap((s) => s.openItems).slice(0, 6);
   if (openTaskTitles.length > 0 || recentOpen.length > 0) {
     lines.push("", "## Open threads");
     for (const t of openTaskTitles.slice(0, 8)) lines.push(`- Task in progress: ${t}`);

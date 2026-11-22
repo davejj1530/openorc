@@ -1,4 +1,5 @@
 import { claudeAccounts, messages, orclingFollowups, orclingGroups, projects, runs, tasks, threads, type Db } from "@openorc/db";
+import { ACCOUNTS_KEPT_SEPARATE, accountReach, accountsSeparate, listedAccount, reachableTitle, reachesTask, threadAccount } from "../services/claude-account-separation.js";
 import { STAY_QUIET } from "../services/orcling-quiet.js";
 import type { McpHost, OrclingStartInput, OrclingTools } from "@openorc/mcp";
 import {
@@ -22,16 +23,16 @@ import type { MemoryService } from "../services/memory.js";
 import type { OrclingService } from "../services/orclings.js";
 import type { RunService } from "../services/runs.js";
 import type { ThreadService } from "../services/threads.js";
-import { describeWork, workAccess, workSettings, type WorkCatalog, type WorkSettings } from "../services/orcling-work.js";
+import { accountNamed, describeWork, workAccess, workSettings, type WorkCatalog, type WorkSettings } from "../services/orcling-work.js";
 import { appTools, type AppDependencies } from "./orcling-app.js";
 import { accountNames, orclingChatIds, overviewTools, threadTree, type OverviewDependencies } from "./orcling-overview.js";
-import { projectAccountPolicy } from "../services/project-claude-accounts.js";
+import { projectAccountPolicy, startingAccount } from "../services/project-claude-accounts.js";
 
 type Dependencies = OverviewDependencies &
   Omit<AppDependencies, "db" | "runs"> & {
     orclings: Pick<OrclingService, "forRun" | "saveInstructions" | "startThread" | "startTask" | "react" | "talk">;
     memory: Pick<MemoryService, "assertEnabled" | "record" | "retrieveOrcling" | "retrieve" | "brief">;
-    runs: Pick<RunService, "authorizeAppAction">;
+    runs: Pick<RunService, "authorizeAppAction" | "models">;
     threads: Pick<ThreadService, "toolThreadRead">;
     send: NonNullable<McpHost["threads"]>["send"];
     invalidate: (keys: string[]) => void;
@@ -140,12 +141,17 @@ function startSettings(opener: string, prompt: string) {
   return { prompt: `${opener}\n\n${prompt}`, promptRole: "system" as const };
 }
 
-/** Which Claude accounts a project's threads may use, which one new threads start on, and whether a limit moves them on. */
-function projectAccounts(db: Db, projectId: string) {
+/**
+ * Which Claude accounts a project's threads may use, which one new threads start on, and whether a limit moves them
+ * on; while accounts are kept separate, only the Orcling's own, when the project uses it.
+ */
+function projectAccounts(db: Db, projectId: string, own: string) {
   if (!claudeAccounts.list(db).some((account) => account.enabled)) return {};
   const policy = projectAccountPolicy(db, projectId);
   const name = accountNames(db);
-  return { claudeAccounts: { uses: policy.allowed.map((id) => name(id) ?? id), newThreadsOn: name(policy.defaultId) ?? null, switchesWhenLimited: policy.autoSwitch } };
+  const uses = policy.allowed.filter(accountReach(db, own));
+  const startsOn = accountsSeparate(db) ? uses[0] : policy.defaultId;
+  return { claudeAccounts: { uses: uses.map((id) => name(id) ?? id), newThreadsOn: (startsOn && name(startsOn)) ?? null, switchesWhenLimited: policy.autoSwitch } };
 }
 
 /** Every place the person works: their Workspace, then their projects. */
@@ -199,8 +205,10 @@ function workPlace(db: Db, input: OrclingStartInput): { parent: Thread | null; t
 /** Work an Orcling starts in a project for the person: a new thread, a subthread, or a saved task taken up, on what was chosen. */
 async function startWork(deps: Dependencies, runId: string, self: Orcling, input: OrclingStartInput): Promise<string> {
   const { parent, target } = workPlace(deps.db, input);
+  assertOwnAccountWork(deps.db, self, input, parent);
   const { task, what } = workTarget(deps.db, target, input);
   const plan = await planWork(deps, runId, self, input);
+  assertProjectUsesOwnAccount(deps.db, self, target, plan.on);
   await deps.runs.authorizeAppAction(runId, "work_start", { toolName: "orcling_thread_start", reason: `${self.name} wants to start work in ${target.name} on ${plan.runsOn}: ${what}`, input });
   const threadId = await launchWork(deps, self, { input, parent, target, task, what, ...plan });
   const thread = threads.get(deps.db, threadId ?? "");
@@ -214,6 +222,19 @@ async function startWork(deps: Dependencies, runId: string, self: Orcling, input
     access: executionModeLabel[thread ? executionMode(thread.mode, thread.permissionMode) : plan.access],
     ...(input.reportBack ? { reportBack: "You'll hear once when its turn ends." } : {}),
   });
+}
+
+/** Kept separate, an Orcling starts work only on its own Claude account, and under no thread on another: it would share that thread's folder. */
+function assertOwnAccountWork(db: Db, self: Orcling, input: OrclingStartInput, parent: Thread | null): void {
+  if (!accountsSeparate(db)) return;
+  if (parent && threadAccount(parent) !== self.claudeAccountId) throw new Error(`"${parent.title}" works on another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`);
+  const named = input.worker.kind === "agent" && input.worker.claudeAccount ? accountNamed(db, input.worker.agent ?? "claude", input.worker.claudeAccount) : undefined;
+  if (named && named !== self.claudeAccountId) throw new Error(`${ACCOUNTS_KEPT_SEPARATE}, so ${self.name} starts work only on its own Claude account.`);
+}
+
+/** Kept separate, a chosen agent works on the Orcling's own account, so a project that doesn't use it refuses before the person is asked. */
+function assertProjectUsesOwnAccount(db: Db, self: Orcling, target: Project, on: WorkSettings | undefined): void {
+  if (on && accountsSeparate(db)) startingAccount(db, target.id, self.claudeAccountId, "inherited");
 }
 
 const workspaceFor = (worktree: boolean): WorkspaceMode => (worktree ? "worktree" : "current");
@@ -246,24 +267,27 @@ async function launchWork(
 function projectTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, "projects" | "project" | "readThread" | "createTask" | "startWork" | "sendThread"> {
   const { db } = deps;
   const project = (id: string) => placeById(db, id);
+  const openTasks = (projectId: string, reach: (account: string) => boolean) => tasks.list(db, { projectId, statuses: OPEN }).filter((t) => reachesTask(db, reach, t));
   return {
     projects: async (runId) => {
-      speaker(runId);
-      return json(places(db).map((p) => ({ id: p.id, name: p.name, folder: p.rootPath, openTasks: tasks.list(db, { projectId: p.id, statuses: OPEN }).length })));
+      const reach = accountReach(db, speaker(runId).claudeAccountId);
+      return json(places(db).map((p) => ({ id: p.id, name: p.name, folder: p.rootPath, openTasks: openTasks(p.id, reach).length })));
     },
     project: async (runId, projectId, query) => {
-      speaker(runId);
+      const self = speaker(runId);
+      const reach = accountReach(db, self.claudeAccountId);
       const found = project(projectId);
-      const open = tasks
-        .list(db, { projectId, statuses: OPEN })
+      const open = openTasks(projectId, reach)
         .slice(0, 20)
         .map((t) => ({ id: t.id, title: t.title, status: t.status }));
       // Orclings' own conversations sit in the Workspace but are private chats, not its work.
       const chats = orclingChatIds(db);
-      const listed = deps.threads.list({ projectIds: [projectId], filter: "active", orderBy: "activity", limit: 10, includeChildren: true }).filter((t) => !chats.has(t.id));
-      const recent = threadTree(listed, (id) => listed.find((t) => t.id === id)?.title ?? threads.get(db, id)?.title, accountNames(db));
-      const memory = query ? (await deps.memory.retrieve(projectId, query, 8)).map(({ memory: m }) => ({ title: m.title, body: m.body })) : deps.memory.brief(found);
-      return json({ project: { id: found.id, name: found.name, folder: found.rootPath }, ...projectAccounts(db, projectId), openTasks: open, threads: recent, memory });
+      const listed = deps.threads
+        .list({ projectIds: [projectId], filter: "active", orderBy: "activity", limit: 10, includeChildren: true, ...listedAccount(db, self.claudeAccountId) })
+        .filter((t) => !chats.has(t.id));
+      const recent = threadTree(listed, (id) => listed.find((t) => t.id === id)?.title ?? reachableTitle(reach, threads.get(db, id)), accountNames(db));
+      const memory = query ? (await deps.memory.retrieve(projectId, query, 8)).map(({ memory: m }) => ({ title: m.title, body: m.body })) : deps.memory.brief(found, self.claudeAccountId);
+      return json({ project: { id: found.id, name: found.name, folder: found.rootPath }, ...projectAccounts(db, projectId, self.claudeAccountId), openTasks: open, threads: recent, memory });
     },
     readThread: async (runId, threadId, limit) => {
       speaker(runId);
@@ -273,7 +297,8 @@ function projectTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, 
       const self = speaker(runId);
       const target = project(input.projectId);
       const title = input.title.trim();
-      const duplicate = tasks.list(db, { projectId: target.id, statuses: OPEN }).find((t) => t.title.trim().toLowerCase() === title.toLowerCase());
+      const reach = accountReach(db, self.claudeAccountId);
+      const duplicate = tasks.list(db, { projectId: target.id, statuses: OPEN }).find((t) => t.title.trim().toLowerCase() === title.toLowerCase() && reachesTask(db, reach, t));
       if (duplicate) return json({ task: { id: duplicate.id, title: duplicate.title, status: duplicate.status }, duplicate: true });
       const task = tasks.insert(db, {
         projectId: target.id,
@@ -310,7 +335,7 @@ function talkTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, "or
     orclings: async (runId) => json(talk.directory(speaker(runId).id)),
     message: async (runId, input) => {
       const self = speaker(runId);
-      const to = talk.byName(input.to, self.id);
+      const to = talk.reachable(self.id, input.to);
       const home = threads.get(db, to.threadId);
       await deps.runs.authorizeAppAction(
         runId,
@@ -323,7 +348,7 @@ function talkTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, "or
     },
     startGroup: async (runId, input) => {
       const self = speaker(runId);
-      const others = input.with.map((name) => talk.byName(name, self.id));
+      const others = input.with.map((name) => talk.reachable(self.id, name));
       await deps.runs.authorizeAppAction(
         runId,
         "thread_message",

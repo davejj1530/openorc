@@ -1,5 +1,6 @@
 import { orclings, tasks, threads, type Db } from "@openorc/db";
-import { WORKSPACE_ID, type Project, type RunMode, type Task, type Thread } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID, type Project, type RunMode, type Task, type Thread } from "@openorc/protocol";
+import { taskOwnerAccount, threadAccount } from "./claude-account-separation.js";
 import type { RunHooks } from "./run-types.js";
 
 /** Prompts for a task or conversation, with memory and mode copy in document order. */
@@ -32,7 +33,7 @@ export class RunBriefs {
         ? "OpenOrc memory is off. Do not call memory_search, memory_record, or memory_feedback. Task instructions remain available through task_context."
         : "The openorc MCP server offers memory_search, task_context, and memory_record for this project's history. Use task_context before changing an unfamiliar area and memory_record after a failed approach.",
     );
-    const memoryBrief = this.hooks.brief(project);
+    const memoryBrief = this.hooks.brief(project, taskOwnerAccount(this.db, task) ?? DEFAULT_CLAUDE_ACCOUNT);
     if (memoryBrief) lines.push("", memoryBrief);
     return lines.join("\n");
   }
@@ -77,7 +78,7 @@ export class RunBriefs {
         ? "OpenOrc memory is off. Do not call memory_search, memory_record, or memory_feedback."
         : "The openorc MCP server also offers memory_search, task_context, and memory_record for this project's history.",
     );
-    const memoryBrief = this.hooks.brief(project);
+    const memoryBrief = this.hooks.brief(project, threadAccount(thread));
     if (memoryBrief) lines.push("", memoryBrief);
     return lines.join("\n");
   }

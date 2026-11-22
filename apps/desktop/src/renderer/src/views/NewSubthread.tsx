@@ -1,7 +1,7 @@
 import { spaceNavigation } from "../lib/space-navigation";
 import { useSpaceThread } from "../lib/space-queries";
-import { offeredAccount, projectAccountChoice, type ModelChoice } from "@openorc/client";
-import { executionMode, placeOf, PLACES, type ThreadSummary } from "@openorc/protocol";
+import { KEPT_SEPARATE, offeredAccount, projectAccountChoice, type ModelChoice, type ProjectAccountChoice } from "@openorc/client";
+import { DEFAULT_CLAUDE_ACCOUNT, executionMode, notCarriedOver, placeOf, PLACES, type ClaudeAccountConnection, type ThreadSummary } from "@openorc/protocol";
 import { useState } from "react";
 import { Composer } from "../components/Composer";
 import { DitherBackdrop } from "../components/DitherBackdrop";
@@ -10,6 +10,7 @@ import type { PickerAccounts } from "../components/ModelPickerAccounts";
 import { ProjectActivity } from "../components/ProjectActivity";
 import { TopBar } from "../components/TopBar";
 import { Button } from "../components/ui";
+import { useAccountsSeparate } from "../lib/accounts-separate";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { readDraft, writeDraft } from "../lib/drafts";
@@ -50,8 +51,8 @@ function SubthreadComposer({ parent }: { parent: ThreadSummary }) {
   const [mode, setMode] = useState(parent.mode);
   const [permission, setPermission] = useState(parent.permissionMode);
   const start = useRpcMutation("threads.start");
-  const { files, picker: accountPicker, claudeAccountId, missing, held } = useSubthreadPlace(parent, start.isPending, () => start.reset());
-  const blocked = held ?? (choice?.agent === "claude" ? missing : null);
+  const { files, picker: accountPicker, claudeAccountId, missing, held, refused } = useSubthreadPlace(parent, start.isPending, () => start.reset());
+  const blocked = held ?? refused ?? (choice?.agent === "claude" ? missing : null);
   const suggestions = useComposerSuggestions({ kind: "thread", id: parent.id }, choice?.agent, executionMode(mode, permission), claudeAccountId);
   const mounted = useMounted();
   const changePrompt = (text: string) => {
@@ -145,39 +146,60 @@ function SubthreadComposer({ parent }: { parent: ThreadSummary }) {
  * Where a subthread starts and on what. Under a cloud thread it starts on OpenOrc Cloud too, on the person's cloud
  * sign-in and with the cloud's files, once its server says it starts one there (`held` until then, in its words, as the
  * thread's menu says it); under a thread here, on this Mac with its project's Claude accounts. `missing` says why a
- * Claude subthread here can't start yet.
+ * Claude subthread here can't start yet, and `refused` why one can't start at all.
  */
 function useSubthreadPlace(parent: ThreadSummary, starting: boolean, onChoose: () => void) {
   const cloud = placeOf(parent) === PLACES.hosted;
   const hosted = useNewThreadFiles(parent.projectId, cloud, parent.id);
-  const { list, picker, claudeAccountId } = useSubthreadAccount(parent, !cloud, starting, onChoose);
+  const { list, picker, claudeAccountId, refused } = useSubthreadAccount(parent, !cloud, starting, onChoose);
   const held = useHostedCapabilities(parent).reason("personSubthreads");
   const files = cloud ? hosted : { draftKey: `${draftKey(parent.id)}.attachments`, hostedFiles: undefined };
-  return { files, picker, claudeAccountId, held, missing: cloud || list.data ? null : (list.error?.message ?? "Loading Claude accounts…") };
+  return { files, picker, claudeAccountId, held, refused, missing: cloud || list.data ? null : (list.error?.message ?? "Loading Claude accounts…") };
+}
+
+/** While accounts are kept separate, the account a subthread on this Mac stays on: its parent's. */
+function useParentAccount(parent: ThreadSummary, enabled: boolean): string | undefined {
+  const separate = useAccountsSeparate();
+  return separate && enabled ? (parent.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) : undefined;
+}
+
+function accountBlocked(kept: string | undefined, starting: boolean): string | undefined {
+  if (kept) return KEPT_SEPARATE.subthread;
+  return starting ? "Starting the thread…" : undefined;
+}
+
+/** The parent's account once the project stopped using it while accounts are kept separate: listed, though nothing can start on it. */
+function droppedParentAccount(kept: string | undefined, choice: ProjectAccountChoice | undefined, accounts: readonly ClaudeAccountConnection[] | undefined) {
+  if (!kept || !choice?.restricted || choice.accounts.some((account) => account.id === kept)) return { outside: undefined, refused: null };
+  const outside = accounts?.find((account) => account.id === kept);
+  return { outside, refused: notCarriedOver(outside?.name ?? "its Claude account") };
 }
 
 /**
  * The Claude accounts a subthread can start on: the ones its project uses, starting on the parent's while the project
- * still uses it, else on the project's default.
+ * still uses it, else on the project's default. While accounts are kept separate it stays on the parent's.
  */
 function useSubthreadAccount(parent: ThreadSummary, enabled: boolean, starting: boolean, onChoose: () => void) {
   const list = useRpc("claude.accounts.list", {}, { enabled });
   const project = useRpc("projects.get", { id: parent.projectId }, { enabled });
+  const kept = useParentAccount(parent, enabled);
   const [chosen, setChosen] = useState(parent.claudeAccountId ?? undefined);
   const choice = list.data && (project.data !== undefined || project.error) ? projectAccountChoice(project.data, list.data) : undefined;
-  const claudeAccountId = offeredAccount(choice, chosen) ?? choice?.defaultId;
+  const claudeAccountId = kept ?? offeredAccount(choice, chosen) ?? choice?.defaultId;
+  const { outside, refused } = droppedParentAccount(kept, choice, list.data?.accounts);
   const picker: PickerAccounts | undefined =
     choice && claudeAccountId
       ? {
-          accounts: choice.accounts,
+          accounts: outside ? [...choice.accounts, outside] : choice.accounts,
           current: claudeAccountId,
           choose: (id) => {
             setChosen(id);
             onChoose();
           },
-          blocked: starting ? "Starting the thread…" : undefined,
+          blocked: accountBlocked(kept, starting),
+          outside: outside?.id,
           project: choice.restricted && project.data ? { id: project.data.id, name: project.data.name } : undefined,
         }
       : undefined;
-  return { list, picker, claudeAccountId };
+  return { list, picker, claudeAccountId, refused };
 }

@@ -6,7 +6,7 @@ export { CodexExecParser } from "./codex/exec-json.js";
 export { withCodexConnection } from "./codex/connection.js";
 export { readableConnectorError, type ConnectorDriver, type ConnectorRow } from "./connectors.js";
 export { claudeConnectorDriver } from "./claude/connectors.js";
-export { sharedClaudeMcpServers } from "./claude/shared-mcp.js";
+export { claudeStateFile, sharedClaudeMcpServers } from "./claude/shared-mcp.js";
 export { codexConnectorDriver } from "./codex/connectors.js";
 export { openCodeConnectorDriver } from "./opencode/connectors.js";
 export { ompConnectorDriver } from "./omp/connectors.js";

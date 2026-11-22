@@ -252,7 +252,7 @@ export interface RunHooks {
   onSteerable?(runId: string): void;
   /** Includes host-generated Codex/Claude requests, after their pending handle exists. */
   onApprovalRequested?(event: Extract<AgentEvent, { type: "approval.requested" }>): void;
-  brief(project: Project): string;
+  brief(project: Project, claudeAccountId: string): string;
   /** Instructions that belong to one conversation, such as the pull request it reviews; null for none. */
   threadContext?(thread: Thread): string | null;
   /** Whether a conversation works in a checkout of code the user hasn't vetted, such as a pull request it reviews. */
@@ -275,6 +275,8 @@ export interface RunHooks {
   claudeUserMcpServers?(): boolean;
   /** Claude MCP servers the user turned off in Connectors. */
   claudeConnectorsOff?(): string[];
+  /** Paths a Claude run on this account keeps its file tools out of: other accounts' own, while accounts are kept separate. */
+  claudeOffLimits?(accountId: string): string[];
   orclings?: OrclingRunHooks;
   /** Folder-relative paths the editor saved under `root` since `since`, for crediting changes between turns to the user. */
   editorSaves?(root: string, since: number): string[];

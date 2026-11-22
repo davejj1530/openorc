@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { audit, orclings, projects, pullReviews, runs, threads, type Db, type PullReviewKey } from "@openorc/db";
+import { audit, claudeAccounts, orclings, projects, pullReviews, runs, threads, type Db, type PullReviewKey } from "@openorc/db";
 import { GitHubPulls, git, remoteRepository, worktree, type PullsAt } from "@openorc/git";
 import type { Hosted } from "@openorc/hosted";
 import type { PullReviewTools } from "@openorc/mcp";
@@ -10,7 +10,9 @@ import {
   isHarnessId,
   patchFiles,
   reviewCommentPlace,
+  reviewDrafted,
   type ModelExecutionSettings,
+  type Orcling,
   type Project,
   type PullRequestBranches,
   type PullRequestDetail,
@@ -28,11 +30,14 @@ import {
   type Run,
   type Thread,
 } from "@openorc/protocol";
+import { ACCOUNTS_KEPT_SEPARATE, accountsSeparate, threadAccount } from "./claude-account-separation.js";
+import { projectAccountPolicy, startingAccount } from "./project-claude-accounts.js";
 import { addReviewCheckout, fetchPullRequestHead, moveReviewCheckout } from "./pull-request-checkout.js";
 import { REVIEW_DIFF, agentAnchor, agentDiff, changedSince } from "./pull-request-diff.js";
 import type { ReviewerAppService } from "./reviewer-app.js";
 import type { RunService } from "./runs.js";
 import type { SystemService } from "./system.js";
+import type { StartThreadInput } from "./thread-inputs.js";
 import type { ThreadService } from "./threads.js";
 import type { WorkspaceWriters } from "./workspace-writers.js";
 
@@ -59,6 +64,8 @@ export interface PullRequestServiceOptions {
 type DraftAuthor = NonNullable<PullRequestDraftComment["author"]>;
 /** Who reviews: a model, or an Orcling with the model it uses. */
 type Reviewer = ModelExecutionSettings & { orclingId: string | null };
+/** The model a review was asked of, with the Claude account it was given. */
+type ReviewModel = Pick<ModelExecutionSettings, "agent"> & { claudeAccountId?: string | undefined };
 
 /** Review diffs kept for agents between tool calls. */
 const CACHED_DIFFS = 16;
@@ -82,6 +89,50 @@ function againPrompt(detail: PullRequestDetail, previous: string | null): string
     lines.push("No commits were added since your last review. Look again, and add only findings you haven't made.");
   }
   return lines.join("\n");
+}
+
+/** An archived conversation, or one whose copy was removed, was put away: the next round starts fresh. */
+function reviewGoesOn(conversation: Thread | null): conversation is Thread {
+  return conversation !== null && conversation.archivedAt === null && Boolean(conversation.worktreePath);
+}
+
+function askedAccount(db: Db, orcling: Pick<Orcling, "claudeAccountId"> | null, model: ReviewModel): string | undefined {
+  if (orcling) return accountsSeparate(db) ? orcling.claudeAccountId : undefined;
+  return model.agent === "claude" ? model.claudeAccountId : undefined;
+}
+
+/**
+ * Where a round of review runs: the conversation it goes on in, unless that is on another account than the round asks
+ * for, else a fresh one; and its Claude account, none for a fresh one on the project's default.
+ */
+export function reviewRound(db: Db, conversation: Thread | null, orcling: Pick<Orcling, "claudeAccountId"> | null, model: ReviewModel): { goesOn: Thread | null; claudeAccountId: string | undefined } {
+  const asked = askedAccount(db, orcling, model);
+  if (reviewGoesOn(conversation) && (!asked || threadAccount(conversation) === asked)) return { goesOn: conversation, claudeAccountId: threadAccount(conversation) };
+  return { goesOn: null, claudeAccountId: asked };
+}
+
+/**
+ * What a fresh review conversation starts on: an Orcling's own account, which the project's accounts leave alone, or
+ * the one a model was given, refused as a new thread's is when the project doesn't use it; else the project's default.
+ */
+function freshAccount(db: Db, projectId: string, reviewer: Reviewer, account: string | undefined): Pick<StartThreadInput, "claudeAccountId" | "claudeAccountFrom"> {
+  if (!account) return {};
+  if (reviewer.orclingId) return { claudeAccountId: account, claudeAccountFrom: "own" };
+  return { claudeAccountId: startingAccount(db, projectId, account, "chosen"), claudeAccountFrom: "chosen" };
+}
+
+/**
+ * While accounts are kept separate, a round on another account than the conversation that wrote the draft would take
+ * the draft's comments and summary with it, so the draft is posted or discarded first. An empty draft moves freely.
+ */
+function assertDraftStays(db: Db, review: PullRequestReview | null, conversation: Thread | null, round: { claudeAccountId: string | undefined }, reviewer: string): void {
+  if (!review || !conversation || !accountsSeparate(db)) return;
+  if (!reviewDrafted(review)) return;
+  const written = threadAccount(conversation);
+  const reviewsOn = round.claudeAccountId ?? projectAccountPolicy(db, review.projectId).defaultId;
+  if (reviewsOn === written) return;
+  const name = (id: string) => claudeAccounts.list(db).find((account) => account.id === id)?.name ?? "another Claude account";
+  throw new Error(`This pull request's review draft was written on ${name(written)}, and ${ACCOUNTS_KEPT_SEPARATE}, so post or discard it before ${reviewer} reviews it on ${name(reviewsOn)}.`);
 }
 
 /** The `owner/name` of a cloud project's repository on GitHub. */
@@ -196,7 +247,7 @@ export class PullRequestService {
    * opens a Plan-mode conversation of its own; later rounds continue it, so the
    * model can check its earlier findings against the new commits.
    */
-  async start(key: PullReviewKey, chosen: ModelExecutionSettings, orclingId?: string): Promise<{ threadId: string }> {
+  async start(key: PullReviewKey, chosen: ModelExecutionSettings, orclingId?: string, claudeAccountId?: string): Promise<{ threadId: string }> {
     const cloud = this.drafts(key.projectId);
     if (cloud) return this.startInCloud(cloud, key, chosen, orclingId);
     const project = this.project(key.projectId);
@@ -211,10 +262,11 @@ export class PullRequestService {
     if (conversation && this.options.runs.threadActivity(conversation.id) !== "idle") throw new Error("A model is already reviewing this pull request. Open its conversation to follow along.");
     const stale = this.staleReason(current, detail.headSha);
     if (stale) throw new Error(stale);
+    const round = reviewRound(this.db, conversation, orcling, { agent: chosen.agent, claudeAccountId });
+    assertDraftStays(this.db, current, conversation, round, orcling?.name ?? "a model");
     try {
-      // An archived conversation, or one whose copy was removed, was put away: the next round starts fresh.
-      if (conversation && conversation.archivedAt === null && conversation.worktreePath) return await this.reviewAgain(key, project, detail, conversation, reviewer);
-      return await this.reviewAnew(key, project, detail, reviewer);
+      if (round.goesOn) return await this.reviewAgain(key, project, detail, round.goesOn, reviewer);
+      return await this.reviewAnew(key, project, detail, reviewer, round.claudeAccountId);
     } finally {
       this.changed();
     }
@@ -231,13 +283,15 @@ export class PullRequestService {
     }
   }
 
-  private async reviewAnew(key: PullReviewKey, project: Project, detail: PullRequestDetail, reviewer: Reviewer): Promise<{ threadId: string }> {
+  private async reviewAnew(key: PullReviewKey, project: Project, detail: PullRequestDetail, reviewer: Reviewer, account: string | undefined): Promise<{ threadId: string }> {
+    const startsOn = freshAccount(this.db, project.id, reviewer, account);
     const mergeBase = await fetchPullRequestHead(project, detail);
     const checkoutPath = await addReviewCheckout(this.options.dataDir, project, detail);
     let admitted = false;
     try {
       const { thread } = await this.options.threads.start(
         {
+          ...startsOn,
           projectId: project.id,
           agent: reviewer.agent,
           model: reviewer.model,

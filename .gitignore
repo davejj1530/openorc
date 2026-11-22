@@ -22,3 +22,7 @@ coverage/
 /AGENTS.md
 /.local-development/
 .impeccable
+
+# Local agent scratch: reviews, logs and work files.
+/scratch/
+/.agent-scratch/

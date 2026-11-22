@@ -41,7 +41,7 @@ Everything else is allowed in every mode, because it changes nothing outside Ope
 - Task Refine: `task_suggest`, which hands back a suggested title, description and labels. Beside `approve`, it is the only OpenOrc tool a Refine run has; the run is read-only, and the task changes only when you use the suggestion.
 - `approve`: Claude Code's permission prompt. Claude Code calls it, not the model, to hand each tool request to OpenOrc's approvals and mode rules.
 
-An Orcling's tools exist only in runs where an Orcling speaks. Its permission caps the mode it works in anywhere: Approve runs as Review everything (Plan on OpenCode, which cannot ask first), Allow as Autonomous, and the stricter of the Orcling's and the conversation's rule wins. `orcling_thread_send` follows the `thread_send` rules below and can reach threads in any project. `orcling_thread_start` sets the Orcling working in a new project thread, or on a saved task that has no conversation of someone else's; that thread works as freely as the conversation that started it, within the Orcling's permission. See [Orclings](orclings.md).
+An Orcling's tools exist only in runs where an Orcling speaks. Its permission caps the mode it works in anywhere: Approve runs as Review everything (Plan on OpenCode, which cannot ask first), Allow as Autonomous, and the stricter of the Orcling's and the conversation's rule wins. `orcling_thread_send` follows the `thread_send` rules below and can reach threads in any project, though only those on its own Claude account while accounts are kept separate. `orcling_thread_start` sets the Orcling working in a new project thread, or on a saved task that has no conversation of someone else's; that thread works as freely as the conversation that started it, within the Orcling's permission. See [Orclings](orclings.md).
 
 `task_start` is refused in Plan. It marks the task in progress so the calling conversation can work on it; it does not start another agent. `execution_switch` changes a Slack request's model or folder, never its permissions.
 
@@ -51,11 +51,12 @@ The `device` tool exists only on a computer with simulators or emulators. It ref
 
 ## Messages to other conversations
 
-`thread_send` has three more rules:
+`thread_send` has four more rules:
 
 - A message to a conversation in the same or a stricter mode is allowed. That conversation acts under its own permissions, so it can do nothing the sender could not.
 - A chain of agent messages stops after 50 messages in a row with no one writing in between. The count is per conversation and kept in memory. A message from a person, in the app, Slack or a schedule, resets it.
 - A retried call with the same `request_key` is delivered once. Without a key, the same text to the same conversation from the same run counts as a retry.
+- While **Keep accounts separate** is on, a message reaches only a conversation on the sender's own Claude account. One on another account answers as if there were no such thread. See [Multiple Claude Code accounts](claude-accounts.md).
 
 ## Memory and passwords
 

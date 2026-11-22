@@ -23,6 +23,7 @@ const account = (id: string, name: string, patch: Partial<ClaudeAccountConnectio
 let project: Project;
 let accounts: ClaudeAccounts;
 let appAutoSwitch: boolean;
+let appSeparate: boolean;
 /** What the host says to the next save, when it refuses it. */
 let refuse: string | null;
 let release: (() => void) | null;
@@ -30,6 +31,7 @@ let release: (() => void) | null;
 beforeEach(() => {
   queryClient.clear();
   appAutoSwitch = false;
+  appSeparate = false;
   refuse = null;
   release = null;
   accounts = {
@@ -54,7 +56,7 @@ beforeEach(() => {
   mocks.call.mockReset().mockImplementation(async (method: string, params: { settings?: Partial<Project["settings"]> }) => {
     if (method === "projects.get") return structuredClone(project);
     if (method === "claude.accounts.list") return structuredClone(accounts);
-    if (method === "app.settings.get") return { claudeAccountAutoSwitch: appAutoSwitch };
+    if (method === "app.settings.get") return { claudeAccountAutoSwitch: appAutoSwitch, claudeAccountsSeparate: appSeparate };
     if (method === "projects.updateSettings") {
       if (release) await new Promise<void>((resolve) => (release = resolve));
       if (refuse) throw new Error(refuse);
@@ -122,6 +124,15 @@ it("chooses accounts, a default and the switch at usage limits, saving each at o
   await waitFor(() => expect(saved().at(-1)).toEqual(own({ accountIds: ["work"], defaultId: "work", autoSwitch: true })));
   expect(box("Work")).toMatchObject({ checked: true, disabled: true });
   expect(toggle("Switch accounts at usage limits")).toMatchObject({ disabled: true });
+});
+
+it("shows the project's switch at usage limits off while Settings keeps accounts separate", async () => {
+  appAutoSwitch = true;
+  appSeparate = true;
+  project.settings.claudeAccounts = own({ accountIds: ["work", "personal"], autoSwitch: true });
+  mount();
+  await waitFor(() => expect(within(section()).getByText("Off while Settings keeps Claude accounts separate.")).toBeTruthy());
+  expect(toggle("Switch accounts at usage limits")).toMatchObject({ checked: false, disabled: true });
 });
 
 it("keeps the selection while turned off and brings it back, without accounts removed since", async () => {

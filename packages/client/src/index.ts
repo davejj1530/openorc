@@ -41,6 +41,7 @@ export {
   type SkillCommand,
   type SkillCommands,
   type SkillListNotice,
+  type SkillListOptions,
   type SkillPrefix,
   type SkillSegment,
 } from "./skill-commands.js";

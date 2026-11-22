@@ -38,6 +38,7 @@ Everything else is allowed in every mode, because it changes nothing outside Ope
 - Documents: `task_create` in the backlog, `orcling_task_create`, `task_update`, `plan_write`, and `visualize`, which adds a view to the conversation.
 - Pull request reviews: `pull_request_diff`, and `pull_request_comment` and `pull_request_summary`, which write the review's drafts for you to post.
 - Task comments: `task_comment_intent`, which records whether a comment asks for work. The work itself starts only after the agent's reply.
+- Task Refine: `task_suggest`, which hands back a suggested title, description and labels. Beside `approve`, it is the only OpenOrc tool a Refine run has; the run is read-only, and the task changes only when you use the suggestion.
 - `approve`: Claude Code's permission prompt. Claude Code calls it, not the model, to hand each tool request to OpenOrc's approvals and mode rules.
 
 An Orcling's tools exist only in runs where an Orcling speaks. Its permission caps the mode it works in anywhere: Approve runs as Review everything (Plan on OpenCode, which cannot ask first), Allow as Autonomous, and the stricter of the Orcling's and the conversation's rule wins. `orcling_thread_send` follows the `thread_send` rules below and can reach threads in any project. `orcling_thread_start` sets the Orcling working in a new project thread, or on a saved task that has no conversation of someone else's; that thread works as freely as the conversation that started it, within the Orcling's permission. See [Orclings](orclings.md).

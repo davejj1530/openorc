@@ -1,0 +1,130 @@
+/* Refine (components/task-refine): its bar in the editor's controls row, its sheet's own fields and the suggestion's
+   marks. The sheet itself is task-threads.css's. Changed words take the soft fills diff runs use. */
+.task-refine-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  margin-bottom: 12px;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+.task-refine-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.task-refine-step {
+  flex: 1 1 120px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-4);
+}
+.task-refine-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.task-refine-note {
+  margin: -6px 0 16px;
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--ink-3);
+}
+.task-refine-asked {
+  color: var(--ink-2);
+}
+
+.task-refine-sheet-hint {
+  margin-top: -6px;
+  font-size: var(--text-sm);
+  line-height: 16px;
+  color: var(--ink-3);
+}
+.task-refine-sheet-instruction {
+  min-height: 64px;
+  max-height: 160px;
+  field-sizing: content;
+}
+
+.task-refine-title-change {
+  display: grid;
+  gap: 2px;
+}
+.task-refine-title-old {
+  font-size: var(--text-sm);
+  color: var(--ink-4);
+  text-decoration-color: var(--bad);
+}
+.task-refine-title {
+  cursor: default;
+}
+.task-refine-labels {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.refine-ins {
+  background: var(--ok-soft);
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px var(--ok-soft);
+}
+.refine-del {
+  color: var(--bad);
+  background: var(--bad-soft);
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px var(--bad-soft);
+  text-decoration-color: var(--bad);
+}
+.refine-document .refine-del {
+  margin-inline-end: 4px;
+}
+.refine-added,
+.refine-removed {
+  position: relative;
+}
+.refine-added::before,
+.refine-removed::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: calc(-16px - var(--refine-indent, 0px));
+  width: 2px;
+  border-radius: 2px;
+  background: var(--ok);
+}
+.refine-removed::before {
+  background: var(--bad);
+}
+.refine-removed {
+  margin: 6px 0 12px;
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--ink-3);
+}
+.refine-removed-toggle {
+  color: var(--ink-3);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+.refine-removed-toggle:hover,
+.refine-removed-toggle:focus-visible {
+  color: var(--ink);
+}
+.refine-removed-text p {
+  margin: 6px 0 0;
+  font-size: var(--text-md);
+  line-height: var(--text-md--line-height);
+  color: var(--bad);
+  text-decoration: line-through;
+  text-decoration-color: var(--bad);
+}

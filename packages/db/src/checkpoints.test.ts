@@ -3,6 +3,7 @@ import { checkpoints } from "./checkpoints.js";
 import { Db } from "./database.js";
 import { projects, runs, tasks, threads } from "./repos.js";
 import { taskComments } from "./task-comments.js";
+import { taskRefines } from "./task-refines.js";
 
 const root = "/repo";
 const stat = { files: 1, insertions: 1, deletions: 0, untracked: 0 };
@@ -35,12 +36,14 @@ describe("checkpoints.agentWorkSince", () => {
     expect(checkpoints.agentWorkSince(db, { root, threadId: mine, since: turn.createdAt })).toBe(true);
   });
 
-  it("sees a run of another conversation that started in the folder since, never this thread's own or a comment run", () => {
+  it("sees a run of another conversation that started in the folder since, never this thread's own, a comment run or a Refine", () => {
     runs.insert(db, { id: "run-mine", taskId: null, threadId: mine, agent: "codex", model: null, mode: "act", permissionMode: "trusted", workingDirectory: root });
     const recipient = { agent: "codex" as const, model: "fixture", effort: null };
     const comment = taskComments.insert(db, { taskId, requestKey: "ask", body: "What next?", recipients: [recipient], replyTo: null, source: "comment", context: "" });
     const attempt = taskComments.addAttempt(db, comment, recipient);
     runs.insert(db, { id: "run-comment", taskId: null, threadId: null, commentTurnId: attempt.id, agent: "codex", model: null, mode: "plan", permissionMode: "review", workingDirectory: root });
+    const refine = taskRefines.insert(db, { taskId, recipient, instruction: "", base: { title: "A task", spec: "", labels: [] } });
+    runs.insert(db, { id: "run-refine", taskId: null, threadId: null, refineId: refine.id, agent: "codex", model: null, mode: "plan", permissionMode: "review", workingDirectory: root });
     expect(checkpoints.agentWorkSince(db, { root, threadId: mine, since: since() })).toBe(false);
     runs.insert(db, { id: "run-theirs", taskId: null, threadId: theirs, agent: "codex", model: null, mode: "act", permissionMode: "trusted", workingDirectory: root });
     expect(checkpoints.agentWorkSince(db, { root, threadId: mine, since: later() })).toBe(false);

@@ -52,7 +52,7 @@ export function createTaskQueriesHandlers({
       await comments.execute(taskId, attemptId);
       return null;
     },
-    "tasks.openThread": ({ taskId }) => threadService.openTaskThread(taskId),
+    "tasks.openThread": ({ taskId, choice }) => threadService.openTaskThread(taskId, choice),
     "tasks.executionThread": ({ taskId }) => threadService.executionThreadFor(taskId),
   };
 }

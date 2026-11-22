@@ -1,4 +1,4 @@
-import { harnessCatalog, type AgentSkill, type FileScope, type HarnessId, type SkillFile } from "@openorc/protocol";
+import { harnessCatalog, skillCall, skillPrompt, type AgentSkill, type FileScope, type HarnessId, type SkillFile } from "@openorc/protocol";
 import { homeRelative } from "../lib/home-path";
 
 /** Where the page reads skills: one agent's, as it resolves them in one project. Reads wait while the page is hidden. */
@@ -47,19 +47,8 @@ export function groupSkills(skills: readonly AgentSkill[], term: string): SkillG
   return skillSources.map(({ id, title }) => ({ id, title, items: matching.filter((skill) => skill.source === id) })).filter((group) => group.items.length > 0);
 }
 
-/** What a message types to call a skill: Codex `$name`, Claude `/name`, Oh My Pi `/skill:name`. OpenCode loads skills through its own tool, so it has none. */
-const callPrefixes: Record<HarnessId, string | null> = { codex: "$", claude: "/", opencode: null, omp: "/skill:", cursor: "/", pi: "/skill:", antigravity: "/", fx: "$" };
-
-export function skillCall(agent: HarnessId, skill: AgentSkill): string | null {
-  const prefix = callPrefixes[agent];
-  return prefix === null ? null : `${prefix}${skill.name}`;
-}
-
-/** What a new thread starts with to try the skill: its call, or for OpenCode, asking for it by name. */
-export const tryPrompt = (agent: HarnessId, skill: AgentSkill) => {
-  const call = skillCall(agent, skill);
-  return call ? `${call} ` : `Use the ${skill.name} skill. `;
-};
+/** What a new thread starts with to try the skill: its call, else asking for it by name. */
+export const tryPrompt = (agent: HarnessId, skill: AgentSkill) => `${skillPrompt(`/${skill.name}`, [skill.name], agent)} `;
 
 /** What a new thread starts with to have its agent write a skill with the user. */
 export const createPrompt = (agent: HarnessId) => {
@@ -108,7 +97,7 @@ export function triggerSettingsFile(agent: HarnessId, skill: AgentSkill): string
  * OpenCode's agent always chooses for itself.
  */
 export function skillTrigger(agent: HarnessId, skill: AgentSkill, settings: string): SkillTrigger {
-  const call = skillCall(agent, skill);
+  const call = skillCall(skill.name, agent);
   if (agent === "claude") {
     const { fields } = splitFrontmatter(settings);
     return { call: fields["user-invocable"] === "false" ? null : call, auto: fields["disable-model-invocation"] !== "true" };

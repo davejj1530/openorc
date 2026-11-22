@@ -86,6 +86,7 @@ export class ThreadService {
       executionThreadFor: (id) => this.executionThreadFor(id),
       taskThreadForStart: (id, selected) => this.taskThreadForStart(id, selected),
       continueThread: (id, input) => this.continueThread(id, input),
+      delete: (id) => this.delete(id),
       handoffBrief: (thread, own) => this.agentTools.handoffBrief(thread, own),
       rejectRetiredThread: (id) => this.rejectRetiredThread(id),
     });
@@ -745,6 +746,15 @@ export class ThreadService {
   }
   startTaskInThread(...args: Parameters<ThreadTaskExecution["startTaskInThread"]>) {
     return this.taskExecution.startTaskInThread(...args);
+  }
+  taskThreadList(...args: Parameters<ThreadTaskExecution["taskThreadList"]>) {
+    return this.taskExecution.taskThreadList(...args);
+  }
+  newTaskThread(...args: Parameters<ThreadTaskExecution["newTaskThread"]>) {
+    return this.taskExecution.newTaskThread(...args);
+  }
+  runTaskButton(...args: Parameters<ThreadTaskExecution["runTaskButton"]>) {
+    return this.taskExecution.runTaskButton(...args);
   }
   startTask(...args: Parameters<ThreadTaskExecution["startTask"]>) {
     return this.taskExecution.startTask(...args);

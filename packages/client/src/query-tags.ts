@@ -197,6 +197,8 @@ const idReadTags: MethodRules = {
   "review.snapshots": (p) => [`snapshots:${String(p["taskId"])}`],
   "git.log": (p) => [`log:${String(p["taskId"])}`],
   "tasks.comments.list": (p) => [`task-comments:${String(p["taskId"])}`],
+  "tasks.refine.get": (p) => [`task-refine:${String(p["taskId"])}`],
+  "tasks.threads": (p) => ["threads", `task:${String(p["taskId"])}`],
   "workspace.usage": (p) => [`task:${String(p["taskId"])}`],
   ...each(["memory.list", "memory.search"], (p) => ["memory", `memory:${String(p["projectId"])}`]),
   "memory.forTask": (p) => ["memory", `memory:task:${String(p["taskId"])}`],
@@ -313,7 +315,12 @@ function workspaceMutationTags(id: string): string[] {
 const idInvalidations: MethodRules = {
   "orclings.react": (p) => [`reactions:${String(p["threadId"])}`],
   "orclings.groups.send": (p) => ["threads", `thread:${String(p["threadId"])}`, `runs:thread:${String(p["threadId"])}`],
-  ...each(["tasks.create", "tasks.update", "tasks.delete", "tasks.prepareWorkspace", "tasks.start", "tasks.openThread"], (p) => ["tasks", "inbox", "threads", taskTag(p)]),
+  ...each(["tasks.create", "tasks.update", "tasks.delete", "tasks.prepareWorkspace", "tasks.start", "tasks.openThread", "tasks.newThread", "tasks.runButton"], (p) => [
+    "tasks",
+    "inbox",
+    "threads",
+    taskTag(p),
+  ]),
   "threads.delete": (p) => ["threads", "tasks", "inbox", `thread:${String(p["id"])}`, `importable:${String(p["projectId"])}`],
   ...each(["threads.start", "threads.fork", "threads.import"], (p) => ["threads", "tasks", "inbox", `thread:${String(p["id"])}`, `importable:${String(p["projectId"])}`]),
   "threads.update": (p) => ["threads", "tasks", "inbox", `thread:${String(p["id"])}`, `runs:thread:${String(p["id"])}`, `importable:${String(p["projectId"])}`, ...scopedTask(p)],
@@ -356,6 +363,7 @@ export function invalidatesFor<M extends RpcMethod>(method: M, params: RpcParams
   if (method.startsWith("projects.")) return ["projects", "tasks"];
   const p = (params ?? {}) as Record<string, unknown>;
   if (method.startsWith("tasks.comments.")) return [`task-comments:${String(p["taskId"])}`];
+  if (method.startsWith("tasks.refine.")) return [`task-refine:${String(p["taskId"])}`];
   if (workspaceMutations.has(method)) return workspaceMutationTags(String(p["id"]));
   return idInvalidations[method]?.(p) ?? [];
 }

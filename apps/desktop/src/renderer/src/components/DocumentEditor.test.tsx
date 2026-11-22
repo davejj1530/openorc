@@ -45,6 +45,43 @@ it("switches to Markdown and back without losing a source edit", async () => {
   expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Task description Markdown" }).value).toBe("## Edited draft");
 });
 
+it("replaces the whole description as one edit, which undo in rich text takes back", async () => {
+  const editor = createRef<DocumentEditorHandle>();
+  const onChange = vi.fn();
+  function Draft() {
+    const [value, setValue] = useState("Old description");
+    return (
+      <DocumentEditor
+        ref={editor}
+        value={value}
+        onChange={(next) => {
+          onChange(next);
+          setValue(next);
+        }}
+      />
+    );
+  }
+
+  render(<Draft />);
+  const rich = screen.getByRole("textbox", { name: "Task description" });
+  await waitFor(() => expect(rich.textContent).toBe("Old description"));
+  act(() => editor.current?.replace("## New goal\n\nOne at a time."));
+  expect(onChange).toHaveBeenLastCalledWith("## New goal\n\nOne at a time.");
+  expect(rich.querySelector("h2")?.textContent).toBe("New goal");
+  fireEvent.keyDown(rich, { key: "z", ctrlKey: true });
+  expect(onChange).toHaveBeenLastCalledWith("Old description");
+  expect(rich.textContent).toBe("Old description");
+});
+
+it("shows a replacement in the editor's place and a bar in place of its controls, keeping the editor mounted", () => {
+  render(<DocumentEditor value="Draft" onChange={() => {}} bar={<div role="status">Refining…</div>} replacement={<p>The suggestion</p>} />);
+  expect(screen.getByRole("status").textContent).toBe("Refining…");
+  expect(screen.queryByRole("button", { name: "Markdown" })).toBeNull();
+  expect(screen.getByText("The suggestion")).toBeTruthy();
+  expect(screen.queryByRole("textbox", { name: "Task description" })).toBeNull();
+  expect(screen.getByRole("textbox", { name: "Task description", hidden: true })).toBeTruthy();
+});
+
 it("links the selected text, reading a bare domain as a web address and refusing other schemes", () => {
   const editor = new Editor({ extensions: documentExtensions(), content: "Read the spec", contentType: "markdown" });
   const onClose = vi.fn();

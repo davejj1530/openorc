@@ -13,6 +13,8 @@ export interface CommandSettleWatcher {
   output(chunk: string): void;
   /** The shell is going away: a typed command not yet reported as finished is reported now. */
   dispose(): void;
+  /** A typed command has not given the prompt back yet. A shell that never marks its prompt counts as running. */
+  running(): boolean;
 }
 
 /**
@@ -57,5 +59,6 @@ export function commandSettleWatcher(onSettled: () => void, settleMs = COMMAND_S
       ran = false;
       onSettled();
     },
+    running: () => ran && !promptSeen,
   };
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { openOrcToolName } from "./mcp-apps.js";
 
 export const Visualization = z.object({
   title: z.string().trim().min(1).max(120).describe("A short title for the concept being explained."),
@@ -9,7 +10,7 @@ export type Visualization = z.infer<typeof Visualization>;
 
 /** OpenOrc's tool names as reported by Codex, Claude Code and OpenCode. */
 export function isVisualizationTool(name: string): boolean {
-  return /^(?:mcp__openorc(?:_[0-9a-f]{32})?__|openorc(?:_[0-9a-f]{32})?\.|openorc_[0-9a-f]{32}_)visualize$/.test(name);
+  return openOrcToolName(name) === "visualize";
 }
 
 export const visualizationInstructions =

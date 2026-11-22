@@ -6,7 +6,10 @@ import type { WorkspaceLease } from "./workspace-writers.js";
 
 /** A run executes a task in its worktree, or a thread's turn in the project root. */
 export type RunScope =
-  { task: Task; thread: null; comment?: never } | { task: null; thread: Thread; comment?: never } | { task: null; thread: null; comment: { id: string; task: Task; resumeRunId?: string } };
+  | { task: Task; thread: null; comment?: never }
+  | { task: null; thread: Thread; comment?: never }
+  /** A read-only run about a task: a comment reply, or with `refine` a Refine whose one tool hands back a suggested document. */
+  | { task: null; thread: null; comment: { id: string; task: Task; resumeRunId?: string; refine?: true } };
 
 /** One adapter per registry harness. Execution is injectable; model discovery still uses the installed provider catalogs. */
 export type RunAdapterRegistry = Record<HarnessId, { start(spec: RunSpec, launch: AgentLaunchEnvironment): RunHandle }>;

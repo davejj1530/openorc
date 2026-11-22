@@ -121,9 +121,10 @@ it("keeps activity in its own tab", () => {
   expect(mocks.commits).not.toHaveBeenCalled();
 });
 
-it("opens Activity's file tools in the same task scope as its transcript links", () => {
-  const { task, project } = show({ id: "executor", teamInstanceId: null }, "chat");
-  expect(mocks.panel).toHaveBeenCalledWith({ context: { kind: "task", task, project } });
+it("opens Activity's file tools in the same task scope as its transcript links, in its thread's folder", () => {
+  const executor = { id: "executor", teamInstanceId: null };
+  const { task, project } = show(executor, "chat");
+  expect(mocks.panel).toHaveBeenCalledWith({ context: { kind: "task", task, project, thread: executor } });
 });
 
 it("saves the overview before switching tabs and stays there if saving fails", async () => {

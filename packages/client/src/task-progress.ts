@@ -1,5 +1,5 @@
 import type { Block } from "./transcript.js";
-import type { RunState } from "@openorc/protocol";
+import { bareToolName, type RunState } from "@openorc/protocol";
 import { taskToolKey } from "./task-tool-reference.js";
 
 /** An unanswered approval outranks a failed run; otherwise the task keeps its saved status. */
@@ -65,7 +65,7 @@ export function taskActivity(blocks: Block[]) {
 }
 
 export function taskStepLabel(name: string): string {
-  const n = name.replace(/^mcp__.*?__|^openorc\./, "");
+  const n = bareToolName(name);
   if (n === "task_context") return "Reading project context";
   if (n === "memory_search") return "Searching project memory";
   if (n === "memory_record") return "Saving project memory";

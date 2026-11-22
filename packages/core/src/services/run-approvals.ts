@@ -1,7 +1,7 @@
 import type { AcpApprovalRequest, CodexApprovalRequest } from "@openorc/agents";
 import { audit, runs, threads, type Db } from "@openorc/db";
 import { UserInput, validateUserAnswers, type UserInputResult } from "@openorc/mcp";
-import type { ExecutionMode, Thread } from "@openorc/protocol";
+import type { ExecutionMode, Run, Thread } from "@openorc/protocol";
 import { executionMode, harnessCatalog, isHarnessId, stricterPermission, type AgentEvent, type ApprovalDecision, type ApprovalResolution } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import type { Logger } from "../transport.js";
@@ -215,6 +215,12 @@ export class RunApprovals {
   private presentPlan(runId: string, input: unknown): ApprovalResolution {
     const run = this.deps.live.get(runId)?.run ?? runs.get(this.deps.db, runId);
     const plan = (input as Record<string, unknown> | null)?.["plan"];
+    // A Refine runs in Plan only so nothing changes; what it hands back is a task, through task_suggest.
+    if (run?.refineId)
+      return {
+        decision: "deny",
+        message: "This is a task Refine, so a plan isn't shown to the user. Call task_suggest now with the complete title, the complete Markdown description, the labels and a one-sentence note.",
+      };
     if (run?.mode !== "plan" || typeof plan !== "string" || !plan.trim()) return { decision: "deny", message: "There is no plan to present. Write it to your plan file first." };
     this.deps.emit({ type: "plan.updated", runId, ts: Date.now(), documentId: "plan", text: plan });
     return {
@@ -310,6 +316,8 @@ export class RunApprovals {
     const entry = this.deps.live.get(runId);
     if (this.deps.isClosing() || entry?.closingRequested || entry?.exiting) return Promise.resolve({ decision: "deny" });
     const run = this.deps.live.get(runId)?.run ?? runs.get(this.deps.db, runId);
+    const refused = this.refineQuestion(run, approvalId, needsAnswer);
+    if (refused) return Promise.resolve(refused);
     if (!needsAnswer && category === "external" && run?.mode === "plan") {
       audit.record(this.deps.db, { actor: "openorc", action: "approval.deny", resourceType: "run", resourceId: runId, metadata: { approvalId, policy: "plan" } });
       return Promise.resolve({ decision: "deny" });
@@ -337,6 +345,17 @@ export class RunApprovals {
       announce();
       this.deps.invalidate(["inbox", "threads", "tasks"]);
     });
+  }
+
+  /** Nothing on the task page answers a Refine's question, which would wait until stopped, so the agent is told to suggest. */
+  private refineQuestion(run: Run | null | undefined, approvalId: string, needsAnswer: boolean): ApprovalResolution | null {
+    if (!needsAnswer || !run?.refineId) return null;
+    audit.record(this.deps.db, { actor: "openorc", action: "approval.deny", resourceType: "run", resourceId: run.id, metadata: { approvalId, policy: "refine" } });
+    return {
+      decision: "deny",
+      message:
+        "This is a task Refine, so nobody can answer your questions. Put them under Open questions in the description, then call task_suggest now with the complete title, the complete Markdown description, the labels and a one-sentence note.",
+    };
   }
 
   resolveApproval(runId: string, approvalId: string, decision: ApprovalDecision, answers?: Record<string, string[]>): void {

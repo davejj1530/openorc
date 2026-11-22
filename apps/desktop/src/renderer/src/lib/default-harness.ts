@@ -1,4 +1,4 @@
-import type { AppSettings, HarnessId } from "@openorc/protocol";
+import { defaultHarnessId, type AppSettings, type HarnessId } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { useRpc, useRpcMutation } from "./client";
 import { readOnboardingState, type PersistedOnboardingState } from "./onboarding";
@@ -13,6 +13,12 @@ export function useDefaultHarness(): HarnessId | null | undefined {
   const settings = useRpc("app.settings.get", {});
   // Until App hands an earlier onboarding choice to the core, that choice still decides.
   return settings.data && (settings.data.defaultHarness ?? (settings.data.enabledHarnesses == null ? readOnboardingState().defaultHarness : null));
+}
+
+/** The agent new work starts on without a choice, as the core picks it: the default harness, else the first one listed. */
+export function useDefaultAgent(): HarnessId | undefined {
+  const harness = useDefaultHarness();
+  return harness === undefined ? undefined : (harness ?? defaultHarnessId);
 }
 
 /**

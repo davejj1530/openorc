@@ -78,12 +78,12 @@ export const projects = {
   },
   /**
    * A shallow merge: keys the patch leaves out, such as ones an older client does not know, keep their values. Choosing
-   * the project's own Claude accounts alone leaves updated_at, which orders the project list, as it was.
+   * the project's own Claude accounts or its task buttons alone leaves updated_at, which orders the project list, as it was.
    */
   updateSettings(db: Db, id: string, patch: Partial<ProjectSettings>): Project {
     const current = projects.get(db, id);
     if (!current) throw new Error(`project ${id} not found`);
-    const touched = Object.keys(patch).some((key) => key !== "claudeAccounts");
+    const touched = Object.keys(patch).some((key) => key !== "claudeAccounts" && key !== "taskButtons");
     db.stmt("UPDATE projects SET settings = ?, updated_at = ? WHERE id = ?").run(JSON.stringify({ ...current.settings, ...patch }), touched ? now() : current.updatedAt, id);
     return projects.get(db, id) as Project;
   },

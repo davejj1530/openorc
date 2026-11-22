@@ -14,6 +14,14 @@ Removing an image from a document does not delete its file, because another draf
 
 Task descriptions are stored as Markdown. Every description opens in rich text, and opening one never rewrites it: only edits are saved. Markdown with no rich form, such as raw HTML, `$$` math, footnotes, and images inside links, is kept exactly as written and shows as plain source you can edit in place. **Markdown** shows the whole source, and **Rich text** returns. Block dragging, image resizing and captions, advanced table editing, and shared editing are not supported.
 
+## Refine
+
+**Refine**, beside **Markdown**, asks an agent to improve the task. Its sheet takes what should change, which is optional, and the model or Orcling to use. A Claude model also takes the account to refine on, from the ones the project uses; an Orcling keeps its own. The sheet remembers both for next time. The task's latest edits are saved first. The agent works read-only: it reads the project and the task's comments, and its only tool, `task_suggest`, hands back a suggested title, description and labels with a one-line note. Nobody can answer the agent during a Refine, so a question it would ask goes under Open questions in the suggestion. It reads the task thread's worktree, or the project folder once that worktree is gone.
+
+While it works, a bar takes the controls' place, naming the agent and its latest step, with **Stop**. The document stays editable. When the suggestion arrives, it shows in place of the document: added blocks have a line in the margin, changed words are shaded, removed text folds behind **Show removed text**, and a changed title shows the old one struck through above it. **Use suggestion** applies it as an ordinary edit, which autosave keeps and, in rich text, ⌘Z in the description undoes. **Dismiss** puts it away, and **Refine again** asks for another, continuing the same agent session when the model and account are the same and the task hasn't changed since; otherwise it starts again from the task as it is now. **Edit** turns the suggestion's title, description and labels into fields to change before using it, and **Show changes** goes back to the marked view with those edits in it. The edits are kept with the suggestion, so they survive leaving the page, and **Use suggestion** applies the edited version. **Refine again** after editing starts from your edited version: the agent keeps your edits unless what you ask now changes them. If you stop it or it doesn't finish, the earlier suggestion stays, with your edits and the reason. If you edit the task while the agent works, the suggestion says it was made from an earlier version.
+
+A suggestion survives leaving the page and restarting. Tasks on OpenOrc Cloud don't offer Refine yet.
+
 ## Images when a task runs
 
 Before a task run starts, OpenOrc checks every image in its description, including reference-style Markdown images but not images inside code examples. A missing, invalid, or still-saving image stops the run before it is created.
@@ -29,4 +37,5 @@ Images are held in IndexedDB until the core writes the file. While saving, the M
 - `apps/desktop/src/renderer/src/components/editor/document-schema.test.ts`: Markdown compatibility and slash-command matching.
 - `packages/core/src/services/attachments.test.ts`: image validation, pending, missing and path-escaping references, and symlink escapes.
 - `packages/core/src/services/task-images.test.ts`: Codex and Claude task starts through `tasks.start` and `runs.start`; task images are listed in the prompt and composer attachments stay separate.
+- `packages/core/src/services/task-refine.test.ts` and `apps/desktop/src/renderer/src/components/task-refine/`: Refine's read-only run, its suggestion, and how the suggestion is shown and used.
 - `node scripts/task-editor-ui-smoke.cjs`: an isolated Electron profile covering clipboard paste, image insertion, reload recovery, failed saves and retry, deletion while saving, formatting, Markdown paste, undo and redo, source preservation, and light, dark and narrow layouts. It makes no paid agent calls.

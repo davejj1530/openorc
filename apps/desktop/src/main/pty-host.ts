@@ -60,6 +60,8 @@ export interface TerminalAttachment {
   backlog: string;
   running: boolean;
   exitCode: number | null;
+  /** Where a shell that was running a command when its panel moved to another folder still is. */
+  stayedIn?: string;
 }
 
 /**
@@ -163,6 +165,8 @@ export class Scrollback {
 
 interface Session {
   readonly pty: PtyProcess;
+  /** The folder it was opened for, not where it has cd'd since. */
+  readonly cwd: string;
   readonly scrollback: Scrollback;
   /** onData and onExit. A shell that ignores SIGHUP outlives the kill, so the host lets go of it explicitly. */
   readonly listeners: PtyListener[];
@@ -172,6 +176,8 @@ interface Session {
   exited: boolean;
   exitCode: number | null;
   readonly commands: CommandSettleWatcher;
+  /** Kept in its folder because a command was running when its panel moved on: only a restart moves it. */
+  stays: boolean;
 }
 
 /**
@@ -184,6 +190,7 @@ interface Session {
  */
 interface Start {
   readonly session: Promise<Session | null>;
+  readonly cwd: string;
   cancelled: boolean;
   /** A resize that arrived with no pty to take it. Applied once there is one. */
   size: TerminalSize | null;
@@ -226,22 +233,26 @@ export class PtyHost {
     if (this.updating) throw new Error("OpenOrc is restarting to update. Please wait.");
     const size = clampSize(input.cols, input.rows);
     const live = this.sessions.get(input.id);
-    if (live) {
+    if (live && live.cwd !== input.cwd && !live.exited && live.commands.running()) live.stays = true;
+    if (live && (live.cwd === input.cwd || live.stays)) {
       // The shell is where it is and may have cd'd since, so a re-attach
-      // adopts it rather than arguing about the cwd the caller asked for.
+      // adopts it rather than arguing about where it is now.
       if (!live.exited) live.pty.resize(size.cols, size.rows);
-      return this.replay(live);
+      return this.replay(live, input.cwd);
     }
     // Checked before the lookup: as the right-hand side of a `??` this is
     // skipped on the branch that joins an in-flight start, which is exactly
     // where a directory that went away between two opens shows up.
     const cwd = validateCwd(input.cwd, this.folder);
+    // Another folder for the same panel, as a thread's once its worktree exists: the old shell is left where the
+    // conversation no longer works, so it ends and a new one starts here.
+    if (live || (this.starting.get(input.id)?.cwd ?? cwd) !== cwd) this.kill(input.id);
     const start = this.starting.get(input.id) ?? this.begin(input.id, cwd, size);
     const session = await start.session;
     // Killed before it ever ran. Nothing was installed, so there is nothing to
     // replay and nothing to draw beyond saying so.
     if (!session) return { backlog: "", running: false, exitCode: null };
-    return this.replay(session);
+    return this.replay(session, cwd);
   }
 
   /** Output for `id` goes to the sink from here until the viewer detaches. */
@@ -316,6 +327,7 @@ export class PtyHost {
 
   private begin(id: string, cwd: string, size: TerminalSize): Start {
     const start: Start = {
+      cwd,
       cancelled: false,
       size: null,
       // `start` is read only once the spawn settles, by which point this
@@ -344,6 +356,7 @@ export class PtyHost {
     }
     const session: Session = {
       pty,
+      cwd: start.cwd,
       scrollback: new Scrollback(),
       pending: "",
       timer: null,
@@ -351,6 +364,7 @@ export class PtyHost {
       exitCode: null,
       listeners: [],
       commands: commandSettleWatcher(() => this.sink.settled(id), this.settleMs),
+      stays: false,
     };
     this.sessions.set(id, session);
     // Both handlers check that this session still holds the key. A kill lets
@@ -390,10 +404,11 @@ export class PtyHost {
    * the ring the caller is about to draw, and sending them as well would print
    * the tail of the session twice.
    */
-  private replay(session: Session): TerminalAttachment {
+  private replay(session: Session, requested: string): TerminalAttachment {
     this.stopTimer(session);
     session.pending = "";
-    return { backlog: session.scrollback.read(), running: !session.exited, exitCode: session.exitCode };
+    const attachment = { backlog: session.scrollback.read(), running: !session.exited, exitCode: session.exitCode };
+    return session.cwd === requested ? attachment : { ...attachment, stayedIn: session.cwd };
   }
 
   private flush(id: string, session: Session): void {

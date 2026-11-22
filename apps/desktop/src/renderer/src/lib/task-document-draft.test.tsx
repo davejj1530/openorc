@@ -40,6 +40,7 @@ it("waits for the editor before saving and retains the last keystroke when navig
     view.result.current.reportImagesReady(false);
     view.result.current.body.current = {
       focus: () => {},
+      replace: () => {},
       flush: async () => {
         await images.promise;
         return true;

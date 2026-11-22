@@ -154,36 +154,20 @@
   font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
+/* The mention list is a .typed-options list (styles/controls.css) across the composer. */
 .task-comment-mentions {
-  max-height: 260px;
-  overflow: auto;
-  padding: 6px;
   border-bottom: var(--hairline) solid var(--line);
 }
 .task-comment-mentions button[role="option"] {
-  display: flex;
-  align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  min-height: 36px;
-  padding: 10px;
-  border-radius: var(--radius-md);
-  text-align: left;
-  font-size: var(--text-sm);
   overflow-wrap: anywhere;
-}
-.task-comment-mentions button[aria-selected="true"],
-.task-comment-mentions button[role="option"]:hover {
-  background: var(--surface-2);
 }
 .task-comment-mentions p {
   padding: 8px;
   font-size: var(--text-sm);
 }
 .task-comment-compose-footer > span,
-.task-comment-recipients,
-.task-comment-mentions button[role="option"] span:last-child {
+.task-comment-recipients {
   color: var(--ink-3);
 }
 

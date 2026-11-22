@@ -1,5 +1,5 @@
 import type { AgentLaunchEnvironment } from "@openorc/agents";
-import { audit, retiredTeams, runs, subagents, taskComments, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
+import { audit, retiredTeams, runs, subagents, taskComments, taskRefines, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
 import { worktree } from "@openorc/git";
 import { internalToolNames, type OpenOrcMcpServer } from "@openorc/mcp";
 import {
@@ -157,12 +157,14 @@ export class RunLaunch {
 
   private recordRun(prepared: PreparedSession, lease: WorkspaceLease, assertAdmission: () => void): Run {
     const { input, runId, model } = prepared;
+    const { comment } = input.scope;
     try {
       assertAdmission();
       return runs.insert(this.deps.db, {
         id: runId,
         workingDirectory: lease.paths[0]!,
-        commentTurnId: input.scope.comment?.id,
+        commentTurnId: comment?.refine ? undefined : comment?.id,
+        refineId: comment?.refine ? comment.id : undefined,
         taskId: input.scope.task?.id ?? null,
         threadId: input.scope.thread?.id ?? null,
         agent: input.agent,
@@ -261,7 +263,7 @@ export class RunLaunch {
     return {
       serverName: `openorc_${randomUUID().replace(/-/g, "")}`,
       url: mcp.urlForRun(runId),
-      toolNames: input.scope.comment ? ["ask_user", "approve", "task_comment_intent"] : [...internalToolNames],
+      toolNames: input.scope.comment ? commentToolNames(input.scope.comment) : [...internalToolNames],
     };
   }
 
@@ -330,6 +332,8 @@ export class RunLaunch {
 
   private scopeBrief(input: StartRunInput): string {
     const { scope, project } = input;
+    if (scope.comment?.refine)
+      return "You are refining a task document in OpenOrc. This is read-only: read the project as you need to, then hand back your suggestion with task_suggest. The task changes only if the user uses your suggestion. No other task or thread tools are available.";
     if (scope.comment) return "You are responding in task comments. This is read-only discussion, not task execution. Reply to the user in comments. No task or thread mutation tools are available.";
     if (scope.task) return this.deps.taskBrief(scope.task, project, input.mode);
     return this.deps.threadBrief(scope.thread, project, input.mode);
@@ -374,7 +378,7 @@ export class RunLaunch {
     const { scope, agent } = input;
     if ((scope.thread && retiredTeams.isHidden(this.deps.db, scope.thread.id)) || (scope.task ?? scope.comment?.task)?.retiredTeam) throw new Error("This item is no longer available.");
     assertAdmission();
-    if (scope.comment && (input.mode !== "plan" || input.permissionMode !== "review" || input.resumeFrom)) throw new Error("Comment turns require a read-only discussion session.");
+    if (scope.comment && (input.mode !== "plan" || input.permissionMode !== "review" || input.resumeFrom)) throw new Error("Comments and Refine run only in a read-only session.");
     // Task images belong to the brief, not the user's message.
     const taskImages = input.collectTaskImages !== false && scope.task?.spec ? ((await this.deps.hooks.taskImages?.(scope.task.spec)) ?? []) : [];
     await this.deps.validateFastMode(agent, input.model, input.fastMode, environment, launch);
@@ -408,13 +412,21 @@ export class RunLaunch {
         ? (runs.lastSession(this.deps.db, scope.task ? { taskId: scope.task.id } : { threadId: scope.thread.id }, agent, input.orclingId, input.claudeAccountId ?? undefined) ?? undefined)
         : undefined;
     const commentRun = scope.comment?.resumeRunId ? runs.get(this.deps.db, scope.comment.resumeRunId) : null;
-    if (scope.comment && input.resume) this.assertCommentResume(scope.comment.task, commentRun, agent, model, input);
+    if (scope.comment && input.resume) this.assertCommentResume(scope.comment.task, commentRun, agent, model, input, Boolean(scope.comment.refine));
     const resumeSessionId = own ?? (scope.comment && input.resume ? commentRun?.externalSessionId : input.resumeFrom?.sessionId);
     return { resumeSessionId, forkSession: !own && Boolean(input.resumeFrom?.fork) };
   }
 
-  private assertCommentResume(task: Task, commentRun: Run | null, agent: AgentKind, model: string | undefined, input: StartRunInput): void {
-    const parent = commentRun?.commentTurnId ? taskComments.attempt(this.deps.db, commentRun.commentTurnId) : null;
+  private refineOf(run: Run | null) {
+    return run?.refineId ? taskRefines.get(this.deps.db, run.refineId) : null;
+  }
+
+  private commentOf(run: Run | null) {
+    return run?.commentTurnId ? taskComments.attempt(this.deps.db, run.commentTurnId) : null;
+  }
+
+  private assertCommentResume(task: Task, commentRun: Run | null, agent: AgentKind, model: string | undefined, input: StartRunInput, refine: boolean): void {
+    const parent = refine ? this.refineOf(commentRun) : this.commentOf(commentRun);
     if (
       !commentRun?.externalSessionId ||
       parent?.taskId !== task.id ||
@@ -425,7 +437,12 @@ export class RunLaunch {
       commentRun.mode !== "plan" ||
       commentRun.permissionMode !== "review"
     ) {
-      throw new Error("Only this task's matching read-only comment session can be resumed.");
+      throw new Error("Only a read-only session of this task on the same model and account can be resumed.");
     }
   }
+}
+
+/** A comment reply records its intent; a Refine only hands back its suggestion. Neither can change the task itself. */
+function commentToolNames(comment: { refine?: true }): string[] {
+  return comment.refine ? ["approve", "task_suggest"] : ["ask_user", "approve", "task_comment_intent"];
 }

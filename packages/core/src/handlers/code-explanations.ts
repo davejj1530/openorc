@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { tasks, threads, type Db } from "@openorc/db";
-import { defaultHarnessId, type FileScope, type HarnessId } from "@openorc/protocol";
+import type { FileScope, HarnessId } from "@openorc/protocol";
 import { conversationFolder } from "../services/conversation-folder.js";
 import { CodeExplanationService, type ExplainConversation } from "../services/code-explanations.js";
 import type { FileService } from "../services/files.js";
@@ -15,7 +15,7 @@ interface Dependencies {
   /** Explanations are kept under it, in `code-explanations`. */
   dataDir: string;
   /** Its default harness explains a project's files before any conversation exists. */
-  settings: Pick<AppSettingsService, "get">;
+  settings: Pick<AppSettingsService, "defaultAgent">;
 }
 
 /** A thread's or a task's conversation explains with its own agent and Claude account, as it names itself. */
@@ -31,14 +31,13 @@ let lookups = 0;
 const conversationKey = (scope: FileScope) => (scope.kind === "project" ? `project:${scope.id}:${scope.workingDirectory ?? ""}` : `${scope.kind}:${scope.id}`);
 
 export function createCodeExplanationHandlers({ db, files, textGeneration, settings, dataDir }: Dependencies): Pick<Handlers, "code.explain"> {
-  const defaultAgent = () => settings.get().defaultHarness ?? defaultHarnessId;
   const explanations = new CodeExplanationService({ dir: join(dataDir, "code-explanations"), complete: (request) => textGeneration.complete(request) });
   return {
     "code.explain": ({ scope, path, text, view, refresh }) =>
       explanations.explain(
         { path, text, view, ...(refresh ? { refresh } : {}) },
         {
-          ...conversationAgent(db, scope, defaultAgent),
+          ...conversationAgent(db, scope, () => settings.defaultAgent()),
           // A find key of its own, so a lookup of callers never stops the user's find or another explanation's lookup.
           find: (query) => files.find(`explain:${conversationKey(scope)}:${++lookups}`, conversationFolder(db, scope), query),
         },

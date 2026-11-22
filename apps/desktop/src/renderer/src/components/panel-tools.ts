@@ -7,7 +7,8 @@ import { BookText, Brain, FileDiff, FileText, Folder, GitCommitHorizontal, Globe
 
 export type PanelContext =
   | { kind: "thread"; thread: ThreadSummary; project: Project; task?: Task }
-  | { kind: "task"; task: Task; project: Project }
+  /** `thread`: the one the task runs in, whose folder the task's terminal and files are in. */
+  | { kind: "task"; task: Task; project: Project; thread?: ThreadSummary | null | undefined }
   | { kind: "project"; project: Project }
   | { kind: "newthread"; project: Project; workingDirectory: string; changes: boolean };
 
@@ -40,10 +41,12 @@ export function terminalId(context: PanelContext, page: Extract<PanelPage, { kin
   return page.shell ? `${base}:shell:${page.shell.id}` : base;
 }
 
+const threadDirectory = (thread: ThreadSummary, project: Project) => thread.workingDirectory ?? thread.worktreePath ?? project.rootPath;
+
 export function panelDirectory(context: PanelContext): string {
   if (context.kind === "newthread") return context.workingDirectory;
-  if (context.kind === "thread") return context.thread.workingDirectory ?? context.thread.worktreePath ?? context.project.rootPath;
-  if (context.kind === "task") return context.task.worktreePath ?? context.project.rootPath;
+  if (context.kind === "thread") return threadDirectory(context.thread, context.project);
+  if (context.kind === "task") return context.thread ? threadDirectory(context.thread, context.project) : (context.task.worktreePath ?? context.project.rootPath);
   return context.project.rootPath;
 }
 

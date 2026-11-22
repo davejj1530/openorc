@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { commandWordAt, insertSkill, rankCommands, skillSegments } from "./skill-commands.js";
+// @vitest-environment jsdom
+import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import type { AgentKind, AgentSkill } from "@openorc/protocol";
+import { commandWordAt, insertSkill, rankCommands, skillSegments, type SkillCommand, type SkillListOptions } from "./skill-commands.js";
+import { testClient } from "./test-fixtures/fake-connection.js";
 
 const names = new Set(["formatting", "code-review", "figma", "figma:figma-use"]);
 const marked = (text: string): string[] =>
@@ -88,5 +92,42 @@ describe("inserting a skill", () => {
   it("replaces the word with the skill and one space, keeping one already there, and puts the caret past it", () => {
     expect(insertSkill("please /co", { start: 7 }, 10, { prefix: "/", name: "code-review" })).toEqual({ text: "please /code-review ", caret: 20 });
     expect(insertSkill("/co the diff", { start: 0 }, 3, { prefix: "$", name: "code-review" })).toEqual({ text: "$code-review the diff", caret: 13 });
+  });
+});
+
+describe("the skills a composer offers each agent", () => {
+  const { client, call, wrapper } = testClient();
+  const skills: AgentSkill[] = [{ name: "review", description: "Reviews the changes.", source: "project", path: "/repo/.claude/skills/review/SKILL.md" }];
+  const scope = { kind: "project", id: "project" } as const;
+  const named = (commands: SkillCommand[]) => commands.map((command) => `${command.prefix}${command.name}`);
+  const offered = (agent: AgentKind, options?: SkillListOptions) => renderHook(() => named(client.useSkillCommands(scope, agent, undefined, options).commands), { wrapper }).result;
+  afterEach(() => {
+    cleanup();
+    client.queryClient.clear();
+    call.mockReset();
+  });
+
+  it("names each the way its agent calls it, and offers an agent with no call none", async () => {
+    call.mockResolvedValue(skills);
+    for (const [agent, name] of [
+      ["claude", "/review"],
+      ["codex", "$review"],
+      ["pi", "/skill:review"],
+    ] as const) {
+      const result = offered(agent);
+      await waitFor(() => expect(result.current).toEqual([name]));
+    }
+    expect(offered("opencode").current).toEqual([]);
+    expect(offered("acp").current).toEqual([]);
+    expect(call.mock.calls.map(([, params]) => (params as { agent: string }).agent)).toEqual(["claude", "codex", "pi"]);
+  });
+
+  it("names each by its name alone for a prompt that asks by name, for an agent with no call too", async () => {
+    call.mockResolvedValue(skills);
+    for (const agent of ["pi", "opencode", "acp"] as const) {
+      const result = offered(agent, { byName: true });
+      await waitFor(() => expect(result.current).toEqual(["/review"]));
+    }
+    expect(call.mock.calls.map(([, params]) => (params as { agent: string }).agent)).toEqual(["pi", "opencode"]);
   });
 });

@@ -197,10 +197,9 @@ describe("the push sender", () => {
 
   it("reads the Mac as away when presence is slower than 250 ms or fails", async () => {
     const to = phone();
-    inUse = () => new Promise((resolve) => setTimeout(() => resolve(true), 400));
-    const started = Date.now();
+    // Presence that never answers: the send finishes only because the 250 ms cutoff reads the Mac as away.
+    inUse = () => new Promise<boolean>(() => {});
     await send(notice({ kind: "finished" }));
-    expect(Date.now() - started).toBeLessThan(400);
     inUse = async () => Promise.reject(new Error("main is gone"));
     await send(notice({ kind: "finished", threadId: "thread-2" }));
     expect(sentTo(to).map((delivery) => delivery.priority)).toEqual([10, 10]);

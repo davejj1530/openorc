@@ -51,7 +51,6 @@ type SheetProps = {
   keptAccount?: string | undefined;
 };
 
-/** A Claude choice on the account it must stay on, when there is one. */
 const onAccount = (choice: ThreadChoice, kept: string | undefined): ThreadChoice => (kept && choice.agent === "claude" ? { ...choice, claudeAccountId: kept } : choice);
 
 /**
@@ -66,8 +65,7 @@ export function ThreadChoiceSheet({ title, confirm, inherited, project, trigger,
   // Until the accounts arrive, the choice keeps no account, so confirming leaves the account to the one the thread would inherit.
   const filled = inherited && prefill(inherited, options, models, accounts ?? []);
   const prefilled = filled && { ...filled, choice: onAccount(filled.choice, keptAccount) };
-  const shown = edited ?? prefilled?.choice;
-  const choice = shown && onAccount(shown, keptAccount);
+  const choice = edited ? onAccount(edited, keptAccount) : prefilled?.choice;
   return (
     <TaskSheet
       sheet={sheet}

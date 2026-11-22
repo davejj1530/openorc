@@ -13,8 +13,7 @@ import { useComposerControl } from "./composer-read-only";
 
 /**
  * A lost session or a failed last turn, with a fresh start that hands the conversation over. A turn stopped by a
- * Claude usage limit can go on with another signed-in account instead, which resumes the conversation's session, unless
- * accounts are kept separate.
+ * Claude usage limit can go on with another signed-in account instead, which resumes the conversation's session.
  */
 export function SessionRecovery({ thread, disabled, onRestart, onContinueWith }: { thread: ThreadSummary; disabled: boolean; onRestart: () => void; onContinueWith: (accountId: string) => void }) {
   const { session } = thread;

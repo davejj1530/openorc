@@ -205,7 +205,7 @@ function DeleteOrcling({ profile }: { profile: OrclingProfile }) {
 
 /**
  * The model sheet, opened from the Model row, changes this Orcling's model, effort, Fast mode and, for Claude, its
- * account, as it changes a composer's: each pick saves at once. Its account stays while the Mac keeps accounts separate.
+ * account, as it changes a composer's: each pick saves at once.
  */
 function useShareModel(composerId: string, profile: OrclingProfile | undefined, save: Save) {
   const held = useAccountsSeparate() ? "Accounts are kept separate, so an Orcling stays on its account." : null;

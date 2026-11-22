@@ -193,7 +193,6 @@ it("sends a signed-out account's thread on to another, and says where to sign ba
 
 const signedOut: ThreadSession = { status: "error", message: "Not logged in", recovery: { kind: "sign_in", provider: "claude" } };
 
-/** The Mac's settings as the phone has held them since it connected. */
 const cached = (settings: Partial<AppSettings>) => mac.phone!.module.queryClient.setQueryData(["app.settings.get", {}], settings);
 
 it.each([

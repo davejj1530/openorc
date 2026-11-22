@@ -243,7 +243,6 @@ it("lists messageable conversations before applying the agent's 30-thread limit"
 const conversation = (title: string, claudeAccountId?: string) =>
   threads.insert(core.db, { projectId: project.id, title, agent: "codex", model: null, mode: "act", permissionMode: "trusted", ...(claudeAccountId ? { claudeAccountId } : {}) });
 
-/** A task saved from a conversation, or from none. */
 const task = (title: string, threadId: string | null) =>
   tasks.insert(core.db, { projectId: project.id, title, spec: null, priority: "none", labels: [], workspaceMode: "current", baseRef: null, parentTaskId: null, threadId });
 

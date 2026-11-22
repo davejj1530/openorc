@@ -76,10 +76,7 @@ export function ClaudeAccountSettings({ active }: { active: boolean }) {
   );
 }
 
-/**
- * Whether work stays on its own account, and whether a thread at its account's usage limit goes on with another. Shown
- * with two enabled accounts, and while accounts are kept separate, so the setting can always be turned off.
- */
+/** Shown with two enabled accounts, and while accounts are kept separate so the setting can always be turned off. */
 function AccountPreferences({ several }: { several: boolean }) {
   const preference = usePreference("app.settings.set");
   const separate = preference.value.claudeAccountsSeparate ?? false;

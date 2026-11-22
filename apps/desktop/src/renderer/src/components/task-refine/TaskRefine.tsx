@@ -89,7 +89,7 @@ function refinerName(recipient: CommentRecipient, models: ModelOption[] | undefi
 
 /**
  * The Claude account a Claude model refines on, from the ones the project uses; an Orcling keeps its own. The last one
- * chosen comes back while the project still uses it. While accounts are kept separate, the task's own is the only one.
+ * chosen comes back while the project still uses it.
  */
 function useRefineAccount(project: AccountsProject | undefined, recipient: CommentRecipient | undefined, kept: string | undefined) {
   const claude = recipient?.agent === "claude" && !recipient.orclingId;

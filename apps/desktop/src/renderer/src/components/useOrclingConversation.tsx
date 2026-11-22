@@ -71,13 +71,8 @@ function groupParts(chat: OrclingChatSpec, runs: number, send: (params: { thread
 /** An Orcling at the tail of its conversation, thinking while a turn runs. */
 const face = (orcling: Orcling) => (working: boolean) => <OrclingPreview look={orcling.look} expression={working ? 1 : 0} size={44} />;
 
-/** What the model picker says of an Orcling it can't give the conversation to, and why. */
 const ON_ANOTHER_ACCOUNT = { label: "On another Claude account", reason: STAYS_ON_ITS_ACCOUNT };
 
-/**
- * While accounts are kept separate, which Orclings can't join a conversation: those on another Claude account than its
- * own. The Orcling already working in it stays.
- */
 function useOnAnotherAccount(thread: ThreadSummary | null): (orcling: Orcling) => boolean {
   const separate = useAccountsSeparate();
   const account = thread?.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;

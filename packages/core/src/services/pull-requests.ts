@@ -84,7 +84,7 @@ function againPrompt(detail: PullRequestDetail, previous: string | null): string
   return lines.join("\n");
 }
 
-/** Whether a review's next round goes on in its conversation. An archived one, or one whose copy was removed, was put away: the next round starts fresh. */
+/** An archived conversation, or one whose copy was removed, was put away: the next round starts fresh. */
 export function reviewGoesOn(conversation: Thread | null): conversation is Thread {
   return conversation !== null && conversation.archivedAt === null && Boolean(conversation.worktreePath);
 }

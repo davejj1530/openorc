@@ -7,7 +7,6 @@ import type { RunService } from "../services/runs.js";
 import { recipientCatalog } from "../services/task-side-runs.js";
 
 type Reach = (account: string) => boolean;
-/** Whether OpenOrc Cloud holds a thread or run. */
 export type CloudHolds = (ref: { thread: string } | { run: string }) => boolean;
 
 /**
@@ -23,9 +22,8 @@ export async function mentionedOrclings(db: Db, runService: Pick<RunService, "mo
 }
 
 /**
- * While accounts are kept separate, what an Orcling does for the person stays on its own Claude account: it acts on no
- * thread, run, task, Orcling or review of another account, starts threads, reviews and Orclings only on its own, and
- * moves no conversation to another.
+ * While accounts are kept separate, why an Orcling's call is refused: it reaches another account's work or OpenOrc
+ * Cloud, starts something on another account, or moves a conversation.
  */
 export function separateAccountsRefusal(
   db: Db,
@@ -48,7 +46,6 @@ export function separateAccountsRefusal(
   return reachesAll(db, reach, method, params, mentioned) ? null : `That belongs to another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`;
 }
 
-/** Why a call that moves a conversation, or names a Claude account that is not the Orcling's own, is refused. */
 function namedAccountRefusal(self: Orcling, method: string, params: Record<string, unknown>): string | null {
   const chosen = params["claudeAccountId"];
   const elsewhere = typeof chosen === "string" && chosen !== self.claudeAccountId;
@@ -61,10 +58,17 @@ function namedAccountRefusal(self: Orcling, method: string, params: Record<strin
 /** Whether a call reaches OpenOrc Cloud: a space's threads or tasks, a cloud thread started, or a thread or run the cloud holds. */
 function reachesCloud(method: string, params: Record<string, unknown>, inCloud: CloudHolds | undefined): boolean {
   if (typeof params["spaceId"] === "string" || (method === "threads.start" && params["hosted"])) return true;
-  const id = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : null);
-  const threadIds = [id("threadId"), id("parentThreadId"), method.startsWith("threads.") ? id("id") : null];
-  const runId = id("runId");
-  return Boolean(inCloud && (threadIds.some((thread) => thread && inCloud({ thread })) || (runId && inCloud({ run: runId }))));
+  const runId = stringParam(params, "runId");
+  return Boolean(inCloud && (threadParams(method, params).some((thread) => thread && inCloud({ thread })) || (runId && inCloud({ run: runId }))));
+}
+
+function stringParam(params: Record<string, unknown>, key: string): string | null {
+  const value = params[key];
+  return typeof value === "string" ? value : null;
+}
+
+function threadParams(method: string, params: Record<string, unknown>): (string | null)[] {
+  return [stringParam(params, "threadId"), stringParam(params, "parentThreadId"), method.startsWith("threads.") ? stringParam(params, "id") : null];
 }
 
 /** Whether the call starts a task that has no conversation yet: its thread would go on its project's default account. */
@@ -88,13 +92,13 @@ function nestedIds(params: Record<string, unknown>): { threadIds: string[]; task
   };
 }
 
-/** Every thread, run, task, Orcling and review the call names, by the parameter names the methods use, and each Orcling a comment asks by @name. */
 function reachesAll(db: Db, reach: Reach, method: string, params: Record<string, unknown>, mentioned: readonly string[]): boolean {
-  const id = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : null);
-  const run = id("runId") ? runs.get(db, id("runId")!) : null;
+  const id = (key: string) => stringParam(params, key);
+  const runId = id("runId");
+  const run = runId ? runs.get(db, runId) : null;
   const review = method.startsWith("pulls.review.") ? reviewConversation(db, params) : null;
   const nested = nestedIds(params);
-  const threadIds = [id("threadId"), id("parentThreadId"), method.startsWith("threads.") ? id("id") : null, run?.threadId ?? null, review?.id ?? null, ...nested.threadIds];
+  const threadIds = [...threadParams(method, params), run?.threadId ?? null, review?.id ?? null, ...nested.threadIds];
   const taskIds = [id("taskId"), method.startsWith("tasks.") ? id("id") : null, ...nested.taskIds];
   const orclingIds = [method.startsWith("orclings.") ? id("id") : null, id("orclingId"), ...nested.orclingIds, ...mentioned];
   const named = threadIds.flatMap((threadId) => (threadId ? [threads.get(db, threadId)] : [])).filter((thread) => thread !== null);
@@ -108,7 +112,6 @@ function reachesAll(db: Db, reach: Reach, method: string, params: Record<string,
   });
 }
 
-/** The conversation a pull request's review keeps, when it has one on this Mac. */
 function reviewConversation(db: Db, params: Record<string, unknown>) {
   const { projectId, number } = params;
   if (typeof projectId !== "string" || typeof number !== "number") return null;
@@ -116,10 +119,7 @@ function reviewConversation(db: Db, params: Record<string, unknown>) {
   return threadId ? threads.get(db, threadId) : null;
 }
 
-/**
- * The account a review would run on, as PullRequests.start decides: another round in its open conversation, else a new
- * one on the project's default. None for a project only OpenOrc Cloud has, whose review runs there.
- */
+/** The account a review would run on, as PullRequests.start decides; none for a project only OpenOrc Cloud has, whose review runs there. */
 function reviewAccount(db: Db, params: Record<string, unknown>): string | null {
   const projectId = String(params["projectId"]);
   if (!projects.get(db, projectId)) return null;

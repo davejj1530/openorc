@@ -15,10 +15,7 @@ const authStatus = z.object({ loggedIn: z.boolean(), email: z.string().nullable(
 const inheritedAuth = /^(ANTHROPIC_|CLAUDE_CODE_(OAUTH_TOKEN|OAUTH_TOKEN_FILE_DESCRIPTOR|API_KEY_FILE_DESCRIPTOR|USE_BEDROCK|USE_VERTEX|USE_FOUNDRY)|CLAUDE_CONFIG_DIR$)/;
 type Connection = Pick<ClaudeAccountConnection, "status" | "email" | "organization" | "message">;
 const disconnected: Connection = { status: "signed_out", email: null, organization: null, message: null };
-/**
- * What of the existing CLI login's folder is its own: sessions and memory, prompt history, sign-in, plans, file
- * snapshots, pasted text, to-dos, background jobs, backups and logs. Its skills and plugins every account uses.
- */
+/** The existing CLI login's own part of its folder; its skills and plugins, which every account uses, are left out. */
 const CLI_LOGIN_PRIVATE = [
   "projects",
   "history.jsonl",
@@ -172,14 +169,14 @@ export class ClaudeAccountService {
       for (const key of Object.keys(env)) if (inheritedAuth.test(key)) delete env[key];
       env["CLAUDE_CONFIG_DIR"] = this.directory(account);
       env[SHARED_CLAUDE_CONFIG_DIR] = shared;
-      // Kept separate, each account keeps its memories in its own folder, as Claude Code does by default.
-      const sharedMemory = !accountsSeparate(this.db);
-      // Claude Code keeps auto-memory under this folder instead of the account's, naming each project's memory folder
-      // the way it does for the CLI login, so every account reads and saves the same memories. autoMemoryDirectory
-      // would need OpenOrc to repeat that naming, and Claude asks permission to use memory through a folder link.
-      if (sharedMemory) env["CLAUDE_CODE_REMOTE_MEMORY_DIR"] = shared;
       linkSharedSkills(shared, env["CLAUDE_CONFIG_DIR"]);
-      if (sharedMemory) moveAccountMemory(shared, env["CLAUDE_CONFIG_DIR"]);
+      // Kept separate, each account keeps its memories in its own folder, as Claude Code does by default.
+      if (!accountsSeparate(this.db)) {
+        // Every account's auto-memory lives here, in folders named as the CLI login's. autoMemoryDirectory would need
+        // OpenOrc to repeat that naming, and Claude asks permission to use memory through a folder link.
+        env["CLAUDE_CODE_REMOTE_MEMORY_DIR"] = shared;
+        moveAccountMemory(shared, env["CLAUDE_CONFIG_DIR"]);
+      }
     }
     return { ...snapshot, env: Object.freeze(env), claudeAccountId: id, scope: `${id}:${this.generations.get(id) ?? 0}` };
   }
@@ -311,10 +308,7 @@ export class ClaudeAccountService {
     return this.directory(claudeAccounts.get(this.db, id));
   }
 
-  /**
-   * While accounts are kept separate, the paths a run on this account keeps its file tools out of: every other added
-   * account's Claude folder, and the existing CLI login's own part of its folder.
-   */
+  /** While accounts are kept separate, the paths a run on this account keeps its file tools out of. */
   offLimits(id: string): string[] {
     if (!accountsSeparate(this.db)) return [];
     return claudeAccounts

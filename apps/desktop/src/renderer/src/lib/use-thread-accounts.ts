@@ -18,7 +18,7 @@ function shownAccount(thread: ThreadSummary | null, separate: boolean): "claude"
 /**
  * A Claude conversation's accounts for its model picker: the project's choices, plus the thread's own when the project
  * stopped using it, so it stays listed until the thread moves. Choosing one moves the conversation between turns; the
- * next message resumes its session there. An Orcling keeps its own account, and none moves while accounts are kept separate.
+ * next message resumes its session there. An Orcling keeps its own account.
  */
 export function useThreadAccounts(thread: ThreadSummary | null, project: Pick<Project, "id" | "name" | "settings"> | null): PickerAccounts | undefined {
   const mac = useMacThreadAccounts(thread, project);
@@ -51,7 +51,6 @@ function useMacThreadAccounts(thread: ThreadSummary | null, project: Pick<Projec
   };
 }
 
-/** Why the conversation's account can't change now, when it can't. */
 function switchBlocked(thread: ThreadSummary, separate: boolean, switching: boolean): string | undefined {
   if (thread.orclingId) return "An Orcling keeps its own account.";
   if (separate) return STAYS_ON_ITS_ACCOUNT;

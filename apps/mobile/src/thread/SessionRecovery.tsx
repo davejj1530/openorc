@@ -59,8 +59,8 @@ function AccountChoice({ choice, now, going, disabled, onPress }: { choice: Cont
 /**
  * Over the composer while a conversation cannot go on as it was: what stopped it, in the agent's words, and the way
  * back. A turn stopped on one Claude account goes on with another, the one with the most left first, and its session
- * goes with it, unless the Mac keeps accounts separate; a lost session or a failed turn starts fresh with a handoff, as
- * on the Mac. Typing a message still resumes, so the card steps aside while the person writes.
+ * goes with it; a lost session or a failed turn starts fresh with a handoff, as on the Mac. Typing a message still
+ * resumes, so the card steps aside while the person writes.
  */
 function Stopped({ thread, request, disabled, onSent }: RecoveryProps) {
   const [going, setGoing] = useState<string | null>(null);

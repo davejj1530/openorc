@@ -201,7 +201,6 @@ function ChosenAccounts({
   own: ProjectClaudeAccounts;
   accounts: ClaudeAccountConnection[];
   appSetting: string;
-  /** Settings keeps Claude accounts separate, so nothing switches at a usage limit. */
   separate: boolean;
   pending: boolean;
   onChange: (next: ProjectClaudeAccounts) => void;

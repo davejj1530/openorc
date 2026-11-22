@@ -163,7 +163,6 @@ function useParentAccount(parent: ThreadSummary, enabled: boolean): string | und
   return separate && enabled ? (parent.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) : undefined;
 }
 
-/** Why the subthread's account can't be chosen now, when it can't. */
 function accountBlocked(kept: string | undefined, starting: boolean): string | undefined {
   if (kept) return "Accounts are kept separate, so a subthread stays on its thread's account.";
   return starting ? "Starting the thread…" : undefined;
@@ -171,8 +170,7 @@ function accountBlocked(kept: string | undefined, starting: boolean): string | u
 
 /**
  * The Claude accounts a subthread can start on: the ones its project uses, starting on the parent's while the project
- * still uses it, else on the project's default. While accounts are kept separate it starts on the parent's, whatever
- * the project uses.
+ * still uses it, else on the project's default.
  */
 function useSubthreadAccount(parent: ThreadSummary, enabled: boolean, starting: boolean, onChoose: () => void) {
   const list = useRpc("claude.accounts.list", {}, { enabled });

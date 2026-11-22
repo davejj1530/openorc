@@ -143,10 +143,7 @@ function DesignerForm({ existing, initialModel }: { existing: Orcling | undefine
   );
 }
 
-/**
- * Which Claude account a Claude Orcling runs on, once there is more than one to choose from. While accounts are kept
- * separate, a saved Orcling stays on the one it has.
- */
+/** Which Claude account a Claude Orcling runs on, once there is more than one to choose from. */
 function AccountField({ value, onChange, saved }: { value: string | undefined; onChange: (id: string) => void; saved: boolean }) {
   const accounts = useRpc("claude.accounts.list", {}).data;
   const kept = useAccountsSeparate() && saved;

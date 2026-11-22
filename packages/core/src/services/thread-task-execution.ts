@@ -674,8 +674,7 @@ type FollowingSettings = Omit<ModelSettings, "claudeAccountId"> & { claudeAccoun
 
 /**
  * A thread's model and account as another thread had them, or the ones a person chose in their place, keeping its
- * account when they chose none. Fast mode stays on only for the same model; an account the project no longer uses goes,
- * or stops the thread while accounts are kept separate.
+ * account when they chose none. Fast mode stays on only for the same model; an account the project no longer uses goes.
  */
 function followingSettings(db: Db, projectId: string, from: ModelSettings, choice: ThreadChoice | undefined): FollowingSettings {
   if (!choice) return { agent: from.agent, model: from.model, effort: from.effort, fastMode: from.fastMode, claudeAccountId: inheritedAccount(db, projectId, from.agent, from.claudeAccountId) };

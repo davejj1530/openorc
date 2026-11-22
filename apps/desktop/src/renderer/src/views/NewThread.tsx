@@ -116,10 +116,7 @@ function useNewThreadAccount(projects: Project[] | undefined, projectId: string,
   return { list, choices, claudeAccountId: orcling ?? offeredAccount(choice, drafted) ?? choice?.defaultId ?? "claude-cli" };
 }
 
-/**
- * A new thread's Claude accounts for its model picker: the ones its project uses, the chosen one checked, in the
- * picker's `section`, Claude's when none. An Orcling brings its own.
- */
+/** A new thread's Claude accounts for its model picker: the ones its project uses, the chosen one checked. An Orcling brings its own. */
 function newThreadAccounts(choices: ClaudeAccounts | undefined, current: string, blocked: string | undefined, choose: (id: string) => void, section: string | undefined): PickerAccounts | undefined {
   return choices ? { accounts: choices.accounts, current, choose, blocked, section } : undefined;
 }

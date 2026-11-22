@@ -19,11 +19,12 @@ export interface ProjectAccountPolicy {
 }
 
 type AccountSettings = Pick<AppSettings, "claudeAccountAutoSwitch" | "claudeAccountsSeparate">;
+/** For a caller that asks only which accounts a project uses, without reading whether its threads switch. */
+export const NO_SWITCHING: AccountSettings = { claudeAccountAutoSwitch: false, claudeAccountsSeparate: false };
 
 /**
  * Where a starting thread's account came from, which decides what happens when the project does not use it. "unused"
- * is a thread that is not Claude's: its account only goes along, so it gives way to the project's default without
- * stopping the start, or is refused as one passed down is while accounts are kept separate.
+ * is a thread that is not Claude's: its account gives way to the project's default, unless accounts are kept separate.
  */
 export type AccountSource = "chosen" | "inherited" | "own" | "unused";
 
@@ -75,12 +76,11 @@ function onlyTheseAccounts(db: Db, policy: ProjectAccountPolicy): string {
  * The account a thread in the project starts on. With none asked for, the project's default (the app's for a project
  * that follows the app's). One a person chose that the project does not use is refused; one passed down from a parent,
  * a task or a schedule gives way to the project's default, or is refused while accounts are kept separate; a starter's
- * own, as an Orcling's, is left alone. A thread that is not Claude's has its account handled as one passed down, and
- * none of the project's accounts being enabled does not stop its start.
+ * own, as an Orcling's, is left alone. Another agent's thread counts as passed down, but starts even if none is enabled.
  */
 export function startingAccount(db: Db, projectId: string, requested: string | undefined, from: AccountSource = "chosen"): string {
   if (from === "own" && requested) return requested;
-  const policy = projectAccountPolicy(db, projectId, { claudeAccountAutoSwitch: false, claudeAccountsSeparate: false });
+  const policy = projectAccountPolicy(db, projectId, NO_SWITCHING);
   if (from === "unused" && !requested) return policy.defaultId;
   if (!requested) return newThreadAccount(policy);
   if (allowsAccount(policy, requested)) return requested;
@@ -90,7 +90,6 @@ export function startingAccount(db: Db, projectId: string, requested: string | u
   throw new Error(onlyTheseAccounts(db, policy));
 }
 
-/** Why work can't go on in a project that no longer uses the account it would carry on with. */
 function notCarriedOver(db: Db, requested: string): string {
   const name = claudeAccounts.list(db).find((account) => account.id === requested)?.name ?? "its Claude account";
   return `This project doesn't use ${name}, and ${ACCOUNTS_KEPT_SEPARATE}, so this can't start on another account.`;

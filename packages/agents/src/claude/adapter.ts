@@ -122,9 +122,8 @@ function launchPermissionSettings(spec: RunSpec, plans: string | null, connectio
 }
 
 /**
- * Keeps Claude Code's file tools out of paths on this machine: Read rules cover Read, Grep and Glob, Edit rules every
- * tool that writes, and a leading `//` marks an absolute path. A shell command can still read them. Windows paths
- * take another form, and a run on another machine has none of these paths.
+ * Claude Code's Read rules also cover Grep and Glob, Edit rules every tool that writes, and `//` starts an absolute
+ * path. A shell command can still read them; Windows paths take another form, and a run on another machine has none.
  */
 function offLimitsRules(paths: readonly string[] | undefined, place: LaunchPlace): string[] {
   if (!paths?.length || place.host || process.platform === "win32") return [];

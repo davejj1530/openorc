@@ -121,7 +121,6 @@ function AccountRows({ accounts, disabled, moveRowFocus }: { accounts: PickerAcc
   clearError.current = accounts.clearError;
   useEffect(() => () => clearError.current?.(), []);
   const inClaude = (accounts.section ?? "claude") === "claude";
-  // This Mac's accounts are Claude's in any agent's section; a cloud thread's are its own agent's.
   const name = inClaude || !accounts.cloud ? "Claude account" : "Account";
   return (
     <div className="model-picker-group" role="group" aria-label={name}>

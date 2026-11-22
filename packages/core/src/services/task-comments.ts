@@ -389,7 +389,6 @@ function commentOutcomeState(status: TurnSettledOutcome["status"]): "success" | 
   return "error";
 }
 
-/** While accounts are kept separate, an Orcling on another Claude account than the task's doesn't answer its comments. */
 function assertOrclingsOnTaskAccount(db: Db, task: Task, recipients: readonly CommentRecipient[], everyOrcling: readonly Orcling[]): void {
   for (const recipient of recipients) {
     const orcling = recipient.orclingId ? everyOrcling.find((candidate) => candidate.id === recipient.orclingId) : undefined;

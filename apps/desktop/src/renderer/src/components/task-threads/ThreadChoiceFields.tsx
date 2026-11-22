@@ -41,7 +41,6 @@ export function NoAccount({ reason, variant, label }: { reason: string; variant:
   );
 }
 
-/** The account a task's work stays on while accounts are kept separate, by name. */
 export function keptAccountName(accounts: readonly ClaudeAccount[] | undefined, kept: string): string {
   return `${accounts?.find((account) => account.id === kept)?.name ?? "The task's account"} (kept separate)`;
 }

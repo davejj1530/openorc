@@ -83,7 +83,6 @@ const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0
 /**
  * Whether a run may read or message a thread: one in its own project, or any for an Orcling. An Orcling's own chat is
  * that Orcling's alone and a group chat its members', whoever asks: other Orclings reach them with their own messages.
- * While accounts are kept separate, none on another Claude account.
  */
 export function reachesThread(db: Db, runId: string, source: Thread, target: Thread): boolean {
   return withinReach(db, runId, source, target) && accountReach(db, runAccount(db, runId, source))(threadAccount(target));
@@ -217,7 +216,6 @@ export class ThreadAgentTools {
     return { task, currentTaskId: scope.currentTaskId };
   }
 
-  /** Which accounts' work the run's agent may see and reach. */
   private accountReach(runId: string): (account: string) => boolean {
     return accountReach(this.db, runAccount(this.db, runId, this.scopeOf(runId).thread));
   }
@@ -404,7 +402,6 @@ export class ThreadAgentTools {
     );
   }
 
-  /** While accounts are kept separate, a thread started under another stays on its parent's account; a starter's own, as an Orcling's, is left alone. */
   private parentAccount(parent: Thread, input: Pick<StartThreadInput, "claudeAccountId" | "claudeAccountFrom">): Pick<StartThreadInput, "claudeAccountId" | "claudeAccountFrom"> {
     if (input.claudeAccountFrom === "own" || !accountsSeparate(this.db)) return {};
     const kept = threadAccount(parent);

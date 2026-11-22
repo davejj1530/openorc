@@ -103,7 +103,6 @@ export class OrclingTalk {
     return found;
   }
 
-  /** Another Orcling this one may reach on its own: any, or only one on its Claude account while accounts are kept separate. */
   reachable(fromId: string, toName: string): Orcling {
     const from = this.orcling(fromId);
     const to = this.byName(toName, fromId);
@@ -307,7 +306,6 @@ export class OrclingTalk {
     void this.next(thread.id);
   }
 
-  /** Whether a group's Orclings work on more than one Claude account while accounts are kept separate, which keeps it quiet. */
   private acrossAccounts(memberIds: readonly string[]): boolean {
     return accountsSeparate(this.deps.db) && new Set(memberIds.map((id) => this.orcling(id).claudeAccountId)).size > 1;
   }

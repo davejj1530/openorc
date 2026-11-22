@@ -456,7 +456,7 @@ export class OpenOrc {
       taskImages: (spec) => new AttachmentService(options.dataDir).forTask(spec),
       inlineToolImages: (output) => this.toolImages.inline(output),
       storeToolImages: (ev) => this.toolImages.withStoredImages(ev),
-      brief: (project, claudeAccountId?: string) => this.memory.brief(project, claudeAccountId),
+      brief: (project, claudeAccountId) => this.memory.brief(project, claudeAccountId),
       threadContext: (thread) => this.pullRequests.brief(thread),
       untrustedCheckout: (thread) => inUnvettedCopy(db, thread),
       memoryEnabled: () => this.memory.enabled(),

@@ -262,19 +262,17 @@ async function launchWork(
 function projectTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, "projects" | "project" | "readThread" | "createTask" | "startWork" | "sendThread"> {
   const { db } = deps;
   const project = (id: string) => placeById(db, id);
+  const openTasks = (projectId: string, reach: (account: string) => boolean) => tasks.list(db, { projectId, statuses: OPEN }).filter((t) => reachesTask(db, reach, t));
   return {
     projects: async (runId) => {
       const reach = accountReach(db, speaker(runId).claudeAccountId);
-      const open = (projectId: string) => tasks.list(db, { projectId, statuses: OPEN }).filter((t) => reachesTask(db, reach, t));
-      return json(places(db).map((p) => ({ id: p.id, name: p.name, folder: p.rootPath, openTasks: open(p.id).length })));
+      return json(places(db).map((p) => ({ id: p.id, name: p.name, folder: p.rootPath, openTasks: openTasks(p.id, reach).length })));
     },
     project: async (runId, projectId, query) => {
       const self = speaker(runId);
       const reach = accountReach(db, self.claudeAccountId);
       const found = project(projectId);
-      const open = tasks
-        .list(db, { projectId, statuses: OPEN })
-        .filter((t) => reachesTask(db, reach, t))
+      const open = openTasks(projectId, reach)
         .slice(0, 20)
         .map((t) => ({ id: t.id, title: t.title, status: t.status }));
       // Orclings' own conversations sit in the Workspace but are private chats, not its work.

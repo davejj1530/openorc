@@ -46,15 +46,11 @@ export function useNewThreadClaudeAccount(projectId: string, chosen: string | un
   );
 }
 
-/**
- * Whether the Mac keeps Claude accounts separate, so no conversation moves to another account. A Mac from before the
- * setting keeps none apart. `enabled` false asks the Mac nothing.
- */
+/** Whether the Mac keeps Claude accounts separate; a Mac from before the setting keeps none apart. */
 export function useAccountsSeparate(enabled = true): boolean {
   return useRpc("app.settings.get", {}, { enabled }).data?.claudeAccountsSeparate ?? false;
 }
 
-/** Why an open thread's account cannot change now, or null: never while accounts are kept separate, else not during a turn. */
 function threadAccountHeld(thread: ThreadSummary, separate: boolean): string | null {
   if (separate) return "Accounts are kept separate, so this conversation stays on its account.";
   return thread.activity === "idle" ? null : "Switch accounts when this turn ends.";
@@ -63,7 +59,7 @@ function threadAccountHeld(thread: ThreadSummary, separate: boolean): string | n
 /**
  * An open Claude thread's account, which it leaves for another between turns: its next message resumes the
  * conversation there. An Orcling's conversation keeps its own, as on the Mac, and an OpenOrc Cloud thread runs on the
- * person's sign-in there, not on an account of the Mac's. None moves while the Mac keeps accounts separate.
+ * person's sign-in there, not on an account of the Mac's.
  */
 export function useThreadClaudeAccount(thread: ThreadSummary | null): ComposerSettings["claudeAccount"] {
   const switching = useRpcMutation("threads.switchClaudeAccount");

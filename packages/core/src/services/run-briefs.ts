@@ -7,7 +7,7 @@ import type { RunHooks } from "./run-types.js";
 export class RunBriefs {
   constructor(
     private readonly db: Db,
-    private readonly hooks: Pick<RunHooks, "memoryEnabled" | "threadContext"> & { brief(project: Project, claudeAccountId?: string): string },
+    private readonly hooks: Pick<RunHooks, "brief" | "memoryEnabled" | "threadContext">,
   ) {}
 
   taskBrief(task: Task, project: Project, mode: RunMode): string {

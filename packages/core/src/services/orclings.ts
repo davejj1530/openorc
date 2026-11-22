@@ -65,10 +65,7 @@ export interface StartOptions {
   under?: string;
 }
 
-/**
- * Who works on what an Orcling starts: itself, on its own settings and account, or the agent and account chosen. While
- * accounts are kept separate, the chosen agent works on the Orcling's own account, as if it were handed down.
- */
+/** Who works on what an Orcling starts: itself, on its own settings and account, or the agent and account chosen. */
 function workerFor(db: Db, orcling: Orcling, on: WorkSettings | undefined) {
   if (!on) {
     const { agent, model, effort, fastMode } = orcling.settings;
@@ -412,7 +409,6 @@ export class OrclingService {
     return thread;
   }
 
-  /** Whether an Orcling works on another Claude account than a conversation's while accounts are kept separate, which keeps it out. */
   private onAnotherAccount(orcling: Orcling, thread: Thread): boolean {
     return accountsSeparate(this.deps.db) && orcling.claudeAccountId !== threadAccount(thread);
   }

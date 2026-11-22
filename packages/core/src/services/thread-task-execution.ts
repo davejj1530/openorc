@@ -151,7 +151,7 @@ export class ThreadTaskExecution {
     const creator = task.threadId ? threads.get(this.db, task.threadId) : null;
     if (creator && retiredTeams.isDeleted(this.db, creator.id)) throw new Error("This conversation was deleted. Its saved activity is available on the task.");
     const target = this.taskAgentSettings(selected, previous, creator);
-    const inherited = this.firstThreadSettings(previous, creator);
+    const inherited = this.firstThreadSettings(task, previous, creator);
     const start: ThreadStart = choice ? { choice, account: chosenAccount(this.db, task.projectId, choice), fastMode: keptFastMode(inherited, choice) } : { account: ownAccount };
     if (this.canReuseCreator(creator, task, target, starting, retainedWorkspace, start)) {
       this.invalidate(["tasks", `task:${taskId}`, "threads"]);
@@ -169,10 +169,10 @@ export class ThreadTaskExecution {
     };
   }
 
-  private firstThreadSettings(previous: Run | undefined, creator: Thread | null): FirstThreadSettings {
+  private firstThreadSettings(task: Task, previous: Run | undefined, creator: Thread | null): FirstThreadSettings {
     return {
       ...this.taskAgentSettings(undefined, previous, creator),
-      claudeAccountId: previous?.claudeAccountId ?? creator?.claudeAccountId ?? null,
+      claudeAccountId: keptTaskAccount(this.db, task) ?? previous?.claudeAccountId ?? creator?.claudeAccountId ?? null,
       fastMode: previous?.fastMode ?? creator?.fastMode ?? false,
       mode: previous?.mode ?? creator?.mode ?? "act",
       permissionMode: previous?.permissionMode ?? creator?.permissionMode ?? new AppSettingsService(this.db).get().defaultPermissionMode,
@@ -391,10 +391,10 @@ export class ThreadTaskExecution {
     this.context.rejectRetiredThread(task.threadId);
     if (retiredTeams.hasTask(this.db, taskId)) throw new Error("This item is no longer available.");
     if (task.status === "archived") throw new Error("Reopen this task before using its buttons.");
-    const button = onTaskAccount(this.db, task, pressed);
+    const button = buttonOnTaskAccount(this.db, task, pressed);
     const work = this.context.executionThreadFor(taskId);
     const creator = task.threadId ? threads.get(this.db, task.threadId) : null;
-    const inherited = work ?? this.firstThreadSettings(runRepo.listForTask(this.db, taskId).at(-1), creator);
+    const inherited = work ?? this.firstThreadSettings(task, runRepo.listForTask(this.db, taskId).at(-1), creator);
     const settings = followingSettings(this.db, task.projectId, inherited, button.choice);
     if (settings.agent === "claude") assertOnTaskAccount(this.db, task, settings.claudeAccountId);
     // Sent with no thread yet, a Current thread button runs as Start does, which makes the thread in Act.
@@ -662,7 +662,7 @@ function chosenAccount(db: Db, projectId: string, choice: ThreadChoice): string 
 }
 
 /** While accounts are kept separate, a button runs on its task's account, whichever one it names. */
-function onTaskAccount(db: Db, task: Task, button: TaskButton): TaskButton {
+function buttonOnTaskAccount(db: Db, task: Task, button: TaskButton): TaskButton {
   if (!button.choice?.claudeAccountId || !keptTaskAccount(db, task)) return button;
   const { agent, model, effort } = button.choice;
   return { ...button, choice: { agent, model, effort } };

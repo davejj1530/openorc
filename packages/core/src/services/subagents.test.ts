@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { RunHandle } from "@openorc/agents";
-import { Db, LedgerWriter, listEvents, projects, runs, subagents, threads, tasks } from "@openorc/db";
+import { Db, LedgerWriter, claudeAccounts, listEvents, projects, runs, subagents, threads, tasks } from "@openorc/db";
 import type { AgentEvent, Frame, RunSpec } from "@openorc/protocol";
 import { FrameCoalescer } from "../frames.js";
 import { RunService, type RunHooks } from "./runs.js";
@@ -151,6 +151,18 @@ it("creates one child and one hosted run for repeated starts, with its prompt an
   expect(conversations.get(child.threadId)).toMatchObject({ activity: "running", liveRunId: child.runId, subagent: { status: "running", stoppable: true } });
   coalescer.flush();
   expect(frames.some((frame) => frame.runId === child.runId)).toBe(true);
+});
+
+it("keeps a Codex thread's subagents on the Claude account its thread is on, which its runs don't carry", async () => {
+  const { db, service, input, handles, project } = fixture;
+  const client = claudeAccounts.add(db, "Client").id;
+  const thread = threads.insert(db, { projectId: project.id, title: "On Client", ...settings, claudeAccountId: client });
+  const host = await service.start({ ...input, scope: { task: null, thread } });
+  expect(host.claudeAccountId).toBeNull();
+  handles
+    .get(host.id)!
+    .emit("event", { type: "subagent.started", runId: host.id, ts: Date.now(), subagentId: "a", toolCallId: "a", title: "Explore a", prompt: "Investigate a", agentType: "Explore" });
+  expect(threads.get(db, subagents.byNative(db, thread.id, "a")!.threadId)?.claudeAccountId).toBe(client);
 });
 
 it("persists a recorded Codex stream into separate hosted runs", async () => {

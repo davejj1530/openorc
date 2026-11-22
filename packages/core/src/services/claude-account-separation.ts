@@ -1,9 +1,9 @@
 import { claudeAccounts, runs, threads, type Db } from "@openorc/db";
-import { DEFAULT_CLAUDE_ACCOUNT, type Orcling, type Task, type Thread } from "@openorc/protocol";
+import { ACCOUNTS_KEPT_SEPARATE, DEFAULT_CLAUDE_ACCOUNT, type Orcling, type Task, type Thread } from "@openorc/protocol";
 import { AppSettingsService } from "./settings.js";
 
-export const ACCOUNTS_KEPT_SEPARATE = "Settings keeps Claude accounts separate";
-export const STAYS_ON_ITS_ACCOUNT = `${ACCOUNTS_KEPT_SEPARATE}, so a conversation stays on the account it started on.`;
+export { ACCOUNTS_KEPT_SEPARATE };
+export const STAYS_ON_ITS_ACCOUNT = `${ACCOUNTS_KEPT_SEPARATE}, so a conversation stays on its account.`;
 
 export function accountsSeparate(db: Db): boolean {
   return new AppSettingsService(db).get().claudeAccountsSeparate;
@@ -22,9 +22,12 @@ export function runAccount(db: Db, runId: string, thread: Pick<Thread, "claudeAc
   return runs.get(db, runId)?.claudeAccountId ?? (thread ? threadAccount(thread) : DEFAULT_CLAUDE_ACCOUNT);
 }
 
+/** Every account's work, as one shared function, so reachesTask can skip reading a task's thread when none is held back. */
+const everyAccount = (): boolean => true;
+
 /** Which accounts' work a speaker on `from` may see and reach: any, or only its own while accounts are kept separate. */
 export function accountReach(db: Db, from: string): (account: string) => boolean {
-  if (!accountsSeparate(db)) return () => true;
+  if (!accountsSeparate(db)) return everyAccount;
   return (account) => account === from;
 }
 
@@ -41,6 +44,7 @@ export function taskOwnerAccount(db: Db, task: Pick<Task, "executionThreadId" | 
 }
 
 export function reachesTask(db: Db, reach: (account: string) => boolean, task: Pick<Task, "executionThreadId" | "threadId">): boolean {
+  if (reach === everyAccount) return true;
   const account = taskOwnerAccount(db, task);
   return account === null || reach(account);
 }
@@ -54,6 +58,10 @@ export function assertOnTaskAccount(db: Db, task: Pick<Task, "executionThreadId"
   if (!kept || kept === account) return;
   const name = claudeAccounts.list(db).find((candidate) => candidate.id === kept)?.name ?? "another Claude account";
   throw new Error(`This task is on ${name}, and ${ACCOUNTS_KEPT_SEPARATE}, so its work stays there.`);
+}
+
+export function orclingOnAnotherAccount(db: Db, orcling: Pick<Orcling, "claudeAccountId">, thread: Pick<Thread, "claudeAccountId">): boolean {
+  return accountsSeparate(db) && orcling.claudeAccountId !== threadAccount(thread);
 }
 
 export function assertOrclingOnTaskAccount(db: Db, task: Pick<Task, "executionThreadId" | "threadId">, orcling: Pick<Orcling, "name" | "claudeAccountId">): void {

@@ -28,7 +28,8 @@ export {
   type SubmitRequest,
   type SubmitTarget,
 } from "./conversation-submit.js";
-export { accountsToContinueWith, canContinueWithAnother, CONTINUE_PROMPT, RESTART_PROMPT } from "./session-recovery.js";
+export { KEPT_SEPARATE } from "./accounts-separate.js";
+export { accountsToContinueWith, canContinueWithAnother, CONTINUE_PROMPT, RESTART_PROMPT, staysOnItsAccount, stoppedByItsAccount } from "./session-recovery.js";
 export { offeredAccount, projectAccountChoice, type AccountsProject, type ProjectAccountChoice } from "./project-claude-accounts.js";
 export {
   commandWordAt,

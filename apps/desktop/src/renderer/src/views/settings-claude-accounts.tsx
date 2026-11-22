@@ -85,7 +85,7 @@ function AccountPreferences({ several }: { several: boolean }) {
     <div className="settings-group settings-account-preferences">
       <Toggle
         label="Keep accounts separate"
-        hint={`Threads, tasks and Orclings only see and reach work on their own account, no conversation or task moves to another account, and each account keeps its own Claude memory from now on; memories saved earlier stay with the existing CLI login.${separate ? " Turning this off moves each account's memories into the shared folder for good; one whose file name is already used there stays with its account." : ""}`}
+        hint={`Agents and Orclings only see and reach work on their own account, no conversation or task moves to another account, Claude's file tools can't open other accounts' folders (unless OpenOrc runs on Windows itself rather than in WSL), and each account keeps its own Claude memory from now on; memories saved earlier stay with the existing CLI login.${separate ? " Turning this off moves each account's memories into the shared folder for good; one whose file name is already used there stays with its account." : ""}`}
         checked={separate}
         disabled={preference.disabled}
         onChange={(claudeAccountsSeparate) => void preference.commit({ claudeAccountsSeparate })}

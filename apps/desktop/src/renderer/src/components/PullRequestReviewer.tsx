@@ -1,7 +1,21 @@
 import { useState } from "react";
-import { harnessInfo, harnessLoggedIn, type ModelOption, type PullRequestDetail, type PullRequestReview, type ThreadSummary } from "@openorc/protocol";
+import { projectAccountChoice } from "@openorc/client";
+import {
+  DEFAULT_CLAUDE_ACCOUNT,
+  harnessInfo,
+  harnessLoggedIn,
+  reviewDrafted,
+  type ModelExecutionSettings,
+  type ModelOption,
+  type Orcling,
+  type Project,
+  type PullRequestDetail,
+  type PullRequestReview,
+  type ThreadSummary,
+} from "@openorc/protocol";
 import { LoaderCircle, Wand } from "./icons";
 import { defaultChoice, ModelPicker, type ModelChoice } from "./ModelPicker";
+import type { PickerAccounts } from "./ModelPickerAccounts";
 import { Button, Segmented, TextButton } from "./ui";
 import { draftAuthor, readPullReviewer, reviewSettings, writePullReviewer, type PullReviewer } from "../lib/pull-requests";
 import { orclingById, useOrclings } from "../lib/orclings";
@@ -9,6 +23,7 @@ import { useRpc, useRpcMutation } from "../lib/client";
 import { openThread } from "../lib/router";
 import { useModelCatalog } from "../lib/use-model-catalog";
 import { useEnabledHarnesses } from "../lib/enabled-harnesses";
+import { ON_ANOTHER_ACCOUNT, useAccountsSeparate } from "../lib/accounts-separate";
 import { CLOUD_MODEL_LIMITS } from "../lib/cloud-model-limits";
 
 const reviewers = [
@@ -37,6 +52,50 @@ function useReviewer(cloud: boolean) {
 
 const offered = (models: ModelOption[] | undefined, choice: ModelChoice | null) => Boolean(choice && models?.some((model) => model.agent === choice.agent && model.id === choice.model));
 
+const DRAFT_ON_ANOTHER_ACCOUNT = "This review's draft was written on another Claude account, and accounts are kept separate, so post or discard it before reviewing on another account.";
+
+/**
+ * A round on a Claude model's picked account, or while accounts are kept separate an Orcling's own, leaves a conversation
+ * on another account for a fresh one; while they are, the core refuses that until the draft is posted or discarded.
+ */
+function useReviewRound(conversation: ThreadSummary | null, review: PullRequestReview | null, orcling: Orcling | null, picked: string | undefined) {
+  const separate = useAccountsSeparate();
+  const live = liveAccount(conversation);
+  const asked = (candidate: Orcling | null): string | undefined => {
+    if (candidate) return separate ? candidate.claudeAccountId : undefined;
+    return picked;
+  };
+  const elsewhere = (candidate: Orcling | null) => {
+    const account = asked(candidate);
+    return live !== null && account !== undefined && account !== live;
+  };
+  const drafted = review !== null && reviewDrafted(review);
+  const blocked = (candidate: Orcling | null) => (separate && elsewhere(candidate) && drafted ? { label: ON_ANOTHER_ACCOUNT.label, reason: DRAFT_ON_ANOTHER_ACCOUNT } : undefined);
+  return { again: live !== null && !elsewhere(orcling), held: blocked(orcling)?.reason, blocked };
+}
+
+/** The account of the review's conversation while a later round can go on in it: none once it was put away. */
+function liveAccount(conversation: ThreadSummary | null): string | null {
+  return conversation !== null && conversation.archivedAt === null ? (conversation.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) : null;
+}
+
+/**
+ * The Claude accounts a Claude model's review can run on, in a project on this Mac that uses more than one: the live
+ * review conversation's checked, else the project's default. The one picked goes with the next round and isn't saved.
+ */
+function useReviewAccounts(
+  project: Project,
+  conversation: ThreadSummary | null,
+  reviewer: { cloud: boolean; orcling: Orcling | null; settings: ModelExecutionSettings | null },
+): { picker: PickerAccounts | undefined; picked: string | undefined } {
+  const [picked, setPicked] = useState<string>();
+  const claudeModel = !reviewer.cloud && !reviewer.orcling && reviewer.settings?.agent === "claude";
+  const list = useRpc("claude.accounts.list", {}, { enabled: claudeModel }).data;
+  const choice = claudeModel && list ? projectAccountChoice(project, list) : null;
+  if (!choice || choice.accounts.filter((account) => account.enabled).length < 2) return { picker: undefined, picked: undefined };
+  return { picker: { accounts: choice.accounts, current: picked ?? liveAccount(conversation) ?? choice.defaultId, choose: setPicked }, picked };
+}
+
 function startLabel(starting: boolean, again: boolean): string {
   if (starting) return "Starting…";
   return again ? "Review again" : "Start review";
@@ -63,23 +122,26 @@ function ReviewConversationLink({ conversation, models }: { conversation: Thread
 export function PullRequestReviewer({ projectId, pull, review }: { projectId: string; pull: PullRequestDetail; review: PullRequestReview | null }) {
   const project = useRpc("projects.get", { id: projectId });
   if (!project.data) return null;
-  return <Reviewer projectId={projectId} pull={pull} review={review} cloud={project.data.rootPath === ""} />;
+  return <Reviewer projectId={projectId} project={project.data} pull={pull} review={review} cloud={project.data.rootPath === ""} />;
 }
 
-function Reviewer({ projectId, pull, review, cloud }: { projectId: string; pull: PullRequestDetail; review: PullRequestReview | null; cloud: boolean }) {
+function Reviewer({ projectId, project, pull, review, cloud }: { projectId: string; project: Project; pull: PullRequestDetail; review: PullRequestReview | null; cloud: boolean }) {
   const { reviewer, choice, choose, models } = useReviewer(cloud);
   const start = useRpcMutation("pulls.review.start");
   const thread = useRpc("threads.get", { id: review?.threadId ?? "" }, { enabled: Boolean(review?.threadId) });
   const settings = reviewSettings(choice);
   const conversation = thread.data ?? null;
   const reviewing = conversation?.activity === "running" || conversation?.activity === "waiting";
-  // A later round continues the review's conversation, unless it was put away.
-  const again = conversation !== null && conversation.archivedAt === null;
   const orclings = useOrclings();
   // Orclings review pull requests of projects on this Mac.
   const orcling = cloud ? null : orclingById(orclings, reviewer.orclingId);
+  const accounts = useReviewAccounts(project, conversation, { cloud, orcling, settings });
+  // A later round continues the review's conversation, unless it was put away or the round runs on another account.
+  const round = useReviewRound(conversation, review, orcling, accounts.picked);
   const begin = () => {
-    if (settings) start.mutate({ projectId, number: pull.number, reviewer: settings, ...(orcling ? { orclingId: orcling.id } : {}) });
+    if (!settings) return;
+    const by = { ...(orcling ? { orclingId: orcling.id } : {}), ...(accounts.picked ? { claudeAccountId: accounts.picked } : {}) };
+    start.mutate({ projectId, number: pull.number, reviewer: settings, ...by });
   };
 
   return (
@@ -92,13 +154,18 @@ function Reviewer({ projectId, pull, review, cloud }: { projectId: string; pull:
           <ModelPicker
             value={orcling ? { ...orcling.settings } : choice}
             onChange={(next) => choose({ kind: "model", choice: next, orclingId: null })}
-            orclings={cloud ? undefined : { options: orclings, selectedId: orcling?.id ?? null, onSelect: (next) => choose({ kind: "model", choice: { ...next.settings }, orclingId: next.id }) }}
+            orclings={
+              cloud
+                ? undefined
+                : { options: orclings, selectedId: orcling?.id ?? null, onSelect: (next) => choose({ kind: "model", choice: { ...next.settings }, orclingId: next.id }), blocked: round.blocked }
+            }
+            accounts={accounts.picker}
             limits={cloud ? CLOUD_MODEL_LIMITS : undefined}
             ariaLabel="Reviewer"
             disabled={start.isPending}
           />
-          <Button size="sm" disabled={!settings || start.isPending || reviewing} onClick={begin}>
-            <Wand size={12} /> {startLabel(start.isPending, again)}
+          <Button size="sm" disabled={!settings || start.isPending || reviewing || Boolean(round.held)} data-tip={round.held} onClick={begin}>
+            <Wand size={12} /> {startLabel(start.isPending, round.again)}
           </Button>
         </>
       ) : null}

@@ -12,7 +12,7 @@ import {
   type TaskRefine,
   type TaskSuggestion,
 } from "@openorc/protocol";
-import { useKeptTaskAccount, useTaskOrclings } from "../../lib/accounts-separate";
+import { keptAccountName, useKeptTaskAccount, useTaskOrclings } from "../../lib/accounts-separate";
 import { useRpc, useRpcMutation } from "../../lib/client";
 import { useDefaultAgent } from "../../lib/default-harness";
 import { readDraft, removeDraft, writeDraft } from "../../lib/drafts";
@@ -23,7 +23,7 @@ import { labelList } from "../../lib/task-draft";
 import { DocumentEditor } from "../DocumentEditor";
 import { OpenOrcMark, WorkingCube } from "../OpenOrcMark";
 import { useProjectClaudeAccounts, useThreadModels } from "../../lib/thread-choice";
-import { AccountSelect, keptAccountName, NoAccount } from "../task-threads/ThreadChoiceFields";
+import { AccountSelect, NoAccount } from "../task-threads/ThreadChoiceFields";
 import { TaskSheet, useTaskSheet } from "../task-threads/TaskSheet";
 import { TaskLabelsField, TaskTitleField } from "../task-list/TaskTextFields";
 import { Button, Select, Textarea, Tooltip } from "../ui";

@@ -240,9 +240,7 @@ it("keeps a task's new threads and buttons on its account while accounts are kep
 
   await expect(call("tasks.newThread", { taskId, choice: claude(work) })).rejects.toThrow("This task is on Personal, and Settings keeps Claude accounts separate, so its work stays there.");
   expect(tasks.get(core.db, taskId)?.executionThreadId).toBe(opened.id);
-  await expect(call("threads.switchClaudeAccount", { id: opened.id, claudeAccountId: work })).rejects.toThrow(
-    "Settings keeps Claude accounts separate, so a conversation stays on the account it started on.",
-  );
+  await expect(call("threads.switchClaudeAccount", { id: opened.id, claudeAccountId: work })).rejects.toThrow("Settings keeps Claude accounts separate, so a conversation stays on its account.");
 
   const side = await call("tasks.runButton", { taskId, buttonId: "review" });
   expect(threads.get(core.db, side.threadId)?.claudeAccountId).toBe(personal);
@@ -264,6 +262,25 @@ it("opens no first thread on another account for a task made in a conversation w
   expect((await call("tasks.openThread", { taskId: chosen, choice: { ...claude(personal), effort: "low" } })).claudeAccountId).toBe(personal);
   // With no account chosen it takes the conversation's, not the project's default.
   expect(await call("tasks.openThread", { taskId: inherited, choice: { ...claude(), effort: "low" } })).toMatchObject({ claudeAccountId: personal, importedFrom: `task:${inherited}` });
+});
+
+it("opens a task's first thread and buttons' threads on the task's account, not an older task run's, while accounts are kept separate", async () => {
+  const { work, personal, claude } = await accounts();
+  const conversation = threads.insert(core.db, { projectId, title: "Chat", agent: "claude", model: "test-model", effort: "high", claudeAccountId: personal, mode: "act", permissionMode: "trusted" });
+  /** A task saved from the conversation on Personal that last ran on Work, before tasks ran in threads. */
+  const ranOnWork = async (title: string) => {
+    const id = (await call("tasks.create", { projectId, threadId: conversation.id, title, spec: "Do it.", workspaceMode: "current" })).id;
+    runs.insert(core.db, { id: crypto.randomUUID(), taskId: id, threadId: null, agent: "claude", model: "test-model", mode: "act", permissionMode: "trusted", claudeAccountId: work });
+    return id;
+  };
+  const [opened, pressed] = [await ranOnWork("Opened"), await ranOnWork("Pressed")];
+  await call("projects.updateSettings", { id: projectId, settings: { taskButtons: [{ ...review, choice: claude() }] } });
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+
+  expect(await call("tasks.openThread", { taskId: opened })).toMatchObject({ agent: "claude", claudeAccountId: personal });
+  const side = await call("tasks.runButton", { taskId: pressed, buttonId: "review" });
+  expect(threads.get(core.db, side.threadId)?.claudeAccountId).toBe(personal);
+  await vi.waitFor(() => expect(runs.listForThread(core.db, side.threadId).at(-1)?.claudeAccountId).toBe(personal));
 });
 
 it.each(["claude", "codex"] as const)(

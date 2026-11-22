@@ -113,7 +113,7 @@ export class SubagentService {
         effort: start?.effort ?? host.run.effort,
         mode: host.run.mode,
         permissionMode: host.run.permissionMode,
-        claudeAccountId: host.run.claudeAccountId,
+        claudeAccountId: host.run.claudeAccountId ?? host.thread.claudeAccountId,
         workspaceMode: host.thread.workspaceMode,
         createdAt: ts,
       });

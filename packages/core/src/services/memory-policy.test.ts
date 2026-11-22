@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { claudeAccounts, Db, extractionJobs, LedgerWriter, memories, projects, runs, settings, summaries, tasks, threads } from "@openorc/db";
 import { Embedder, Extractor, Retriever, type Extraction } from "@openorc/memory";
-import type { Thread } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, type Thread } from "@openorc/protocol";
 import { MemoryService } from "./memory.js";
 import { RunBriefs } from "./run-briefs.js";
 import { AppSettingsService } from "./settings.js";
@@ -68,11 +68,11 @@ describe("OpenOrc memory master switch", () => {
 
   it("blocks recording, recall and briefs while retaining user curation", async () => {
     const { memory, project, task, input, saved } = fixture();
-    expect(memory.brief(project)).toContain(saved.title);
+    expect(memory.brief(project, DEFAULT_CLAUDE_ACCOUNT)).toContain(saved.title);
     await memory.updateSettings({ enabled: false });
     expect(() => memory.record(input)).toThrow(/memory is off/i);
     expect(await memory.retrieve(project.id, "fixture", 8)).toEqual([]);
-    expect(memory.brief(project)).toBe("");
+    expect(memory.brief(project, DEFAULT_CLAUDE_ACCOUNT)).toBe("");
     expect(await memory.taskContext(task)).not.toContain(saved.title);
     expect(await memory.taskContext(task)).toContain("Keep task instructions");
     expect(memory.list(project.id)).toHaveLength(1);
@@ -206,4 +206,66 @@ it("names only the tasks in progress on the run's own Claude account in its brie
   ]);
   new AppSettingsService(db).set({ claudeAccountsSeparate: true });
   expect([named(onClient), named(onCliLogin)]).toEqual([["Ship the client report"], ["Rotate the deploy keys"]]);
+});
+
+it("says what was left open only from the run's own Claude account's sessions while accounts are kept separate, however many newer ones another has", () => {
+  const { db, memory, project } = fixture();
+  const client = claudeAccounts.add(db, "Client").id;
+  const conversation = (title: string, claudeAccountId?: string) =>
+    threads.insert(db, { projectId: project.id, title, agent: "claude", model: null, mode: "act", permissionMode: "trusted", ...(claudeAccountId ? { claudeAccountId } : {}) });
+  let at = Date.now();
+  const leftOpen = (thread: Thread, item: string) => {
+    const run = runs.insert(db, { id: `run-${item}`, taskId: null, threadId: thread.id, agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+    summaries.upsert(db, { runId: run.id, taskId: null, threadId: thread.id, projectId: project.id, request: item, workDone: "Started it", outcome: "partial", openItems: [item], model: null });
+    db.stmt("UPDATE session_summaries SET created_at = ? WHERE run_id = ?").run(at++, run.id);
+  };
+  leftOpen(conversation("On the client account", client), "Send the client the invoice");
+  const onCliLogin = conversation("On the CLI login");
+  for (const key of ["one", "two", "three", "four", "five"]) leftOpen(onCliLogin, `Rotate deploy key ${key}`);
+  const open = (account: string) =>
+    memory
+      .brief(project, account)
+      .split("\n")
+      .filter((line) => line.startsWith("- Left open last time: "));
+  expect(open(client)).toContain("- Left open last time: Rotate deploy key five");
+  expect(open(client)).not.toContain("- Left open last time: Send the client the invoice");
+
+  new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+  expect(open(client)).toEqual(["- Left open last time: Send the client the invoice"]);
+  expect(open(DEFAULT_CLAUDE_ACCOUNT)).toHaveLength(5);
+  expect(open(DEFAULT_CLAUDE_ACCOUNT)).not.toContain("- Left open last time: Send the client the invoice");
+});
+
+it("says what a session with no thread left open to its task's account, and one with neither to every account, while accounts are kept separate", () => {
+  const { db, memory, project, task } = fixture();
+  const client = claudeAccounts.add(db, "Client").id;
+  const onClient = threads.insert(db, { projectId: project.id, title: "On the client account", agent: "claude", model: null, mode: "act", permissionMode: "trusted", claudeAccountId: client });
+  const clientTask = tasks.insert(db, {
+    projectId: project.id,
+    title: "Send the invoice",
+    spec: null,
+    priority: "none",
+    labels: [],
+    workspaceMode: "current",
+    baseRef: null,
+    parentTaskId: null,
+    threadId: onClient.id,
+  });
+  let at = Date.now();
+  // A run belongs to something; the summary alone says which task or thread its session was for.
+  const leftOpen = (item: string, taskId: string | null) => {
+    const run = runs.insert(db, { id: `run-${item}`, taskId: taskId ?? task.id, threadId: null, agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+    summaries.upsert(db, { runId: run.id, taskId, threadId: null, projectId: project.id, request: item, workDone: "Started it", outcome: "partial", openItems: [item], model: null });
+    db.stmt("UPDATE session_summaries SET created_at = ? WHERE run_id = ?").run(at++, run.id);
+  };
+  leftOpen("Attach the receipts", clientTask.id);
+  leftOpen("Update the changelog", null);
+  const open = (account: string) =>
+    memory
+      .brief(project, account)
+      .split("\n")
+      .filter((line) => line.startsWith("- Left open last time: "));
+  new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+  expect(open(client)).toEqual(["- Left open last time: Update the changelog", "- Left open last time: Attach the receipts"]);
+  expect(open(DEFAULT_CLAUDE_ACCOUNT)).toEqual(["- Left open last time: Update the changelog"]);
 });

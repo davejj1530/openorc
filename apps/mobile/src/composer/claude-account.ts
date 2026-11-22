@@ -1,4 +1,4 @@
-import { offeredAccount, projectAccountChoice } from "@openorc/client";
+import { KEPT_SEPARATE, offeredAccount, projectAccountChoice } from "@openorc/client";
 import { DEFAULT_CLAUDE_ACCOUNT, placeOf, type ClaudeAccountConnection, type ThreadSummary } from "@openorc/protocol";
 import { useRpc, useRpcMutation } from "../client";
 import type { AccountChoice, ComposerSettings, ModelSettings } from "./settings-bridge";
@@ -52,7 +52,7 @@ export function useAccountsSeparate(enabled = true): boolean {
 }
 
 function threadAccountHeld(thread: ThreadSummary, separate: boolean): string | null {
-  if (separate) return "Accounts are kept separate, so this conversation stays on its account.";
+  if (separate) return KEPT_SEPARATE.conversation;
   return thread.activity === "idle" ? null : "Switch accounts when this turn ends.";
 }
 

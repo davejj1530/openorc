@@ -2,10 +2,11 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
-import { claudeAccounts, orclingFollowups, projects, runs, taskComments, tasks, threads } from "@openorc/db";
+import { claudeAccounts, orclingFollowups, projects, pullReviews, runs, taskComments, tasks, threads } from "@openorc/db";
 import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
 import { DEFAULT_CLAUDE_ACCOUNT, defaultOrclingLook, type AgentKind, type InboxList, type ModelOption, type OrclingDraft, type PlanLimits } from "@openorc/protocol";
 import { createOrclingHost } from "../mcp-host/orcling.js";
+import type { CloudHolds } from "../mcp-host/orcling-app-accounts.js";
 import { guardContext } from "../remote/policy.js";
 import { OpenOrc } from "../openorc.js";
 import { AppSettingsService } from "./settings.js";
@@ -76,7 +77,8 @@ async function fixture() {
   vi.spyOn(core.settings, "get").mockReturnValue({ ...settings, defaultHarness: "codex" });
   const limits: PlanLimits[] = [];
   const idle = (threadId: string) => vi.waitFor(() => expect(core.threads.get(threadId)?.activity).toBe("idle"), { timeout: 5000 });
-  const host = () =>
+  /** The Orcling's tools; `inCloud` says what OpenOrc Cloud holds, which is nothing unless given. */
+  const host = (inCloud?: CloudHolds) =>
     createOrclingHost({
       db: core.db,
       orclings: core.orclings,
@@ -88,6 +90,7 @@ async function fixture() {
       guard: guardContext(core.db, root!),
       call: (method, params) => core.handle({ type: "rpc", id: 0, method, params }).then((reply) => (reply.type === "rpc.result" ? reply.result : Promise.reject(new Error(reply.message)))),
       send: (runId, id, text, requestKey) => core.threads.toolThreadSend(runId, id, text, requestKey),
+      inCloud,
       invalidate: () => {},
     }).orcling!;
   /** An Orcling that has said hello, with the run it speaks from, and a project to start work in. */
@@ -544,7 +547,7 @@ it("keeps what an Orcling moves, takes up, makes and reviews through the app on 
     const turn = { agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted", prompt: "Go on" };
     new AppSettingsService(core.db).set({ claudeAccountsSeparate: true });
 
-    await expect(host().app(run, "runs.start", { ...turn, threadId: own.id, claudeAccountId: DEFAULT_CLAUDE_ACCOUNT })).rejects.toThrow("a conversation stays on the account it started on");
+    await expect(host().app(run, "runs.start", { ...turn, threadId: own.id, claudeAccountId: DEFAULT_CLAUDE_ACCOUNT })).rejects.toThrow("a conversation stays on its account");
     expect(runs.listForThread(core.db, own.id)).toEqual([]);
     await expect(host().app(run, "runs.start", { ...turn, taskId: loose.id })).rejects.toThrow("take up a task that has no conversation with orcling_thread_start");
     expect(tasks.get(core.db, loose.id)?.executionThreadId).toBeNull();
@@ -555,9 +558,86 @@ it("keeps what an Orcling moves, takes up, makes and reviews through the app on 
     // Site follows the app's accounts, whose default is the CLI login; a project this Mac doesn't have reviews in OpenOrc Cloud.
     const reviewer = { agent: "codex", model: "fixture", effort: null, fastMode: false };
     await expect(host().app(run, "pulls.review.start", { projectId: site.id, number: 7, reviewer })).rejects.toThrow(
-      "That review runs on another Claude account, and Settings keeps Claude accounts separate.",
+      "That review runs on another Claude account, and Settings keeps Claude accounts separate, so review it as yourself, with your own orclingId, which reviews on your own Claude account.",
     );
     await expect(host().app(run, "pulls.review.start", { projectId: "only-in-the-cloud", number: 7, reviewer })).rejects.toThrow("project only-in-the-cloud not found");
+    // Reviewing as itself, it reviews on its own account.
+    const reviewing = vi.spyOn(core.pullRequests, "start").mockResolvedValue({ threadId: "review" });
+    await expect(host().app(run, "pulls.review.start", { projectId: site.id, number: 7, reviewer, orclingId: bo.id })).resolves.toBe('{"threadId":"review"}');
+    expect(reviewing).toHaveBeenCalledWith({ projectId: site.id, number: 7 }, reviewer, bo.id, undefined);
+    // A Claude model it asks reviews on the account it names, which has to be its own, even where that is the project's default.
+    const settings = { claudeAccounts: { only: true, accountIds: [client, DEFAULT_CLAUDE_ACCOUNT], defaultId: client, autoSwitch: false } };
+    const shop = projects.insert(core.db, { name: "Shop", rootPath: join(root!, "shop"), gitRemote: null, defaultBranch: null, settings });
+    const claudeReviewer = { agent: "claude", model: "claude-opus-5-5", effort: null, fastMode: false };
+    const review = { projectId: shop.id, number: 7, reviewer: claudeReviewer };
+    await expect(host().app(run, "pulls.review.start", { ...review, claudeAccountId: DEFAULT_CLAUDE_ACCOUNT })).rejects.toThrow("That review runs on another Claude account");
+    await expect(host().app(run, "pulls.review.start", { ...review, claudeAccountId: client })).resolves.toBe('{"threadId":"review"}');
+    expect(reviewing).toHaveBeenLastCalledWith({ projectId: shop.id, number: 7 }, claudeReviewer, undefined, client);
+    // A review whose conversation is on the CLI login stays there, whoever reviews it.
+    const onTheLogin = threads.insert(core.db, { projectId: site.id, title: "Review #8", agent: "codex", model: "fixture", mode: "plan", permissionMode: "review" });
+    pullReviews.open(core.db, { projectId: site.id, number: 8 }, "a".repeat(40));
+    pullReviews.update(core.db, { projectId: site.id, number: 8 }, { threadId: onTheLogin.id });
+    await expect(host().app(run, "pulls.review.start", { projectId: site.id, number: 8, reviewer, orclingId: bo.id })).rejects.toThrow(
+      "That belongs to another Claude account, and Settings keeps Claude accounts separate.",
+    );
+    expect(reviewing).toHaveBeenCalledTimes(2);
+
+    // A Claude model asked about a task with no conversation would answer on the project's default, the CLI login; asked
+    // about one of Bo's own, on Bo's account.
+    const claude = { agent: "claude", model: "claude-opus-5-5", effort: "high" };
+    const ask = (taskId: string, asked: Record<string, unknown>) => host().app(run, "tasks.comments.post", { taskId, body: "Thoughts?", requestKey: crypto.randomUUID(), recipients: [], ...asked });
+    const answersElsewhere = "A Claude model would answer that comment on another Claude account, and Settings keeps Claude accounts separate, so start the work with orcling_thread_start";
+    await expect(ask(loose.id, { recipients: [claude] })).rejects.toThrow(answersElsewhere);
+    await expect(ask(loose.id, { body: "@claude:claude-opus-5-5-high, thoughts?" })).rejects.toThrow(answersElsewhere);
+    // Another agent answers on no Claude account, but work it agrees to there would start the task's thread on the CLI login.
+    const codex = { agent: "codex", model: "fixture", effort: "high" };
+    const startsElsewhere = "Work a model agrees to in that comment would start on another Claude account, and Settings keeps Claude accounts separate, so start the work with orcling_thread_start";
+    await expect(ask(loose.id, { recipients: [codex] })).rejects.toThrow(startsElsewhere);
+    await expect(ask(loose.id, { body: "@codex:fixture-high, implement this" })).rejects.toThrow(startsElsewhere);
+    expect(taskComments.list(core.db, loose.id).comments).toEqual([]);
+    const ownTask = tasks.insert(core.db, {
+      projectId: site.id,
+      title: "Bo's",
+      spec: null,
+      priority: "none",
+      labels: [],
+      workspaceMode: "current",
+      baseRef: null,
+      parentTaskId: null,
+      threadId: own.id,
+    });
+    await ask(ownTask.id, { recipients: [claude, codex] });
+    const replyOf = (agent: string) => taskComments.list(core.db, ownTask.id).attempts.find((attempt) => attempt.recipient.agent === agent)?.runId ?? "";
+    await vi.waitFor(() => expect([runs.get(core.db, replyOf("claude"))?.claudeAccountId, runs.get(core.db, replyOf("codex"))?.agent]).toEqual([client, "codex"]));
+  } finally {
+    await core.close();
+  }
+});
+
+it("lets an Orcling on another Claude account than the default move, take up, start and reach what the person can, with the setting off", async () => {
+  const { core, host, idle } = await fixture();
+  try {
+    const client = claudeAccounts.add(core.db, "Client").id;
+    const bo = await core.orclings.create({ ...draft("Bo"), claudeAccountId: client });
+    await core.threads.continueThread(bo.threadId, { agent: "codex", model: "fixture", effort: undefined, attachments: undefined, mode: "act", permissionMode: "autonomous", prompt: "hi" });
+    await idle(bo.threadId);
+    const run = runs.listForThread(core.db, bo.threadId).at(-1)!.id;
+    const site = projects.insert(core.db, { name: "Site", rootPath: root!, gitRemote: null, defaultBranch: null, settings: {} });
+    const onTheLogin = threads.insert(core.db, { projectId: site.id, title: "On the CLI login", agent: "claude", model: "claude-opus-5-5", mode: "act", permissionMode: "trusted" });
+    const loose = tasks.insert(core.db, { projectId: site.id, title: "Loose", spec: null, priority: "none", labels: [], workspaceMode: "current", baseRef: null, parentTaskId: null, threadId: null });
+    const turn = { agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted", prompt: "Go on" };
+
+    await expect(host().app(run, "threads.switchClaudeAccount", { id: onTheLogin.id, claudeAccountId: client })).resolves.toContain(`"claudeAccountId":"${client}"`);
+    expect(threads.get(core.db, onTheLogin.id)?.claudeAccountId).toBe(client);
+    const taken = JSON.parse(await host().app(run, "runs.start", { ...turn, taskId: loose.id })) as { threadId: string };
+    expect(tasks.get(core.db, loose.id)?.executionThreadId).toBe(taken.threadId);
+    await idle(taken.threadId);
+    const started = JSON.parse(await host().app(run, "threads.start", { ...turn, projectId: site.id, claudeAccountId: DEFAULT_CLAUDE_ACCOUNT })) as { thread: { id: string } };
+    expect(threads.get(core.db, started.thread.id)?.claudeAccountId).toBe(DEFAULT_CLAUDE_ACCOUNT);
+    await idle(started.thread.id);
+    // A thread OpenOrc Cloud holds is the person's to reach too.
+    const held: CloudHolds = (ref) => "thread" in ref && ref.thread === started.thread.id;
+    expect(JSON.parse(await host(held).app(run, "runs.listForThread", { threadId: started.thread.id }))).toHaveLength(1);
   } finally {
     await core.close();
   }
@@ -581,7 +661,21 @@ it("keeps an Orcling's app calls to its own Claude account's threads, runs, task
       tasks.insert(core.db, { projectId: project.id, title, spec, priority: "none", labels: [], workspaceMode: "current", baseRef: null, parentTaskId: null, threadId });
     const [myTask, theirTask, loose] = [taskOf("My task", mine.id), taskOf("Their task", theirs.id), taskOf("Loose", null)];
     const askingBo = taskOf("Asking Bo", null, "@Bo, have a look.");
+    // A task that ran on the Client account before tasks ran in threads: its run belongs to no thread.
+    const ranOnClient = runs.insert(core.db, {
+      id: crypto.randomUUID(),
+      taskId: taskOf("Ran on Client", null).id,
+      threadId: null,
+      agent: "claude",
+      model: "claude-opus-5-5",
+      mode: "act",
+      permissionMode: "trusted",
+      claudeAccountId: client,
+    });
+    const openTasks = async () => (JSON.parse(await host().projects(run)) as { id: string; openTasks: number }[]).find((place) => place.id === project.id)!.openTasks;
+    const everyOpenTask = await openTasks();
     new AppSettingsService(core.db).set({ claudeAccountsSeparate: true });
+    expect(await openTasks()).toBe(everyOpenTask - 1);
 
     const app = (method: string, params: unknown) => host().app(run, method, params);
     const turn = (threadId: string) => ({ threadId, agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted", prompt: "Go on" });
@@ -600,10 +694,12 @@ it("keeps an Orcling's app calls to its own Claude account's threads, runs, task
       ["runs.start", turn(theirs.id)],
       ["runs.listForThread", { threadId: theirs.id }],
       ["events.page", { runId: runOf(theirs.id) }],
+      ["events.page", { runId: ranOnClient.id }],
       ["tasks.get", { id: theirTask.id }],
       ["tasks.comments.post", comment(theirTask.id)],
       ["threads.start", handedTo(bo.id)],
       ["files.list", folder(theirs.id)],
+      ["files.list", { scope: { kind: "task", id: theirTask.id }, path: "" }],
       ["files.read", notes(theirs.id)],
       ["files.list", folder(bo.threadId)],
       ["files.read", notes(bo.threadId)],

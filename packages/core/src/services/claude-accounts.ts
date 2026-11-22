@@ -3,12 +3,14 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, readl
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { SHARED_CLAUDE_CONFIG_DIR, captureLaunchEnvironment, claudeConfigDir, launchCommand, stopProcess, stopProcessFromCallback } from "@openorc/agents";
+import { SHARED_CLAUDE_CONFIG_DIR, captureLaunchEnvironment, claudeConfigDir, claudeStateFile, launchCommand, stopProcess, stopProcessFromCallback } from "@openorc/agents";
 import { chromeExecutable, chromeIncognitoFlags } from "@openorc/agents/chrome-incognito";
-import { claudeAccounts, type Db } from "@openorc/db";
+import { claudeAccounts, orclings, type Db } from "@openorc/db";
 import { DEFAULT_CLAUDE_ACCOUNT, type ClaudeAccount, type ClaudeAccountConnection, type ClaudeAccounts } from "@openorc/protocol";
 import { z } from "zod";
+import { DATABASE_FILES, PROVIDER_LOGS } from "../data-dir.js";
 import { accountsSeparate } from "./claude-account-separation.js";
+import { OrclingFolders } from "./orcling-folders.js";
 import type { EnvSnapshot } from "./shell-environment.js";
 
 const authStatus = z.object({ loggedIn: z.boolean(), email: z.string().nullable().optional(), orgName: z.string().nullable().optional() });
@@ -308,16 +310,29 @@ export class ClaudeAccountService {
     return this.directory(claudeAccounts.get(this.db, id));
   }
 
-  /** While accounts are kept separate, the paths a run on this account keeps its file tools out of. */
+  /**
+   * While accounts are kept separate, the paths a run on this account keeps its file tools out of: the other accounts'
+   * own, the folders of their Orclings, and OpenOrc's database and provider logs, which hold every account's work.
+   */
   offLimits(id: string): string[] {
     if (!accountsSeparate(this.db)) return [];
-    return claudeAccounts
+    const accountsOwn = claudeAccounts
       .list(this.db)
       .filter((account) => account.id !== id)
       .flatMap((account) => {
         const folder = this.directory(account);
-        return account.kind === "managed" ? [folder] : CLI_LOGIN_PRIVATE.map((name) => path.join(folder, name));
+        return account.kind === "managed" ? [folder] : [...CLI_LOGIN_PRIVATE.map((name) => path.join(folder, name)), claudeStateFile(folder)];
       });
+    // A folder the person chose for an Orcling elsewhere is theirs, and stays open. So does the group chats' folder,
+    // which an Orcling named Groups shares, since every account's groups work in it.
+    const folders = new OrclingFolders(this.dataDir);
+    const orclingFolders = orclings
+      .list(this.db)
+      .filter((orcling) => orcling.claudeAccountId !== id)
+      .map((orcling) => folders.desk(orcling.name))
+      .filter((folder) => folder !== folders.groupChats);
+    const everyAccountsWork = [...DATABASE_FILES, PROVIDER_LOGS].map((name) => path.join(this.dataDir, name));
+    return [...accountsOwn, ...orclingFolders, ...everyAccountsWork];
   }
 
   private directory(account: ClaudeAccount): string {

@@ -3,7 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SHARED_CLAUDE_CONFIG_DIR } from "@openorc/agents";
-import { claudeAccounts, Db } from "@openorc/db";
+import { claudeAccounts, Db, orclings, projects, threads } from "@openorc/db";
+import { defaultOrclingLook } from "@openorc/protocol";
 import { ClaudeAccountService } from "./claude-accounts.js";
 import { AppSettingsService } from "./settings.js";
 import type { EnvSnapshot } from "./shell-environment.js";
@@ -150,10 +151,21 @@ it("keeps each added account's memory in its own folder while accounts are kept 
   await expect(stat(path.join(root, "original", "projects", "-repo", "memory"))).rejects.toThrow();
 });
 
-it("names the other accounts' own folders a run stays out of, only while accounts are kept separate", () => {
+it("names what a run stays out of only while accounts are kept separate: the other accounts' own folders, their Orclings', and OpenOrc's database and provider logs", () => {
   const [work, client] = ["Work", "Client"].map((name) => service.add(name));
   const folder = (id: string) => path.join(root, "claude-accounts", id);
   const cli = path.join(root, "original");
+  const project = projects.insert(db, { name: "Workspace", rootPath: root, gitRemote: null, defaultBranch: null, settings: {} });
+  for (const [name, claudeAccountId] of [
+    ["Pip", "claude-cli"],
+    ["Bo", work!.id],
+  ] as const) {
+    const home = threads.insert(db, { projectId: project.id, title: name, agent: "claude", model: null, mode: "act", permissionMode: "autonomous" });
+    const settings = { agent: "claude" as const, model: "fixture", effort: null, fastMode: false };
+    orclings.insert(db, { id: name.toLowerCase(), draft: { name, look: defaultOrclingLook, settings, permission: "allow", claudeAccountId }, threadId: home.id });
+  }
+  const orclingFolder = (handle: string) => path.join(root, "orclings", handle);
+  const everyAccountsWork = ["openorc.sqlite", "openorc.sqlite-wal", "openorc.sqlite-shm", path.join("logs", "provider")].map((name) => path.join(root, name));
   expect(service.offLimits(work!.id)).toEqual([]);
   new AppSettingsService(db).set({ claudeAccountsSeparate: true });
   const cliOwn = [
@@ -173,8 +185,21 @@ it("names the other accounts' own folders a run stays out of, only while account
     "daemon.log",
     "backups",
   ];
-  expect(service.offLimits(work!.id)).toEqual([...cliOwn.map((name) => path.join(cli, name)), folder(client!.id)]);
-  expect(service.offLimits("claude-cli").sort()).toEqual([folder(work!.id), folder(client!.id)].sort());
+  const cliState = path.join(cli, ".claude.json");
+  expect(service.offLimits(work!.id)).toEqual([...cliOwn.map((name) => path.join(cli, name)), cliState, folder(client!.id), orclingFolder("pip"), ...everyAccountsWork]);
+  expect(service.offLimits("claude-cli").sort()).toEqual([folder(work!.id), folder(client!.id), orclingFolder("bo"), ...everyAccountsWork].sort());
+});
+
+it("keeps no run out of the group chats' folder, even for an Orcling named Groups on another account", () => {
+  const work = service.add("Work");
+  const project = projects.insert(db, { name: "Workspace", rootPath: root, gitRemote: null, defaultBranch: null, settings: {} });
+  const home = threads.insert(db, { projectId: project.id, title: "Groups", agent: "claude", model: null, mode: "act", permissionMode: "autonomous" });
+  const settings = { agent: "claude" as const, model: "fixture", effort: null, fastMode: false };
+  orclings.insert(db, { id: "groups", draft: { name: "Groups", look: defaultOrclingLook, settings, permission: "allow", claudeAccountId: "claude-cli" }, threadId: home.id });
+  new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+  const groupChat = path.join(root, "orclings", "groups", "group-thread");
+  const covers = (target: string) => target === groupChat || groupChat.startsWith(`${target}${path.sep}`);
+  expect(service.offLimits(work!.id).filter(covers)).toEqual([]);
 });
 
 it("signs in through the selected CLI directory and reports only public account metadata", async () => {

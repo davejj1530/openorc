@@ -2,10 +2,13 @@ import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { Db, checkpoints, projects, pullReviews, runs, threads } from "@openorc/db";
+import { Db, checkpoints, claudeAccounts, orclings, projects, pullReviews, runs, threads } from "@openorc/db";
 import { GhError, GitHubPulls, commitAll, git, type GhRunner, type ReviewSubmission } from "@openorc/git";
-import { PULL_REVIEW_NEEDS_FOLDER, type Project, type SystemInfo, type Thread } from "@openorc/protocol";
+import { PULL_REVIEW_NEEDS_FOLDER, defaultOrclingLook, type Project, type SystemInfo, type Thread } from "@openorc/protocol";
+import { claudeRunAccount } from "./claude-run-account.js";
 import { PullRequestService, type PullRequestServiceOptions } from "./pull-requests.js";
+import { AppSettingsService } from "./settings.js";
+import { startAccount } from "./thread-inputs.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
 
 const url = "https://github.com/acme/app/pull/7";
@@ -110,6 +113,8 @@ function setup(
         projectId: input.projectId,
         title: input.title!,
         agent: input.agent,
+        // On the account the thread service starts it on, and its first run on the one the run service gives it.
+        claudeAccountId: startAccount(db, input),
         model: input.model ?? null,
         mode: input.mode,
         permissionMode: input.permissionMode,
@@ -120,7 +125,16 @@ function setup(
       return adopted;
     });
     started = thread;
-    const run = runs.insert(db, { id: `run-${thread.id}`, taskId: null, threadId: thread.id, agent: input.agent, model: input.model ?? null, mode: input.mode, permissionMode: input.permissionMode });
+    const run = runs.insert(db, {
+      id: `run-${thread.id}`,
+      taskId: null,
+      threadId: thread.id,
+      agent: input.agent,
+      model: input.model ?? null,
+      mode: input.mode,
+      permissionMode: input.permissionMode,
+      claudeAccountId: claudeRunAccount(db, { scope: { task: null, thread } }),
+    });
     return { thread, run };
   });
   const invalidate = vi.fn();
@@ -350,6 +364,148 @@ describe("model reviews", () => {
     expect(start).toHaveBeenCalledTimes(2);
     expect(next.threadId).not.toBe(threadId);
     expect(pullReviews.get(db, key)?.threadId).toBe(next.threadId);
+  });
+
+  /** Bo, an Orcling on the Client account, and Cy, one on Personal: neither is the app's default. */
+  function bothOrclings(db: Db, projectId: string) {
+    const orcling = (name: string, claudeAccountId: string) => {
+      const home = threads.insert(db, { projectId, title: name, agent: "claude", model: "claude-opus-5-5", mode: "act", permissionMode: "review", claudeAccountId });
+      const settings = { agent: "claude" as const, model: "claude-opus-5-5", effort: null, fastMode: false };
+      return orclings.insert(db, { id: name.toLowerCase(), threadId: home.id, draft: { name, look: defaultOrclingLook, settings, permission: "allow", claudeAccountId } });
+    };
+    return { bo: orcling("Bo", claudeAccounts.add(db, "Client").id), cy: orcling("Cy", claudeAccounts.add(db, "Personal").id) };
+  }
+  const model = { agent: "codex", model: "gpt-6", effort: null, fastMode: false } as const;
+
+  it("reviews as an Orcling on its own Claude account while accounts are kept separate, and starts afresh for one on another", async () => {
+    const { service, key, db, start } = setup();
+    const { bo, cy } = bothOrclings(db, key.projectId);
+    new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+
+    const { threadId } = await service.start(key, model, bo.id);
+    expect(start.mock.calls[0]![0]).toMatchObject({ claudeAccountId: bo.claudeAccountId, claudeAccountFrom: "own", agent: "claude" });
+    expect(threads.get(db, threadId)).toMatchObject({ claudeAccountId: bo.claudeAccountId, orclingId: bo.id });
+    expect(runs.listForThread(db, threadId)[0]?.claudeAccountId).toBe(bo.claudeAccountId);
+
+    // Cy can't go on in Bo's conversation without working on Bo's account, so its round starts a conversation of its own.
+    const next = await service.start(key, model, cy.id);
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(next.threadId).not.toBe(threadId);
+    expect(threads.get(db, next.threadId)).toMatchObject({ claudeAccountId: cy.claudeAccountId, orclingId: cy.id });
+    expect(runs.listForThread(db, next.threadId)[0]?.claudeAccountId).toBe(cy.claudeAccountId);
+    expect(pullReviews.get(db, key)?.threadId).toBe(next.threadId);
+    expect(threads.get(db, threadId)).toMatchObject({ claudeAccountId: bo.claudeAccountId, orclingId: bo.id });
+  });
+
+  it("goes on in the review conversation, while accounts are kept separate, for an Orcling on its account and for a model", async () => {
+    const { service, key, db, start } = setup();
+    const { bo } = bothOrclings(db, key.projectId);
+    new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+
+    const { threadId } = await service.start(key, model, bo.id);
+    await expect(service.start(key, model, bo.id)).resolves.toEqual({ threadId });
+    await expect(service.start(key, model)).resolves.toEqual({ threadId });
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(threads.get(db, threadId)).toMatchObject({ claudeAccountId: bo.claudeAccountId, orclingId: null });
+  });
+
+  it("takes no draft written on another Claude account to an Orcling's fresh review while accounts are kept separate", async () => {
+    const { service, key, db, start } = setup();
+    const { bo, cy } = bothOrclings(db, key.projectId);
+    new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+    const { threadId } = await service.start(key, model, bo.id);
+    const refused = "This pull request's review draft was written on Client, and Settings keeps Claude accounts separate, so post or discard it before Cy reviews it on Personal.";
+
+    service.comment({ ...key, commitId: repo.head, ...yours });
+    await expect(service.start(key, model, cy.id)).rejects.toThrow(refused);
+    service.discard(key);
+    service.setSummary(key, repo.head, "Looks close.");
+    await expect(service.start(key, model, cy.id)).rejects.toThrow(refused);
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(pullReviews.get(db, key)).toMatchObject({ threadId, summary: "Looks close." });
+
+    service.discard(key);
+    const next = await service.start(key, model, cy.id);
+    expect(next.threadId).not.toBe(threadId);
+    expect(pullReviews.get(db, key)?.threadId).toBe(next.threadId);
+  });
+
+  it("reviews as an Orcling on the conversation's account, and hands that conversation to the next, with the setting off", async () => {
+    const { service, key, db, start } = setup();
+    const { bo, cy } = bothOrclings(db, key.projectId);
+
+    const { threadId } = await service.start(key, model, bo.id);
+    expect(start.mock.calls[0]![0]).not.toHaveProperty("claudeAccountId");
+    expect(threads.get(db, threadId)).toMatchObject({ claudeAccountId: claudeAccounts.defaultId(db), orclingId: bo.id });
+
+    await expect(service.start(key, model, cy.id)).resolves.toEqual({ threadId });
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(threads.get(db, threadId)).toMatchObject({ claudeAccountId: claudeAccounts.defaultId(db), orclingId: cy.id });
+  });
+
+  const claude = { agent: "claude", model: "claude-opus-5-5", effort: null, fastMode: false } as const;
+
+  it.each([false, true])("reviews as a Claude model on the account it is given, goes on there, and starts afresh on another (kept separate: %s)", async (separate) => {
+    const { service, key, db, start } = setup();
+    const client = claudeAccounts.add(db, "Client").id;
+    const personal = claudeAccounts.add(db, "Personal").id;
+    new AppSettingsService(db).set({ claudeAccountsSeparate: separate });
+
+    const { threadId } = await service.start(key, claude, undefined, client);
+    expect(start.mock.calls[0]![0]).toMatchObject({ claudeAccountId: client, claudeAccountFrom: "chosen", agent: "claude" });
+    expect(threads.get(db, threadId)).toMatchObject({ claudeAccountId: client });
+    expect(runs.listForThread(db, threadId)[0]?.claudeAccountId).toBe(client);
+    await expect(service.start(key, claude, undefined, client)).resolves.toEqual({ threadId });
+    await expect(service.start(key, claude)).resolves.toEqual({ threadId });
+    expect(start).toHaveBeenCalledTimes(1);
+
+    const next = await service.start(key, claude, undefined, personal);
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(next.threadId).not.toBe(threadId);
+    expect(threads.get(db, next.threadId)).toMatchObject({ claudeAccountId: personal });
+    expect(runs.listForThread(db, next.threadId)[0]?.claudeAccountId).toBe(personal);
+    expect(pullReviews.get(db, key)?.threadId).toBe(next.threadId);
+    expect(threads.get(db, threadId)).toMatchObject({ claudeAccountId: client });
+  });
+
+  it("leaves the account given to another agent's model or to an Orcling alone", async () => {
+    const { service, key, db, start } = setup();
+    const { bo } = bothOrclings(db, key.projectId);
+    const work = claudeAccounts.add(db, "Work").id;
+
+    const { threadId } = await service.start(key, model, undefined, work);
+    expect(start.mock.calls[0]![0]).not.toHaveProperty("claudeAccountId");
+    expect(threads.get(db, threadId)).toMatchObject({ claudeAccountId: claudeAccounts.defaultId(db) });
+    await expect(service.start(key, claude, bo.id, work)).resolves.toEqual({ threadId });
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a Claude account the project doesn't use", async () => {
+    const { service, key, db, start } = setup();
+    const client = claudeAccounts.add(db, "Client").id;
+    const personal = claudeAccounts.add(db, "Personal").id;
+    projects.updateSettings(db, key.projectId, { claudeAccounts: { only: true, accountIds: [client], defaultId: client, autoSwitch: false } });
+
+    await expect(service.start(key, claude, undefined, personal)).rejects.toThrow("This project only uses these Claude accounts: Client.");
+    expect(start).not.toHaveBeenCalled();
+    expect(pullReviews.get(db, key)).toBeNull();
+  });
+
+  it("takes no draft written on another Claude account to a model's fresh review while accounts are kept separate", async () => {
+    const { service, key, db, start } = setup();
+    const client = claudeAccounts.add(db, "Client").id;
+    const personal = claudeAccounts.add(db, "Personal").id;
+    new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+    const { threadId } = await service.start(key, claude, undefined, client);
+
+    service.comment({ ...key, commitId: repo.head, ...yours });
+    await expect(service.start(key, claude, undefined, personal)).rejects.toThrow(
+      "This pull request's review draft was written on Client, and Settings keeps Claude accounts separate, so post or discard it before a model reviews it on Personal.",
+    );
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(pullReviews.get(db, key)?.threadId).toBe(threadId);
+    // On the conversation's own account the round goes on, draft and all.
+    await expect(service.start(key, claude, undefined, client)).resolves.toEqual({ threadId });
   });
 
   it("will not start a second review while one is running", async () => {

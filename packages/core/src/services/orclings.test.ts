@@ -4,7 +4,7 @@ import { basename, join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import { memories, projects, runs, settings, summaries, tasks, threads } from "@openorc/db";
 import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
-import { WORKSPACE_ID, defaultOrclingLook, orclingExecution, type OrclingDraft, type RunSpec } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID, defaultOrclingLook, orclingExecution, type OrclingDraft, type RunSpec } from "@openorc/protocol";
 import { createOrclingHost } from "../mcp-host/orcling.js";
 import { guardContext } from "../remote/policy.js";
 import { OpenOrc } from "../openorc.js";
@@ -164,8 +164,8 @@ it("keeps its own conversation a private chat: no Workspace memory in its prompt
 
     const home = runs.listForThread(core.db, rini.threadId).at(-1)!.id;
     summary(home, rini.threadId, "Rini's own open item");
-    expect(core.memory.brief(workspace)).toContain("Fiancée runs the diagnostic");
-    expect(core.memory.brief(workspace)).not.toContain("Rini's own open item");
+    expect(core.memory.brief(workspace, DEFAULT_CLAUDE_ACCOUNT)).toContain("Fiancée runs the diagnostic");
+    expect(core.memory.brief(workspace, DEFAULT_CLAUDE_ACCOUNT)).not.toContain("Rini's own open item");
 
     const tools = createOrclingHost({
       db: core.db,
@@ -392,6 +392,36 @@ it("asks into a conversation, and gives it to, only an Orcling on the conversati
     await call("app.settings.set", { claudeAccountsSeparate: false });
     await call("orclings.assign", { threadId: thread.id, orclingId: bo.id });
     expect(stored()).toMatchObject({ orclingId: bo.id, claudeAccountId: client.id });
+  } finally {
+    await core.close();
+  }
+});
+
+it("speaks in no conversation handed to it on another Claude account before accounts were kept separate, and still in its own", async () => {
+  const { core, idle } = await fixture();
+  try {
+    const call = rpcClient(() => core);
+    const project = projects.insert(core.db, { name: "Site", rootPath: root!, gitRemote: null, defaultBranch: null, settings: {} });
+    const bo = await core.orclings.create(draft({ name: "Bo", claudeAccountId: core.claudeAccounts.add("Client").id }));
+    const { thread } = await core.threads.start({ ...turn, mode: "act", permissionMode: "autonomous", prompt: "Build the page", projectId: project.id, title: "Page" });
+    await idle(thread.id);
+    // A Slack hand-off, or a review round, gave Bo the conversation without moving it to Bo's account.
+    threads.update(core.db, thread.id, { orclingId: bo.id });
+    const send = (threadId: string, prompt: string) => core.threads.continueThread(threadId, { ...turn, mode: "act", permissionMode: "autonomous", prompt });
+
+    await call("app.settings.set", { claudeAccountsSeparate: true });
+    await expect(send(thread.id, "Go on")).rejects.toThrow(
+      "Bo works on another Claude account than this conversation, and Settings keeps Claude accounts separate, so give the conversation to a model or an Orcling on its account.",
+    );
+    expect(runs.listForThread(core.db, thread.id)).toHaveLength(1);
+    await send(bo.threadId, "Hi");
+    await idle(bo.threadId);
+    expect(runs.listForThread(core.db, bo.threadId).at(-1)!.orclingId).toBe(bo.id);
+
+    await call("app.settings.set", { claudeAccountsSeparate: false });
+    await send(thread.id, "Go on");
+    await idle(thread.id);
+    expect(runs.listForThread(core.db, thread.id).at(-1)!.orclingId).toBe(bo.id);
   } finally {
     await core.close();
   }

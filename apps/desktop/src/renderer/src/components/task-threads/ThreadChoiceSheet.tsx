@@ -15,7 +15,13 @@ type Prefill = { choice: ThreadChoice; inherited: boolean };
  * The inherited settings as a choice the fields offer: the model, or the agent's default, at its effort or the model's
  * default, else the nearest one listed. The account stays while the project uses it; otherwise the project's default.
  */
-function prefill(inherited: InheritedSettings, options: readonly CommentMentionOption[], models: readonly ModelOption[] | undefined, accounts: readonly ClaudeAccount[]): Prefill | undefined {
+function prefill(
+  inherited: InheritedSettings,
+  options: readonly CommentMentionOption[],
+  models: readonly ModelOption[] | undefined,
+  accounts: readonly ClaudeAccount[],
+  kept: string | undefined,
+): Prefill | undefined {
   const model = inherited.model ?? models?.find((candidate) => candidate.agent === inherited.agent && candidate.isDefault)?.id;
   const effort = inherited.effort ?? models?.find((candidate) => candidate.agent === inherited.agent && candidate.id === model)?.defaultEffort ?? null;
   const key = model ? threadModelKey({ agent: inherited.agent as ThreadChoice["agent"], model, effort }) : null;
@@ -27,7 +33,7 @@ function prefill(inherited: InheritedSettings, options: readonly CommentMentionO
     options[0];
   if (!option) return undefined;
   const { agent, model: chosen, effort: chosenEffort } = option.recipient;
-  const account = agent === "claude" ? accounts.find((candidate) => candidate.id === inherited.claudeAccountId)?.id : undefined;
+  const account = agent === "claude" ? (kept ?? accounts.find((candidate) => candidate.id === inherited.claudeAccountId)?.id) : undefined;
   return { choice: { agent, model: chosen, effort: chosenEffort, ...(account ? { claudeAccountId: account } : {}) }, inherited: option === exact };
 }
 
@@ -62,9 +68,8 @@ export function ThreadChoiceSheet({ title, confirm, inherited, project, trigger,
   const sheet = useTaskSheet(() => setEdited(undefined));
   const { models, options } = useThreadModels(false);
   const accounts = useProjectClaudeAccounts(project, undefined, sheet.open);
-  // Until the accounts arrive, the choice keeps no account, so confirming leaves the account to the one the thread would inherit.
-  const filled = inherited && prefill(inherited, options, models, accounts ?? []);
-  const prefilled = filled && { ...filled, choice: onAccount(filled.choice, keptAccount) };
+  // Until the accounts arrive, the choice keeps no account but a kept one, so confirming leaves the account to the one the thread would inherit.
+  const prefilled = inherited && prefill(inherited, options, models, accounts ?? [], keptAccount);
   const choice = edited ? onAccount(edited, keptAccount) : prefilled?.choice;
   return (
     <TaskSheet

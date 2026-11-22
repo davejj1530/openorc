@@ -1,8 +1,19 @@
 import { orclings, projects, pullReviews, runs, tasks, threads, type Db } from "@openorc/db";
-import { resolveCommentMentions, type InboxList, type Orcling, type OrclingChatSummary, type OrclingDraft, type Task, type ThreadSummary } from "@openorc/protocol";
-import { ACCOUNTS_KEPT_SEPARATE, STAYS_ON_ITS_ACCOUNT, accountReach, accountsSeparate, reachesTask, threadAccount } from "../services/claude-account-separation.js";
+import {
+  resolveCommentMentions,
+  type CommentRecipient,
+  type InboxList,
+  type ModelExecutionSettings,
+  type Orcling,
+  type OrclingChatSummary,
+  type OrclingDraft,
+  type Task,
+  type ThreadSummary,
+} from "@openorc/protocol";
+import { ACCOUNTS_KEPT_SEPARATE, STAYS_ON_ITS_ACCOUNT, accountReach, accountsSeparate, reachesTask, taskOwnerAccount, threadAccount } from "../services/claude-account-separation.js";
+import { commentReplyAccount } from "../services/claude-run-account.js";
 import { projectAccountPolicy } from "../services/project-claude-accounts.js";
-import { reviewGoesOn } from "../services/pull-requests.js";
+import { reviewRound } from "../services/pull-requests.js";
 import type { RunService } from "../services/runs.js";
 import { recipientCatalog } from "../services/task-side-runs.js";
 
@@ -10,15 +21,15 @@ type Reach = (account: string) => boolean;
 export type CloudHolds = (ref: { thread: string } | { run: string }) => boolean;
 
 /**
- * The Orclings a comment asks by @name, in its text or, when it asks about the description, in its task's description,
- * read as the comment service reads them. A name it can't read fails here as it would there.
+ * The Orclings and models a comment asks by @name, in its text or, when it asks about the description, in its task's
+ * description, read as the comment service reads them. A name it can't read fails here as it would there.
  */
-export async function mentionedOrclings(db: Db, runService: Pick<RunService, "models">, method: string, params: Record<string, unknown>): Promise<string[]> {
+export async function mentionedRecipients(db: Db, runService: Pick<RunService, "models">, method: string, params: Record<string, unknown>): Promise<CommentRecipient[]> {
   if (method !== "tasks.comments.post" || !accountsSeparate(db)) return [];
   const task = typeof params["taskId"] === "string" ? tasks.get(db, params["taskId"]) : null;
   const text = params["source"] === "description" ? (task?.spec ?? "") : String(params["body"] ?? "");
   if (!/(?:^|\s)@/.test(text)) return [];
-  return resolveCommentMentions(text, await recipientCatalog(runService), orclings.list(db)).flatMap((recipient) => recipient.orclingId ?? []);
+  return resolveCommentMentions(text, await recipientCatalog(runService), orclings.list(db));
 }
 
 /**
@@ -30,7 +41,7 @@ export function separateAccountsRefusal(
   self: Orcling,
   method: string,
   params: Record<string, unknown>,
-  { inCloud, mentioned = [] }: { inCloud?: CloudHolds; mentioned?: readonly string[] } = {},
+  { inCloud, mentioned = [] }: { inCloud?: CloudHolds; mentioned?: readonly CommentRecipient[] } = {},
 ): string | null {
   if (!accountsSeparate(db)) return null;
   const named = namedAccountRefusal(self, method, params);
@@ -42,8 +53,11 @@ export function separateAccountsRefusal(
   const drafted = (params["draft"] as Partial<OrclingDraft> | undefined)?.claudeAccountId;
   if (drafted && !reach(drafted)) return `${ACCOUNTS_KEPT_SEPARATE}, so you keep Orclings on your own Claude account.`;
   const reviewOn = method === "pulls.review.start" ? reviewAccount(db, params) : null;
-  if (reviewOn && !reach(reviewOn)) return `That review runs on another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`;
-  return reachesAll(db, reach, method, params, mentioned) ? null : `That belongs to another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`;
+  if (reviewOn && !reach(reviewOn))
+    return `That review runs on another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}, so review it as yourself, with your own orclingId, which reviews on your own Claude account.`;
+  if (!reachesAll(db, reach, method, params, mentioned)) return `That belongs to another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}.`;
+  const elsewhere = method === "tasks.comments.post" ? modelWorksElsewhere(db, self, params, mentioned) : null;
+  return elsewhere ? `${elsewhere}, and ${ACCOUNTS_KEPT_SEPARATE}, so start the work with orcling_thread_start instead, which starts it on your own Claude account.` : null;
 }
 
 function namedAccountRefusal(self: Orcling, method: string, params: Record<string, unknown>): string | null {
@@ -92,7 +106,7 @@ function nestedIds(params: Record<string, unknown>): { threadIds: string[]; task
   };
 }
 
-function reachesAll(db: Db, reach: Reach, method: string, params: Record<string, unknown>, mentioned: readonly string[]): boolean {
+function reachesAll(db: Db, reach: Reach, method: string, params: Record<string, unknown>, mentioned: readonly CommentRecipient[]): boolean {
   const id = (key: string) => stringParam(params, key);
   const runId = id("runId");
   const run = runId ? runs.get(db, runId) : null;
@@ -100,7 +114,7 @@ function reachesAll(db: Db, reach: Reach, method: string, params: Record<string,
   const nested = nestedIds(params);
   const threadIds = [...threadParams(method, params), run?.threadId ?? null, review?.id ?? null, ...nested.threadIds];
   const taskIds = [id("taskId"), method.startsWith("tasks.") ? id("id") : null, ...nested.taskIds];
-  const orclingIds = [method.startsWith("orclings.") ? id("id") : null, id("orclingId"), ...nested.orclingIds, ...mentioned];
+  const orclingIds = [method.startsWith("orclings.") ? id("id") : null, id("orclingId"), ...nested.orclingIds, ...mentioned.flatMap((recipient) => recipient.orclingId ?? [])];
   const named = threadIds.flatMap((threadId) => (threadId ? [threads.get(db, threadId)] : [])).filter((thread) => thread !== null);
   const others = orclingIds.flatMap((orclingId) => (orclingId ? [orclings.get(db, orclingId)] : [])).filter((orcling) => orcling !== null);
   if (run && !run.threadId && run.claudeAccountId && !reach(run.claudeAccountId)) return false;
@@ -123,9 +137,25 @@ function reviewConversation(db: Db, params: Record<string, unknown>) {
 function reviewAccount(db: Db, params: Record<string, unknown>): string | null {
   const projectId = String(params["projectId"]);
   if (!projects.get(db, projectId)) return null;
-  const conversation = reviewConversation(db, params);
-  if (reviewGoesOn(conversation)) return threadAccount(conversation);
-  return projectAccountPolicy(db, projectId).defaultId;
+  const orclingId = stringParam(params, "orclingId");
+  const model = { agent: (params["reviewer"] as Pick<ModelExecutionSettings, "agent">).agent, claudeAccountId: stringParam(params, "claudeAccountId") ?? undefined };
+  const round = reviewRound(db, reviewConversation(db, params), orclingId ? orclings.get(db, orclingId) : null, model);
+  return round.claudeAccountId ?? projectAccountPolicy(db, projectId).defaultId;
+}
+
+/**
+ * What a model a comment asks, by name or @name, would do on another account than the Orcling's, on a task with no
+ * conversation: Claude would answer there, or work another agent agrees to would start the task's thread there.
+ */
+function modelWorksElsewhere(db: Db, self: Orcling, params: Record<string, unknown>, mentioned: readonly CommentRecipient[]): string | null {
+  const task = typeof params["taskId"] === "string" ? tasks.get(db, params["taskId"]) : null;
+  if (!task) return null;
+  const named = Array.isArray(params["recipients"]) ? (params["recipients"] as CommentRecipient[]) : [];
+  const models = [...named, ...mentioned].filter((recipient) => !recipient.orclingId);
+  if (models.some((recipient) => recipient.agent === "claude") && commentReplyAccount(db, task) !== self.claudeAccountId) return "A Claude model would answer that comment on another Claude account";
+  if (!models.some((recipient) => recipient.agent !== "claude") || taskOwnerAccount(db, task) !== null) return null;
+  const startsOn = runs.listForTask(db, task.id).at(-1)?.claudeAccountId ?? projectAccountPolicy(db, task.projectId).defaultId;
+  return startsOn === self.claudeAccountId ? null : "Work a model agrees to in that comment would start on another Claude account";
 }
 
 /** Threads an Orcling starts or lists, and Orclings it makes, are on its own account while accounts are kept separate. */

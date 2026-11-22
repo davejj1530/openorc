@@ -1,5 +1,5 @@
-import { targetModel, threadDefault } from "@openorc/client";
-import { placeOf, type PermissionPreset, type RpcParams, type ThreadSummary } from "@openorc/protocol";
+import { KEPT_SEPARATE, targetModel, threadDefault } from "@openorc/client";
+import { DEFAULT_CLAUDE_ACCOUNT, placeOf, type PermissionPreset, type RpcParams, type ThreadSummary } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { useRpc, useRpcMutation } from "../client";
 import { useCloudFiles } from "../cloud/cloud-files";
@@ -7,7 +7,7 @@ import { OLDER_MAC_SUBTHREADS } from "../connection/link-connection";
 import { useShares } from "../connection/use-shares";
 import { composerControls } from "../composer/composer-state";
 import { useDimReason } from "../composer/dim-reason";
-import { useNewThreadClaudeAccount } from "../composer/claude-account";
+import { useAccountsSeparate, useNewThreadClaudeAccount } from "../composer/claude-account";
 import type { ComposerSettings } from "../composer/settings-bridge";
 import { useEmptiedPrompt } from "../composer/keyboard-leftover";
 import { useImageAttach } from "../composer/use-image-attach";
@@ -58,6 +58,20 @@ function useParentDefault(parent: ThreadSummary, cloud: boolean, draft: SheetDra
 }
 
 /**
+ * A subthread's Claude account, chosen as a new thread's is. While accounts are kept separate it is the parent's, can't
+ * change, and the start names it, so a Mac whose setting changed since doesn't move it to the project's default.
+ */
+function useSubthreadClaudeAccount(parent: ThreadSummary, cloud: boolean, chosen: string | undefined, select: (id: string) => void) {
+  const offered = useNewThreadClaudeAccount(parent.projectId, chosen);
+  const kept = useAccountsSeparate(!cloud) && !cloud;
+  const claudeAccountId = kept ? (parent.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) : offered;
+  const claudeAccount: ComposerSettings["claudeAccount"] = kept
+    ? { chosen: claudeAccountId, select: () => undefined, held: KEPT_SEPARATE.subthread, projectId: parent.projectId }
+    : { chosen: claudeAccountId, select, projectId: parent.projectId };
+  return { claudeAccount, claudeAccountId };
+}
+
+/**
  * A thread started under `parent`, as the desktop's New subthread starts one: in the parent's folder, on its model,
  * mode, permission and account until they are changed here. The draft is kept per parent, and a start the Mac refuses
  * keeps it and says why.
@@ -82,7 +96,7 @@ export function useNewSubthread(parent: ThreadSummary) {
   const attach = useImageAttach({ onImage: (image) => setDraft((current) => ({ ...current, images: [...current.images, image] })), onError: setError, cloud: files.scope });
   const { uploading } = attach;
   const chooseImages = cloud && !files.scope ? () => void (files.refusal && setError(files.refusal)) : attach.chooseImages;
-  const claudeAccountId = useNewThreadClaudeAccount(parent.projectId, draft.claudeAccountId);
+  const { claudeAccount, claudeAccountId } = useSubthreadClaudeAccount(parent, cloud, draft.claudeAccountId, (id) => change({ claudeAccountId: id }));
   // An older Mac starts none for a phone; a cloud thread's own server starts one under it.
   const shared = useShares(SUBTHREAD_STARTS);
   const olderMac = !cloud && shared === false;
@@ -96,7 +110,7 @@ export function useNewSubthread(parent: ThreadSummary) {
       change({ mode: next.mode });
       setPermission(next.permissionMode);
     },
-    claudeAccount: { chosen: claudeAccountId, select: (claudeAccountId) => change({ claudeAccountId }), projectId: parent.projectId },
+    claudeAccount,
   };
   const blocker = olderMac ? OLDER_MAC_SUBTHREADS : startBlocker(draft, { permissionReady: true });
   const controls = composerControls({

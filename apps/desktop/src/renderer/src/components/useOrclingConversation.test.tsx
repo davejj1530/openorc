@@ -18,7 +18,7 @@ const thread = { id: "thread", projectId: "project", agent: "claude", model: "so
 const answers = (): Record<string, unknown> => ({
   "app.settings.get": { claudeAccountsSeparate: host.separate, enabledHarnesses: ["claude"] },
   "orclings.list": [orcling("pip", "Pip", "work"), orcling("bo", "Bo", "personal")],
-  "orclings.groups.list": [],
+  "orclings.groups.list": [{ threadId: "group", title: "Pip and Bo", memberIds: ["pip", "bo"], createdAt: 1 }],
   "agents.modelCatalog": { models, providers: [] },
   "system.info": info,
 });
@@ -102,4 +102,29 @@ it("sends a message naming an Orcling on another account as an ordinary one whil
   fireEvent.click(screen.getByRole("button", { name: "Send to Bo" }));
   expect((await screen.findByRole("status")).textContent).toBe("Sent as a message");
   expect(calls("orclings.ask")).toEqual([]);
+});
+
+function GroupHarness() {
+  const group = { ...thread, id: "group", projectId: "workspace" } as ThreadSummary;
+  const orclings = useOrclingConversation({ thread: group, runs: [], choice: null, onModel: () => {} });
+  return <output>{orclings.placeholder ? (orclings.disabledReason ?? "Can send") : "Loading"}</output>;
+}
+const showGroup = () =>
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <GroupHarness />
+    </QueryClientProvider>,
+  );
+
+it("holds a group of Orclings on different Claude accounts while accounts are kept separate, in the core's words", async () => {
+  host.separate = true;
+  showGroup();
+  await waitFor(() =>
+    expect(screen.getByRole("status").textContent).toBe("This group's Orclings work on different Claude accounts, and Settings keeps Claude accounts separate, so it waits until that's off."),
+  );
+});
+
+it("lets a group of Orclings on different Claude accounts talk while the setting to keep them separate is off", async () => {
+  showGroup();
+  await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Can send"));
 });

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { RemoteApproval, RemoteDecision } from "./approvals.js";
 import { orclings, runs, settings, redact, threads } from "@openorc/db";
-import type { AgentEvent, SlackClientConfig, HarnessId } from "@openorc/protocol";
+import type { AgentEvent, SlackClientConfig, HarnessId, Orcling } from "@openorc/protocol";
 import type { ExecutionSwitchInput } from "@openorc/mcp";
 import type { OpenOrc } from "../../openorc.js";
 import type { TurnSettledOutcome } from "../runs.js";
@@ -10,6 +10,7 @@ import type { SlackImages, LocalSlackImage, SlackFile } from "./images.js";
 import type { SlackJob } from "./relay.js";
 
 import { harnessLoggedIn, harnessCatalog, harnessName, isHarnessId, stricterPermission } from "@openorc/protocol";
+import { ACCOUNTS_KEPT_SEPARATE, orclingOnAnotherAccount } from "../claude-account-separation.js";
 import { workspaceHome, directory } from "../workspace-home.js";
 import { folderCatalog, within } from "./folders.js";
 
@@ -254,8 +255,21 @@ export class SlackRunner {
           p.failedModels.get(`${m.agent}:${m.id}`) ?? m.unavailable ?? (info.harnesses.some((h) => h.id === m.agent && harnessLoggedIn(h)) ? null : "Connect this harness in OpenOrc Settings."),
       })),
       folders,
-      orclings: orclings.list(this.core.db).map((o) => ({ id: o.id, name: o.name, agent: o.settings.agent, model: o.settings.model, current: current.orclingId === o.id })),
+      orclings: orclings.list(this.core.db).map((o) => ({
+        id: o.id,
+        name: o.name,
+        agent: o.settings.agent,
+        model: o.settings.model,
+        current: current.orclingId === o.id,
+        ...(this.onAnotherAccount(p, o) ? { unavailable: "On another Claude account" } : {}),
+      })),
     };
+  }
+
+  /** While accounts are kept separate, an Orcling takes only a conversation on its own Claude account. */
+  private onAnotherAccount(p: Pending, orcling: Orcling): boolean {
+    const conversation = p.threadId ? threads.get(this.core.db, p.threadId) : null;
+    return conversation !== null && orclingOnAnotherAccount(this.core.db, orcling, conversation);
   }
 
   async switchExecution(runId: string, input: ExecutionSwitchInput) {
@@ -301,6 +315,8 @@ export class SlackRunner {
     if (p.switches >= 4) throw new Error("Too many switches in one request. Ask the owner to continue in a new reply.");
     const orcling = orclings.get(this.core.db, orclingId);
     if (!orcling) throw new Error("Choose an Orcling ID from execution_context; the request has not switched.");
+    if (this.onAnotherAccount(p, orcling))
+      throw new Error(`${orcling.name} works on another Claude account, and ${ACCOUNTS_KEPT_SEPARATE}, so choose an Orcling on this conversation's account; the request has not switched.`);
     const context = await this.executionContext(runId);
     const selected = context.models.find((m) => m.agent === orcling.settings.agent && m.id === orcling.settings.model);
     if (!selected || selected.unavailable) throw new Error(selected?.unavailable ?? `${orcling.name}'s model is unavailable right now. The request has not switched.`);

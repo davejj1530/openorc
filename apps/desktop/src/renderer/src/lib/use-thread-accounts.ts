@@ -1,7 +1,7 @@
-import { cloudAccountChoices, projectAccountChoice } from "@openorc/client";
+import { cloudAccountChoices, KEPT_SEPARATE, projectAccountChoice } from "@openorc/client";
 import { isHarnessId, type AccountStatus, type Project, type ThreadSummary, type TurnAccountSettings } from "@openorc/protocol";
 import type { PickerAccounts } from "../components/ModelPickerAccounts";
-import { STAYS_ON_ITS_ACCOUNT, useAccountsSeparate } from "./accounts-separate";
+import { useAccountsSeparate } from "./accounts-separate";
 import { useClaudeAccountId } from "./claude-account";
 import { useRpc, useRpcMutation } from "./client";
 
@@ -16,7 +16,7 @@ function shownAccount(thread: ThreadSummary | null, separate: boolean): "claude"
 }
 
 /**
- * A Claude conversation's accounts for its model picker: the project's choices, plus the thread's own when the project
+ * A conversation's Claude accounts for its model picker: the project's choices, plus the thread's own when the project
  * stopped using it, so it stays listed until the thread moves. Choosing one moves the conversation between turns; the
  * next message resumes its session there. An Orcling keeps its own account.
  */
@@ -53,7 +53,7 @@ function useMacThreadAccounts(thread: ThreadSummary | null, project: Pick<Projec
 
 function switchBlocked(thread: ThreadSummary, separate: boolean, switching: boolean): string | undefined {
   if (thread.orclingId) return "An Orcling keeps its own account.";
-  if (separate) return STAYS_ON_ITS_ACCOUNT;
+  if (separate) return KEPT_SEPARATE.conversation;
   if (thread.activity !== "idle") return "Switch accounts when this turn ends.";
   return switching ? "Switching accounts…" : undefined;
 }

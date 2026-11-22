@@ -1,6 +1,6 @@
 import { claudeAccounts, projects, type Db } from "@openorc/db";
-import { WORKSPACE_ID, type AppSettings, type ProjectClaudeAccounts } from "@openorc/protocol";
-import { ACCOUNTS_KEPT_SEPARATE, accountsSeparate } from "./claude-account-separation.js";
+import { notCarriedOver, WORKSPACE_ID, type AppSettings, type ProjectClaudeAccounts } from "@openorc/protocol";
+import { accountsSeparate } from "./claude-account-separation.js";
 import { AppSettingsService } from "./settings.js";
 
 /**
@@ -76,7 +76,8 @@ function onlyTheseAccounts(db: Db, policy: ProjectAccountPolicy): string {
  * The account a thread in the project starts on. With none asked for, the project's default (the app's for a project
  * that follows the app's). One a person chose that the project does not use is refused; one passed down from a parent,
  * a task or a schedule gives way to the project's default, or is refused while accounts are kept separate; a starter's
- * own, as an Orcling's, is left alone. Another agent's thread counts as passed down, but starts even if none is enabled.
+ * own, as an Orcling's, is left alone. Another agent's thread counts as passed down, but starts even if none is enabled,
+ * unless accounts are kept separate and it was passed one the project doesn't use.
  */
 export function startingAccount(db: Db, projectId: string, requested: string | undefined, from: AccountSource = "chosen"): string {
   if (from === "own" && requested) return requested;
@@ -84,15 +85,14 @@ export function startingAccount(db: Db, projectId: string, requested: string | u
   if (from === "unused" && !requested) return policy.defaultId;
   if (!requested) return newThreadAccount(policy);
   if (allowsAccount(policy, requested)) return requested;
-  if ((from === "inherited" || from === "unused") && accountsSeparate(db)) throw new Error(notCarriedOver(db, requested));
+  if ((from === "inherited" || from === "unused") && accountsSeparate(db)) throw new Error(notCarriedOver(accountName(db, requested)));
   if (from === "unused") return policy.defaultId;
   if (from === "inherited" || !policy.allowed.length) return newThreadAccount(policy);
   throw new Error(onlyTheseAccounts(db, policy));
 }
 
-function notCarriedOver(db: Db, requested: string): string {
-  const name = claudeAccounts.list(db).find((account) => account.id === requested)?.name ?? "its Claude account";
-  return `This project doesn't use ${name}, and ${ACCOUNTS_KEPT_SEPARATE}, so this can't start on another account.`;
+function accountName(db: Db, id: string): string {
+  return claudeAccounts.list(db).find((account) => account.id === id)?.name ?? "its Claude account";
 }
 
 /** Refuses a project's own accounts that could not work: none selected, unknown ones, a default outside them, or the Workspace. */

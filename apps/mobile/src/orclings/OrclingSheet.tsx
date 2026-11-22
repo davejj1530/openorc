@@ -1,3 +1,4 @@
+import { KEPT_SEPARATE } from "@openorc/client";
 import { isHarnessId, type OrclingProfile } from "@openorc/protocol";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
@@ -208,7 +209,7 @@ function DeleteOrcling({ profile }: { profile: OrclingProfile }) {
  * account, as it changes a composer's: each pick saves at once.
  */
 function useShareModel(composerId: string, profile: OrclingProfile | undefined, save: Save) {
-  const held = useAccountsSeparate() ? "Accounts are kept separate, so an Orcling stays on its account." : null;
+  const held = useAccountsSeparate() ? KEPT_SEPARATE.orcling : null;
   useShareSettings(composerId, {
     choice: profile ? profile.settings : null,
     selectModel: (choice) => {

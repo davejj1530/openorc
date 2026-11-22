@@ -387,6 +387,7 @@ export function ModelPicker({
   disabled,
   showEffort = true,
   orclings,
+  accounts,
   placeholder = "Choose a model",
   ariaLabel,
   limits,
@@ -396,6 +397,8 @@ export function ModelPicker({
   disabled?: boolean;
   showEffort?: boolean;
   orclings?: OrclingPickerChoices;
+  /** The Claude accounts to offer above Claude's models, with what each has left. */
+  accounts?: PickerAccounts | undefined;
   placeholder?: string;
   ariaLabel?: string;
   limits?: ModelLimits | undefined;
@@ -419,6 +422,7 @@ export function ModelPicker({
         ref={popup.trigger}
         disabled={disabled}
         aria-label={ariaLabel}
+        {...warmAccountUsage(accounts)}
         data-tip={selectedLabel ?? modelTitle(current, value?.model) ?? placeholder}
         className="inline-flex min-w-0 items-center gap-1.5 h-7 pl-2 pr-1.5 rounded-md text-base text-ink-2 hover:bg-surface-2 hover:text-ink disabled:text-ink-4 disabled:pointer-events-none"
       >
@@ -435,6 +439,7 @@ export function ModelPicker({
               value={value}
               onChange={onChange}
               orclings={orclings}
+              accounts={accounts}
               showEffort={showEffort}
               showFast={showEffort && (limits?.fast ?? true)}
               disabled={disabled}

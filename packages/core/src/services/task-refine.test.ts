@@ -238,9 +238,34 @@ it("refines a task only on the Claude account it is on while accounts are kept s
   await expect(call("tasks.refine.start", { taskId: owned, recipient: { ...claude, orclingId: pip.id }, instruction: "", again: false })).rejects.toThrow(
     "Pip works on another Claude account than this task's, and Settings keeps Claude accounts separate.",
   );
+  // An Orcling on another account is refused whatever agent it runs on.
+  const cy = await core.orclings.create({
+    name: "Cy",
+    look: defaultOrclingLook,
+    settings: { agent: "codex", model: "test-model", effort: "high", fastMode: false },
+    permission: "allow",
+    claudeAccountId: personal,
+  });
+  await expect(call("tasks.refine.start", { taskId: owned, recipient: { ...recipient, orclingId: cy.id }, instruction: "", again: false })).rejects.toThrow(
+    "Cy works on another Claude account than this task's, and Settings keeps Claude accounts separate.",
+  );
   const refine = await call("tasks.refine.start", { taskId: owned, recipient: claude, instruction: "", again: false });
   await vi.waitFor(() => expect(taskRefines.get(core.db, refine.id)?.runId).toBeTruthy());
   expect(runs.get(core.db, taskRefines.get(core.db, refine.id)!.runId!)?.claudeAccountId).toBe(work);
+});
+
+it("refines no task on another account while accounts are kept separate once its project stopped using the task's", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => claudeAccounts.add(core.db, name).id) as [string, string];
+  const conversation = threads.insert(core.db, { projectId, title: "Chat", agent: "claude", model: "test-model", effort: "high", claudeAccountId: work, mode: "act", permissionMode: "trusted" });
+  const owned = (await call("tasks.create", { projectId, threadId: conversation.id, title: "From the chat", spec: "Do it.", workspaceMode: "current" })).id;
+  await call("projects.updateSettings", { id: projectId, settings: { claudeAccounts: { only: true, accountIds: [personal], defaultId: personal, autoSwitch: false } } });
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+
+  await expect(call("tasks.refine.start", { taskId: owned, recipient: { agent: "claude", model: "test-model", effort: "high" }, instruction: "", again: false })).rejects.toThrow(
+    "This project doesn't use Work, and Settings keeps Claude accounts separate, so this can't start on another account.",
+  );
+  expect(await call("tasks.refine.get", { taskId: owned })).toBeNull();
+  expect(sessions.size).toBe(0);
 });
 
 it("turns Claude's Plan-mode ExitPlanMode back to task_suggest, so the plan doesn't swallow the suggestion", async () => {

@@ -3,9 +3,10 @@ import { STAY_QUIET } from "./orcling-quiet.js";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { listEvents, orclingGroups, orclingMessages, orclings, runs as runRepo, threads, type Db } from "@openorc/db";
-import { orclingHandle, WORKSPACE_ID, type Orcling, type OrclingGroup, type OrclingMessageOrigin, type Run, type Thread } from "@openorc/protocol";
+import { GROUP_ACROSS_ACCOUNTS, orclingHandle, WORKSPACE_ID, type Orcling, type OrclingGroup, type OrclingMessageOrigin, type Run, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { ACCOUNTS_KEPT_SEPARATE, accountReach, accountsSeparate } from "./claude-account-separation.js";
+import { OrclingFolders } from "./orcling-folders.js";
 import type { RunService } from "./runs.js";
 import type { ThreadService } from "./threads.js";
 import { executionProject } from "./workspace-home.js";
@@ -184,7 +185,7 @@ export class OrclingTalk {
       mode: "act",
       permissionMode: "review",
     });
-    const folder = path.join(this.deps.dataDir, "orclings", "groups", thread.id);
+    const folder = path.join(new OrclingFolders(this.deps.dataDir).groupChats, thread.id);
     await mkdir(folder, { recursive: true });
     threads.update(db, thread.id, { workingDirectory: await realpath(folder) });
     orclingGroups.create(
@@ -245,7 +246,7 @@ export class OrclingTalk {
   async sendToGroup(threadId: string, text: string, options: { messageId?: string; attachments?: string[] }): Promise<void> {
     const group = orclingGroups.get(this.deps.db, threadId);
     if (!group) throw new Error("This group chat no longer exists.");
-    if (this.acrossAccounts(group.memberIds)) throw new Error(`This group's Orclings work on different Claude accounts, and ${ACCOUNTS_KEPT_SEPARATE}, so it waits until that's off.`);
+    if (this.acrossAccounts(group.memberIds)) throw new Error(GROUP_ACROSS_ACCOUNTS);
     const state = this.state(threadId);
     state.orclingTurns = 0;
     const named = namedIn(
@@ -342,6 +343,8 @@ export class OrclingTalk {
   private async next(threadId: string): Promise<void> {
     const state = this.state(threadId);
     if (state.starting || this.deps.runs().threadActivity(threadId) !== "idle") return;
+    // Turns that were waiting when accounts became separate don't run in a group whose Orclings are on different accounts.
+    if (this.acrossAccounts(orclingGroups.get(this.deps.db, threadId)?.memberIds ?? [])) state.queue = [];
     const turn = state.queue.shift();
     if (!turn) return;
     state.starting = true;

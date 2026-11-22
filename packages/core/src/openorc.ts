@@ -85,6 +85,7 @@ import { composeHandlers, type Handlers } from "./handlers/types.js";
 import { createWorkspaceHandlers } from "./handlers/workspace.js";
 import { createWorktreeHandlers } from "./handlers/worktrees.js";
 import type { OpenOrcOptions } from "./options.js";
+import { DATABASE_FILE, PROVIDER_LOGS } from "./data-dir.js";
 import { phoneCloudPlace } from "./remote/cloud-policy.js";
 import { NO_CLOUD_SESSION, RemoteAccess } from "./remote/remote-access.js";
 import { requestOrigin, type RequestOrigin } from "./request-origin.js";
@@ -219,7 +220,7 @@ export class OpenOrc {
     };
     this.db = db;
     this.log = transportLogger(options.transport);
-    this.providerLog = new ProviderLog(path.join(options.dataDir, "logs", "provider"));
+    this.providerLog = new ProviderLog(path.join(options.dataDir, PROVIDER_LOGS));
     this.toolImages = new ToolImageStore(options.dataDir);
     this.ledger = new LedgerWriter(db, { native: (ev) => this.providerLog.write(ev) });
     this.upkeep = new LedgerUpkeep(db, { log: this.log, toolImages: this.toolImages });
@@ -514,7 +515,7 @@ export class OpenOrc {
       options.transport.push({ type: "startup", message: `Agent recovery needs attention: ${error instanceof Error ? error.message : String(error)}` });
       throw error;
     }
-    const file = path.join(options.dataDir, "openorc.sqlite");
+    const file = path.join(options.dataDir, DATABASE_FILE);
     const db = options.ephemeral ? Db.memory() : Db.open(file);
     if (!options.ephemeral && LedgerUpkeep.needsCompaction(db, options.dataDir)) {
       options.transport.push({ type: "startup", message: "Tidying up saved history. This happens once and can take a minute." });

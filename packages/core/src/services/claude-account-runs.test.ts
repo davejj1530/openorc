@@ -614,6 +614,37 @@ it("forks a thread onto its project's default account carrying the parent's sess
   expect(threads.get(db, thread.id)?.claudeAccountId).toBe(client);
 });
 
+it("goes on with a task on the account it is on, not an older task run's, while accounts are kept separate", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
+  const conversation = threads.insert(db, { projectId: project.id, title: "Chat", agent: "claude", model: "fixture", mode: "act", permissionMode: "review", claudeAccountId: work });
+  /** A task saved from the conversation on Work that last ran on Personal, before tasks ran in threads. */
+  const ranOnPersonal = () => {
+    const task = tasks.insert(db, {
+      projectId: project.id,
+      threadId: conversation.id,
+      title: "Ship it",
+      spec: null,
+      priority: "none",
+      labels: [],
+      workspaceMode: "current",
+      baseRef: null,
+      parentTaskId: null,
+    });
+    runs.insert(db, { id: crypto.randomUUID(), taskId: task.id, threadId: null, agent: "claude", model: "fixture", mode: "act", permissionMode: "review", claudeAccountId: personal });
+    return task;
+  };
+  const reply = (task: ReturnType<typeof ranOnPersonal>) => claudeRunAccount(db, { scope: { task: null, thread: null, comment: { id: "reply", task } } });
+  const target = { agent: "claude" as const, model: "fixture", effort: null };
+
+  const together = ranOnPersonal();
+  expect(reply(together)).toBe(personal);
+  expect(conversations.taskThreadForStart(together.id, target).claudeAccountId).toBe(personal);
+  new AppSettingsService(db).set({ claudeAccountsSeparate: true });
+  const separate = ranOnPersonal();
+  expect(reply(separate)).toBe(work);
+  expect(conversations.taskThreadForStart(separate.id, target).claudeAccountId).toBe(work);
+});
+
 it("starts a task's thread on its starter's own account, as an Orcling's, even when none of the project's accounts is enabled", async () => {
   const [work, orcling] = ["Work", "Orcling"].map((name) => accounts.add(name).id) as [string, string];
   onlyUse([work], work);

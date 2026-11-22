@@ -141,12 +141,17 @@ function startSettings(opener: string, prompt: string) {
   return { prompt: `${opener}\n\n${prompt}`, promptRole: "system" as const };
 }
 
-/** Which Claude accounts a project's threads may use, which one new threads start on, and whether a limit moves them on. */
-function projectAccounts(db: Db, projectId: string) {
+/**
+ * Which Claude accounts a project's threads may use, which one new threads start on, and whether a limit moves them
+ * on; while accounts are kept separate, only the Orcling's own, when the project uses it.
+ */
+function projectAccounts(db: Db, projectId: string, own: string) {
   if (!claudeAccounts.list(db).some((account) => account.enabled)) return {};
   const policy = projectAccountPolicy(db, projectId);
   const name = accountNames(db);
-  return { claudeAccounts: { uses: policy.allowed.map((id) => name(id) ?? id), newThreadsOn: name(policy.defaultId) ?? null, switchesWhenLimited: policy.autoSwitch } };
+  const uses = policy.allowed.filter(accountReach(db, own));
+  const startsOn = accountsSeparate(db) ? uses[0] : policy.defaultId;
+  return { claudeAccounts: { uses: uses.map((id) => name(id) ?? id), newThreadsOn: (startsOn && name(startsOn)) ?? null, switchesWhenLimited: policy.autoSwitch } };
 }
 
 /** Every place the person works: their Workspace, then their projects. */
@@ -281,8 +286,8 @@ function projectTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, 
         .list({ projectIds: [projectId], filter: "active", orderBy: "activity", limit: 10, includeChildren: true, ...listedAccount(db, self.claudeAccountId) })
         .filter((t) => !chats.has(t.id));
       const recent = threadTree(listed, (id) => listed.find((t) => t.id === id)?.title ?? reachableTitle(reach, threads.get(db, id)), accountNames(db));
-      const memory = query ? (await deps.memory.retrieve(projectId, query, 8)).map(({ memory: m }) => ({ title: m.title, body: m.body })) : deps.memory.brief(found);
-      return json({ project: { id: found.id, name: found.name, folder: found.rootPath }, ...projectAccounts(db, projectId), openTasks: open, threads: recent, memory });
+      const memory = query ? (await deps.memory.retrieve(projectId, query, 8)).map(({ memory: m }) => ({ title: m.title, body: m.body })) : deps.memory.brief(found, self.claudeAccountId);
+      return json({ project: { id: found.id, name: found.name, folder: found.rootPath }, ...projectAccounts(db, projectId, self.claudeAccountId), openTasks: open, threads: recent, memory });
     },
     readThread: async (runId, threadId, limit) => {
       speaker(runId);

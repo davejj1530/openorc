@@ -198,11 +198,12 @@ const cached = (settings: Partial<AppSettings>) => mac.phone!.module.queryClient
 it.each([
   { stop: "a usage limit", session: limited, title: "Secondary reached its limit" },
   { stop: "a sign-out", session: signedOut, title: "Secondary is signed out" },
-])("offers no other account after $stop while the Mac keeps accounts separate, and reads no usage for one", async ({ session, title }) => {
+])("offers no other account after $stop while the Mac keeps accounts separate, says why, and reads no usage for one", async ({ session, title }) => {
   cached({ claudeAccountsSeparate: true });
   mac.limits = [share("backup", 62)];
   show(session);
   await waitFor(() => expect(screen.getByRole("header").textContent).toBe(title));
+  expect(screen.getByText("Accounts are kept separate, so this conversation stays on its account.")).toBeTruthy();
   expect(screen.queryAllByRole("button")).toEqual([]);
   expect(mac.calls).toEqual(["claude.accounts.list"]);
 });
@@ -210,6 +211,7 @@ it.each([
 it("keeps the fresh start of a lost session while the Mac keeps accounts separate", async () => {
   cached({ claudeAccountsSeparate: true });
   show({ status: "lost", message: null });
+  expect(screen.queryByText(/kept separate/)).toBeNull();
   await act(async () => screen.getByRole("button", { name: "Start a fresh session with a handoff" }).click());
   expect(mac.starts[0]).toMatchObject({ resume: false, prompt: "Continue where you left off. Check the working tree first." });
 });
@@ -223,6 +225,7 @@ it.each([
   show(limited);
   await waitFor(() => expect(offered()).toEqual(["Continue with Backup, 62% left", "Continue with Primary, 12% left"]));
   expect(mac.calls).toContain("app.settings.get");
+  expect(screen.queryByText(/kept separate/)).toBeNull();
 });
 
 it("words Codex's limit the same, with no accounts to offer", async () => {

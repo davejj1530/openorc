@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { accountsToContinueWith, canContinueWithAnother, projectAccountChoice } from "@openorc/client";
+import { accountsToContinueWith, canContinueWithAnother, projectAccountChoice, staysOnItsAccount } from "@openorc/client";
 import { harnessShortName, type ClaudeAccountConnection, type ThreadSummary } from "@openorc/protocol";
 import { useAccountsSeparate } from "../lib/accounts-separate";
 import { CoversPreview } from "../lib/browser-preview";
@@ -17,7 +17,7 @@ import { useComposerControl } from "./composer-read-only";
  */
 export function SessionRecovery({ thread, disabled, onRestart, onContinueWith }: { thread: ThreadSummary; disabled: boolean; onRestart: () => void; onContinueWith: (accountId: string) => void }) {
   const { session } = thread;
-  const { accounts, exhausted } = useAccountsToContinueWith(thread);
+  const { accounts, exhausted, kept } = useAccountsToContinueWith(thread);
   const control = useComposerControl(disabled);
   if (session.status !== "lost" && session.status !== "error") return null;
   return (
@@ -34,6 +34,7 @@ export function SessionRecovery({ thread, disabled, onRestart, onContinueWith }:
             </Button>
             {session.status === "error" ? <span className="text-xs text-ink-2">Or send a message to resume.</span> : null}
           </div>
+          {kept ? <div className="text-xs text-ink-2">{kept}</div> : null}
           {exhausted ? (
             <div className="text-xs text-ink-2">
               Every account this project uses is at its limit.{" "}
@@ -52,13 +53,15 @@ export function SessionRecovery({ thread, disabled, onRestart, onContinueWith }:
  * The accounts the stopped turn can go on with, of those its project uses; `exhausted` when its usage limit stopped it,
  * the project uses only some accounts, and none of them is left to go on with. A signed-out account is not at its limit.
  */
-function useAccountsToContinueWith(thread: ThreadSummary): { accounts: ClaudeAccountConnection[]; exhausted: boolean } {
-  const offered = !useAccountsSeparate() && canContinueWithAnother(thread);
+function useAccountsToContinueWith(thread: ThreadSummary): { accounts: ClaudeAccountConnection[]; exhausted: boolean; kept: string | null } {
+  const separate = useAccountsSeparate();
+  const offered = canContinueWithAnother(thread, separate);
   const list = useRpc("claude.accounts.list", {}, { enabled: offered }).data;
   const project = useRpc("projects.get", { id: thread.projectId }, { enabled: offered }).data;
-  const accounts = offered ? accountsToContinueWith(thread, list?.accounts ?? [], project) : [];
+  const accounts = accountsToContinueWith(thread, separate, list?.accounts ?? [], project);
   const atLimit = thread.session.recovery?.kind === "usage";
-  return { accounts, exhausted: Boolean(offered && atLimit && list && project && projectAccountChoice(project, list).restricted && !accounts.length) };
+  const exhausted = Boolean(offered && atLimit && list && project && projectAccountChoice(project, list).restricted && !accounts.length);
+  return { accounts, exhausted, kept: staysOnItsAccount(thread, separate) };
 }
 
 function ContinueWith({ accounts, disabled, onChoose }: { accounts: ClaudeAccountConnection[]; disabled: boolean; onChoose: (accountId: string) => void }) {

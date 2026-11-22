@@ -385,7 +385,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
               }
               busy={optimistic.busy}
               allowEmpty={firstTaskRun}
-              disabledReason={taskDraft.blocked ?? sendDisabledReason ?? cloud.blocked}
+              disabledReason={taskDraft.blocked ?? sendDisabledReason ?? orclings.disabledReason ?? cloud.blocked}
               live={live && activeRun ? { runId: activeRun.id, working } : null}
               queueing={Boolean(thread && working)}
               liveByDefault

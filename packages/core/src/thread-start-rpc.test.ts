@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
-import { claudeAccounts, projects, runs, settings, tasks, threads } from "@openorc/db";
+import { claudeAccounts, memories, projects, runs, settings, tasks, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import { DEFAULT_CLAUDE_ACCOUNT, THREAD_EXISTS, type ModelOption, type Project, type RpcParams, type RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
@@ -318,7 +318,23 @@ it("keeps a Claude run's file tools out of the other accounts' folders while acc
   expect((await firstSpec(before.id)).offLimits).toBeUndefined();
   await call("app.settings.set", { claudeAccountsSeparate: true });
   const { thread } = await parent({ agent: "claude", model: "claude-fixture" });
-  expect((await firstSpec(thread.id)).offLimits).toEqual([path.join(folder, "data", "claude-accounts", client)]);
+  const database = ["openorc.sqlite", "openorc.sqlite-wal", "openorc.sqlite-shm"].map((name) => path.join(folder, "data", name));
+  expect((await firstSpec(thread.id)).offLimits).toEqual([path.join(folder, "data", "claude-accounts", client), ...database, path.join(folder, "data", "logs", "provider")]);
+});
+
+it("names in a Claude thread's memory brief only the tasks in progress on its own Claude account while accounts are kept separate", async () => {
+  const claude = await scriptClaude();
+  const client = claudeAccounts.add(core.db, "Client").id;
+  settings.set(core.db, "memory.enabled", "true");
+  memories.upsert(core.db, { projectId: project.id, type: "lesson", title: "Run the linter first", body: "CI stops at lint before the tests run.", source: "user" });
+  const inProgress = (title: string, thread: { id: string }) => tasks.update(core.db, task(title, null).id, { status: "in_progress", executionThreadId: thread.id });
+  inProgress("Send the client the invoice", conversation("On the client account", client));
+  inProgress("Rotate the deploy keys", conversation("On the CLI login"));
+  await call("app.settings.set", { claudeAccountsSeparate: true });
+  const { thread } = await parent({ ...claude, claudeAccountId: client });
+  const brief = (await firstSpec(thread.id)).systemPromptAppendix ?? "";
+  expect(brief).toContain("- Task in progress: Send the client the invoice");
+  expect(brief).not.toContain("Rotate the deploy keys");
 });
 
 /** A thread a person starts under `parentThreadId` from OpenOrc. */

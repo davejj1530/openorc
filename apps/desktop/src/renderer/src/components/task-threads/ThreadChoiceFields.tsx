@@ -1,5 +1,6 @@
 import type { AccountsProject } from "@openorc/client";
 import type { ClaudeAccount, ThreadChoice } from "@openorc/protocol";
+import { keptAccountName } from "../../lib/accounts-separate";
 import { modelEffortLabel } from "../../lib/model-effort-label";
 import { threadModelKey, useProjectClaudeAccounts, useThreadModels } from "../../lib/thread-choice";
 import { ClaudeAccountOptions } from "../ClaudeAccountPicker";
@@ -39,10 +40,6 @@ export function NoAccount({ reason, variant, label }: { reason: string; variant:
       <option value="">{reason}</option>
     </Select>
   );
-}
-
-export function keptAccountName(accounts: readonly ClaudeAccount[] | undefined, kept: string): string {
-  return `${accounts?.find((account) => account.id === kept)?.name ?? "The task's account"} (kept separate)`;
 }
 
 type FieldsProps = {

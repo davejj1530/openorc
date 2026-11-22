@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ClaudeAccountId } from "./claude-accounts.js";
 import type { AgentKind } from "./events.js";
 import { ModelExecutionSettings } from "./execution-target.js";
 
@@ -188,6 +189,10 @@ export interface PullRequestReview {
   updatedAt: number;
 }
 
+export function reviewDrafted(review: Pick<PullRequestReview, "comments" | "summary" | "modelSummary">): boolean {
+  return review.comments.length > 0 || review.summary.trim() !== "" || Boolean(review.modelSummary?.trim());
+}
+
 export const PullRequestReviewEvent = z.enum(["comment", "approve", "request_changes"]);
 export type PullRequestReviewEvent = z.infer<typeof PullRequestReviewEvent>;
 
@@ -271,7 +276,8 @@ export const pullRequestRpcParams = {
   "pulls.review.discard": z.object(PullRequestRef).strict(),
   /** Starts a model reviewing the pull request in a read-only conversation of its own. */
   /** With `orclingId`, that Orcling reviews with its own model, instructions and memory. */
-  "pulls.review.start": z.object({ ...PullRequestRef, reviewer: ModelExecutionSettings, orclingId: z.string().min(1).optional() }).strict(),
+  /** With `claudeAccountId`, a Claude model reviews on that account; a later round on another one starts a fresh conversation there. */
+  "pulls.review.start": z.object({ ...PullRequestRef, reviewer: ModelExecutionSettings, orclingId: z.string().min(1).optional(), claudeAccountId: ClaudeAccountId.optional() }).strict(),
   /** Posts the draft as one GitHub review, as you or as your reviewer app, then clears it. */
   "pulls.review.submit": z.object({ ...PullRequestRef, event: PullRequestReviewEvent, summary: z.string().max(REVIEW_TEXT_LIMIT), as: PullRequestReviewAuthor.default("you") }).strict(),
   "reviewerApp.get": z.object({}).strict(),

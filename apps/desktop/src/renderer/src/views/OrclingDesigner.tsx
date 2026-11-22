@@ -11,7 +11,7 @@ import {
   type OrclingPermission,
 } from "@openorc/protocol";
 import { cn } from "../lib/cn";
-import { defaultChoice, pickerCatalog, type ModelChoice } from "@openorc/client";
+import { defaultChoice, KEPT_SEPARATE, pickerCatalog, type ModelChoice } from "@openorc/client";
 import { useAccountsSeparate } from "../lib/accounts-separate";
 import { afterOrclingDeleted, groupsGoingWith, useOrclingGroups, useOrclings } from "../lib/orclings";
 import { ClaudeAccountScope } from "../lib/claude-account";
@@ -157,7 +157,7 @@ function AccountField({ value, onChange, saved }: { value: string | undefined; o
           <ClaudeAccountOptions accounts={accounts.accounts} value={chosen} />
         </Select>
       </div>
-      {kept ? <p className="text-sm text-ink-3">Accounts are kept separate, so an Orcling stays on its account.</p> : null}
+      {kept ? <p className="text-sm text-ink-3">{KEPT_SEPARATE.orcling}</p> : null}
     </>
   );
 }

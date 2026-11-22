@@ -1,5 +1,5 @@
-import { accountsToContinueWith, canContinueWithAnother, CONTINUE_PROMPT, RESTART_PROMPT, usageResetLabel, type SubmitRequest } from "@openorc/client";
-import { DEFAULT_CLAUDE_ACCOUNT, harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/protocol";
+import { accountsToContinueWith, canContinueWithAnother, CONTINUE_PROMPT, RESTART_PROMPT, staysOnItsAccount, stoppedByItsAccount, usageResetLabel, type SubmitRequest } from "@openorc/client";
+import { DEFAULT_CLAUDE_ACCOUNT, harnessShortName, isHarnessId, type ClaudeAccountConnection, type ThreadSummary } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { client, useRpc } from "../client";
@@ -56,6 +56,11 @@ function AccountChoice({ choice, now, going, disabled, onPress }: { choice: Cont
   );
 }
 
+function cardWords(thread: ThreadSummary, accounts: readonly ClaudeAccountConnection[]) {
+  const own = accounts.find((account) => account.id === (thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT))?.name;
+  return stoppedWords(thread, thread.agent === "claude" && accounts.length > 1 ? own : undefined);
+}
+
 /**
  * Over the composer while a conversation cannot go on as it was: what stopped it, in the agent's words, and the way
  * back. A turn stopped on one Claude account goes on with another, the one with the most left first, and its session
@@ -68,17 +73,19 @@ function Stopped({ thread, request, disabled, onSent }: RecoveryProps) {
   const inFlight = useRef(false);
   const [failure, setFailure] = useState<string | null>(null);
   const submitter = client.useSubmit();
-  const separate = useAccountsSeparate(canContinueWithAnother(thread));
-  const offered = !separate && canContinueWithAnother(thread) && request.choice?.agent === "claude";
-  const list = useRpc("claude.accounts.list", {}, { enabled: canContinueWithAnother(thread) });
+  const stopped = stoppedByItsAccount(thread);
+  const claude = request.choice?.agent === "claude";
+  const separate = useAccountsSeparate(stopped);
+  const offered = canContinueWithAnother(thread, separate) && claude;
+  const list = useRpc("claude.accounts.list", {}, { enabled: stopped });
   // From the cached list: a project that uses only some accounts goes on with one of those.
   const project = useRpc("projects.list", {}, { enabled: offered }).data?.find((each) => each.id === thread.projectId);
   const limits = useRpc("providers.limits", {}, { enabled: offered, staleTime: 60_000, gcTime: Infinity });
   const now = Date.now();
   const accounts = list.data?.accounts ?? [];
-  const choices = offered ? continueChoices(accountsToContinueWith(thread, accounts, project), limits.data ?? [], now) : [];
-  const own = accounts.find((account) => account.id === (thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT))?.name;
-  const words = stoppedWords(thread, thread.agent === "claude" && accounts.length > 1 ? own : undefined);
+  const choices = offered ? continueChoices(accountsToContinueWith(thread, separate, accounts, project), limits.data ?? [], now) : [];
+  const kept = claude ? staysOnItsAccount(thread, separate) : null;
+  const words = cardWords(thread, accounts);
   const start = (key: string, how: Pick<SubmitRequest, "restart" | "claudeAccountId">, prompt: string) => {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -111,6 +118,7 @@ function Stopped({ thread, request, disabled, onSent }: RecoveryProps) {
           {words.detail}
         </Text>
       ) : null}
+      {kept ? <Text className="text-sm text-ink-3">{kept}</Text> : null}
       {choices.length ? (
         <View className="gap-1.5 pt-1">
           <Text className="text-sm text-ink-4">Continue with</Text>

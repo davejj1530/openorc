@@ -100,6 +100,11 @@ it("keeps accounts separate, which turns switching at usage limits off", async (
   const switching = screen.getByRole<HTMLInputElement>("switch", { name: /Switch accounts at usage limits/ });
   await waitFor(() => expect(switching.checked).toBe(true));
   expect(keep.checked).toBe(false);
+  expect(
+    screen.getByText(
+      /^Agents and Orclings only see and reach work on their own account, .* Claude's file tools can't open other accounts' folders \(unless OpenOrc runs on Windows itself rather than in WSL\), /,
+    ),
+  ).toBeTruthy();
   expect(screen.queryByText(/Turning this off moves each account's memories/)).toBeNull();
   fireEvent.click(keep);
   await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("app.settings.set", { claudeAccountsSeparate: true }));

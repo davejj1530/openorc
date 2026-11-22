@@ -189,6 +189,7 @@ it("offers the other signed-in Claude accounts after a usage limit, and goes on 
   const session = { status: "error", message: "You've hit your 5-hour limit", recovery: { kind: "usage", provider: "claude" } } as const;
   await open({ thread: { agent: "claude", model: "opus", claudeAccountId: "work", session }, runs: [{ id: "A", agent: "claude", live: false }] });
   expect(screen.queryByRole("button", { name: /Old/ })).toBeNull();
+  expect(screen.queryByText(/kept separate/)).toBeNull();
   await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Continue with Personal" })));
   expect(vi.mocked(core.call).mock.calls.filter(([method]) => sends.has(method))).toEqual(
     start(true, { agent: "claude", model: "opus", prompt: "Continue where you left off.", claudeAccountId: "personal" }),
@@ -202,6 +203,7 @@ it("offers no other account to continue with after a usage limit while accounts 
   const session = { status: "error", message: "You've hit your 5-hour limit", recovery: { kind: "usage", provider: "claude" } } as const;
   await open({ thread: { agent: "claude", model: "opus", claudeAccountId: "work", session }, runs: [{ id: "A", agent: "claude", live: false }] });
   expect(screen.queryByRole("button", { name: /Continue with/ })).toBeNull();
+  expect(screen.getByText("Accounts are kept separate, so this conversation stays on its account.")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Retry with a fresh session" })).toBeTruthy();
   expect(screen.queryByText(/Every account this project uses/)).toBeNull();
 });
@@ -230,4 +232,19 @@ it("offers only the accounts the thread's project uses after a usage limit, and 
   } finally {
     queries.delete("projects.get");
   }
+});
+
+it("holds a group of Orclings on different Claude accounts while accounts are kept separate, in the core's words", async () => {
+  const orcling = (id: string, claudeAccountId: string) => ({ id, name: id, claudeAccountId, threadId: `${id}-home`, settings: { agent: "claude", model: "opus", effort: null, fastMode: false } });
+  queries.set("orclings.list", [orcling("pip", "work"), orcling("bo", "personal")]);
+  queries.set("orclings.groups.list", [{ threadId: "thread", title: "pip and bo", memberIds: ["pip", "bo"], createdAt: 1 }]);
+  queries.set("app.settings.get", { claudeAccountsSeparate: false });
+  const group: { thread: Partial<ThreadSummary>; runs: RunSpec[] } = { thread: { agent: "claude", model: "opus", projectId: "workspace" }, runs: [{ id: "A", agent: "claude", live: false }] };
+  await open(group);
+  expect(composer.props?.disabledReason).toBeNull();
+  cleanup();
+
+  queries.set("app.settings.get", { claudeAccountsSeparate: true });
+  await open(group);
+  expect(composer.props?.disabledReason).toBe("This group's Orclings work on different Claude accounts, and Settings keeps Claude accounts separate, so it waits until that's off.");
 });

@@ -4,7 +4,7 @@ import { REMOTE_METHODS, rpcParams, type Orcling, type RemoteMethod, type RpcMet
 import { z } from "zod";
 import { admitRemoteRequest, type GuardContext } from "../remote/policy.js";
 import type { RunService } from "../services/runs.js";
-import { keptToOwnAccount, mentionedOrclings, onOwnAccount, separateAccountsRefusal, type CloudHolds } from "./orcling-app-accounts.js";
+import { keptToOwnAccount, mentionedRecipients, onOwnAccount, separateAccountsRefusal, type CloudHolds } from "./orcling-app-accounts.js";
 
 /**
  * What an Orcling may do in OpenOrc for the person: everything their paired phone may, under the guards the Mac's own
@@ -169,7 +169,7 @@ export function appTools(deps: AppDependencies, speaker: (runId: string) => Orcl
       const parsed = rpcParams[method].safeParse(params ?? {});
       if (!parsed.success) throw new Error(`${method} takes other parameters: ${parsed.error.message}`);
       const data = onOwnAccount(db, self, method, parsed.data);
-      const mentioned = await mentionedOrclings(db, deps.runs, method, data as Record<string, unknown>);
+      const mentioned = await mentionedRecipients(db, deps.runs, method, data as Record<string, unknown>);
       const refusal =
         selfRefusal(self, db, method, data) ??
         separateAccountsRefusal(db, self, method, data as Record<string, unknown>, { inCloud: deps.inCloud, mentioned }) ??

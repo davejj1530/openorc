@@ -15,6 +15,9 @@ interface Pending {
   reject: (reason: Error) => void;
 }
 
+/** What a call is told when the core stopped before answering it. */
+const CORE_STOPPED = "OpenOrc stopped before answering. It is starting again, so try again in a moment.";
+
 /**
  * The renderer's one line to the core: request/response RPC plus pushes over the MessagePort main handed us. A window
  * hears every run's frames, so interest is never sent. Logs, benchmarks, startup and the MCP port are desktop matters
@@ -42,13 +45,16 @@ class CoreClient implements CoreConnection {
 
   /** Asks the preload for a port. However often it is asked, one window listener takes the port that arrives. */
   connect(): void {
-    if (!this.listening) window.addEventListener("message", this.takePort);
+    if (!this.listening) window.addEventListener("message", this.fromPreload);
     this.listening = true;
     window.openorc.connectBridge();
   }
 
-  private readonly takePort = (e: MessageEvent) => {
-    if (e.source !== window || e.data !== "openorc:port" || e.ports.length === 0) return;
+  /** The preload's word, and only the preload's: a port to the core, or that the core behind the port stopped. */
+  private readonly fromPreload = (e: MessageEvent) => {
+    if (e.source !== window) return;
+    if (e.data === "openorc:core-lost") return this.lose();
+    if (e.data !== "openorc:port" || e.ports.length === 0) return;
     const port = e.ports[0] as MessagePort;
     this.port = port;
     port.onmessage = (m: MessageEvent<CorePush>) => this.receive(m.data);
@@ -60,6 +66,24 @@ class CoreClient implements CoreConnection {
       emit(this.mediaListeners, media);
     }
   };
+
+  /**
+   * The core stopped by itself, and main is starting another. What it was asked and never answered fails now instead of
+   * waiting forever: a send gives its words back to the composer, and a list says it could not load. Later calls wait for
+   * the next port, and the new core's ready resumes the session, which loads everything again.
+   */
+  private lose(): void {
+    const port = this.port;
+    if (!port) return;
+    port.onmessage = null;
+    port.close();
+    this.port = null;
+    // Calls only queue while there is no port, so every one still waiting went to the core that stopped.
+    const unanswered = [...this.pending.values()];
+    this.pending.clear();
+    for (const call of unanswered) call.reject(new Error(CORE_STOPPED));
+    this.setStartup("OpenOrc stopped unexpectedly. Starting it again…");
+  }
 
   /** The port device streams travel on, beside the RPC port. A listener hears the current one and every later one. */
   onMediaPort(fn: Listener<MessagePort>): () => void {

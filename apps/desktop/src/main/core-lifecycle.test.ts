@@ -3,7 +3,7 @@ import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HostChoice } from "../shared/host";
 import { encodeFrame, FrameReader, type WslFrame } from "../shared/wsl-frames";
-import { CoreLifecycle, type DistroAnswer } from "./core-lifecycle";
+import { CoreLifecycle, type DistroAnswer, type StopsAnswer } from "./core-lifecycle";
 import type { CoreProcess } from "./host-core";
 import { WslCore, type CoreChild, type WslCoreStart } from "./wsl/core";
 import { ALREADY_RUNNING } from "./wsl/runtime";
@@ -90,8 +90,20 @@ function harness(host: HostChoice = { kind: "local" }) {
   /** The cores the next starts hand out, in order. */
   const next: CoreProcess[] = [];
   const started: CoreProcess[] = [];
-  const did = { connected: [] as [CoreProcess, string][], reloaded: [] as string[][], left: 0, released: 0, quit: 0, madeLocal: 0, imported: [] as [CoreProcess, string][], notAdded: [] as string[] };
+  const did = {
+    connected: [] as [CoreProcess, string][],
+    lost: [] as string[][],
+    reloaded: [] as string[][],
+    left: 0,
+    released: 0,
+    quit: 0,
+    madeLocal: 0,
+    imported: [] as [CoreProcess, string][],
+    notAdded: [] as string[],
+  };
   const asked: { distro: string; reason: string; answer(answer: DistroAnswer): Promise<void> }[] = [];
+  /** Each time the core here kept stopping, the question that was asked about it. */
+  const askedAboutStops: { answer(answer: StopsAnswer): Promise<void> }[] = [];
   const imports: ((error?: string) => void)[] = [];
   const lifecycle = new CoreLifecycle<string>({
     host: () => place.host,
@@ -102,6 +114,7 @@ function harness(host: HostChoice = { kind: "local" }) {
       return core;
     },
     connect: (core, window) => void did.connected.push([core, window]),
+    lost: (windows) => void did.lost.push([...windows]),
     everyWindow: () => ["main", "second"],
     reload: (windows) => void did.reloaded.push([...windows]),
     leave: () => void did.left++,
@@ -111,6 +124,15 @@ function harness(host: HostChoice = { kind: "local" }) {
         asked.push({
           distro,
           reason,
+          answer: async (answer) => {
+            resolve(answer);
+            await settled();
+          },
+        }),
+      ),
+    keepsStopping: () =>
+      new Promise((resolve) =>
+        askedAboutStops.push({
           answer: async (answer) => {
             resolve(answer);
             await settled();
@@ -134,7 +156,7 @@ function harness(host: HostChoice = { kind: "local" }) {
     lifecycle.begin();
     return core;
   };
-  return { lifecycle, place, next, started, did, asked, imports, begin };
+  return { lifecycle, place, next, started, did, asked, askedAboutStops, imports, begin };
 }
 
 /** A switch from this computer into Ubuntu for a folder there, up to its core starting to be set up. */
@@ -153,21 +175,109 @@ async function switchedForFolder() {
 }
 
 describe("the core's windows", () => {
-  it("hands each window the core, and starts one again for the next window once it has stopped on this computer", () => {
-    const { lifecycle, next, did, asked, begin } = harness();
-    const first = begin(new LocalCore());
-    lifecycle.connect("main");
-    first.emit("exit", 1);
-    const second = new LocalCore();
-    next.push(second);
+  it("hands each window the one core", () => {
+    const { lifecycle, started, did, begin } = harness();
+    const core = begin(new LocalCore());
     lifecycle.connect("main");
     lifecycle.connect("second");
+    expect(did.connected).toEqual([
+      [core, "main"],
+      [core, "second"],
+    ]);
+    expect(started).toEqual([core]);
+  });
+});
+
+describe("a core on this computer that stops by itself", () => {
+  it("tells every window, starts the core again at once and hands it every window", () => {
+    const { lifecycle, next, started, did, asked, askedAboutStops, begin } = harness();
+    const first = begin(new LocalCore());
+    lifecycle.connect("main");
+    const second = new LocalCore();
+    next.push(second);
+    first.emit("exit", 133);
+    expect(did.lost).toEqual([["main", "second"]]);
+    expect(started).toEqual([first, second]);
     expect(did.connected).toEqual([
       [first, "main"],
       [second, "main"],
       [second, "second"],
     ]);
-    expect(asked).toEqual([]);
+    // A window that reloads afterwards is handed the core that took over, not a third.
+    lifecycle.connect("main");
+    expect(did.connected.at(-1)).toEqual([second, "main"]);
+    expect(started).toEqual([first, second]);
+    expect([asked, askedAboutStops]).toEqual([[], []]);
+  });
+
+  it("starts nothing and tells no window when the core closed for an update or a quit", async () => {
+    const updated = harness();
+    const updating = updated.begin(new LocalCore());
+    const closing = updated.lifecycle.closeForUpdate();
+    updating.answer("update:prepared");
+    updating.emit("exit", 0);
+    await expect(closing).resolves.toBeNull();
+    expect(updated.did.lost).toEqual([]);
+    expect(updated.started).toEqual([updating]);
+
+    const quitting = harness();
+    const leaving = quitting.begin(new LocalCore());
+    expect(quitting.lifecycle.beforeQuit()).toBe(true);
+    leaving.emit("exit", 1);
+    expect(quitting.did).toMatchObject({ lost: [], quit: 1 });
+    expect(quitting.started).toEqual([leaving]);
+  });
+
+  it("asks once it has stopped three times in two minutes, starts nothing until the answer, and starts again when told", async () => {
+    const { lifecycle, next, started, did, askedAboutStops, begin } = harness();
+    const cores = [begin(new LocalCore()), new LocalCore(), new LocalCore()];
+    next.push(cores[1]!, cores[2]!);
+    for (const core of cores) core.emit("exit", 133);
+    expect(started).toEqual(cores);
+    expect(askedAboutStops).toHaveLength(1);
+    expect(did.lost).toHaveLength(3);
+    // A window that reloads while the question is open waits for the answer, rather than starting the core again itself.
+    const connectedBefore = did.connected.length;
+    lifecycle.connect("main");
+    expect(did.connected).toHaveLength(connectedBefore);
+
+    const fourth = new LocalCore();
+    next.push(fourth);
+    await askedAboutStops[0]!.answer("retry");
+    expect(did.connected.slice(-2)).toEqual([
+      [fourth, "main"],
+      [fourth, "second"],
+    ]);
+    // Trying again starts the count afresh: the next stop starts the core again without asking.
+    next.push(new LocalCore());
+    fourth.emit("exit", 133);
+    expect(askedAboutStops).toHaveLength(1);
+    expect(started).toHaveLength(5);
+  });
+
+  it("starts the core again each time when its stops are far apart", () => {
+    vi.useFakeTimers();
+    const { next, started, askedAboutStops, begin } = harness();
+    let core: LocalCore = begin(new LocalCore());
+    for (let stop = 0; stop < 4; stop++) {
+      const after = new LocalCore();
+      next.push(after);
+      core.emit("exit", 133);
+      core = after;
+      vi.advanceTimersByTime(61_000);
+    }
+    expect(started).toHaveLength(5);
+    expect(askedAboutStops).toEqual([]);
+  });
+
+  it("quits when told to, and starts nothing", async () => {
+    const { next, started, did, askedAboutStops, begin } = harness();
+    const cores = [begin(new LocalCore()), new LocalCore(), new LocalCore()];
+    next.push(cores[1]!, cores[2]!);
+    for (const core of cores) core.emit("exit", 133);
+    await askedAboutStops[0]!.answer("quit");
+    expect(did.quit).toBe(1);
+    expect(started).toEqual(cores);
   });
 });
 
@@ -369,15 +479,21 @@ describe("closing the core for an update", () => {
     expect(started).toEqual([core]);
   });
 
-  it("says the core is unavailable when none runs, and holds nothing for it", async () => {
-    const { lifecycle, next, did, begin } = harness();
-    begin(new LocalCore()).emit("exit", 1);
+  it("says the core is unavailable while none runs, and holds nothing for it", async () => {
+    const { lifecycle, next, did, askedAboutStops, begin } = harness();
+    // A core that keeps stopping leaves none running until the question about it is answered.
+    const cores = [begin(new LocalCore()), new LocalCore(), new LocalCore()];
+    next.push(cores[1]!, cores[2]!);
+    for (const core of cores) core.emit("exit", 1);
     await expect(lifecycle.closeForUpdate()).rejects.toThrow("The core is unavailable");
     expect(did.released).toBe(1);
     const again = new LocalCore();
     next.push(again);
-    lifecycle.connect("main");
-    expect(did.connected).toEqual([[again, "main"]]);
+    await askedAboutStops[0]!.answer("retry");
+    expect(did.connected.slice(-2)).toEqual([
+      [again, "main"],
+      [again, "second"],
+    ]);
   });
 });
 

@@ -7,6 +7,9 @@ import { ALREADY_RUNNING } from "./wsl/runtime";
 /** What the user chose about a distribution that could not run the core. */
 export type DistroAnswer = "retry" | "local" | "quit";
 
+/** What the user chose about a core on this computer that keeps stopping. */
+export type StopsAnswer = "retry" | "quit";
+
 /** What the core's life needs from the app around it: its windows, its shells, the question it asks and the preference it keeps. */
 export interface CoreLifecycleDeps<Window> {
   /** Where the core runs now: the preference, as this computer can honour it. */
@@ -15,6 +18,8 @@ export interface CoreLifecycleDeps<Window> {
   start(host: HostChoice): CoreProcess;
   /** Hands the core one window. */
   connect(core: CoreProcess, window: Window): void;
+  /** Tells windows their core stopped by itself: what they asked it is never answered, and another comes in its place. */
+  lost(windows: Iterable<Window>): void;
   everyWindow(): Window[];
   reload(windows: Iterable<Window>): void;
   /** Ends what belongs to the place being left: its shells and its pages. */
@@ -23,6 +28,8 @@ export interface CoreLifecycleDeps<Window> {
   shells: { hold(): boolean; release(): void };
   /** Asks what to do about a distribution that could not run the core, or stopped running it. */
   ask(distro: string, reason: string): Promise<DistroAnswer>;
+  /** Asks what to do about a core on this computer that stopped by itself several times in a short while. */
+  keepsStopping(): Promise<StopsAnswer>;
   /** Makes this computer the place OpenOrc runs. */
   chooseLocal(): void;
   quit(): void;
@@ -38,13 +45,18 @@ export interface CoreLifecycleDeps<Window> {
  *   serving    a core runs, or the next window to ask starts one
  *   switching  the core is closing so one can start somewhere else
  *   updating   the core is closing for an update, or has closed for it; only a refusal goes back to serving
- *   asking     a distribution could not run the core, and the user has not yet said what to do
+ *   asking     a distribution could not run the core, or the core here keeps stopping, and the user has not yet said
+ *              what to do
  *   quitting   the app leaves once the core has closed
  */
 type Phase = "serving" | "switching" | "updating" | "asking" | "quitting";
 
 /** How long a core that was told to shut down for a quit has before it is ended. */
 const QUIT_WITHIN_MS = 12_000;
+
+/** A core here that stops by itself this often within this long is asked about rather than started again. */
+const STOPS_BEFORE_ASKING = 3;
+const STOPS_WITHIN_MS = 2 * 60_000;
 
 /** Why a core inside a distribution stopped by itself, from how it exited and the last things it printed. */
 function stopReason(distro: string, code: number, lastWords: string): string {
@@ -55,8 +67,9 @@ function stopReason(distro: string, code: number, lastWords: string): string {
 
 /**
  * The one core main holds, from its start to the app's quit: started where the preference says, closed for a switch or
- * an update, started again elsewhere, and asked about when a distribution cannot run it. Every exit is heard here, so
- * what follows one never depends on the order other listeners were added in.
+ * an update, started again elsewhere, started again here when it stops by itself, and asked about when a distribution
+ * cannot run it or it keeps stopping. Every exit is heard here, so what follows one never depends on the order other
+ * listeners were added in.
  */
 export class CoreLifecycle<Window> {
   private core: CoreProcess | null = null;
@@ -65,6 +78,8 @@ export class CoreLifecycle<Window> {
   private readonly turnedAway = new Set<Window>();
   /** A folder chosen where OpenOrc was not running, to add as a project once a core is up where it lives. Kept until that core answers, so a start that fails and is tried again still adds it. */
   private folderToAdd: string | null = null;
+  /** When the core on this computer last stopped by itself, within the while that counts. */
+  private stops: number[] = [];
 
   constructor(private readonly deps: CoreLifecycleDeps<Window>) {}
 
@@ -166,9 +181,38 @@ export class CoreLifecycle<Window> {
       // Only the core main holds now: one that was replaced has nothing left to report.
       if (this.core !== child) return;
       this.core = null;
+      // Any other phase closed it on purpose, and says what follows.
+      if (this.phase !== "serving") return;
+      this.deps.lost(this.deps.everyWindow());
       if (inDistro) this.stopped(inDistro.name, failure ?? stopReason(inDistro.name, code, inDistro.core.lastWords));
+      else this.startAgain();
     });
     return child;
+  }
+
+  /**
+   * The core on this computer stopped by itself while windows relied on it. It starts again at once and every window is
+   * handed it, so nothing waits on a core that is gone; one that keeps stopping is asked about instead of started over
+   * and over.
+   */
+  private startAgain(): void {
+    const now = Date.now();
+    this.stops = [...this.stops.filter((at) => now - at < STOPS_WITHIN_MS), now];
+    if (this.stops.length < STOPS_BEFORE_ASKING) return this.serveEveryWindow();
+    this.phase = "asking";
+    void this.deps.keepsStopping().then((answer) => {
+      // Something else took over meanwhile: a quit, or a switch chosen in Settings.
+      if (this.phase !== "asking") return;
+      this.phase = "serving";
+      if (answer === "quit") return this.deps.quit();
+      this.stops = [];
+      this.serveEveryWindow();
+    });
+  }
+
+  private serveEveryWindow(): void {
+    const core = this.start();
+    for (const window of this.deps.everyWindow()) this.deps.connect(core, window);
   }
 
   /**

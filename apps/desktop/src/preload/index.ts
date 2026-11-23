@@ -195,3 +195,5 @@ contextBridge.exposeInMainWorld("openorc", api);
 ipcRenderer.on("bridge:port", (event) => {
   if (event.ports[0]) window.postMessage("openorc:port", "*", event.ports);
 });
+// The core stopped by itself. The page hears it in order with the ports, ahead of the one for the core that replaces it.
+ipcRenderer.on("bridge:lost", () => window.postMessage("openorc:core-lost", "*"));

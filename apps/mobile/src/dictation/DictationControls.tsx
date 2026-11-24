@@ -3,6 +3,7 @@ import Animated from "react-native-reanimated";
 import { DEVICE } from "../device";
 import { Check, Mic, X } from "../generated/icons";
 import { motion } from "../generated/tokens";
+import { cn } from "../ui/cn";
 import { ease } from "../ui/motion";
 import { useReducedMotion } from "../ui/reduced-motion";
 import { Text } from "../ui/Text";
@@ -25,36 +26,57 @@ const unfold = {
   animationTimingFunction: ease.out,
 } as const;
 
+/** The dot's breath while the microphone is open: full to half and back, slow enough to sit beside the time. */
+const breathe = {
+  animationName: { from: { opacity: 1 }, to: { opacity: 0.5 } },
+  animationDuration: "1600ms",
+  animationTimingFunction: "ease-in-out",
+  animationIterationCount: "infinite",
+  animationDirection: "alternate",
+} as const;
+
+/** The dot every recorder shows. It breathes while the microphone is open and rests dim before and after. */
+function RecordingDot({ open }: { open: boolean }) {
+  const still = useReducedMotion();
+  return <Animated.View className={cn("size-1.5 rounded-full bg-recording", !open && "opacity-35")} style={open && !still ? breathe : undefined} />;
+}
+
 /**
- * Dictating: the bar gives its room to the recording. A pill shows the voice as it was just heard and how long it has
- * listened, with a check where the microphone was, since pressing the pill finishes and keeps the words. Cancel
- * stands before it, and takes them back out.
+ * Dictating: the bar gives its room to the recording, as one pill. Cancel stands at its start, a circle inside its
+ * round end, and takes the words back out. The rest finishes and keeps them: the voice as it was just heard, the red
+ * dot of a recording with how long it has listened, and a check where the microphone was.
  */
 export function DictationPill({ phase, since, onFinish, onCancel }: { phase: DictationPhase; since: number | null; onFinish: () => void; onCancel: () => void }) {
   const still = useReducedMotion();
   return (
-    <Animated.View className="min-w-0 flex-1 flex-row items-center justify-end gap-2" style={still ? undefined : unfold}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Cancel dictation"
-        onPress={onCancel}
-        hitSlop={6}
-        className="size-8 items-center justify-center rounded-full bg-surface-2 active:bg-surface-3"
-      >
-        <X size={14} className="text-ink-3" />
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Finish dictating"
-        accessibilityState={{ busy: phase !== "listening" }}
-        disabled={phase === "finishing"}
-        onPress={onFinish}
-        className="h-control-send min-w-0 max-w-80 flex-1 flex-row items-center gap-2.5 rounded-full bg-surface-2 pl-3.5 pr-3 active:bg-surface-3"
-      >
-        <DictationMeter />
-        <DictationTime since={since} />
-        <Check size={16} className="text-ink" />
-      </Pressable>
+    <Animated.View className="min-w-0 flex-1 flex-row justify-end" style={still ? undefined : unfold}>
+      <View className="h-control-send min-w-0 max-w-80 flex-1 flex-row items-center rounded-full bg-key pl-0.5">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Cancel dictation"
+          onPress={onCancel}
+          hitSlop={{ top: 8, bottom: 8, left: 8 }}
+          className="size-7 items-center justify-center rounded-full active:bg-surface-3"
+        >
+          <X size={14} className="text-ink-3" />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Finish dictating"
+          accessibilityState={{ busy: phase !== "listening" }}
+          disabled={phase === "finishing"}
+          onPress={onFinish}
+          hitSlop={{ top: 8, bottom: 8 }}
+          className="min-w-0 flex-1 flex-row items-center gap-2.5 self-stretch pl-2 pr-3 active:opacity-60"
+        >
+          <DictationMeter />
+          <View className="flex-row items-center gap-1.5">
+            <RecordingDot open={phase === "listening"} />
+            <DictationTime since={since} />
+          </View>
+          <Check size={16} className="text-ink" />
+        </Pressable>
+      </View>
     </Animated.View>
   );
 }

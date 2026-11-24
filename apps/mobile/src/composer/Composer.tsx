@@ -4,6 +4,7 @@ import { useImperativeHandle, useState, type Ref } from "react";
 import { Pressable, View, type LayoutChangeEvent } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useDictation } from "../dictation/phone-dictation";
 import { useDictatedSend } from "../dictation/use-composer-dictation";
 import { Square } from "../generated/icons";
 import { SessionRecovery } from "../thread/SessionRecovery";
@@ -71,9 +72,10 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
   const { controls } = composer;
   const activity = composerActivity({ stopping: composer.stopping, submitting: composer.sending, generatingImage });
   const failure = composer.error ?? settings.error?.message ?? settings.permissionError;
-  // A send or a queue asked for while dictating waits for the last words. Stop is the run's, and goes at once.
+  // A send asked for while dictating waits for the last words. Stop is the run's, and goes at once. The other way to
+  // send steps aside meanwhile, so the recording has the bar.
   const send = useDictatedSend(thread.id, composer.primary);
-  const queue = useDictatedSend(thread.id, composer.queue);
+  const dictating = useDictation((state) => state.take?.owner === thread.id);
   return (
     <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
       <View onLayout={onLayout} className="bg-bg pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
@@ -110,11 +112,11 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
                 <Square size={14} className="text-ink-4" />
               </Pressable>
             ) : null}
-            {controls.queue && !to ? (
+            {controls.queue && !to && !dictating ? (
               <Pressable
                 accessibilityRole="button"
                 disabled={!controls.canSend}
-                onPress={queue}
+                onPress={composer.queue}
                 hitSlop={{ top: 8, bottom: 8 }}
                 className="h-control-sm justify-center rounded-full px-2.5 active:bg-surface-2"
               >

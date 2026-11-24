@@ -11,6 +11,8 @@ const EXPIRE_BATCH = 500;
 const RUNS_PER_QUERY = 50;
 /** Free pages handed back to the disk per step. */
 const RECLAIM_PAGES = 256;
+/** Search entries read per step. */
+const SEARCH_SPAN = 500;
 const SWEEP_KEY = "ledger.fragmentSweep";
 const COMPACTION_FAILED_KEY = "ledger.compactionFailedAt";
 /** How long a failed rebuild waits before the next launch tries again. */
@@ -56,6 +58,9 @@ export interface LedgerUpkeepOptions {
 export class LedgerUpkeep {
   private timer: NodeJS.Timeout | null = null;
   private pass: Promise<void> | null = null;
+  /** The cleanup after a deletion, and whether another deletion asked for one while it ran. */
+  private forgetting: Promise<void> | null = null;
+  private forgetAgain = false;
   private stopped = false;
   private readonly rawRetentionMs: number;
   private readonly startDelayMs: number;
@@ -122,7 +127,7 @@ export class LedgerUpkeep {
   async stop(): Promise<void> {
     this.stopped = true;
     if (this.timer) clearTimeout(this.timer);
-    await this.pass;
+    await Promise.all([this.pass, this.forgetting]);
   }
 
   /** One pass; exposed for tests. Each step runs even when an earlier one fails. */
@@ -147,11 +152,39 @@ export class LedgerUpkeep {
   }
 
   /**
-   * Removes search entries and stored tool images left by deleted runs. Returns how many runs' images went.
+   * Removes search entries and stored tool images left by deleted runs, a step at a time. Returns how many runs'
+   * images went.
    */
   async forgetDeletedRuns(): Promise<number> {
-    ledgerMaintenance.clearDeletedRunSearch(this.db);
+    let after: number | null = 0;
+    while (after !== null && !this.stopped) {
+      after = ledgerMaintenance.clearDeletedRunSearch(this.db, after, SEARCH_SPAN);
+      if (after !== null) await this.pause();
+    }
     return (await this.options.toolImages?.prune((runId) => this.db.stmt("SELECT 1 FROM runs WHERE id = ?").get(runId) !== undefined)) ?? 0;
+  }
+
+  /**
+   * Starts the cleanup a deletion calls for and returns at once, so the deletion is answered without waiting for it.
+   * One cleanup runs at a time; a deletion during it is followed by one more.
+   */
+  runsDeleted(): void {
+    if (this.forgetting) {
+      this.forgetAgain = true;
+      return;
+    }
+    this.forgetting = this.forgetDeletedRuns()
+      .then(
+        () => undefined,
+        (error: unknown) => this.options.log.warn(`ledger upkeep could not clean up deleted runs: ${error instanceof Error ? error.message : String(error)}`),
+      )
+      .finally(() => {
+        this.forgetting = null;
+        if (this.forgetAgain && !this.stopped) {
+          this.forgetAgain = false;
+          this.runsDeleted();
+        }
+      });
   }
 
   private async expireRaw(): Promise<number> {

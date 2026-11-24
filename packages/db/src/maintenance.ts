@@ -53,9 +53,19 @@ export const ledgerMaintenance = {
     return Number(db.stmt("DELETE FROM events WHERE run_id = ? AND seq IN (SELECT value FROM json_each(?))").run(runId, JSON.stringify(redundant)).changes);
   },
 
-  /** Deletes search entries whose run is gone; the search index has no foreign key to cascade from. Returns rows deleted. */
-  clearDeletedRunSearch(db: Db): number {
-    return Number(db.stmt("DELETE FROM messages_fts WHERE run_id NOT IN (SELECT id FROM runs)").run().changes);
+  /**
+   * Deletes the search entries whose run is gone among the next `span` entries after `after`. The search index has no
+   * foreign key to cascade from and no index by run, so every entry is read: callers repeat from the entry this
+   * returns until it returns null, yielding between calls so the single writer is never held for long. The entries
+   * are read from the index's own content table (c1 is its run column): asked through the index, a range of entries
+   * reads all of them.
+   */
+  clearDeletedRunSearch(db: Db, after: number, span: number): number | null {
+    const read = db.stmt("SELECT id, c1 NOT IN (SELECT id FROM runs) AS orphaned FROM messages_fts_content WHERE id > ? ORDER BY id LIMIT ?");
+    const entries = read.all(after, span) as Array<{ id: number; orphaned: number }>;
+    for (const entry of entries) if (entry.orphaned) db.stmt("DELETE FROM messages_fts WHERE rowid = ?").run(entry.id);
+    const last = entries.at(-1);
+    return last && entries.length === span ? last.id : null;
   },
 
   space(db: Db): LedgerSpace {

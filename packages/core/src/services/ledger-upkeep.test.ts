@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Db, ledgerMaintenance, listEvents, projects, runs, settings, threads } from "@openorc/db";
+import { Db, ledgerMaintenance, listEvents, messages, projects, runs, settings, threads } from "@openorc/db";
 import type { AgentEvent } from "@openorc/protocol";
 import { LedgerUpkeep } from "./ledger-upkeep.js";
 
@@ -84,6 +84,40 @@ describe("LedgerUpkeep", () => {
     await upkeep().run();
     expect(kinds(first)).toEqual(["message.delta", "message.delta", "message.completed"]);
     expect(kinds(second)).toEqual(["message.delta", "message.completed"]);
+  });
+
+  it("drops what a deleted run said from search across steps, yielding between them, and keeps the rest", async () => {
+    const said = (runId: string, count: number) => {
+      for (let i = 0; i < count; i += 1) messages.index(db, { runId, messageId: `${runId}-${i}`, role: "assistant", text: `words of ${runId}`, ts: i });
+    };
+    const kept = run("kept", "success");
+    const gone = run("gone", "success");
+    said(kept, 300);
+    said(gone, 700);
+    said(kept, 300);
+    db.stmt("DELETE FROM runs WHERE id = ?").run(gone);
+    let pauses = 0;
+    await new LedgerUpkeep(db, { log, now: () => NOW, pause: async () => void (pauses += 1) }).forgetDeletedRuns();
+    const left = db.stmt("SELECT run_id AS runId, COUNT(*) AS entries FROM messages_fts GROUP BY run_id").all();
+    expect(left).toEqual([{ runId: kept, entries: 600 }]);
+    expect(messages.search(db, "gone")).toEqual([]);
+    expect(pauses).toBeGreaterThan(1);
+  });
+
+  it("answers a deletion at once and cleans up after it, once more for a deletion made meanwhile", async () => {
+    const gone = run("gone", "success");
+    messages.index(db, { runId: gone, messageId: "m", role: "assistant", text: "left behind", ts: 1 });
+    db.stmt("DELETE FROM runs WHERE id = ?").run(gone);
+    const service = upkeep();
+    service.runsDeleted();
+    const later = run("later", "success");
+    messages.index(db, { runId: later, messageId: "m", role: "assistant", text: "left behind too", ts: 2 });
+    db.stmt("DELETE FROM runs WHERE id = ?").run(later);
+    service.runsDeleted();
+    const entries = () => (db.stmt("SELECT COUNT(*) AS entries FROM messages_fts").get() as { entries: number }).entries;
+    expect(entries()).toBe(1);
+    await expect.poll(entries).toBe(0);
+    await service.stop();
   });
 
   it("hands free space back to the disk once the file is incremental", async () => {

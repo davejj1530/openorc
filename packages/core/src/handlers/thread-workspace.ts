@@ -7,7 +7,7 @@ import type { Handlers } from "./types.js";
 type Dependencies = {
   db: Db;
   threadService: Pick<ThreadService, "delete" | "fork" | "moveWorkspace" | "movePreview" | "restore" | "restorePreview">;
-  upkeep: Pick<LedgerUpkeep, "forgetDeletedRuns">;
+  upkeep: Pick<LedgerUpkeep, "runsDeleted">;
 };
 export function createThreadWorkspaceHandlers({
   db,
@@ -21,7 +21,7 @@ export function createThreadWorkspaceHandlers({
       const owner = orclings.forThread(db, id);
       if (owner) throw new Error(`This is ${owner.name}'s own conversation. Delete ${owner.name} to remove it.`);
       await threadService.delete(id);
-      await upkeep.forgetDeletedRuns();
+      upkeep.runsDeleted();
       return null;
     },
     "threads.fork": ({ id }) => threadService.fork(id),

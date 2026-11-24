@@ -15,7 +15,7 @@ type Dependencies = {
   runService: Pick<RunService, "liveRunForTask" | "closeAndWait">;
   db: Db;
   log: Pick<Logger, "warn">;
-  upkeep: Pick<LedgerUpkeep, "forgetDeletedRuns">;
+  upkeep: Pick<LedgerUpkeep, "runsDeleted">;
   invalidate: (keys: string[]) => void;
 };
 
@@ -33,7 +33,7 @@ export function createTaskDeleteHandlers({ workspaces, comments, refines, runSer
       await workspaces.cleanup(task, project, { deleteBranch: deleteBranch ?? false, force: true, ...(acceptLoss ? { acceptLoss } : {}) });
       tasks.delete(db, id);
       await unpinProjectRefs(project, snapshotRefs(id)).catch((e: unknown) => log.warn(`snapshot refs of task ${id} were kept: ${e instanceof Error ? e.message : String(e)}`));
-      await upkeep.forgetDeletedRuns();
+      upkeep.runsDeleted();
       invalidate(["tasks", "inbox"]);
       return null;
     },

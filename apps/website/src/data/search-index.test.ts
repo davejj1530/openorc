@@ -7,7 +7,7 @@ import { searchEntries, searchSuggestions } from "./search-index";
 
 const release: ChangelogRelease = {
   tag: "v0.1.0-beta.13",
-  url: "https://github.com/davejj1530/openorc/releases/tag/v0.1.0-beta.13",
+  url: "https://github.com/open-orc/openorc/releases/tag/v0.1.0-beta.13",
   publishedAt: "2026-10-19T10:00:00Z",
   prerelease: true,
   highlights: ["One ground, fill steps and a single weight", "Quieter sidebar.", "Calmer turns"],

@@ -1,7 +1,7 @@
 import { releaseAssets, type ReleaseAsset } from "./release-assets";
 
-const releasesUrl = "https://api.github.com/repos/davejj1530/openorc/releases?per_page=100";
-const releasePath = "/davejj1530/openorc/releases/tag/";
+const releasesUrl = "https://api.github.com/repos/open-orc/openorc/releases?per_page=100";
+const releasePath = "/open-orc/openorc/releases/tag/";
 
 interface GitHubRelease {
   tag_name?: unknown;

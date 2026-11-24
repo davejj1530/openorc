@@ -7,10 +7,10 @@
   "homepage": "https://openorc.app",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/davejj1530/openorc.git"
+    "url": "git+https://github.com/open-orc/openorc.git"
   },
   "bugs": {
-    "url": "https://github.com/davejj1530/openorc/issues"
+    "url": "https://github.com/open-orc/openorc/issues"
   },
   "packageManager": "pnpm@11.21.0",
   "engines": {

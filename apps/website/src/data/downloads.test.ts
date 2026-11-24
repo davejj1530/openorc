@@ -7,11 +7,11 @@ function release(tag = "v0.1.0-beta.4", changes: Record<string, unknown> = {}) {
   const names = [`OpenOrc-${tag.slice(1)}-mac-arm64.dmg`, `OpenOrc-${tag.slice(1)}-mac-x64.dmg`, `OpenOrc-${tag.slice(1)}-win-x64${tag.includes("beta") ? "-unsigned" : ""}.exe`];
   return {
     tag_name: tag,
-    html_url: `https://github.com/davejj1530/openorc/releases/tag/${tag}`,
+    html_url: `https://github.com/open-orc/openorc/releases/tag/${tag}`,
     draft: false,
     prerelease: tag.includes("beta"),
     published_at: "2026-09-28T10:00:00Z",
-    assets: names.map((name) => ({ name, size: 250_000_000, state: "uploaded", browser_download_url: `https://github.com/davejj1530/openorc/releases/download/${tag}/${name}` })),
+    assets: names.map((name) => ({ name, size: 250_000_000, state: "uploaded", browser_download_url: `https://github.com/open-orc/openorc/releases/download/${tag}/${name}` })),
     ...changes,
   };
 }
@@ -59,7 +59,7 @@ void test("offers each Linux package under its format's own architecture name", 
   const tag = "v0.2.0";
   const linux = release(tag);
   const names = ["OpenOrc-0.2.0-linux-x86_64.rpm", "OpenOrc-0.2.0-linux-amd64.deb", "OpenOrc-0.2.0-linux-x86_64.AppImage", "OpenOrc-0.2.0-linux-x64.rpm"];
-  linux.assets = names.map((name) => ({ name, size: 110_000_000, state: "uploaded", browser_download_url: `https://github.com/davejj1530/openorc/releases/download/${tag}/${name}` }));
+  linux.assets = names.map((name) => ({ name, size: 110_000_000, state: "uploaded", browser_download_url: `https://github.com/open-orc/openorc/releases/download/${tag}/${name}` }));
   assert.deepEqual(
     selectDownloadRelease(publishedReleases([linux]))?.installers.map(({ target, name, unsigned }) => ({ target, name, unsigned })),
     [
@@ -73,7 +73,7 @@ void test("offers each Linux package under its format's own architecture name", 
 void test("does not offer an unsigned installer as a stable Windows release", () => {
   const stable = release("v0.1.0");
   stable.assets = [
-    { ...stable.assets[2]!, name: "OpenOrc-0.1.0-win-x64-unsigned.exe", browser_download_url: "https://github.com/davejj1530/openorc/releases/download/v0.1.0/OpenOrc-0.1.0-win-x64-unsigned.exe" },
+    { ...stable.assets[2]!, name: "OpenOrc-0.1.0-win-x64-unsigned.exe", browser_download_url: "https://github.com/open-orc/openorc/releases/download/v0.1.0/OpenOrc-0.1.0-win-x64-unsigned.exe" },
   ];
   assert.equal(selectDownloadRelease(publishedReleases([stable])), null);
 });

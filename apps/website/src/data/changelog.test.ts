@@ -8,7 +8,7 @@ import { loadPublishedReleases, publishedReleases } from "./changelog";
 
 const release = (changes: Record<string, unknown> = {}) => ({
   tag_name: "v0.1.0",
-  html_url: "https://github.com/davejj1530/openorc/releases/tag/v0.1.0",
+  html_url: "https://github.com/open-orc/openorc/releases/tag/v0.1.0",
   published_at: "2026-09-25T10:00:00Z",
   prerelease: false,
   draft: false,
@@ -19,11 +19,11 @@ const release = (changes: Record<string, unknown> = {}) => ({
 // node:test owns registered test completion and reports any rejection.
 void test("shows only published releases and keeps beta releases distinct", () => {
   const entries = publishedReleases([
-    release({ tag_name: "v0.2.0", html_url: "https://github.com/davejj1530/openorc/releases/tag/v0.2.0", draft: true, body: "## Highlights\n- Private plans" }),
+    release({ tag_name: "v0.2.0", html_url: "https://github.com/open-orc/openorc/releases/tag/v0.2.0", draft: true, body: "## Highlights\n- Private plans" }),
     release(),
     release({
       tag_name: "v0.2.0-beta.1",
-      html_url: "https://github.com/davejj1530/openorc/releases/tag/v0.2.0-beta.1",
+      html_url: "https://github.com/open-orc/openorc/releases/tag/v0.2.0-beta.1",
       published_at: "2026-09-26T10:00:00Z",
       prerelease: true,
       body: "## What's new\n- **Faster** launches.\n\n## Install notes\n- Internal detail",
@@ -54,8 +54,8 @@ void test("reads all release pages before sorting the changelog", async () => {
     assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer test-pagination-token");
     calls.push(String(input));
     return calls.length === 1
-      ? Response.json([release()], { headers: { link: '<https://api.github.com/repos/davejj1530/openorc/releases?per_page=100&page=2>; rel="next"' } })
-      : Response.json([release({ tag_name: "v0.2.0", html_url: "https://github.com/davejj1530/openorc/releases/tag/v0.2.0", published_at: "2026-09-26T10:00:00Z" })]);
+      ? Response.json([release()], { headers: { link: '<https://api.github.com/repos/open-orc/openorc/releases?per_page=100&page=2>; rel="next"' } })
+      : Response.json([release({ tag_name: "v0.2.0", html_url: "https://github.com/open-orc/openorc/releases/tag/v0.2.0", published_at: "2026-09-26T10:00:00Z" })]);
   }, "test-pagination-token");
   assert.equal(calls.length, 2);
   assert.deepEqual(
@@ -104,7 +104,7 @@ void test("the static build authenticates release requests without publishing it
     releaseRequests++;
     if (new Headers(init?.headers).get("Authorization") !== `Bearer ${token}`) return Promise.resolve(new Response(null, { status: 403, statusText: "rate limit exceeded" }));
     const name = "OpenOrc-0.1.0-mac-arm64.dmg";
-    const asset = { name, size: 250_000_000, state: "uploaded", browser_download_url: `https://github.com/davejj1530/openorc/releases/download/v0.1.0/${name}` };
+    const asset = { name, size: 250_000_000, state: "uploaded", browser_download_url: `https://github.com/open-orc/openorc/releases/download/v0.1.0/${name}` };
     return Promise.resolve(Response.json([release({ assets: [asset] }), release({ draft: true, body: "## Highlights\n- Unpublished draft detail" })]));
   });
 
@@ -115,7 +115,7 @@ void test("the static build authenticates release requests without publishing it
   assert.match(html, /First public release/);
   assert.doesNotMatch(html, /Unpublished draft detail/);
   const downloads = await readFile(join(outDir, "download/index.html"), "utf8");
-  assert.match(downloads, /href="https:\/\/github.com\/davejj1530\/openorc\/releases\/download\/v0.1.0\/OpenOrc-0.1.0-mac-arm64.dmg"/);
+  assert.match(downloads, /href="https:\/\/github.com\/open-orc\/openorc\/releases\/download\/v0.1.0\/OpenOrc-0.1.0-mac-arm64.dmg"/);
   assert.doesNotMatch(downloads, /href="[^"]*(?:mac-x64.dmg|win-x64.exe)"/);
   const home = await readFile(join(outDir, "index.html"), "utf8");
   assert.doesNotMatch(home, /Coming soon/);

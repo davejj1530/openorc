@@ -1,6 +1,6 @@
 /* global AudioWorkletProcessor, registerProcessor */
 
-/** A tenth of a second at 16 kHz: small enough that words appear as they are spoken, large enough to cost little. */
+/** About a tenth of a second at the rates dictation records at: small enough that words appear as they are spoken, large enough to cost little. */
 const BLOCK = 1600;
 
 /** Gathers the microphone's mono samples into blocks and posts each to the page. */

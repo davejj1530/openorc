@@ -362,6 +362,8 @@
   padding: 14px 16px;
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
+  /* A reason can come from a service in its own words, a web address among them. */
+  overflow-wrap: anywhere;
 }
 .composer-dictate-title {
   font-size: var(--text-base);

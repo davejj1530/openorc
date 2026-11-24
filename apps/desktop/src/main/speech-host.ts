@@ -8,6 +8,15 @@ export interface SpeechProcess {
   kill(): boolean;
 }
 
+/** Something that turns one recording at a time into words: the model on this computer, or a service. */
+export interface Transcriber {
+  start(id: string): void;
+  audio(id: string, pcm: Float32Array): void;
+  finish(id: string): void;
+  cancel(id: string): void;
+  close(): void;
+}
+
 /** How long the process outlives its last recording, with the model still loaded for the next one. */
 const IDLE_MS = 5 * 60_000;
 
@@ -16,18 +25,36 @@ const IDLE_MS = 5 * 60_000;
  * ended after a quiet while so the model's memory comes back. One recording runs at a time; a new one takes over. If
  * the process ends under a recording, the recording is told.
  */
-export class SpeechHost {
+export class SpeechHost implements Transcriber {
   private child: SpeechProcess | null = null;
   private recording: string | null = null;
   private idle: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly fork: () => SpeechProcess,
+    /** The model file recordings run on. */
+    private readonly file: () => string,
     private readonly report: (event: DictationEvent) => void,
     private readonly idleMs = IDLE_MS,
   ) {}
 
-  send(request: SpeechRequest): void {
+  start(id: string): void {
+    this.send({ type: "start", id, file: this.file() });
+  }
+
+  audio(id: string, pcm: Float32Array): void {
+    this.send({ type: "audio", id, pcm });
+  }
+
+  finish(id: string): void {
+    this.send({ type: "finish", id });
+  }
+
+  cancel(id: string): void {
+    this.send({ type: "cancel", id });
+  }
+
+  private send(request: SpeechRequest): void {
     if (request.type === "start") this.begin(request.id);
     else if (request.id !== this.recording) return;
     this.child?.postMessage(request);

@@ -1,15 +1,17 @@
 import { create } from "zustand";
-import { DEFAULT_SPEECH_MODEL, type DictationEvent, type SpeechModelState } from "../../../../shared/dictation";
+import { DEFAULT_SPEECH_MODEL, ENGINE_SAMPLE_RATE, type DictationEvent, type DictationSettings, type SpeechModelState } from "../../../../shared/dictation";
 import type { Spoken } from "../../components/composer-editor/ComposerEditor";
 import { captureMicrophone, type Capture } from "./capture";
 
 /** A recording opens the microphone, hears the person, then waits for the model's last words. */
 export type DictationPhase = "starting" | "listening" | "finishing";
 
-/** What a composer's microphone has to say: the model is not here yet, the microphone is refused, or a recording stopped. */
-export type DictationNotice = { kind: "model" } | { kind: "microphone" } | { kind: "failed"; reason: string };
+/** What a composer's microphone has to say: the model is not here yet, OpenAI has no key, the microphone is refused, or a recording stopped. */
+export type DictationNotice = { kind: "model" } | { kind: "key" } | { kind: "microphone" } | { kind: "failed"; reason: string };
 
 interface DictationState {
+  /** The engine chosen and whether it has its key; null until main has said. */
+  settings: DictationSettings | null;
   models: Record<string, SpeechModelState>;
   /** The one recording in progress, and the composer it writes in. */
   take: { id: string; owner: string; phase: DictationPhase } | null;
@@ -28,7 +30,7 @@ function savedMicrophone(): string | null {
   }
 }
 
-export const useDictation = create<DictationState>(() => ({ models: {}, take: null, notice: null, microphone: savedMicrophone() }));
+export const useDictation = create<DictationState>(() => ({ settings: null, models: {}, take: null, notice: null, microphone: savedMicrophone() }));
 
 export function setMicrophone(microphone: string | null): void {
   useDictation.setState({ microphone });
@@ -95,6 +97,8 @@ export function connectDictation(): boolean {
   const api = window.openorc?.dictation;
   if (!api || connected) return Boolean(api);
   connected = true;
+  void api.settings().then((settings) => useDictation.setState({ settings }));
+  api.onSettings((settings) => useDictation.setState({ settings }));
   void api.models().then((models) => useDictation.setState({ models }));
   api.onModel((model, state) => useDictation.setState((s) => ({ models: { ...s.models, [model]: state } })));
   api.onEvent(heard);
@@ -103,16 +107,19 @@ export function connectDictation(): boolean {
 }
 
 /**
- * Starts a recording for one composer: `speak` opens the place in its draft the words go. Without the model, the
- * composer is told to offer it instead. The speech process starts before the microphone opens, so the model loads
- * while the person begins to talk, and what they said meanwhile is heard once it has.
+ * Starts a recording for one composer: `speak` opens the place in its draft the words go. Without what the chosen
+ * engine needs, its model or its key, the composer is told to offer that instead. The engine starts before the
+ * microphone opens, so it readies itself while the person begins to talk, and what they said meanwhile is heard once
+ * it has.
  */
 export async function startDictation(owner: string, speak: () => Spoken | undefined): Promise<void> {
   const api = window.openorc.dictation;
-  const { take, models, microphone } = useDictation.getState();
+  const { take, models, microphone, settings } = useDictation.getState();
   if (take) return;
-  if (models[DEFAULT_SPEECH_MODEL.id]?.phase !== "ready") {
-    useDictation.setState({ notice: { owner, kind: "model" } });
+  const engine = settings?.engine ?? "local";
+  const ready = engine === "openai" ? settings?.openaiKey : models[DEFAULT_SPEECH_MODEL.id]?.phase === "ready";
+  if (!ready) {
+    useDictation.setState({ notice: { owner, kind: engine === "openai" ? "key" : "model" } });
     return;
   }
   const id = crypto.randomUUID();
@@ -123,8 +130,8 @@ export async function startDictation(owner: string, speak: () => Spoken | undefi
   try {
     if ((await api.microphone()) === "denied") throw new MicrophoneRefused();
     if (recording !== current) return;
-    await api.start(id, DEFAULT_SPEECH_MODEL.id);
-    const capture = await captureMicrophone(microphone, (pcm) => api.audio(id, pcm));
+    await api.start(id);
+    const capture = await captureMicrophone(microphone, ENGINE_SAMPLE_RATE[engine], (pcm) => api.audio(id, pcm));
     if (recording !== current) {
       capture.stop();
       api.cancel(id);

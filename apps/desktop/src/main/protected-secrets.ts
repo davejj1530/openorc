@@ -11,7 +11,20 @@ function requireEncryption(): void {
   if (!safeStorage.isEncryptionAvailable() || (process.platform === "linux" && safeStorage.getSelectedStorageBackend() === "basic_text")) throw new Error(storageError);
 }
 
-async function save(file: string, value: string, dataDir: string): Promise<void> {
+/** Reads a secret main keeps for itself, or null where none is saved. */
+export async function loadProtectedSecret(file: string): Promise<string | null> {
+  const encrypted = await readFile(file).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  });
+  // A fresh profile needs no keychain access until a secret is saved.
+  if (!encrypted) return null;
+  requireEncryption();
+  return safeStorage.decryptString(encrypted);
+}
+
+/** Saves a secret encrypted by the operating system, in `dataDir`. */
+export async function saveProtectedSecret(file: string, value: string, dataDir: string): Promise<void> {
   requireEncryption();
   const encrypted = safeStorage.encryptString(value);
   const temporary = `${file}.${randomUUID()}.tmp`;
@@ -50,18 +63,9 @@ export function installProtectedSecrets(child: { on(event: "message", listener: 
     const channel = request.type;
     const file = join(dataDir, filename);
     const operation = async (): Promise<string | null> => {
-      if (request.operation === "load") {
-        const encrypted = await readFile(file).catch((error: NodeJS.ErrnoException) => {
-          if (error.code === "ENOENT") return null;
-          throw error;
-        });
-        // A fresh profile needs no keychain access until a secret is saved.
-        if (!encrypted) return null;
-        requireEncryption();
-        return safeStorage.decryptString(encrypted);
-      }
+      if (request.operation === "load") return loadProtectedSecret(file);
       if (request.operation !== "save" || typeof request.value !== "string" || request.value.length > 100_000) throw new Error(storageError);
-      await save(file, request.value, dataDir);
+      await saveProtectedSecret(file, request.value, dataDir);
       return null;
     };
     const next = (pending.get(channel) ?? Promise.resolve()).then(operation, operation);

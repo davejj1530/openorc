@@ -13,6 +13,7 @@ import {
   type DictationNotice,
   type DictationPhase,
 } from "../lib/dictation/dictation";
+import { useRouter } from "../lib/router";
 import { floatingGround } from "../lib/use-anchor-ground";
 import type { ComposerEditorHandle } from "./composer-editor/ComposerEditor";
 import { useLatest } from "./composer-editor/shared";
@@ -166,8 +167,27 @@ function MicrophoneRefused() {
   );
 }
 
+/** OpenAI is chosen and has no key: where to give it one. */
+function KeyMissing() {
+  const open = () => {
+    dismissDictationNotice();
+    useRouter.getState().navigate({ view: "settings", section: "general" });
+  };
+  return (
+    <>
+      <Popover.Title className="composer-dictate-title">Dictating with OpenAI needs your API key</Popover.Title>
+      <div className="composer-dictate-row">
+        <Button size="sm" variant="primary" onClick={open}>
+          Open Settings
+        </Button>
+      </div>
+    </>
+  );
+}
+
 function NoticeWords({ notice, model }: { notice: DictationNotice; model: SpeechModelState | undefined }) {
   if (notice.kind === "model") return <ModelOffer model={model} />;
+  if (notice.kind === "key") return <KeyMissing />;
   if (notice.kind === "microphone") return <MicrophoneRefused />;
   return <Popover.Title className="composer-dictate-title">{notice.reason}</Popover.Title>;
 }
@@ -176,7 +196,8 @@ function NoticeWords({ notice, model }: { notice: DictationNotice; model: Speech
  * The composer's microphone, beside send. At rest it is the glyph. Dictating, the key opens into a pill: the voice as
  * it was just heard, how long it has listened, and a check where the microphone was, since pressing it finishes.
  * Cancel arrives beside it, so taking the words back is in reach without knowing Escape does it. What the microphone
- * has to say opens above it: the model to download the first time, the microphone refused, or why a recording stopped.
+ * has to say opens above it: the model to download the first time, the key OpenAI needs, the microphone refused, or
+ * why a recording stopped.
  */
 export function ComposerDictation({ dictation }: { dictation: ComposerDictationState }) {
   const control = useComposerControl();

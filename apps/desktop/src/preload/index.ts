@@ -97,6 +97,14 @@ const api: OpenOrcApi = {
    * its own shells and its own pane.
    */
   dictation: {
+    settings: () => ipcRenderer.invoke("dictation:settings"),
+    setEngine: (engine) => ipcRenderer.invoke("dictation:setEngine", engine),
+    setOpenAiKey: (key) => ipcRenderer.invoke("dictation:setOpenAiKey", key),
+    onSettings(callback) {
+      const listener = (_event: unknown, settings: import("../shared/dictation").DictationSettings) => callback(settings);
+      ipcRenderer.on("dictation:settings", listener);
+      return () => ipcRenderer.off("dictation:settings", listener);
+    },
     models: () => ipcRenderer.invoke("dictation:models"),
     download: (model) => ipcRenderer.invoke("dictation:download", model),
     cancelDownload: (model) => ipcRenderer.invoke("dictation:cancelDownload", model),
@@ -108,7 +116,7 @@ const api: OpenOrcApi = {
     },
     microphone: () => ipcRenderer.invoke("dictation:microphone"),
     openMicrophoneSettings: () => ipcRenderer.send("dictation:openMicrophoneSettings"),
-    start: (id, model) => ipcRenderer.invoke("dictation:start", id, model),
+    start: (id) => ipcRenderer.invoke("dictation:start", id),
     audio: (id, pcm) => ipcRenderer.send("dictation:audio", id, pcm),
     finish: (id) => ipcRenderer.send("dictation:finish", id),
     cancel: (id) => ipcRenderer.send("dictation:cancel", id),

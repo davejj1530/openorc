@@ -32,6 +32,18 @@ export const DEFAULT_SPEECH_MODEL = SPEECH_MODELS[0]!;
 
 export const speechModel = (id: string): SpeechModel | undefined => SPEECH_MODELS.find((model) => model.id === id);
 
+/** Who turns speech into words: the model on this computer, or OpenAI's live transcription on the person's own key. */
+export type DictationEngine = "local" | "openai";
+
+/** The rate each one hears at, in samples a second. */
+export const ENGINE_SAMPLE_RATE: Record<DictationEngine, number> = { local: 16_000, openai: 24_000 };
+
+export interface DictationSettings {
+  engine: DictationEngine;
+  /** Whether an OpenAI key is saved. The key itself never reaches a window. */
+  openaiKey: boolean;
+}
+
 /** Where a model is: not on this computer, on its way, here, or stopped by a failed download. */
 export type SpeechModelState = { phase: "missing" } | { phase: "downloading"; received: number } | { phase: "ready" } | { phase: "failed"; reason: string };
 
@@ -45,10 +57,15 @@ export type SpeechRequest = { type: "start"; id: string; file: string } | { type
 export type MicrophoneAccess = "granted" | "denied";
 
 /**
- * Dictation, as the window reaches it. Main keeps the model files and the process that runs them; the window records
- * and sends what it hears as 16 kHz mono samples.
+ * Dictation, as the window reaches it. Main keeps the model files, the process that runs them, the choice of engine
+ * and the OpenAI key; the window records and sends what it hears as mono samples at the engine's rate.
  */
 export interface DictationApi {
+  settings(): Promise<DictationSettings>;
+  setEngine(engine: DictationEngine): Promise<DictationSettings>;
+  /** Saves the key in protected storage; an empty one removes it. */
+  setOpenAiKey(key: string): Promise<DictationSettings>;
+  onSettings(callback: (settings: DictationSettings) => void): () => void;
   models(): Promise<Record<string, SpeechModelState>>;
   download(model: string): Promise<void>;
   cancelDownload(model: string): Promise<void>;
@@ -57,7 +74,7 @@ export interface DictationApi {
   /** Asks the operating system for the microphone, the first time. */
   microphone(): Promise<MicrophoneAccess>;
   openMicrophoneSettings(): void;
-  start(id: string, model: string): Promise<void>;
+  start(id: string): Promise<void>;
   audio(id: string, pcm: Float32Array): void;
   finish(id: string): void;
   cancel(id: string): void;

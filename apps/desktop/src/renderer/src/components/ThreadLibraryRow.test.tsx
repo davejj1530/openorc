@@ -9,6 +9,7 @@ import { useRouter } from "../lib/router";
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
 const notes = vi.hoisted(() => ({ page: null as unknown }));
 vi.mock("../lib/client", () => ({
+  useRun: () => undefined,
   useRpc: (method: string, _params: unknown, options?: { enabled?: boolean }) => {
     if (method !== "threads.notes") return { data: { defaultWorkspaceMode: "current" } };
     return { data: options?.enabled === false ? undefined : notes.page };
@@ -112,7 +113,7 @@ it("shows a cloud glyph, dims it offline, and preserves place and teammate names
   expect(row.getAttribute("data-tip-detail")).toContain("Ana Lee · OpenOrc Cloud");
 });
 
-it("marks an unread mention with @ in the state slot and names who wrote it on demand, unless work holds the slot", () => {
+it("marks an unread mention in the state slot and names who wrote it on demand, unless work holds the slot", () => {
   const mara = { id: "u-mara", name: "Mara Okafor", image: null };
   notes.page = {
     notes: [{ id: "n1", seq: 1, author: mara, text: "@Theo look", mentions: [], replyTo: null, createdAt: "", afterEventSeq: 0, mentionedYou: true, read: false }],
@@ -134,7 +135,7 @@ it("marks an unread mention with @ in the state slot and names who wrote it on d
   } as unknown as ThreadSummary;
   const { rerender } = render(<ThreadRow thread={marked} active={false} />);
   const slot = screen.getByRole("img", { name: "Mentioned you" });
-  expect(slot.textContent).toBe("@");
+  expect(slot.getAttribute("data-mark")).toBe("mention");
   const row = screen.getByText("Export the log").closest("button")!;
   expect(row.getAttribute("data-tip-detail")).toMatch(/ · Mara Okafor · OpenOrc Cloud · main · Mara mentioned you$/);
   expect(row.getAttribute("aria-description")).toContain("Mara mentioned you");
@@ -151,7 +152,7 @@ it("marks an unread mention with @ in the state slot and names who wrote it on d
   expect(row.getAttribute("data-tip-detail")).not.toContain("mentioned you");
 });
 
-it("keeps all four facts together, with the teammate's waiting mark separate from its PR", () => {
+it("keeps the teammate's waiting mark in the lead and the row's facts at its end", () => {
   render(
     <ThreadRow
       thread={{
@@ -167,7 +168,6 @@ it("keeps all four facts together, with the teammate's waiting mark separate fro
     />,
   );
   expect(screen.getByRole("img", { name: "OpenOrc Cloud" })).toBeTruthy();
-  expect(screen.getByRole("img", { name: "Pull request #8, merged" })).toBeTruthy();
   expect(screen.getByRole("img", { name: "Waiting on Morgan" })).toBeTruthy();
   expect(screen.queryByRole("img", { name: "Needs you" })).toBeNull();
   expect(screen.getByText(subagent.title).closest("button")?.getAttribute("aria-description")).toContain("Morgan Reed");

@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode, type RefObject } from "react";
 import { ContextMenu } from "@base-ui/react/context-menu";
 import { Menu } from "@base-ui/react/menu";
-import type { GroupProject } from "@openorc/client";
+import type { GroupProject, ProjectActivity } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
@@ -32,6 +32,7 @@ export function SidebarProjectGroup({
   project,
   open,
   waiting,
+  activity,
   hidden,
   onToggle,
   onShowMore,
@@ -41,6 +42,8 @@ export function SidebarProjectGroup({
   project: GroupProject;
   open: boolean;
   waiting: number;
+  /** What its threads are up to, as its mark shows it. */
+  activity: ProjectActivity;
   /** How many of its threads are past the page, for "Show N more". */
   hidden: number;
   onToggle: () => void;
@@ -67,7 +70,7 @@ export function SidebarProjectGroup({
             }}
           >
             <span className="sidebar-project-mark" aria-hidden="true">
-              <ProjectLogo project={project} />
+              <ProjectLogo project={project} sigil={{ name: project.name, activity }} />
             </span>
             <span className="sidebar-project-name" data-tip={project.name}>
               {project.name}

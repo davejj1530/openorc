@@ -25,6 +25,7 @@ import {
   cloudProjects,
   inShownWorkspaces,
   sidebarDayList,
+  projectActivity,
   sidebarFoldKey,
   sidebarGroupsGrow,
   SIDEBAR_LIST,
@@ -421,6 +422,7 @@ function ThreadGroups({ children }: { children: ChildPages }) {
               project={group.project}
               open={group.open}
               waiting={group.waiting}
+              activity={projectActivity(group.roots, group.waiting)}
               hidden={group.hidden}
               onToggle={toggle(sidebarFoldKey.project(group.project.id))}
               onShowMore={group.showMore}

@@ -5,7 +5,7 @@ import { useLayout } from "../lib/layout";
 import { ThreadTreeList } from "./ThreadTreeList";
 
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
-vi.mock("../lib/client", () => ({ useRpc: () => ({ data: undefined }) }));
+vi.mock("../lib/client", () => ({ useRpc: () => ({ data: undefined }), useRun: () => undefined }));
 beforeEach(() => {
   vi.stubGlobal(
     "ResizeObserver",

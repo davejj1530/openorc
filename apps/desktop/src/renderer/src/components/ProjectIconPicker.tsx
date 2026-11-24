@@ -1,6 +1,7 @@
 import { useState, type ReactNode, type RefObject } from "react";
 import { Popover } from "@base-ui/react/popover";
 import { useQueryClient } from "@tanstack/react-query";
+import { projectMarkMotion, type ProjectActivity } from "@openorc/client";
 import type { ProjectIconState } from "../../../shared/project-icons";
 import { PROJECT_STACK_LABELS, type ProjectStackIconId } from "../../../shared/project-stack-icons";
 import { projectIconKey, useProjectIcon } from "../lib/project-icons";
@@ -11,28 +12,45 @@ import { Check, Cloud, Folder, FolderOpen, Globe } from "./icons";
 import { Button, Tooltip } from "./ui";
 import { cn } from "../lib/cn";
 import { ProjectStackIcon } from "./ProjectStackIcon";
+import { StateMark } from "./StateMark";
 
-function IconImage({ source, fallback, expanded, size = 16 }: { source: string | undefined; fallback?: ProjectStackIconId | null; expanded?: boolean; size?: number }) {
+/** A project's own mark, drawn from its name, and what its threads are up to. */
+export type ProjectSigil = { name: string; activity?: ProjectActivity };
+
+function IconImage({
+  source,
+  fallback,
+  expanded,
+  sigil,
+  size = 16,
+}: {
+  source: string | undefined;
+  fallback?: ProjectStackIconId | null;
+  expanded?: boolean;
+  sigil?: ProjectSigil | undefined;
+  size?: number;
+}) {
   const [failed, setFailed] = useState<string | null>(null);
   if (!source || failed === source) {
     if (fallback) return <ProjectStackIcon id={fallback} size={size} className="shrink-0" />;
+    if (sigil) return <StateMark motion={projectMarkMotion(sigil.name, sigil.activity ?? "quiet")} size={size} />;
     return expanded ? <FolderOpen size={size} className="shrink-0" /> : <Folder size={size} className="shrink-0" />;
   }
   return <img src={source} alt="" width={size} height={size} style={{ width: size, height: size }} className="shrink-0 object-contain" onError={() => setFailed(source)} />;
 }
 
 /** The same project artwork as the sidebar, without opening the icon chooser; 16px unless `size` says otherwise. */
-export function ProjectIcon({ rootPath, size }: { rootPath: string; size?: number }) {
+export function ProjectIcon({ rootPath, sigil, size }: { rootPath: string; sigil?: ProjectSigil | undefined; size?: number }) {
   const { data: state } = useProjectIcon(rootPath);
-  return <IconImage source={state?.selected?.dataUrl} fallback={state?.mode === "auto" ? state.fallback : null} {...(size ? { size } : {})} />;
+  return <IconImage source={state?.selected?.dataUrl} fallback={state?.mode === "auto" ? state.fallback : null} sigil={sigil} {...(size ? { size } : {})} />;
 }
 
 /**
- * A project's mark wherever the project is named: its chosen or detected icon, the cloud for a project only OpenOrc
- * Cloud has, else No project's globe.
+ * A project's mark wherever the project is named: its chosen or detected icon, else the sigil drawn from its name
+ * where the caller names it; the cloud for a project only OpenOrc Cloud has, else No project's globe.
  */
-export function ProjectLogo({ project, size = 14 }: { project: { rootPath?: string | null; cloud?: boolean }; size?: number }) {
-  if (project.rootPath) return <ProjectIcon rootPath={project.rootPath} size={size} />;
+export function ProjectLogo({ project, sigil, size = 14 }: { project: { rootPath?: string | null; cloud?: boolean }; sigil?: ProjectSigil | undefined; size?: number }) {
+  if (project.rootPath) return <ProjectIcon rootPath={project.rootPath} sigil={sigil} size={size} />;
   return project.cloud ? <Cloud size={size} /> : <Globe size={size} />;
 }
 

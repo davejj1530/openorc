@@ -405,7 +405,7 @@ it("leads each project's label with its mark, and No project's with the globe", 
     expect(mark.querySelector("svg, img")).not.toBeNull();
   }
   expect(label("No project").querySelector('.sidebar-project-mark [data-icon="Globe"]')).not.toBeNull();
-  expect(label("First project").querySelector('.sidebar-project-mark [data-icon="Folder"]')).not.toBeNull();
+  expect(label("First project").querySelector(".sidebar-project-mark .state-mark")).not.toBeNull();
 });
 
 it("reaches a project's actions from a button at its label's end, with the keyboard as with a click", async () => {
@@ -671,18 +671,18 @@ it("keeps freshness and place in the hover facts, the pull request as a mark, an
   expect(worktree.getAttribute("aria-description")).toContain(worktree.getAttribute("data-tip-detail"));
   const pull = within(worktree).getByRole("img", { name: "Pull request #8, merged" });
   expect(pull.textContent).toBe("");
-  expect(pull.getAttribute("class")).toContain("text-ok");
+  expect(pull.getAttribute("data-mark")).toBe("merged");
 });
 
-it("ends the title line with what the thread needs or is doing", async () => {
+it("leads the title line with what the thread needs or is doing", async () => {
   dayThreads();
   fixture.threads[0] = { ...fixture.threads[0]!, activity: "running" };
   fixture.threads[1] = { ...fixture.threads[1]!, activity: "waiting" };
   mountSidebar();
   const row = await screen.findByRole("button", { name: /Recent notes/ });
-  expect(row.querySelector(".thread-fact-slot[data-fact=state] [aria-label='Working']")).not.toBeNull();
+  expect(row.querySelector(".thread-lead-slot [aria-label='Working']")).not.toBeNull();
   const asking = screen.getByRole("button", { name: /Yesterday's notes/ });
-  expect(asking.querySelector(".thread-fact-slot[data-fact=state] [aria-label='Needs you']")).not.toBeNull();
+  expect(asking.querySelector(".thread-lead-slot [aria-label='Needs you']")).not.toBeNull();
 });
 
 it("reads on by itself until every group is whole, then pages a project's Resolved when asked", async () => {

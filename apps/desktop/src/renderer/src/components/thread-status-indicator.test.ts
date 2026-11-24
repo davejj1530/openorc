@@ -14,23 +14,22 @@ const idle: StatusFields = {
 const render = (changes: Partial<StatusFields> = {}) => renderToStaticMarkup(createElement(ThreadStatusIndicator, { thread: { ...idle, ...changes } }));
 
 describe("sidebar thread status", () => {
-  it("keeps the question mark in quiet ink when it waits on a teammate", () => {
+  it("keeps the cube quiet when it waits on a teammate", () => {
     const html = render({ activity: "waiting", owner: { brain: "hosted", reach: "live", heardAt: 1, startedBy: { name: "Morgan Reed", image: null } } });
     expect(html).toContain('aria-label="Waiting on Morgan"');
-    expect(html).toContain('data-mark="ask"');
-    expect(html).toContain("text-ink-3");
-    expect(html).not.toContain("text-attention");
+    expect(html).toContain('data-mark="waiting"');
+    expect(html).toContain('data-tone="quiet"');
+    expect(html).not.toContain('data-tone="attention"');
   });
 
   it.each([
-    ["waiting", "Needs you", 'data-mark="ask"'],
-    ["running", "Working", 'class="working-cube"'],
+    ["waiting", "Needs you", 'data-mark="question"'],
+    ["running", "Working", 'data-mark="working"'],
   ] as const)("shows %s ahead of failure, unread and completion", (activity, label, mark) => {
     const html = render({ activity, session: { status: "error", message: "Previous failure" }, unread: true, doneAt: 1 });
     expect(html).toContain(`aria-label="${label}"`);
     expect(html).toContain(`data-tip="${label}"`);
     expect(html).toContain(mark);
-    expect(html.match(/role="img"/g)).toHaveLength(1);
     expect(html).not.toContain("Previous failure");
   });
 
@@ -49,7 +48,7 @@ describe("sidebar thread status", () => {
     const html = render({ unread: true, doneAt: 1 });
     expect(html).toContain('aria-label="Unread"');
     expect(html).toContain('data-tip="Unread"');
-    expect(html).toContain('data-mark="unread"');
+    expect(html).toContain('data-mark="done"');
     expect(html).not.toContain('data-icon="Check"');
   });
 

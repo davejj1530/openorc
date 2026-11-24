@@ -1,10 +1,23 @@
 import { ContextMenu } from "@base-ui/react/context-menu";
 import { useRef } from "react";
-import { mentionLeads, ownerMark, rowFacts, subagentStatusLabel, threadStatus, threadTreeStatus, useSidebarNow, useTicking, workDuration, type ThreadStatus } from "@openorc/client";
+import {
+  mentionLeads,
+  ownerMark,
+  rowFacts,
+  subagentStatusLabel,
+  threadStatus,
+  threadTreeStatus,
+  useSidebarNow,
+  useTicking,
+  workDuration,
+  type RunTranscript,
+  type ThreadStatus,
+} from "@openorc/client";
 import { harnessShortName, type ThreadSummary } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { CoversPreview } from "../lib/browser-preview";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
+import { useRun } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { endThreadDrag, startThreadDrag } from "../lib/thread-drag";
 import { floatingGround } from "../lib/use-anchor-ground";
@@ -12,26 +25,23 @@ import { useMentionWords } from "../lib/mention-words";
 import { AccountFace } from "./AccountFace";
 import { ThreadMenuItems, type MenuParts } from "./ThreadActions";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
-import { CircleCheck, CircleDashed, Cloud, GitMerge, GitPullRequest, GitPullRequestClosed, X } from "./icons";
+import { CircleCheck, CircleDashed, Cloud, X } from "./icons";
 import { menuPopup } from "./menu";
-
-const pullRequestTone = { open: "text-ink-3", merged: "text-ok", closed: "text-bad" } as const;
-const pullRequestIcons = { open: GitPullRequest, merged: GitMerge, closed: GitPullRequestClosed } as const;
 
 /** The project a sidebar row names, in a group that holds many projects. */
 export type RowProject = { name: string };
 
 type ThreadRowProps = { thread: ThreadSummary; subthreads?: ThreadStatus | null; active: boolean; project?: RowProject; compact?: boolean };
 
-/** Whether a row has a state to mark: its own or its sub threads' status, a subagent's result, or an unread mention. */
+/** Whether a row has a state to mark: its own or its sub threads' status, a subagent's result, an unread mention, or a pull request. */
 export function rowHasState(thread: ThreadSummary, subthreads: ThreadStatus | null): boolean {
   const status = threadTreeStatus(threadStatus(thread), subthreads);
-  return Boolean(status || thread.subagent || mentionLeads(thread, status));
+  return Boolean(status || thread.subagent || mentionLeads(thread, status) || thread.prUrl);
 }
 
 /**
- * A title and right-aligned facts. A sub thread's state leads its row instead, where its branch ends. Parent status
- * includes its children; all open panes share the selected fill.
+ * A row's state, its title, then right-aligned facts. The state leads every row in one column, where a sub thread's
+ * branch ends. Parent status includes its children; all open panes share the selected fill.
  */
 export function ThreadRow({ thread, subthreads = null, active, project, compact = false }: ThreadRowProps) {
   const navigate = useRouter((s) => s.navigate);
@@ -40,6 +50,7 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
   const open = useRouter((s) => s.route.view !== "team-chat" && s.threadIds.includes(thread.id)) || active;
   const menu = useRef<ContextMenu.Root.Actions>(null);
   const status = threadTreeStatus(threadStatus(thread), subthreads);
+  const run = useRun(thread.liveRunId ?? undefined);
   const facts = rowFacts(thread, { now: useSidebarNow(), project: project?.name });
   const child = thread.subagent;
   const ticking = useTicking(child?.status === "running");
@@ -72,7 +83,7 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
           />
         }
       >
-        <ThreadLine thread={thread} subthreads={subthreads} facts={facts} child={compact} />
+        <ThreadLine thread={thread} subthreads={subthreads} facts={facts} run={run} />
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <CoversPreview />
@@ -93,21 +104,11 @@ function rowDescription(thread: ThreadSummary, detail: string): string {
   return [detail, ...about, ownerMark(thread)?.label, [...new Set(agents)].map(harnessShortName).join(", ")].filter(Boolean).join(" · ");
 }
 
-/** Every sub thread keeps the lead slot, marked or not, so their titles share one line. */
-function ThreadLine({ thread, subthreads, facts, child }: { thread: ThreadSummary; subthreads: ThreadStatus | null; facts: ReturnType<typeof rowFacts>; child: boolean }) {
-  const { starter, pull, cloud } = facts;
-  const PullIcon = pull ? pullRequestIcons[pull.state] : GitPullRequest;
-  const state = rowHasState(thread, subthreads) ? <SidebarThreadMark thread={thread} subthreads={subthreads} /> : null;
+/** Every row keeps the lead slot, marked or not, so titles share one line and states one column. */
+function ThreadLine({ thread, subthreads, facts, run }: { thread: ThreadSummary; subthreads: ThreadStatus | null; facts: ReturnType<typeof rowFacts>; run: RunTranscript | undefined }) {
+  const { starter, cloud } = facts;
   const slots = [
     { kind: "starter", mark: starter ? <AccountFace name={starter.name} image={starter.image} className="thread-preview-face" /> : null },
-    {
-      kind: "pull",
-      mark: pull ? (
-        <span role="img" aria-label={pull.label} className={pullRequestTone[pull.state]}>
-          <PullIcon size={14} />
-        </span>
-      ) : null,
-    },
     {
       kind: "cloud",
       mark: cloud ? (
@@ -116,15 +117,12 @@ function ThreadLine({ thread, subthreads, facts, child }: { thread: ThreadSummar
         </span>
       ) : null,
     },
-    { kind: "state", mark: child ? null : state },
   ].filter((slot) => slot.mark !== null);
   return (
     <span className="thread-preview-heading">
-      {child ? (
-        <span className="thread-lead-slot" data-fact="state">
-          {state}
-        </span>
-      ) : null}
+      <span className="thread-lead-slot" data-fact="state">
+        {rowHasState(thread, subthreads) ? <SidebarThreadMark thread={thread} subthreads={subthreads} run={run} /> : null}
+      </span>
       <span className="thread-preview-title" data-tip-title>
         {thread.title}
       </span>
@@ -141,8 +139,8 @@ function ThreadLine({ thread, subthreads, facts, child }: { thread: ThreadSummar
   );
 }
 
-/** State remains last, separate from the pull request. */
-function SidebarThreadMark({ thread, subthreads }: { thread: ThreadSummary; subthreads: ThreadStatus | null }) {
+/** A subagent at rest says how it ended; every other row wears its thread's cube, or its pull request's while it rests. */
+function SidebarThreadMark({ thread, subthreads, run }: { thread: ThreadSummary; subthreads: ThreadStatus | null; run: RunTranscript | undefined }) {
   let Icon = X;
   if (thread.subagent?.status === "completed") Icon = CircleCheck;
   if (thread.subagent?.status === "no_updates") Icon = CircleDashed;
@@ -151,6 +149,6 @@ function SidebarThreadMark({ thread, subthreads }: { thread: ThreadSummary; subt
       <Icon size={13} />
     </span>
   ) : (
-    <ThreadStatusIndicator thread={thread} subthreads={subthreads} />
+    <ThreadStatusIndicator thread={thread} subthreads={subthreads} run={run} pull />
   );
 }

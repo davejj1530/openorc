@@ -1,0 +1,39 @@
+/*
+ * State marks: a thread's cube and a project's sigil, drawn as dots (packages/client state-marks.ts). Each dot scales
+ * from its own centre and wears its mark's colour, from faded into the ground to whole, as its animation says. The
+ * colour is the theme's own for what the mark says, so a mark changes with the palette and with light and dark.
+ */
+@property --mark-wear {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+/* An agent at work, in the theme's working ink. A dot may wear a tone of its own. */
+.state-mark {
+  flex-shrink: 0;
+  overflow: visible;
+  --mark-color: var(--working-ink);
+}
+:is(.state-mark, .state-mark circle)[data-tone="think"] {
+  --mark-color: var(--tone-think);
+}
+:is(.state-mark, .state-mark circle)[data-tone="ink"] {
+  --mark-color: var(--ink);
+}
+:is(.state-mark, .state-mark circle)[data-tone="attention"] {
+  --mark-color: var(--attention);
+}
+:is(.state-mark, .state-mark circle)[data-tone="bad"] {
+  --mark-color: var(--bad);
+}
+:is(.state-mark, .state-mark circle)[data-tone="ok"] {
+  --mark-color: var(--ok);
+}
+:is(.state-mark, .state-mark circle)[data-tone="quiet"] {
+  --mark-color: var(--ink-3);
+}
+.state-mark circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  fill: color-mix(in oklab, var(--mark-color) calc(45% + var(--mark-wear) * 55%), var(--bg));
+}

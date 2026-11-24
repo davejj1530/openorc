@@ -69,13 +69,13 @@ const END_INSET = 4;
 const LEAD = 24;
 
 /**
- * A row of the tree with its share of the branch lines drawn over its lead. A parent carries its disclosure at the end
- * of its title line, where the phone keeps it: the chevron points down while its sub threads are folded and turns up
+ * A row of the tree with its share of the branch lines drawn over its lead. A parent carries its disclosure right
+ * after its title, as a project's label does: the chevron points down while its sub threads are folded and turns up
  * as they open.
  */
 function BranchRow({ row, children, marked = true, paging = false, onToggle }: { row: ThreadTreeRow; children: ReactNode; marked?: boolean; paging?: boolean; onToggle?: () => void }) {
   const element = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ height: 32, mid: 16, title: 16 });
+  const [size, setSize] = useState({ height: 32, mid: 16, title: 16, titleEnd: 0 });
   useLayoutEffect(() => {
     const node = element.current;
     if (!node) return;
@@ -86,15 +86,20 @@ function BranchRow({ row, children, marked = true, paging = false, onToggle }: {
         const box = part?.getBoundingClientRect();
         return box ? (box.top - bounds.top + box.height / 2) / scale : node.offsetHeight / 2;
       };
+      const title = node.querySelector(".thread-preview-title");
       if (scale)
         setSize({
           height: node.offsetHeight,
           mid: center(node.querySelector(".thread-preview-heading")),
           title: center(node.querySelector(".thread-preview-heading")),
+          titleEnd: title ? (title.getBoundingClientRect().right - bounds.left) / scale : 0,
         });
     };
     const observer = new ResizeObserver(measure);
     observer.observe(node);
+    // The title's own width moves its disclosure: a rename, or a fact arriving beside it.
+    const title = node.querySelector(".thread-preview-title");
+    if (title) observer.observe(title);
     measure();
     return () => observer.disconnect();
   }, []);
@@ -111,7 +116,7 @@ function BranchRow({ row, children, marked = true, paging = false, onToggle }: {
       {onToggle ? (
         <button
           className="sidebar-tree-toggle no-drag"
-          style={{ top: size.title - 12 }}
+          style={{ top: size.title - 12, left: size.titleEnd + 2 }}
           aria-label={`${row.expanded ? "Collapse" : "Expand"} ${row.thread.title}`}
           aria-expanded={row.expanded}
           onClick={onToggle}

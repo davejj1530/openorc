@@ -588,6 +588,11 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   width: 14px;
   height: 14px;
 }
+/* A sigil is dots, not a drawing: it takes the row's 16px so they hold. */
+.sidebar-project-mark > .state-mark {
+  width: 16px;
+  height: 16px;
+}
 
 /* One title line on the navigation rhythm: 32px high and a 2px list gap. */
 .app-shell .thread-preview {
@@ -633,7 +638,7 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   container: thread-row / inline-size;
 }
 .thread-preview-title {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   font-size: var(--text-base);
   line-height: 16px;
@@ -641,8 +646,8 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-/* A sub thread's state leads its row, where its branch ends. Every sub thread keeps the 16px slot, so their titles
-   share one line 24px in, under the first letters of the thread above. */
+/* A row's state leads it, where a sub thread's branch ends. Every row keeps the 16px slot, so states share one
+   column and titles one line, a sub thread's 24px in from the thread above. */
 .thread-lead-slot {
   display: flex;
   flex-shrink: 0;
@@ -655,6 +660,7 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
 /* Present facts pack against the count line; absent facts leave their space to the title. */
 .thread-facts {
   display: grid;
+  margin-left: auto;
   grid-auto-flow: column;
   grid-auto-columns: 16px;
   gap: 4px;

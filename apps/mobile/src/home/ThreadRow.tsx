@@ -19,7 +19,7 @@ import {
 } from "@openorc/client";
 import { harnessShortName, isHarnessId, isSubagentThread, placeOf, type ThreadSummary } from "@openorc/protocol";
 import { Link, router, type Href } from "expo-router";
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo } from "react";
 import { useWindowDimensions, View } from "react-native";
 import { Cloud } from "../generated/icons";
 import { useListOpen, useSplit } from "../layout";
@@ -37,9 +37,9 @@ import { useSnoozeClock } from "../thread/snooze-clock";
 import { useThreadActions } from "../thread/use-thread-actions";
 import { useRowRun } from "./row-run";
 import { STILL, type RowMotion } from "./fold-motion";
-import { CHROME_SCALE, MARGIN, ROOT_GAP, ROW_INSET, titleMid } from "./grid";
+import { ACTION_RESERVE, CHROME_SCALE, MARGIN, ROOT_GAP, ROW_INSET, titleMid } from "./grid";
 import { ThreadTreeFrame, treeIndent, TreeToggle } from "./ThreadBranch";
-import { DISCLOSURE_AT, leadReach, RowStatus, RowTitle, ThreadRowHeading } from "./ThreadRowHeading";
+import { leadReach, RowStatus, ThreadRowHeading } from "./ThreadRowHeading";
 
 /** Where it works, who works on it and when it last moved: the details a row keeps for its menu. */
 function menuFacts(thread: ThreadSummary, where: string): string[] {
@@ -60,7 +60,7 @@ export function cloudPlace(thread: ThreadSummary, project: string | null, outOfR
   };
 }
 
-/** A row's padding either side, inside its pressed fill: its lead starts and its facts end at the margin. */
+/** Where a row's lead starts, inside its pressed fill: at the margin. */
 const ROW_PAD = MARGIN - ROW_INSET;
 
 /**
@@ -96,30 +96,14 @@ type Lead = { mark: ThreadMark | null; kind: ThreadMarkKind | undefined };
 
 /**
  * A root row's one line, as the desktop sidebar's: its cube in one column down the list, the title, lighting up while
- * its agent works, a parent's disclosure after it, then its facts at the end. When it last moved, where it works and
- * what it is doing are in its label and its menu.
+ * its agent works, then its facts, which end before the action column on every row so they line up whether or not a
+ * disclosure stands there. When it last moved, where it works and what it is doing are in its label and its menu.
  */
-function RootLine({
-  thread,
-  lead,
-  working,
-  parent,
-  cloudLabel,
-  onTitleEnd,
-}: {
-  thread: ThreadSummary;
-  lead: Lead;
-  working: boolean;
-  parent: boolean;
-  cloudLabel: boolean;
-  onTitleEnd: (x: number) => void;
-}) {
+function RootLine({ thread, lead, working, cloudLabel }: { thread: ThreadSummary; lead: Lead; working: boolean; cloudLabel: boolean }) {
   return (
     <View className="flex-row items-center" style={{ gap: ROOT_GAP }}>
       <RowStatus thread={thread} mark={lead.mark} kind={lead.kind} className="w-5" />
-      <RowTitle parent={parent} onEnd={onTitleEnd}>
-        <SweepText text={thread.title} className="text-xl text-ink" sweeping={working} />
-      </RowTitle>
+      <SweepText text={thread.title} className="flex-1 text-xl text-ink" sweeping={working} />
       <FactSlots thread={thread} cloudLabel={cloudLabel} />
     </View>
   );
@@ -153,7 +137,7 @@ function treePlace(tree: ThreadTreeRow | undefined, motion: RowMotion, arriving:
   return {
     compact,
     rowClass: cn("mx-3 min-h-touch justify-center rounded-lg px-2 active:bg-surface-2", lit ? "bg-navigation-soft" : "bg-bg", compact ? "py-2.75" : "py-2.5"),
-    rowStyle: { paddingLeft: ROW_PAD + treeIndent(tree?.depth ?? 0), paddingRight: ROW_PAD },
+    rowStyle: { paddingLeft: ROW_PAD + treeIndent(tree?.depth ?? 0), paddingRight: ACTION_RESERVE },
     open: Boolean(tree?.expanded && !motion.folding),
     moves: motion.arrive === undefined && arriving ? { ...motion, arrive: 0 } : motion,
   };
@@ -209,9 +193,6 @@ export const ThreadRow = memo(
     const child = thread.subagent;
     const { status, working, mark } = rowMarks(thread, compact);
     const lead: Lead = { mark, kind: threadStateMark(thread, { run })?.kind };
-    const parent = Boolean(tree?.hasChildren && onFold);
-    // Where the title ends on its line, for a parent's disclosure to follow it.
-    const [titleEnd, setTitleEnd] = useState<number | null>(null);
     const place = threadPlace(thread);
     const fontScale = useWindowDimensions().fontScale;
     const cloud = cloudPlace(thread, project);
@@ -228,14 +209,10 @@ export const ThreadRow = memo(
         : { state: mark?.label, about: [headline?.text, detail, pullRequestMark(thread)?.label] },
       facts,
     );
-    const lines = compact ? (
-      <ThreadRowHeading thread={thread} mark={mark} kind={lead.kind} parent={parent} onTitleEnd={setTitleEnd} />
-    ) : (
-      <RootLine thread={thread} lead={lead} working={working} parent={parent} cloudLabel={cloudLabel} onTitleEnd={setTitleEnd} />
-    );
+    const lines = compact ? <ThreadRowHeading thread={thread} mark={mark} kind={lead.kind} /> : <RootLine thread={thread} lead={lead} working={working} cloudLabel={cloudLabel} />;
     // A root row's own tree line drops from under its title's first letters.
     const node = compact ? undefined : { mid: titleMid(false, fontScale) + 12 * Math.min(fontScale, CHROME_SCALE), reach: 0 };
-    const toggle = <TreeToggle tree={tree} open={open} compact={compact} at={titleEnd === null ? null : ROW_INSET + rowStyle.paddingLeft + titleEnd + DISCLOSURE_AT} onFold={onFold} />;
+    const toggle = <TreeToggle tree={tree} open={open} compact={compact} onFold={onFold} />;
     return (
       <ThreadTreeFrame tree={tree} reach={leadReach(thread, mark)} node={node} motion={moves} compact={compact}>
         <SwipeRow id={thread.id} leading={leading} trailing={trailing}>

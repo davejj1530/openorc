@@ -23,8 +23,8 @@ export const ACTION_RIGHT = ACTION_INSET - 22;
 /** A row's pressed fill runs this far outside the margin (mx-3), so the fill has room around the mark. */
 export const ROW_INSET = 12;
 /**
- * What a row with an action at its end keeps clear there: the action column. A thread's row has none; its facts end
- * at the margin and a parent's disclosure follows its title.
+ * What every row keeps clear at its trailing end: the action column. Titles and a row's facts end before it, so they
+ * line up down the list; the column holds a parent's disclosure or nothing.
  */
 export const ACTION_RESERVE = ACTION_RIGHT + 44 - ROW_INSET;
 /** How far interface text grows with the reader's text size (ui/Text.tsx). */

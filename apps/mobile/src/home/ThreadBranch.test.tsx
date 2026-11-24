@@ -45,7 +45,7 @@ it("keeps a disclosure's pressed circle inside its row, centered on the title li
   for (const fontScale of [0.82, 1, 1.4, 2.4])
     for (const compact of [false, true]) {
       dimensions.fontScale = fontScale;
-      const { style, hitSlop } = TreeToggle({ tree, open: false, compact, at: 200, onFold: () => undefined })!.props as {
+      const { style, hitSlop } = TreeToggle({ tree, open: false, compact, onFold: () => undefined })!.props as {
         style: { top: number; height: number };
         hitSlop: number;
       };

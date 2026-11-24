@@ -35,8 +35,8 @@ jobs:
           done
 
   # Linux runs everything on every push and pull request: its runners are plentiful and start at once, so the work is
-  # split until no job takes much over two minutes. Typecheck, lint and the format check read the same sources on
-  # every system, so only Linux runs them.
+  # split until no job outlasts lint. Only twenty jobs run at once across the repository, so it is split no further:
+  # two pull requests fit together. Typecheck and lint read the same sources on every system, so only Linux runs them.
   linux:
     name: Linux typecheck and build
     runs-on: ubuntu-24.04
@@ -60,7 +60,7 @@ jobs:
       - run: pnpm --filter @openorc/desktop bundle:wsl
 
   lint:
-    name: Linux lint and format
+    name: Linux lint
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -76,7 +76,6 @@ jobs:
       - run: pnpm lint
         env:
           NODE_OPTIONS: --max-old-space-size=8192
-      - run: pnpm format:check
 
   # Hosted and mobile take as long as every other workspace together, so they run apart from the rest. Core and
   # desktop have their own shards.
@@ -109,13 +108,13 @@ jobs:
 
   # Desktop's jsdom tests wait on rendering and time out when other workspaces share the runner.
   linux-desktop-tests:
-    name: Linux desktop tests (${{ matrix.shard }}/3)
+    name: Linux desktop tests (${{ matrix.shard }}/2)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -124,7 +123,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @openorc/desktop test --shard=${{ matrix.shard }}/3
+      - run: pnpm --filter @openorc/desktop test --shard=${{ matrix.shard }}/2
         env:
           GIT_AUTHOR_NAME: ci
           GIT_AUTHOR_EMAIL: ci@openorc.local
@@ -132,13 +131,13 @@ jobs:
           GIT_COMMITTER_EMAIL: ci@openorc.local
 
   linux-core-tests:
-    name: Linux core tests (${{ matrix.shard }}/3)
+    name: Linux core tests (${{ matrix.shard }}/2)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -147,7 +146,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @openorc/core test --shard=${{ matrix.shard }}/3
+      - run: pnpm --filter @openorc/core test --shard=${{ matrix.shard }}/2
         env:
           GIT_AUTHOR_NAME: ci
           GIT_AUTHOR_EMAIL: ci@openorc.local
@@ -155,7 +154,7 @@ jobs:
           GIT_COMMITTER_EMAIL: ci@openorc.local
 
   windows:
-    name: Windows build
+    name: Windows build and format check
     runs-on: windows-2025
     timeout-minutes: 30
     steps:
@@ -169,6 +168,9 @@ jobs:
       - run: pnpm check:size
       - run: node --test scripts/size-limit.test.cjs
       - run: node --test scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
+      # Prettier reads the same on every system. It runs here because this job has time to spare, and a Windows
+      # checkout is where line endings would go wrong.
+      - run: pnpm format:check
       # The full suite currently includes POSIX-only fixtures (e.g. /bin/sh).
       # Keep running it in the macOS jobs until those tests are portable.
       - run: pnpm build

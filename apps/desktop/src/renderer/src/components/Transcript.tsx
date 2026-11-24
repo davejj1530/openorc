@@ -121,7 +121,8 @@ export function Transcript({
       if (top < lastScrollTop.current && !atBottom()) pinned.current = false;
       else if (top > lastScrollTop.current && atBottom()) pinned.current = true;
       lastScrollTop.current = top;
-      anchor.current = firstTurnInView(el);
+      // The anchor serves a reader away from the tail. Following it, every frame of new content is a scroll.
+      anchor.current = pinned.current ? null : firstTurnInView(el);
     };
     // Input arrives before scroll events. Release the tail before a render or
     // ResizeObserver can undo the first few pixels of an upward gesture.
@@ -174,8 +175,10 @@ export function Transcript({
     const first = el.querySelector<HTMLElement>("[data-turn]")?.dataset["turn"];
     const olderArrived = firstTurn.current !== undefined && first !== firstTurn.current;
     firstTurn.current = first;
-    if (pinned.current) el.scrollTop = el.scrollHeight;
-    else if (olderArrived && anchor.current && Math.abs(el.scrollTop - anchor.current.scrollTop) < 1) {
+    // Pinned, the size observer follows the tail once the browser has laid the new content out. Measuring here too
+    // would lay the conversation out for every streamed frame, including those that arrive between two paints.
+    if (pinned.current) return;
+    if (olderArrived && anchor.current && Math.abs(el.scrollTop - anchor.current.scrollTop) < 1) {
       const turn = el.querySelector(`[data-turn="${CSS.escape(anchor.current.id)}"]`);
       const drift = turn ? turn.getBoundingClientRect().top - el.getBoundingClientRect().top - anchor.current.offset : 0;
       if (Math.abs(drift) >= 1) el.scrollTop += drift;

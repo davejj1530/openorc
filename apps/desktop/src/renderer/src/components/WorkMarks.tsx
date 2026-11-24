@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Block, ObjectState, WorkChip } from "@openorc/client";
-import { Brain, Check, Folder, Globe, Hammer, Loader2, Search, Terminal, WorkDelegate, X } from "./icons";
+import { Brain, Check, Folder, Globe, Hammer, Search, Terminal, WorkDelegate, X } from "./icons";
+import { Spinner } from "./Spinner";
 import { FileGlyph } from "./FileGlyph";
 
 /** How raw blocks render: the transcript's own rows. `details` draws a call as its details alone, under its chip. */
@@ -22,7 +23,7 @@ export function OpenedCall({ open, calls, renderBlocks, children }: { open: bool
 
 /** Running, done or failed, as a mark. A row says only what is unusual: `quiet` leaves a finished one unmarked. */
 export function StateMark({ state, size = 14, quiet = false }: { state: ObjectState; size?: number; quiet?: boolean }) {
-  if (state === "running") return <Loader2 size={size} className="tool-row-live work-object-mark" />;
+  if (state === "running") return <Spinner size={size} className="tool-row-live work-object-mark" />;
   if (state === "failed") return <X size={size} className="work-object-mark" data-tone="bad" />;
   return state === "done" && !quiet ? <Check size={size} className="work-object-mark" /> : null;
 }

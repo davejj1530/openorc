@@ -451,10 +451,13 @@
 .tool-row:is(:hover, :focus-visible, [aria-expanded="true"]) .tool-row-chevron {
   opacity: 1;
 }
+.spinner {
+  display: inline-flex;
+  animation: work-spin 1.2s linear infinite;
+}
 .tool-row-live {
   flex-shrink: 0;
   color: var(--ink-4);
-  animation: work-spin 1.2s linear infinite;
 }
 .tool-row-text {
   margin-left: 24px;

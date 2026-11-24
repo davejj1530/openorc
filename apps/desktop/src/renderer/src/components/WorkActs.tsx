@@ -19,7 +19,8 @@ import {
   type TestsObject,
   type WorkObject,
 } from "@openorc/client";
-import { FileText, GitBranch, Lightbulb, Loader2, Terminal } from "./icons";
+import { FileText, GitBranch, Lightbulb, Terminal } from "./icons";
+import { Spinner } from "./Spinner";
 import { ThreadLink } from "./ThreadImages";
 import { toolIcons } from "./tool-icons";
 import { CommandSteps } from "./ToolCommand";
@@ -162,7 +163,7 @@ function ActResult({ result }: { result: LineResult }) {
     return (
       <>
         <span>{result.since}</span>
-        <Loader2 size={14} className="tool-row-live" />
+        <Spinner size={14} className="tool-row-live" />
       </>
     );
   if (result.kind === "words") return <span data-tone={result.bad ? "bad" : undefined}>{result.text}</span>;

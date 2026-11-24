@@ -1,4 +1,5 @@
 import type { TeamChatAnswered, TeamChatFile, TeamChatOrclingPick, TeamConversation } from "@openorc/protocol";
+import { Spinner } from "./Spinner";
 import type { ReactNode } from "react";
 import { teamChatShortNames, teamConversationTitle } from "@openorc/client";
 import { TopBar } from "./TopBar";
@@ -6,7 +7,7 @@ import { ThreadTabs } from "./ThreadTabs";
 import { TeamChatFace, TeamConversationFace } from "./TeamChatFace";
 import { TeamChatComposer, type TeamChatComposerFiles } from "./TeamChatComposer";
 import { TeamChatTranscript, type TeamChatTranscriptProps } from "./TeamChatTranscript";
-import { ChevronDown, Loader2, X } from "./icons";
+import { ChevronDown, X } from "./icons";
 import { Button } from "./ui";
 import "../styles/team-chat.css";
 
@@ -106,7 +107,7 @@ function TeamChatBody(props: TeamChatProps) {
   if (props.loading)
     return (
       <div className="team-chat-state" role="status">
-        <Loader2 size={16} className="animate-spin" />
+        <Spinner size={16} />
         <span>Loading chat…</span>
       </div>
     );

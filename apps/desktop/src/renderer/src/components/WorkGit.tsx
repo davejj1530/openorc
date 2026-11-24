@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { relativeTime, shortSha, type GitObject, type ObjectState } from "@openorc/client";
 import { useRpc } from "../lib/client";
-import { Cloud, GitBranch, GitPullRequest, Loader2, X } from "./icons";
+import { Cloud, GitBranch, GitPullRequest, X } from "./icons";
+import { Spinner } from "./Spinner";
 import { ThreadLink, useThreadMedia } from "./ThreadImages";
 import { SizeBlocks, SizeStat } from "./WorkMarks";
 
@@ -82,7 +83,7 @@ function GitMark({ state, children }: { state: ObjectState; children: ReactNode 
   if (state === "running")
     return (
       <span className="work-git-mark">
-        <Loader2 size={14} className="tool-row-live" />
+        <Spinner size={14} className="tool-row-live" />
       </span>
     );
   if (state === "failed")

@@ -23,7 +23,8 @@ import {
   type StepThoughts,
 } from "@openorc/client";
 import { cn } from "../lib/cn";
-import { Check, ChevronRight, Lightbulb, List, Loader2, Workflow, X } from "./icons";
+import { Check, ChevronRight, Lightbulb, List, Workflow, X } from "./icons";
+import { Spinner } from "./Spinner";
 import type { RenderBlocks } from "./WorkMarks";
 import { ActRow, ThoughtRow } from "./WorkActs";
 import { WorkTimeline } from "./WorkTimeline";
@@ -137,7 +138,7 @@ export function WorkNow({ blocks, turn, taskCards = true, lead }: { blocks: Bloc
   const headline = liveHeadline(entries, turn);
   return headline ? (
     <div className="work-now motion-arrive" role="status">
-      <Loader2 size={16} className="tool-row-live" />
+      <Spinner size={16} className="tool-row-live" />
       {lead ? <span className="work-now-lead">{lead}</span> : null}
       <LiveWords headline={headline} elapsed />
     </div>
@@ -223,7 +224,7 @@ function LiveLine({ headline }: { headline: LiveHeadline }) {
   return (
     <div className="work-act work-live" data-state="running">
       <div className="work-act-head">
-        {thinking ? <Lightbulb size={14} className="work-chip-icon" /> : <Loader2 size={14} className="tool-row-live" />}
+        {thinking ? <Lightbulb size={14} className="work-chip-icon" /> : <Spinner size={14} className="tool-row-live" />}
         <span className="work-act-words">
           <span className="work-live-words">{thinking ? "Thinking" : headline.label}</span>
         </span>
@@ -264,7 +265,7 @@ export type StepState = "pending" | "running" | "done" | "failed";
 export function StepMark({ state }: { state: StepState }) {
   return (
     <span className="step-mark" data-state={state} aria-hidden="true">
-      {state === "running" ? <Loader2 size={16} className="tool-row-live" /> : null}
+      {state === "running" ? <Spinner size={16} className="tool-row-live" /> : null}
       {state === "done" ? (
         <span className="step-check">
           <Check size={11} strokeWidth={2.25} />

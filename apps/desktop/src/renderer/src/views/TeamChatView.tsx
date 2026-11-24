@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Spinner } from "../components/Spinner";
 import type { TeamChatRoute } from "../lib/team-chat-route";
 import { useTeamChatContext, type TeamChatContextValue } from "../lib/team-chat-context";
 import { chatTimelineKey, teamChatDrafts, useTeamChatState, useTeamChatWatch } from "../lib/team-chat-queries";
@@ -9,7 +10,6 @@ import { ThreadTabs } from "../components/ThreadTabs";
 import { TeamChatConversation } from "../components/TeamChatConversation";
 import { CoversPreview } from "../lib/browser-preview";
 import { useTeamChatVisible } from "../lib/team-chat-visibility";
-import { Loader2 } from "../components/icons";
 import { Button } from "../components/ui";
 
 export function TeamChatView({ target }: { target: TeamChatRoute }) {
@@ -77,7 +77,7 @@ function ChatWaiting({ error, onRetry }: { error: string | null; onRetry(): void
         <ThreadTabs />
       </TopBar>
       <div className="team-chat-state" role="status">
-        {!error ? <Loader2 size={16} className="animate-spin" /> : null}
+        {!error ? <Spinner size={16} /> : null}
         <p>{error ?? "Loading chat…"}</p>
         {error ? (
           <Button size="sm" onClick={onRetry}>

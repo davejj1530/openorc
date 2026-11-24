@@ -1,4 +1,5 @@
 import { Popover } from "@base-ui/react/popover";
+import { Spinner } from "./Spinner";
 import type { TeamChatPerson, TeamMessage } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import type { TeamChatContextValue } from "../lib/team-chat-context";
@@ -8,7 +9,7 @@ import { useTeamChatPins } from "../lib/team-chat-pins";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { TeamChatActorFace } from "./TeamChatActorFace";
 import { actorName } from "../lib/team-chat-actor";
-import { Loader2, Pin, PinOff } from "./icons";
+import { Pin, PinOff } from "./icons";
 import { Button, Tooltip } from "./ui";
 import "../styles/team-chat-pins.css";
 
@@ -51,7 +52,7 @@ function PinsBody({ pins, people, onOpen, onUnpin }: { pins: ReturnType<typeof u
   if (pins.isPending)
     return (
       <div className="team-chat-pins-state" role="status">
-        <Loader2 size={14} className="animate-spin" />
+        <Spinner size={14} />
       </div>
     );
   if (pins.error)

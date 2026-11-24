@@ -1,5 +1,6 @@
 import type { Task } from "@openorc/protocol";
-import { Loader2, MessageSquare } from "./icons";
+import { Spinner } from "./Spinner";
+import { MessageSquare } from "./icons";
 import { IconButton, Tooltip } from "./ui";
 import { useRpcMutation } from "../lib/client";
 import { openThread, useRouter } from "../lib/router";
@@ -24,7 +25,7 @@ export function TaskStart({ task }: { task: Task }) {
             }
           }}
         >
-          {conversation.isPending ? <Loader2 size={14} className="animate-spin" /> : <MessageSquare size={14} />}
+          {conversation.isPending ? <Spinner size={14} /> : <MessageSquare size={14} />}
         </IconButton>
       </Tooltip>
       {conversation.error ? (

@@ -5,6 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { spawnSync } = require("node:child_process");
+const { finished } = require("node:stream/promises");
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "openorc-notice-test-"));
@@ -120,6 +121,12 @@ test("correct sources do not hide a stale notice in a built artifact", (t) => {
   assert.match(result.stderr, /built website notice is missing or stale/);
 });
 
+// @electron/asar resolves createPackage with the still-flushing write stream; wait for it so
+// a checker process never reads a partially written archive.
+async function createAsar(asar, src, dest) {
+  await finished(await asar.createPackage(src, dest));
+}
+
 async function desktopFixture(t) {
   const { root, write, run } = fixture(t);
   const { createRequire } = require("node:module");
@@ -144,7 +151,7 @@ async function desktopFixture(t) {
   }
   write("Fixture.app/Contents/Frameworks/Electron Framework.framework/Resources/Info.plist", "<key>CFBundleVersion</key><string>1.0.0</string>");
   write("archive/node_modules/fixture-native/package.json", { name: "fixture-native", version: "1.0.0", license: "MIT" });
-  await asar.createPackage(path.join(root, "archive"), path.join(root, resources, "app.asar"));
+  await createAsar(asar, path.join(root, "archive"), path.join(root, resources, "app.asar"));
   const manifest = {
     schemaVersion: 1,
     packages: [
@@ -243,7 +250,7 @@ test("a metadata exception is visible, version-bound, and does not waive other m
   const archive = path.join(root, resources, "app.asar");
   const pack = async (pkg = metadata) => {
     write("archive/node_modules/fixture-native/package.json", pkg);
-    await asar.createPackage(path.join(root, "archive"), archive);
+    await createAsar(asar, path.join(root, "archive"), archive);
   };
   const report = path.join(root, "report.json");
   write("licenses/manifest.json", reviewed);

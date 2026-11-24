@@ -86,7 +86,7 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
     <ul>
       <li>The window loads only the files that ship with OpenOrc and never navigates away from them. Embedded <code>&lt;webview&gt;</code> tags are refused.</li>
       <li>A web link opens in the Preview or in your browser, or in Chrome Incognito if you choose that from the link's menu. Files and other schemes don't open, and only the app's own page can ask to open a link.</li>
-      <li>The app's page may show notifications and copy text to the clipboard. Every other web permission, such as the camera, microphone, or location, is refused.</li>
+      <li>The app's page may show notifications, copy text to the clipboard, and hear the microphone while you dictate. Every other web permission, such as the camera or location, is refused.</li>
       <li>
         Visualizations that agents draw, and MCP Apps, run in sandboxed frames with an opaque origin, each in a process of its own. They can't reach the network, except an MCP App's connections to the <code>https</code> domains its
         server declares.

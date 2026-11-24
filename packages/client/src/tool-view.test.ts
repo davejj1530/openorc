@@ -190,3 +190,11 @@ it("names a parameter in words, reads a message as what it said, and a page the 
   // The line already says what the browser was asked to do.
   expect(toolInputView(call("openorc.browser", { action: "screenshot" }))).toEqual({ kind: "none" });
 });
+
+it("reads any tool's answer that opens as a diff as a diff, and one that only quotes a diff as its words", () => {
+  const patch = "diff --git a/src/a.ts b/src/a.ts\nindex 1..2 100644\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-const a = 1;\n+const a = 2;";
+  expect(toolOutputView(call("mcp__openorc_0123456789abcdef0123456789abcdef__pull_request_diff", { path: "src/a.ts" }), patch)).toEqual({ kind: "diff", patch });
+  expect(toolOutputView(call("mcp__notes__read", {}), `The change was:\n${patch}`)).toMatchObject({ kind: "text" });
+  // The diff is headed by its file, so the path it was asked for is not listed over it.
+  expect(toolInputView(call("mcp__openorc_0123456789abcdef0123456789abcdef__pull_request_diff", { path: "src/a.ts" }))).toEqual({ kind: "none" });
+});

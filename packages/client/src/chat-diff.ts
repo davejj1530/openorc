@@ -3,6 +3,11 @@ export function isUnifiedDiff(text: string): boolean {
   return /^(?:diff --git |--- [^\n]+\n\+\+\+ )/m.test(text);
 }
 
+/** Whether a tool's whole answer is a unified diff: it opens on a diff's first lines, not merely quotes one further down. */
+export function opensAsDiff(text: string): boolean {
+  return /^\s*(?:diff --git |--- [^\n]+\n\+\+\+ )/.test(text);
+}
+
 /** Codex fileChange entries may carry a full patch or just numbered hunks. */
 export function toolDiff(input: unknown): string | null {
   if (!Array.isArray(input)) return null;

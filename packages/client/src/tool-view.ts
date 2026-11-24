@@ -1,4 +1,5 @@
-import { isUnifiedDiff, toolDiff } from "./chat-diff.js";
+import { isUnifiedDiff, opensAsDiff, toolDiff } from "./chat-diff.js";
+import { ownToolName } from "./tool-presentation.js";
 import { commandLine, shellSteps, shellTokens, unwrapShell, type CommandLine, type ShellStep } from "./shell.js";
 import { fileList, gitStatus, languageFor, matchGroups, numberedCode, prettyJson, stripAnsi, testTally, type ChangedFile, type MatchGroup, type MatchShape, type TestTally } from "./tool-text.js";
 import type { Block } from "./transcript.js";
@@ -176,9 +177,13 @@ export function toolInputView(block: ToolBlock): InputView {
   // The line already says what the browser or a device was asked to do; a page it opened is where it went.
   const acted = /^(browser|device)$/.test(name);
   if (acted && str(input, "url")) return { kind: "web", target: str(input, "url") };
-  const list = fields(acted ? Object.fromEntries(Object.entries(input).filter(([key]) => key !== "action")) : input);
+  const said = SAID[ownToolName(block.name) ?? ""] ?? (acted ? "action" : null);
+  const list = fields(said ? Object.fromEntries(Object.entries(input).filter(([key]) => key !== said)) : input);
   return list.length ? { kind: "fields", fields: list } : { kind: "none" };
 }
+
+/** The field a tool's answer shows again, so it is not listed twice: a diff is headed by the file it was asked for. */
+const SAID: Record<string, string | undefined> = { pull_request_diff: "path" };
 
 function readView(name: string, input: Input): InputView | null {
   if (!/^(read|read_file|view|notebookread)$/i.test(name)) return null;
@@ -428,5 +433,7 @@ export function toolOutputView(block: ToolBlock, raw: string): OutputView | null
   if (paths) return { kind: "files", paths };
   if (/^(task|agent)$/i.test(name)) return { kind: "markdown", text, fetched: false };
   if (/^(webfetch|fetch)$/i.test(name)) return { kind: "markdown", text, fetched: true };
+  // Any tool may answer with a diff, as OpenOrc's own does for a pull request's changes.
+  if (opensAsDiff(text)) return { kind: "diff", patch: text };
   return json(text) ?? { kind: "text", text };
 }

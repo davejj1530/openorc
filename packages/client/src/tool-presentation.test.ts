@@ -29,6 +29,8 @@ describe("OpenOrc's own tools", () => {
       object: "One question about the server half.",
     });
     expect(toolCallPresentation("openorc.thread_list", {})).toMatchObject({ verb: "Listed threads", object: "" });
+    expect(toolCallPresentation("openorc.pull_request_diff", { path: "packages/core/src/mcp-host/core-tools.ts" })).toMatchObject({ verb: "Read the changes to", object: "core-tools.ts" });
+    expect(toolCallPresentation("openorc.pull_request_diff", {})).toMatchObject({ verb: "Read the pull request's changes", object: "" });
     expect(toolCallPresentation("openorc.thread_read", { id: "t1" })).toMatchObject({ verb: "Read thread" });
     expect(toolCallPresentation("openorc.thread_start", { prompt: "Draw the icons", title: "Icons" })).toMatchObject({ verb: "Started thread", object: "Icons" });
     expect(toolCallPresentation("ExitPlanMode", {})).toMatchObject({ verb: "Proposed a plan" });

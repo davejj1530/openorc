@@ -33,6 +33,12 @@ const namedTools: [RegExp, (str: (key: string) => string, input: unknown) => Too
     /thread_send$|send_message$|team_say$/,
     (str) => ({ icon: "WorkMessage", verb: "Sent message", object: str("target") || str("recipient") || firstLine(str("text") || str("message")), tone: "neutral" }),
   ],
+  [/pull_request_diff$/, (str) => ({ icon: "WorkRead", verb: str("path") ? "Read the changes to" : "Read the pull request's changes", object: fileName(str("path")), tone: "read" })],
+  [/pull_request_comment$/, (str) => ({ icon: "WorkMessage", verb: "Commented on", object: fileName(str("path")), tone: "neutral" })],
+  [/pull_request_draft$/, () => ({ icon: "WorkRead", verb: "Read the draft review", object: "", tone: "read" })],
+  [/pull_request_edit_comment$/, () => ({ icon: "WorkMessage", verb: "Changed a draft comment", object: "", tone: "neutral" })],
+  [/pull_request_delete_comment$/, () => ({ icon: "WorkMessage", verb: "Removed a draft comment", object: "", tone: "neutral" })],
+  [/pull_request_summary$/, () => ({ icon: "WorkMessage", verb: "Wrote the review's summary", object: "", tone: "neutral" })],
   [/thread_list$/, () => ({ icon: "WorkMessage", verb: "Listed threads", object: "", tone: "neutral" })],
   [/thread_read$/, () => ({ icon: "WorkMessage", verb: "Read thread", object: "", tone: "neutral" })],
   [/thread_start$/, (str) => ({ icon: "WorkDelegate", verb: "Started thread", object: str("title") || firstLine(str("prompt")), tone: "task" })],
@@ -55,6 +61,9 @@ const namedTools: [RegExp, (str: (key: string) => string, input: unknown) => Too
   [/^toolsearch$/i, (str) => ({ icon: "Search", verb: "Looked up tools", object: lookedUpTools(str("query")), tone: "neutral" })],
   [/^skill$/i, (str) => ({ icon: "FileText", verb: "Used skill", object: str("skill"), tone: "context" })],
 ];
+
+/** A file by its name alone, as a line has room for. */
+const fileName = (path: string): string => path.split(/[\\/]/).at(-1) ?? path;
 
 /** A message's first line, short enough for a row. */
 function firstLine(text: string): string {

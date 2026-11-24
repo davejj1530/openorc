@@ -25,8 +25,8 @@ const startThread = (projectId: string) => {
 
 /**
  * One project's part of the thread list: its mark and name as a quiet label that folds the group, with how many of its threads
- * wait on the person and, on hover or focus, the project's actions and New thread there; then its rows, and "Show N more"
- * while some are past the page. A right click on the label gives the same actions.
+ * wait on the person and, on hover or focus, the project's actions and New thread there; then its rows, "Show N more"
+ * while some are past the page, and its Resolved. A right click on the label gives the same actions.
  */
 export function SidebarProjectGroup({
   project,
@@ -35,6 +35,7 @@ export function SidebarProjectGroup({
   hidden,
   onToggle,
   onShowMore,
+  resolved,
   children,
 }: {
   project: GroupProject;
@@ -44,6 +45,8 @@ export function SidebarProjectGroup({
   hidden: number;
   onToggle: () => void;
   onShowMore: () => void;
+  /** Its Resolved, under the rows. */
+  resolved: ReactNode;
   children: ReactNode;
 }) {
   const [animate, setAnimate] = useState(false);
@@ -91,6 +94,7 @@ export function SidebarProjectGroup({
             Show {hidden} more
           </button>
         ) : null}
+        {resolved}
       </div>
       {actions.dialogs}
     </section>

@@ -1,35 +1,29 @@
-/* Resolved sits at the list's foot, right above the dock, as a 28px door: "Resolved" and a chevron
-   after it, with no count. Open, it rises over the list to its rows' height, up to most of the
-   column, and scrolls on its own; its rows arrive a step apart, and fold away with it. While a
-   thread it would take is dragged, the row grows and draws a dashed ring, with a check in place of
-   the chevron; held over it, the ring turns solid on the current row's fill. */
-.resolved-drawer {
-  --resolved-head: 28px;
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  height: min(calc(var(--resolved-head) + 8px + var(--resolved-rows, 0px)), 62%);
-  padding: 4px 8px;
-  transition: height var(--duration-resize) var(--ease-out);
+/* Resolved is the last part of an open project's rows: the word and a chevron on the day labels' line, in their
+   ink and size, with the same hairline to the rows' end. It stays folded until opened; its rows then arrive a step
+   apart. While a thread of the project is dragged, the label draws a dashed ring with a check in place of the
+   chevron; held over it, the ring turns solid on the current row's fill. */
+.project-resolved {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
 }
-.resolved-drawer[data-inviting] {
-  --resolved-head: 44px;
+.project-resolved:not(:first-child) {
+  margin-top: 8px;
 }
 .resolved-toggle {
   display: flex;
-  flex: none;
   align-items: center;
   gap: 4px;
-  height: var(--resolved-head);
+  height: 24px;
   padding: 0 8px;
   border-radius: var(--radius-md);
   outline: 1px dashed transparent;
   outline-offset: -1px;
-  font-size: var(--text-sm);
-  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
   text-align: left;
   transition:
-    height var(--duration-resize) var(--ease-out),
     color var(--duration-quick) var(--ease-out),
     background-color var(--duration-quick) var(--ease-out),
     outline-color var(--duration-quick) var(--ease-out);
@@ -37,11 +31,17 @@
 .resolved-toggle:hover {
   color: var(--ink);
 }
+.resolved-toggle::after {
+  content: "";
+  flex: 1;
+  margin-left: 4px;
+  border-top: var(--hairline) solid var(--line);
+  transition: opacity var(--duration-quick) var(--ease-out);
+}
 /* The chevron starts where a project's does, 4px after the word; the check that takes its place shares the start. */
 .resolved-mark {
   display: grid;
   place-items: center start;
-  margin-right: auto;
 }
 .resolved-mark > * {
   grid-area: 1 / 1;
@@ -51,7 +51,7 @@
     transform var(--duration-resize) var(--ease-out),
     opacity var(--duration-quick) var(--ease-out);
 }
-.resolved-chevron[data-open] {
+.project-resolved[data-open] .resolved-chevron {
   transform: rotate(90deg);
 }
 .resolved-check {
@@ -62,39 +62,30 @@
     scale var(--duration-confirm) var(--ease-overshoot),
     color var(--duration-quick) var(--ease-out);
 }
-.resolved-drawer[data-inviting] .resolved-toggle {
+.project-resolved[data-inviting] .resolved-toggle {
   outline-color: var(--line-strong);
   color: var(--ink-3);
 }
-.resolved-drawer[data-inviting] .resolved-chevron {
+.project-resolved[data-inviting] .resolved-toggle::after,
+.project-resolved[data-inviting] .resolved-chevron {
   opacity: 0;
 }
-.resolved-drawer[data-inviting] .resolved-check {
+.project-resolved[data-inviting] .resolved-check {
   opacity: 1;
   scale: 1;
 }
-.resolved-drawer[data-drop] .resolved-toggle {
+.project-resolved[data-drop] .resolved-toggle {
   outline-style: solid;
   outline-color: var(--accent);
   background-color: var(--current-row-fill);
   color: var(--ink);
 }
-.resolved-drawer[data-drop] .resolved-check {
+.project-resolved[data-drop] .resolved-check {
   color: var(--accent-ink);
 }
-.resolved-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  opacity: 0;
-  transition: opacity var(--duration-leave) var(--ease-out);
-}
-.resolved-drawer[data-open] .resolved-body {
-  opacity: 1;
-  transition-duration: var(--duration-arrive);
-}
-.resolved-list {
-  padding-top: 2px;
+/* Why it lists nothing lines up with the titles its rows would have. */
+.resolved-list > .browser-empty {
+  padding-left: 8px;
 }
 .resolved-list.motion-stagger > * {
   animation: resolved-row-arrive var(--duration-arrive) var(--ease-out) var(--motion-delay, 0ms) both;

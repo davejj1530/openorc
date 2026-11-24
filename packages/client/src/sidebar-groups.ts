@@ -10,11 +10,11 @@ export const WORKSPACES_FOLD = "workspaces-closed";
 const GROUPED_FOLDS: ReadonlySet<string> = new Set([sidebarFoldKey.pinned(SIDEBAR_LIST), sidebarFoldKey.snoozed(SIDEBAR_LIST), sidebarFoldKey.resolved(SIDEBAR_LIST), WORKSPACES_FOLD]);
 
 /**
- * Whether a saved fold names a part of the list grouped by project: a sub thread tree, a project's group, Pinned,
- * Snoozed, Resolved, or the whole of Workspaces.
+ * Whether a saved fold names a part of the list grouped by project: a sub thread tree, a project's group or its
+ * Resolved, Pinned, Snoozed, or the whole of Workspaces.
  */
 export function liveGroupedFold(key: string): boolean {
-  return /^(thread-(open|closed)|project):/.test(key) || GROUPED_FOLDS.has(key);
+  return /^(thread-(open|closed)|project|resolved-open):/.test(key) || GROUPED_FOLDS.has(key);
 }
 
 /**

@@ -626,7 +626,7 @@ it("keeps a project's waiting threads in its count past the loaded pages", async
   expect(useUi.getState().threadOrder).toEqual([]);
 });
 
-it("lists every thread from the last day and yesterday in its project, and the older ones in Resolved", async () => {
+it("lists every thread from the last day and yesterday in its project, and the older ones in its Resolved", async () => {
   dayThreads();
   mountSidebar();
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["recent", "yesterday"]));
@@ -648,7 +648,7 @@ it("keeps the open thread in view inside a folded Resolved without unfolding it"
 it("leads with pinned threads however long ago they last worked", async () => {
   dayThreads();
   fixture.threads[3]!.pinnedAt = 1;
-  useLayout.setState({ collapsed: ["resolved-open:threads"] });
+  useLayout.setState({ collapsed: ["resolved-open:one"] });
   mountSidebar();
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["older", "recent", "yesterday", "week"]));
   expect(section("Pinned")).toBe("true");
@@ -685,7 +685,7 @@ it("ends the title line with what the thread needs or is doing", async () => {
   expect(asking.querySelector(".thread-fact-slot[data-fact=state] [aria-label='Needs you']")).not.toBeNull();
 });
 
-it("reads on by itself until every group is whole, then pages Resolved when asked", async () => {
+it("reads on by itself until every group is whole, then pages a project's Resolved when asked", async () => {
   projectThreads();
   const base = fixture.threads[1]!;
   fixture.threads = [
@@ -700,20 +700,23 @@ it("reads on by itself until every group is whole, then pages Resolved when aske
     ...Array.from({ length: 30 }, (_, index) => ({ ...base, id: `old-${index}`, title: `Old ${index}`, lastActivityAt: ago(30) - index * 1000 })),
   ];
   const shown = (project: number) => Array.from({ length: 15 }, (_, index) => `today-${index}`).filter((_, index) => index % 2 === project);
-  const today = [...shown(1).slice(0, 4), ...shown(0).slice(0, 4)];
-  const old = (count: number) => Array.from({ length: count }, (_, index) => `old-${index}`);
+  const [first, second] = [shown(1).slice(0, 4), shown(0).slice(0, 4)];
+  const today = [...first, ...second];
+  // The old threads are the first project's, so they list in its Resolved, before the second project's rows.
+  const withOld = (count: number) => [...first, ...Array.from({ length: count }, (_, index) => `old-${index}`), ...second];
   mountSidebar();
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(today));
   expect(within(group("First project")).getByRole("button", { name: "Show 3 more" })).toBeTruthy();
   expect(within(group("Second project")).getByRole("button", { name: "Show 4 more" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Load more threads" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Resolved" }));
-  await waitFor(() => expect(useUi.getState().threadOrder).toEqual([...today, ...old(9)]));
-  fireEvent.click(await screen.findByRole("button", { name: "Load more threads" }));
-  await waitFor(() => expect(useUi.getState().threadOrder).toEqual([...today, ...old(21)]));
-  fireEvent.click(await screen.findByRole("button", { name: "Load more threads" }));
-  await waitFor(() => expect(useUi.getState().threadOrder).toEqual([...today, ...old(30)]));
+  fireEvent.click(within(group("First project")).getByRole("button", { name: "Resolved" }));
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(withOld(5)));
+  for (const count of [17, 29, 30]) {
+    fireEvent.click(await screen.findByRole("button", { name: "Load more threads" }));
+    await waitFor(() => expect(useUi.getState().threadOrder).toEqual(withOld(count)));
+  }
   expect(screen.queryByRole("button", { name: "Load more threads" })).toBeNull();
+  expect(within(group("Second project")).queryByRole("button", { name: /Old/ })).toBeNull();
 });
 
 it("keeps the pinned filter, and lists resolved threads in Resolved rather than a filter", async () => {
@@ -738,8 +741,8 @@ it("keeps the pinned filter, and lists resolved threads in Resolved rather than 
   fireEvent.click(await screen.findByRole("menuitem", { name: "All threads" }));
   await screen.findByRole("button", { name: /New 13/ });
   expect(screen.queryByRole("button", { name: /Archived notes/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Resolved" }));
-  await screen.findByRole("button", { name: /Archived notes/ });
+  fireEvent.click(within(group("First project")).getByRole("button", { name: "Resolved" }));
+  await within(group("First project")).findByRole("button", { name: /Archived notes/ });
   expect(useUi.getState().threadOrder.at(-1)).toBe("archived");
 });
 
@@ -796,9 +799,9 @@ function dragData() {
   };
 }
 
-it("resolves a thread dropped on Resolved and reopens a resolved one dropped on the list", async () => {
+it("resolves a thread dropped on its project's Resolved and reopens a resolved one dropped on the list", async () => {
   dayThreads();
-  useLayout.setState({ collapsed: ["resolved-open:threads"] });
+  useLayout.setState({ collapsed: ["resolved-open:one"] });
   mountSidebar();
   const toggle = await screen.findByRole("button", { name: "Resolved" });
   expect(toggle.textContent).toBe("Resolved");

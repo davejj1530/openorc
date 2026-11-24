@@ -48,6 +48,7 @@ export type ThreadMarkKind =
   | "question"
   | "approval"
   | "mention"
+  | "resting"
   | "waiting"
   | "done"
   | "failed"
@@ -170,6 +171,8 @@ const PATTERNS: Record<ThreadMarkKind, Pattern> = {
   approval: { tone: "attention", period: 1600, light: (point, at) => [0.55 + 0.45 * Math.sin(TAU * at), 0.05, 1][point.ring]! },
   // The heart of the cube alone: someone named you.
   mention: still("attention", (point) => (point.ring < 2 ? 1 : 0.05)),
+  // The heart of the cube in grey: nothing to say, but its sub threads show, and their tree hangs from it.
+  resting: still("quiet", (point) => (point.ring < 2 ? 1 : 0.05)),
   // The top lit and still, in grey: it waits on someone else.
   waiting: still("quiet", (point) => lit(point, { top: 0.9, right: REST, left: REST })),
   // The whole cube, with a sheen passing over it now and then.

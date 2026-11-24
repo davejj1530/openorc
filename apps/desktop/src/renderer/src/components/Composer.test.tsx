@@ -453,15 +453,14 @@ describe("the send cluster", () => {
     fireEvent.click(ink());
     expect(onStop).toHaveBeenCalledOnce();
     type(screen.getByRole("textbox", { name: "Message" }), "A correction");
-    expect(ink().getAttribute("aria-label")).toBe("Send now");
-    expect(ink().textContent).toBe("Send now");
-    expect(screen.getByRole("button", { name: "Queue" }).classList.contains("composer-send-other")).toBe(true);
+    expect([ink().getAttribute("aria-label"), ink().getAttribute("data-state"), ink().textContent]).toEqual(["Send now", "send", ""]);
+    expect(screen.getByRole("button", { name: "Queue" }).classList.contains("composer-way")).toBe(true);
     expect(screen.getByRole("button", { name: "Stop" }).classList.contains("composer-stop")).toBe(true);
     type(screen.getByRole("textbox", { name: "Message" }), "  \n ");
     expect(ink().getAttribute("aria-label")).toBe("Stop");
   });
 
-  it("sends into the turn from the pill and with Enter, and queues from the quiet word and with Command and Enter", async () => {
+  it("sends into the turn from the ink button and with Enter, and queues from the key beside it and with Command and Enter", async () => {
     const onSubmit = vi.fn(async () => {});
     mount({ queueing: true, liveByDefault: true, steerable: true, onSubmit });
     fireEvent.click(ink());
@@ -472,10 +471,10 @@ describe("the send cluster", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenLastCalledWith("say something", [], false));
   });
 
-  it("puts Queue on the pill when the person queues by default, with Send now beside it", async () => {
+  it("puts the queue's pile on the ink button when the person queues by default, with Send now beside it", async () => {
     const onSubmit = vi.fn(async () => {});
     mount({ queueing: true, liveByDefault: false, steerable: true, onSubmit });
-    expect(ink().getAttribute("aria-label")).toBe("Queue");
+    expect([ink().getAttribute("aria-label"), ink().getAttribute("data-state")]).toEqual(["Queue", "queue"]);
     fireEvent.click(screen.getByRole("button", { name: "Send now" }));
     await waitFor(() => expect(onSubmit).toHaveBeenLastCalledWith("say something", [], true));
   });
@@ -501,13 +500,13 @@ describe("the send cluster", () => {
     expect(ink().textContent).toBe("");
   });
 
-  it("says why a send cannot go only on the dimmed send, and names the bare arrow otherwise", () => {
+  it("says why a send cannot go only on the dimmed send, and names each key otherwise", () => {
     mount({ disabledReason: "Sign in to OpenOrc Cloud to start a turn." });
     expect(ink().getAttribute("data-tip")).toBe("Sign in to OpenOrc Cloud to start a turn.");
     cleanup();
     mount({ queueing: true, liveByDefault: true, steerable: true });
-    expect(ink().getAttribute("data-tip")).toBeNull();
-    expect(screen.getByRole("button", { name: "Queue" }).getAttribute("data-tip")).toBeNull();
+    expect(ink().getAttribute("data-tip")).toBe("Send now");
+    expect(screen.getByRole("button", { name: "Queue" }).getAttribute("data-tip")).toBe("Queue");
   });
 
   it.each([false, true])("keeps a blocked draft editable and takes no send by mouse or keyboard while queueing=%s", async (queueing) => {

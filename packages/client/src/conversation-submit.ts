@@ -132,8 +132,8 @@ const TURN_TAKES_NOTHING = "This turn can’t take a message now.";
 /**
  * The composer's send cluster, so what it draws and what Enter does never disagree. With nothing typed while something
  * runs, one ink Stop. With nothing running, the bare arrow, which only ever sends (or, for a task's empty first send,
- * names that it starts the task). While a turn runs and something is typed, the ink pill carries the word of what Enter
- * does and a quiet word beside it is the other way; Stop steps aside as a white key. While an ask waits on the person
+ * names that it starts the task). While a turn runs and something is typed, the ink button carries the glyph of what Enter
+ * does and a white key beside it is the other way; Stop steps aside as a white key too. While an ask waits on the person
  * the ink is the ask's: with nothing typed Stop stands alone as a white key, and a message typed meanwhile queues, with
  * Send now dimmed for the ask's reason. A draft that tags a person is a note, which posts to the thread and never reaches
  * the agent: the pill says Post note through every state, with Stop beside it while something runs.

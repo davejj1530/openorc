@@ -40,7 +40,7 @@ it("dims Queue with the reader's own refusal while Send now still joins", () => 
   expect(screen.getByRole("button", { name: "Send now" }).hasAttribute("disabled")).toBe(false);
 });
 
-it("says Send uses the reader's own sign-in and hours with nothing running, and keeps today's words without a payer", () => {
+it("says Send uses the reader's own sign-in and hours with nothing running, and names each key without a payer", () => {
   const { rerender } = render(
     <ComposerSendCluster
       cluster={{ kind: "send", stop: false, startsTask: false }}
@@ -58,7 +58,7 @@ it("says Send uses the reader's own sign-in and hours with nothing running, and 
   rerender(
     <ComposerSendCluster cluster={{ kind: "turn", stop: true, enter: "now", other: { way: "queue", blocked: null } }} canSend block={null} stopping={false} onSend={vi.fn()} onStop={vi.fn()} />,
   );
-  expect(screen.getByRole("button", { name: "Queue" }).getAttribute("data-tip")).toBeNull();
+  expect(screen.getByRole("button", { name: "Queue" }).getAttribute("data-tip")).toBe("Queue");
   expect(screen.getByRole("button", { name: "Stop" }).getAttribute("data-tip")).toBe("Stop");
 });
 

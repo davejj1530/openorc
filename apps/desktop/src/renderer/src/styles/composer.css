@@ -606,7 +606,7 @@
   display: flex;
 }
 
-/* The send cluster: the column's one ink pill, and beside it mid-turn a white Stop and the other way as a quiet word. */
+/* The send cluster: the column's one ink button, and beside it mid-turn Stop and the other way as white keys its size. */
 .composer-send-cluster {
   display: flex;
   align-items: center;
@@ -622,8 +622,8 @@
     transform: scale(0.6);
   }
 }
-/* One button through every state: the bare arrow, the one Stop, and a pill whose words fold in and out beside the
-   arrow, so a turn starting or ending swaps it in place. */
+/* One button through every state: the bare arrow, the one Stop, the glyph of what Enter does mid-turn, and a pill
+   whose words fold in and out beside the arrow, so a turn starting or ending swaps it in place. */
 .composer-send {
   display: inline-flex;
   align-items: center;
@@ -646,8 +646,8 @@
 .composer-send[data-words] {
   padding-inline: 14px 8px;
 }
-/* Ready to send, the arrow is lit where the palette lights it. */
-.composer-send[data-state="send"]:not(:disabled) {
+/* Ready to send, the button is lit where the palette lights it. */
+.composer-send:not([data-state="stop"], :disabled) {
   box-shadow: var(--lit-strong);
 }
 .composer-send:hover:not(:disabled) {
@@ -697,6 +697,7 @@
     transform var(--duration-confirm) var(--ease-overshoot);
 }
 .composer-send[data-state="send"] > .composer-send-glyph > [data-layer="send"],
+.composer-send[data-state="queue"] > .composer-send-glyph > [data-layer="queue"],
 .composer-send[data-state="stop"] > .composer-send-glyph > [data-layer="stop"] {
   opacity: 1;
   transform: none;
@@ -707,8 +708,10 @@
   border-radius: 2px;
   background: currentColor;
 }
-/* Stop beside the words: a white key, as round as the pill is tall. */
-.composer-stop {
+/* Stop and the other way beside the ink button: white keys its own size. Dimmed, a key keeps the pointer so its
+   reason can open. */
+.composer-stop,
+.composer-way {
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -718,32 +721,10 @@
   background-color: var(--control-fill);
   color: var(--ink);
 }
-.composer-stop:hover:not(:disabled) {
+:is(.composer-stop, .composer-way):hover:not(:disabled) {
   background-image: linear-gradient(var(--surface-2), var(--surface-2));
 }
-.composer-stop:disabled {
-  color: var(--ink-4);
-}
-/* The other way, a quiet word; dimmed, it keeps the pointer so its reason can open. */
-.composer-send-other {
-  flex-shrink: 0;
-  height: var(--control-sm);
-  padding: 0 10px;
-  border-radius: var(--radius-pill);
-  color: var(--ink-2);
-  font-size: var(--text-md);
-  line-height: 20px;
-  letter-spacing: var(--text-md--letter-spacing);
-  white-space: nowrap;
-  transition:
-    background-color var(--duration-quick) var(--ease-out),
-    color var(--duration-quick) var(--ease-out);
-}
-.composer-send-other:hover:not(:disabled) {
-  background-color: var(--surface-2);
-  color: var(--ink);
-}
-.composer-send-other:disabled {
+:is(.composer-stop, .composer-way):disabled {
   color: var(--ink-4);
 }
 

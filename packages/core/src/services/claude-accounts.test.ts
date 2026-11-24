@@ -104,6 +104,25 @@ it("links the CLI login's personal skills into a signed-in added account and dro
   expect(service.environment(snapshot, "claude-cli").env[SHARED_CLAUDE_CONFIG_DIR]).toBeUndefined();
 });
 
+it("runs a signed-in added account with the CLI login's settings, instructions and plugins, keeping what the account has of its own", async () => {
+  const original = path.join(root, "original");
+  await mkdir(path.join(original, "commands"), { recursive: true });
+  await writeFile(path.join(original, "settings.json"), '{"attribution":{"commit":""}}');
+  await writeFile(path.join(original, "CLAUDE.md"), "Mine.");
+  const account = service.add("Work");
+  const directory = path.join(root, "claude-accounts", account.id);
+  await mkdir(directory, { recursive: true });
+  await writeFile(path.join(directory, "CLAUDE.md"), "The account's own.");
+  const { env } = service.environment(snapshot, account.id);
+  expect(await readFile(path.join(directory, "settings.json"), "utf8")).toBe('{"attribution":{"commit":""}}');
+  expect(await readlink(path.join(directory, "commands"))).toBe(path.join(original, "commands"));
+  expect(await readFile(path.join(directory, "CLAUDE.md"), "utf8")).toBe("The account's own.");
+  // The CLI login has no subagents, so the account gets no link to nothing.
+  await expect(lstat(path.join(directory, "agents"))).rejects.toThrow();
+  expect(env.CLAUDE_CODE_PLUGIN_CACHE_DIR).toBe(path.join(original, "plugins"));
+  expect(service.environment(snapshot, "claude-cli").env.CLAUDE_CODE_PLUGIN_CACHE_DIR).toBeUndefined();
+});
+
 it("keeps an added account's memory with the CLI login's and moves in what the account saved alone", async () => {
   const account = service.add("Work");
   const original = path.join(root, "original");

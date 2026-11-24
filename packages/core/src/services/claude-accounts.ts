@@ -1,5 +1,5 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, readlinkSync, renameSync, rmdirSync, symlinkSync, unlinkSync, writeFileSync, type Dirent } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, readlinkSync, renameSync, rmdirSync, statSync, symlinkSync, unlinkSync, writeFileSync, type Dirent } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -35,6 +35,9 @@ const CLI_LOGIN_PRIVATE = [
   "daemon.log",
   "backups",
 ];
+
+/** How one folder is linked to another: Windows links folders without elevation only as junctions. */
+const FOLDER_LINK = process.platform === "win32" ? "junction" : "dir";
 
 /**
  * An added account uses the personal skills installed for the existing CLI login: each is linked into the
@@ -75,9 +78,29 @@ function linkSharedSkills(shared: string, account: string): void {
   for (const name of installed) {
     if (existing.has(name)) continue;
     try {
-      symlinkSync(path.join(from, name), path.join(to, name), process.platform === "win32" ? "junction" : "dir");
+      symlinkSync(path.join(from, name), path.join(to, name), FOLDER_LINK);
     } catch {
       // That one skill stays out of this account; the rest still link.
+    }
+  }
+}
+
+/** The existing CLI login's settings, with their hooks and permissions, and its instructions, commands, subagents and output styles. */
+const CLI_LOGIN_SETUP = ["settings.json", "CLAUDE.md", "rules", "commands", "agents", "output-styles"];
+
+/**
+ * An added account runs with the existing CLI login's setup: each part is linked into the account's folder, where Claude
+ * Code reads and writes it as the account's own. A part the account already has stays its own.
+ */
+function linkSharedSetup(shared: string, account: string): void {
+  // As for skills: sign-in makes the folder, in its private mode.
+  if (!existsSync(account)) return;
+  for (const name of CLI_LOGIN_SETUP) {
+    const from = path.join(shared, name);
+    try {
+      symlinkSync(from, path.join(account, name), statSync(from).isDirectory() ? FOLDER_LINK : "file");
+    } catch {
+      // The CLI login has none, or the account has its own.
     }
   }
 }
@@ -172,6 +195,9 @@ export class ClaudeAccountService {
       env["CLAUDE_CONFIG_DIR"] = this.directory(account);
       env[SHARED_CLAUDE_CONFIG_DIR] = shared;
       linkSharedSkills(shared, env["CLAUDE_CONFIG_DIR"]);
+      linkSharedSetup(shared, env["CLAUDE_CONFIG_DIR"]);
+      // The linked settings turn the CLI login's plugins on; Claude Code finds them installed here instead of installing each again.
+      env["CLAUDE_CODE_PLUGIN_CACHE_DIR"] ??= path.join(shared, "plugins");
       // Kept separate, each account keeps its memories in its own folder, as Claude Code does by default.
       if (!accountsSeparate(this.db)) {
         // Every account's auto-memory lives here, in folders named as the CLI login's. autoMemoryDirectory would need

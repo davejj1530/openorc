@@ -61,6 +61,12 @@ const QUIET_ENDS = new Set(["aborted", "no-speech", "speech-timeout"]);
 const REFUSALS = new Set(["not-allowed"]);
 const UNAVAILABLE = new Set(["service-not-allowed", "language-not-supported"]);
 
+/** What a recognizer's failure tells the person: the microphone refused, no model on the device, or a recording broken off. */
+function failureOf(code: string): DictationNoticeKind {
+  if (REFUSALS.has(code)) return "microphone";
+  return UNAVAILABLE.has(code) ? "unavailable" : "stopped";
+}
+
 export interface Dictation {
   store: StoreApi<DictationState>;
   /** Starts `owner`'s recording into the draft `speak` opens. Another owner's recording is cancelled first. */
@@ -130,7 +136,7 @@ export function createDictation(recognizer: Recognizer, now: () => number = Date
         },
         error: (code) => {
           if (QUIET_ENDS.has(code)) return;
-          failure = REFUSALS.has(code) ? "microphone" : UNAVAILABLE.has(code) ? "unavailable" : "stopped";
+          failure = failureOf(code);
         },
         // What was heard before a recording broke off stays; a recording that never began has nothing to keep.
         end: () => close(mine, true, failure),

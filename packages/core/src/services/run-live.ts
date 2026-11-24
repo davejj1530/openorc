@@ -175,7 +175,13 @@ export class RunLive {
     const cwd = canonicalDirectory(lease);
     // Each conversation's folder as its runs launch: a thread through executionProject, a task with the raw project row.
     const checkout = projects.get(this.deps.db, project.id) ?? project;
-    const here = (dir: string) => canonicalDirectory(dir) === cwd;
+    // Most conversations of a project share its folder: each distinct folder is resolved once.
+    const resolved = new Map<string, string>();
+    const here = (dir: string) => {
+      const known = resolved.get(dir) ?? canonicalDirectory(dir);
+      resolved.set(dir, known);
+      return known === cwd;
+    };
     const threadKeys = threads
       .list(this.deps.db, { projectId: project.id, filter: "active" })
       .flatMap((thread) => (here(executionFolder({ thread, task: null }, executionProject(this.deps.db, thread))) ? [`threaddiff:${thread.id}`] : []));

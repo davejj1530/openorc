@@ -1,5 +1,5 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
-import { workObjects, workTimeline, type Block, type Timeline, type TimelineLane, type TimelineStep, type WorkEntry, objectVerb } from "@openorc/client";
+import { workObjects, workTimeline, type ActLine, type Block, type Timeline, type TimelineLane, type TimelineStep, type WorkEntry, objectVerb } from "@openorc/client";
 import { FileGlyph } from "./FileGlyph";
 import { ActRow } from "./WorkActs";
 import type { RenderBlocks } from "./WorkMarks";
@@ -96,11 +96,14 @@ export function WorkTimeline({ entries, turn, live, renderBlocks }: { entries: W
   const clip = useId();
   const { steps, lanes } = timeline;
   const last = steps.length - 1;
-  const view = Math.min(hovered ?? pinned ?? last, last);
+  // Where the reading rests: the step kept, or else where the turn has got to.
+  const rest = Math.min(pinned ?? last, last);
+  const view = Math.min(hovered ?? rest, last);
   const step = steps[view];
+  const resting = steps[rest];
   const shape = shapeOf(timeline, width, live);
   const height = ROW * (lanes.length + 1);
-  if (!step) return <div ref={ref} className="work-timeline" />;
+  if (!step || !resting) return <div ref={ref} className="work-timeline" />;
   const at = (event: MouseEvent) => Math.max(0, Math.min(last, Math.round((event.clientX - event.currentTarget.getBoundingClientRect().left - LEFT) / (shape.x(1) - shape.x(0))) - 1));
   const onKey = (event: KeyboardEvent) => {
     const move = STEPS[event.key] ?? 0;
@@ -155,19 +158,29 @@ export function WorkTimeline({ entries, turn, live, renderBlocks }: { entries: W
         <Names lanes={lanes} shape={shape} current={step.lane} onPick={setPinned} />
       </div>
       <div className="tl-now">
-        <ol className="work-acts">
+        <ol className="work-acts" data-covered={view !== rest || undefined}>
           <ActRow
-            key={step.id}
-            line={{ object: step.object, times: 1, group: [] }}
-            open={pinned === view || (live && view === last)}
-            current={live && view === last}
-            onToggle={() => setPinned((kept) => (kept === view ? null : view))}
+            key={resting.id}
+            line={lineOf(resting)}
+            open={pinned === rest || (live && rest === last)}
+            current={live && rest === last}
+            onToggle={() => setPinned((kept) => (kept === rest ? null : rest))}
             renderBlocks={renderBlocks}
           />
         </ol>
+        {view === rest ? null : (
+          <ol className="work-acts">
+            <ActRow key={step.id} line={lineOf(step)} open={false} current={false} onToggle={() => setPinned(view)} renderBlocks={renderBlocks} />
+          </ol>
+        )}
       </div>
     </div>
   );
+}
+
+/** A step as the one line it reads back as. */
+function lineOf(step: TimelineStep): ActLine {
+  return { object: step.object, times: 1, group: [] };
 }
 
 /** Each lane's name; pressing one goes to the file's last step. */

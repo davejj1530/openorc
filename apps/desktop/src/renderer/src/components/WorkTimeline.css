@@ -141,7 +141,16 @@
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
-/* The step being read, as the line a step draws for it. */
+/* The step being read, as the line a step draws for it. A step read back under the pointer lies over the one the
+   reading rests on, which keeps its room: the graph must not move while the pointer is on it. */
 .tl-now {
+  display: grid;
   min-width: 0;
+}
+.tl-now > .work-acts {
+  grid-area: 1 / 1;
+  align-self: start;
+}
+.tl-now > [data-covered] {
+  visibility: hidden;
 }

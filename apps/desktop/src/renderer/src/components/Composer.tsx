@@ -40,6 +40,7 @@ import { ComposerChoice } from "./ComposerChoice";
 import { ComposerReadOnly } from "./composer-read-only";
 import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
 import { ComposerCommitChip } from "./ComposerCommitChip";
+import { ComposerDictation, useComposerDictation } from "./ComposerDictation";
 import { ComposerAddMenu, type AddOffers } from "./ComposerAddMenu";
 import { ComposerAsk } from "./ComposerAsk";
 import { ComposerInput, type ComposerLists } from "./ComposerInput";
@@ -265,6 +266,7 @@ export function Composer(props: ComposerProps) {
   const addFiles = (chosen: File[]) => (props.readOnlyReason ? Promise.resolve() : files.addFiles(chosen));
   const { value, onChange } = props;
   const editor = useRef<ComposerEditorHandle>(null);
+  const dictation = useComposerDictation(editor, shell, props.draftKey);
   const appendFiles = files.append;
   const quoted = useComposerQuotes(props.draftKey);
   const note = useDraftNote(props.notes, props.draftKey, value, attachments.length + uploading + quoted.quotes.length);
@@ -314,8 +316,7 @@ export function Composer(props: ComposerProps) {
   }, [submission, value, onChange, acknowledge]);
   const drop = useComposerDrop((dropped) => void addFiles(dropped), props.fileSearch);
   const attachmentBlock = files.pendingReason ?? (attachments.length > 0 ? files.blocked : null);
-  // A note goes where the server lets the reader post notes (`notes`), whatever holds their messages.
-  const canSend = note.isNote ? Boolean(note.post) && !submitting : messageSends(props, { attachments: attachments.length, quotes: quoted.quotes.length, uploading, submitting, attachmentBlock });
+  const canSend = draftSends(props, note, Boolean(dictation.block), { attachments: attachments.length, quotes: quoted.quotes.length, uploading, submitting, attachmentBlock });
 
   const canStop = turnStops(props);
   const asks = props.asks ?? [];
@@ -385,8 +386,8 @@ export function Composer(props: ComposerProps) {
             onFiles={addFiles}
             onReady={props.readOnlyReason || note.isNote ? undefined : readyForMessages(props.onReady, Boolean(props.notes))}
             draftKey={props.draftKey}
-            disabled={Boolean(props.busy || submitting)}
-            placeholder={props.placeholder}
+            disabled={Boolean(props.busy || submitting || dictation.block)}
+            placeholder={dictation.block ? "Listening…" : props.placeholder}
             autoFocus={props.autoFocus}
             fileSearch={props.fileSearch}
             mentions={props.mentions}
@@ -430,10 +431,11 @@ export function Composer(props: ComposerProps) {
             ) : null}
             {isNewThread ? null : <ComposerCommitChip changes={props.changes} />}
             <ComposerContext {...props} />
+            {props.presentation === "small" ? null : <ComposerDictation dictation={dictation} />}
             <ComposerSendCluster
               cluster={cluster}
               canSend={canSend}
-              block={note.isNote ? note.block : composerSendBlock({ disabledReason: props.readOnlyReason ?? props.disabledReason, attachmentBlock })}
+              block={note.isNote ? note.block : composerSendBlock({ disabledReason: props.readOnlyReason ?? props.disabledReason ?? dictation.block, attachmentBlock })}
               stopping={stopping}
               payer={props.sendPayer}
               onSend={submit}
@@ -466,6 +468,15 @@ function messageSends(
 ): boolean {
   if (props.busy || submitting || props.readOnlyReason || props.disabledReason || attachmentBlock || uploading > 0) return false;
   return Boolean(props.allowEmpty || props.value.trim() || attachments > 0 || quotes > 0);
+}
+
+/**
+ * Whether the draft can go now. A note goes where the server lets the reader post notes (`notes`), whatever holds their
+ * messages; nothing goes while it is being dictated.
+ */
+function draftSends(props: ComposerProps, note: { isNote: boolean; post: unknown }, dictating: boolean, held: Parameters<typeof messageSends>[1]): boolean {
+  if (dictating) return false;
+  return note.isNote ? Boolean(note.post) && !held.submitting : messageSends(props, held);
 }
 
 function guardHostedCommand(props: ComposerProps, held: HeldCommands): ComposerProps {

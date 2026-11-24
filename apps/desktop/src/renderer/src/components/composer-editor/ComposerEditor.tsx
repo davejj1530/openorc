@@ -1,8 +1,8 @@
-import { HISTORY_PUSH_TAG } from "lexical";
-import { useEffect, useImperativeHandle, type AriaAttributes, type FocusEventHandler, type PointerEventHandler, type Ref } from "react";
+import { HISTORY_MERGE_TAG, HISTORY_PUSH_TAG } from "lexical";
+import { useEffect, useImperativeHandle, useRef, type AriaAttributes, type FocusEventHandler, type PointerEventHandler, type Ref } from "react";
 import type { MarkSources } from "../../lib/message-marks";
 import { $readDraft, $writeDraft } from "./draft";
-import { EditorBox, EditorPlaceholder, EditorProvider, useEditor } from "./editor";
+import { EditorBox, EditorPlaceholder, EditorProvider, useEditable, useEditor } from "./editor";
 import { MARK_NODES } from "./nodes";
 import { ClipboardPlugin } from "./plugins/ClipboardPlugin";
 import { DraftPlugin, type DraftChange } from "./plugins/DraftPlugin";
@@ -12,14 +12,16 @@ import { LandingPlugin } from "./plugins/LandingPlugin";
 import { MarksPlugin } from "./plugins/MarksPlugin";
 import { ReadyPlugin } from "./plugins/ReadyPlugin";
 import { PICKED } from "./shared";
+import { speakInto, type Spoken } from "./spoken";
 
 export type { DraftChange } from "./plugins/DraftPlugin";
+export type { Spoken } from "./spoken";
 
 /**
  * What the composer does to its draft, each as one step to undo with the caret where it belongs: a pick from a list
  * writes the message, and its pills land with a pop; `write` puts words back, as a queued message returning, and
  * nothing moves; `begin` starts an `@` or `/` word where the person was, as the plus menu does; `focus` puts the keyboard
- * back in the words where the caret was, as a docked ask hands it back.
+ * back in the words where the caret was, as a docked ask hands it back; `speak` starts dictated words at the caret.
  */
 export interface ComposerEditorHandle {
   pick: (text: string, caret: number) => void;
@@ -27,6 +29,7 @@ export interface ComposerEditorHandle {
   /** Starts a word at `at`, apart from the word before it. */
   begin: (start: string, at: number) => void;
   focus: () => void;
+  speak: () => Spoken;
 }
 
 export interface ComposerEditorProps {
@@ -57,7 +60,19 @@ export interface ComposerEditorProps {
 /** The composer's handle and its editable state, which belong to the editor rather than to any one concern. */
 function EditorControls({ handle, disabled }: Pick<ComposerEditorProps, "handle" | "disabled">) {
   const editor = useEditor();
+  const editable = useEditable(editor);
   useEffect(() => editor.setEditable(!disabled), [editor, disabled]);
+  // A box that cannot be typed in cannot take the keyboard. Asked for meanwhile, it comes once the box can, with the
+  // caret where the draft has it: words written while it could not be typed in moved the draft's caret and not the
+  // page's, and an update made outside an event would otherwise start from the page's.
+  const awaited = useRef(false);
+  useEffect(() => {
+    if (!editable || !awaited.current) return;
+    awaited.current = false;
+    const { text, caret } = editor.getEditorState().read($readDraft);
+    editor.update(() => $writeDraft(text, caret ?? text.length), { discrete: true, tag: HISTORY_MERGE_TAG });
+    editor.getRootElement()?.focus({ preventScroll: true });
+  }, [editor, editable]);
   useImperativeHandle(handle, () => {
     const writeAs = (tags: string[]) => (text: string, caret: number) => {
       editor.update(() => $writeDraft(text, caret), { discrete: true, tag: tags });
@@ -76,7 +91,17 @@ function EditorControls({ handle, disabled }: Pick<ComposerEditorProps, "handle"
         { discrete: true, tag: HISTORY_PUSH_TAG },
       );
     };
-    return { pick: writeAs([HISTORY_PUSH_TAG, PICKED]), write: writeAs([HISTORY_PUSH_TAG]), begin, focus: () => editor.getRootElement()?.focus({ preventScroll: true }) };
+    return {
+      pick: writeAs([HISTORY_PUSH_TAG, PICKED]),
+      write: writeAs([HISTORY_PUSH_TAG]),
+      begin,
+      focus: () => {
+        const root = editor.getRootElement();
+        if (root?.getAttribute("contenteditable") === "false") awaited.current = true;
+        else root?.focus({ preventScroll: true });
+      },
+      speak: () => speakInto(editor),
+    };
   }, [editor]);
   return null;
 }

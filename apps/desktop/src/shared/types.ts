@@ -206,6 +206,7 @@ export interface OpenOrcApi {
     install(): Promise<void>;
   };
   autorun: Autorun;
+  dictation: import("./dictation").DictationApi;
   terminal: TerminalApi;
   browser: BrowserPaneApi;
 }

@@ -96,6 +96,28 @@ const api: OpenOrcApi = {
    * messages out, so a second window listening on the same channel hears only
    * its own shells and its own pane.
    */
+  dictation: {
+    models: () => ipcRenderer.invoke("dictation:models"),
+    download: (model) => ipcRenderer.invoke("dictation:download", model),
+    cancelDownload: (model) => ipcRenderer.invoke("dictation:cancelDownload", model),
+    remove: (model) => ipcRenderer.invoke("dictation:remove", model),
+    onModel(callback) {
+      const listener = (_event: unknown, model: string, state: import("../shared/dictation").SpeechModelState) => callback(model, state);
+      ipcRenderer.on("dictation:model", listener);
+      return () => ipcRenderer.off("dictation:model", listener);
+    },
+    microphone: () => ipcRenderer.invoke("dictation:microphone"),
+    openMicrophoneSettings: () => ipcRenderer.send("dictation:openMicrophoneSettings"),
+    start: (id, model) => ipcRenderer.invoke("dictation:start", id, model),
+    audio: (id, pcm) => ipcRenderer.send("dictation:audio", id, pcm),
+    finish: (id) => ipcRenderer.send("dictation:finish", id),
+    cancel: (id) => ipcRenderer.send("dictation:cancel", id),
+    onEvent(callback) {
+      const listener = (_event: unknown, event: import("../shared/dictation").DictationEvent) => callback(event);
+      ipcRenderer.on("dictation:event", listener);
+      return () => ipcRenderer.off("dictation:event", listener);
+    },
+  },
   terminal: {
     attach(id) {
       ipcRenderer.send("terminal:attach", id);

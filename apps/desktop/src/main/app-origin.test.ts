@@ -34,6 +34,13 @@ describe("permissions and external links", () => {
     expect(permitted("notifications", "http://127.0.0.1:4000/app", isApp)).toBe(false);
   });
 
+  it("grants the app window the microphone, never the camera", () => {
+    expect(permitted("media", page, isApp, ["audio"])).toBe(true);
+    expect(permitted("media", page, isApp, ["video"])).toBe(false);
+    expect(permitted("media", page, isApp, ["audio", "video"])).toBe(false);
+    expect(permitted("media", "http://127.0.0.1:4000/app", isApp, ["audio"])).toBe(false);
+  });
+
   it("opens only web pages in the system browser", () => {
     expect(isExternalWebUrl("https://github.com/openorc")).toBe(true);
     expect(isExternalWebUrl("file:///Applications/Calculator.app")).toBe(false);

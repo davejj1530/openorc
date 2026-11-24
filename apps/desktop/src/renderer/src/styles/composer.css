@@ -179,6 +179,59 @@
   pointer-events: none;
 }
 
+/* The microphone. Recording, it is a key holding four bars that rise with the voice, each to its own reach. */
+.composer-dictate[data-state] {
+  background: var(--control-fill);
+  color: var(--ink);
+}
+.composer-dictate-bars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+}
+.composer-dictate-bars > span {
+  width: 2px;
+  height: calc(3px + 11px * var(--dictation-level, 0) * var(--reach));
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  transition: height var(--duration-quick) var(--ease-out);
+}
+.composer-dictate-bars > :nth-child(1) {
+  --reach: 0.55;
+}
+.composer-dictate-bars > :nth-child(2) {
+  --reach: 1;
+}
+.composer-dictate-bars > :nth-child(3) {
+  --reach: 0.75;
+}
+.composer-dictate-bars > :nth-child(4) {
+  --reach: 0.4;
+}
+/* What the microphone has to say: a title, a line under it, and its one action at the end. */
+.composer-dictate-popup {
+  display: grid;
+  gap: 10px;
+  width: min(264px, calc(100vw - 24px));
+  padding: 14px 16px;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+.composer-dictate-title {
+  font-size: var(--text-base);
+  line-height: 20px;
+}
+.composer-dictate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.composer-dictate-row > :only-child {
+  margin-left: auto;
+}
+
 /* Chips: the model, the mode, a destination. A pill on the control fill; hover steps the fill. */
 .composer-chip,
 .composer-model-trigger {

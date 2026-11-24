@@ -68,7 +68,7 @@ export function EditorProvider({ namespace, nodes, children }: { namespace: stri
 }
 
 /** Whether the editor takes typing now, following its editable listener. */
-function useEditable(editor: LexicalEditor): boolean {
+export function useEditable(editor: LexicalEditor): boolean {
   const [subscribe, read] = useMemo(() => [(changed: () => void) => editor.registerEditableListener(changed), () => editor.isEditable()] as const, [editor]);
   return useSyncExternalStore(subscribe, read, read);
 }

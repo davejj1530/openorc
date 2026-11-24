@@ -11,7 +11,7 @@ import { builtAccountServer } from "./src/shared/account-server";
 // dependencies of this app to resolve from its node_modules. Prettier loads at
 // runtime too: the bundler renders any chunk holding its TypeScript plugin empty.
 // Packaging audits the compiled imports against scripts/packaged-runtime-dependencies.cjs.
-const nodeExternals = ["electron", /^electron-updater(?:\/|$)/, "node-pty", "sqlite-vec", "fastembed", "onnxruntime-node", /^prettier(?:\/|$)/, "typescript"];
+const nodeExternals = ["electron", /^electron-updater(?:\/|$)/, "node-pty", "sqlite-vec", "fastembed", "onnxruntime-node", "transcribe-cpp", /^prettier(?:\/|$)/, "typescript"];
 
 export default defineConfig(({ mode }) => {
   // Test switches (autorun, benchmarks, screenshots) exist only in development and QA builds. OPENORC_QA_BUILD=1 keeps
@@ -29,6 +29,8 @@ export default defineConfig(({ mode }) => {
           input: {
             index: resolve(import.meta.dirname, "src/main/index.ts"),
             core: resolve(import.meta.dirname, "src/core/index.ts"),
+            // Main starts dictation's speech model in a utility process of its own, by file name.
+            speech: resolve(import.meta.dirname, "src/speech/index.ts"),
             // The core starts these as worker threads by file name.
             "embedder-worker": resolve(import.meta.dirname, "src/core/embedder-worker.ts"),
             "formatter-worker": resolve(import.meta.dirname, "src/core/formatter-worker.ts"),

@@ -2,6 +2,7 @@ import { cleanup, fireEvent, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import { shortcuts, useAppShortcuts } from "./app-shortcuts";
+import { registerDictationTarget } from "./dictation/dictation";
 import { useFilesTool } from "./files-tool";
 import { useLayout } from "./layout";
 import { core } from "./rpc";
@@ -32,6 +33,9 @@ afterEach(() => {
   updates.length = 0;
   vi.restoreAllMocks();
 });
+
+const dictate = vi.fn();
+let composerGone = () => {};
 
 const cases: { chord: string; does: string; given?: () => void; then: () => unknown }[] = [
   { chord: "n", does: "starts a thread in the current project", then: () => expect(route()).toEqual({ view: "newthread", projectId: "project" }) },
@@ -77,6 +81,17 @@ const cases: { chord: string; does: string; given?: () => void; then: () => unkn
   },
   { chord: "⇧p", does: "pins the focused thread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { pinned: true } }])) },
   { chord: "⇧a", does: "resolves the focused thread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { archived: true } }])) },
+  {
+    chord: "⇧d",
+    does: "dictates into the composer on screen",
+    given: () => {
+      composerGone = registerDictationTarget("composer", { shell: { current: document.body }, toggle: dictate });
+    },
+    then: () => {
+      expect(dictate).toHaveBeenCalledOnce();
+      composerGone();
+    },
+  },
   { chord: "⇧u", does: "marks the focused thread unread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { seen: false } }])) },
 ];
 

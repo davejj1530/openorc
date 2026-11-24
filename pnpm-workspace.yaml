@@ -5,6 +5,8 @@ packages:
 allowBuilds:
   electron: true
   esbuild: true
+  # Its install script only confirms a prebuilt binding or compiles one; the binding arrives as a platform package.
+  koffi: false
   node-pty: true
   # Downloads the tree-sitter grammars and math renderer its native build compiles in.
   react-native-enriched-markdown: true

@@ -87,6 +87,7 @@
     "sqlite-vec": "0.1.9",
     "streamdown": "^2.6.0",
     "tailwind-merge": "^3.3.0",
+    "transcribe-cpp": "0.4.2",
     "typegpu": "^0.12.5",
     "typescript": "^5.9.3",
     "uqr": "0.1.3",

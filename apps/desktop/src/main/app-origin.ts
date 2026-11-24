@@ -20,8 +20,11 @@ export function appOrigin(options: { packaged: boolean; devUrl: string | undefin
 
 /** Web permissions the app window uses; reading the clipboard is a terminal's Paste. Every other permission, and any request from another page or frame, is refused. */
 const APP_PERMISSIONS = new Set(["notifications", "clipboard-sanitized-write", "clipboard-read"]);
-export function permitted(permission: string, requestingUrl: string, isAppOrigin: (url: string) => boolean): boolean {
-  return APP_PERMISSIONS.has(permission) && isAppOrigin(requestingUrl);
+/** `media` names what a media request is for: the microphone alone is granted, for dictation, and never the camera. */
+export function permitted(permission: string, requestingUrl: string, isAppOrigin: (url: string) => boolean, media: readonly string[] = []): boolean {
+  if (!isAppOrigin(requestingUrl)) return false;
+  if (permission === "media") return media.length > 0 && media.every((kind) => kind === "audio");
+  return APP_PERMISSIONS.has(permission);
 }
 
 /** Only web pages leave the app for the system browser; files and other schemes do not. */

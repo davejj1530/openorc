@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { threadResolved } from "@openorc/client";
 import { isSubagentThread, type RpcParams, type ThreadSummary } from "@openorc/protocol";
+import { toggleDictation } from "./dictation/dictation";
 import { openFilesTool } from "./files-tool";
 import { useLayout } from "./layout";
 import { core } from "./rpc";
@@ -74,6 +75,7 @@ export const shortcuts: ReadonlyMap<string, Shortcut> = new Map([
   ["⇧]", step(1)],
   ["⇧n", act(({ projectId }) => useUi.getState().openNewTask(projectId))],
   ["⇧f", ({ focusedThreadId }) => openFilesTool(focusedThreadId)],
+  ["⇧d", toggleDictation],
   ["⇧p", onFocusedThread((thread) => ({ pinned: !thread.pinnedAt }))],
   ["⇧a", onFocusedThread((thread) => ({ archived: !threadResolved(thread, Date.now()) }))],
   ["⇧u", onFocusedThread((thread) => ({ seen: thread.unread }))],

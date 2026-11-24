@@ -8,6 +8,7 @@ import electronUpdater from "electron-updater";
 import { AppUpdates } from "./app-updates";
 import { configureReleaseFeed } from "./release-feed";
 import { installUpdateControls } from "./update-ipc";
+import { installDictation } from "./dictation-ipc";
 import { installUpdateMenu } from "./update-menu";
 import { hostSandboxFrames, isolateSandboxFrames, McpAppSandbox } from "./mcp-app-sandbox";
 import { forgetShellEnv, listenForShellEnv } from "./shell-env";
@@ -326,9 +327,13 @@ function createWindow(route?: string): BrowserWindow {
 }
 
 app.whenReady().then(async () => {
-  // The app window may show notifications, and copy and paste text; nothing else, and nothing for another page or embedded frame.
-  session.defaultSession.setPermissionRequestHandler((_contents, permission, callback, details) => callback(permitted(permission, details.requestingUrl, isAppOrigin)));
-  session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => permitted(permission, details.requestingUrl ?? contents?.getURL() ?? "", isAppOrigin));
+  // The app window may show notifications, copy and paste text, and hear the microphone for dictation; nothing else, and nothing for another page or embedded frame.
+  session.defaultSession.setPermissionRequestHandler((_contents, permission, callback, details) =>
+    callback(permitted(permission, details.requestingUrl, isAppOrigin, "mediaTypes" in details ? details.mediaTypes : undefined)),
+  );
+  session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) =>
+    permitted(permission, details.requestingUrl ?? contents?.getURL() ?? "", isAppOrigin, details.mediaType ? [details.mediaType] : undefined),
+  );
   await mcpAppSandbox.start({ session: session.defaultSession, direct: devServer ? [new URL(devServer).host] : [] }).catch((error: unknown) => console.warn("MCP Apps sandbox unavailable:", error));
   ipcMain.handle("mcp-app:register", (event, document: unknown) => {
     if (event.senderFrame !== event.sender.mainFrame || !isAppOrigin(event.senderFrame.url)) throw new Error("Only the app window can host MCP Apps.");
@@ -414,6 +419,8 @@ app.whenReady().then(async () => {
     if (process.platform === "linux" && typeof text === "string") void clipboard.selection.writeText(text);
   });
   installBrowserPane(ipcMain, { getWindow: () => BrowserWindow.getAllWindows()[0] ?? null });
+
+  app.once("will-quit", installDictation({ userData: app.getPath("userData"), here, isAppOrigin }));
 
   ipcMain.on("window:open", (_event, route: unknown) => {
     if (typeof route === "string" && /^[a-z]+(:[A-Za-z0-9-]+){0,2}$/.test(route)) createWindow(route);

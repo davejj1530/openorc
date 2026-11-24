@@ -40,7 +40,7 @@ import { ComposerChoice } from "./ComposerChoice";
 import { ComposerReadOnly } from "./composer-read-only";
 import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
 import { ComposerCommitChip } from "./ComposerCommitChip";
-import { ComposerDictation, useComposerDictation } from "./ComposerDictation";
+import { ComposerDictation, useComposerDictation, useDictatedSend } from "./ComposerDictation";
 import { ComposerAddMenu, type AddOffers } from "./ComposerAddMenu";
 import { ComposerAsk } from "./ComposerAsk";
 import { ComposerInput, type ComposerLists } from "./ComposerInput";
@@ -316,7 +316,7 @@ export function Composer(props: ComposerProps) {
   }, [submission, value, onChange, acknowledge]);
   const drop = useComposerDrop((dropped) => void addFiles(dropped), props.fileSearch);
   const attachmentBlock = files.pendingReason ?? (attachments.length > 0 ? files.blocked : null);
-  const canSend = draftSends(props, note, Boolean(dictation.block), { attachments: attachments.length, quotes: quoted.quotes.length, uploading, submitting, attachmentBlock });
+  const canSend = draftSends(props, note, { attachments: attachments.length, quotes: quoted.quotes.length, uploading, submitting, attachmentBlock });
 
   const canStop = turnStops(props);
   const asks = props.asks ?? [];
@@ -350,6 +350,7 @@ export function Composer(props: ComposerProps) {
     });
   };
 
+  const send = useDictatedSend(dictation, shell, submit);
   const lists = useRef<ComposerLists>(null);
 
   const stopping = props.stopAction?.pending ?? interrupt.isPending;
@@ -381,13 +382,13 @@ export function Composer(props: ComposerProps) {
           <ComposerInput
             value={props.value}
             onChange={props.onChange}
-            onSubmit={submit}
+            onSubmit={send}
             handle={drop.input}
             onFiles={addFiles}
             onReady={props.readOnlyReason || note.isNote ? undefined : readyForMessages(props.onReady, Boolean(props.notes))}
             draftKey={props.draftKey}
-            disabled={Boolean(props.busy || submitting || dictation.block)}
-            placeholder={dictation.block ? "Listening…" : props.placeholder}
+            disabled={Boolean(props.busy || submitting || dictation.phase)}
+            placeholder={dictation.phase ? "Listening…" : props.placeholder}
             autoFocus={props.autoFocus}
             fileSearch={props.fileSearch}
             mentions={props.mentions}
@@ -435,10 +436,10 @@ export function Composer(props: ComposerProps) {
             <ComposerSendCluster
               cluster={cluster}
               canSend={canSend}
-              block={note.isNote ? note.block : composerSendBlock({ disabledReason: props.readOnlyReason ?? props.disabledReason ?? dictation.block, attachmentBlock })}
+              block={note.isNote ? note.block : composerSendBlock({ disabledReason: props.readOnlyReason ?? props.disabledReason, attachmentBlock })}
               stopping={stopping}
               payer={props.sendPayer}
-              onSend={submit}
+              onSend={send}
               onStop={stop}
             />
           </div>
@@ -470,12 +471,8 @@ function messageSends(
   return Boolean(props.allowEmpty || props.value.trim() || attachments > 0 || quotes > 0);
 }
 
-/**
- * Whether the draft can go now. A note goes where the server lets the reader post notes (`notes`), whatever holds their
- * messages; nothing goes while it is being dictated.
- */
-function draftSends(props: ComposerProps, note: { isNote: boolean; post: unknown }, dictating: boolean, held: Parameters<typeof messageSends>[1]): boolean {
-  if (dictating) return false;
+/** Whether the draft can go now. A note goes where the server lets the reader post notes (`notes`), whatever holds their messages. */
+function draftSends(props: ComposerProps, note: { isNote: boolean; post: unknown }, held: Parameters<typeof messageSends>[1]): boolean {
   return note.isNote ? Boolean(note.post) && !held.submitting : messageSends(props, held);
 }
 

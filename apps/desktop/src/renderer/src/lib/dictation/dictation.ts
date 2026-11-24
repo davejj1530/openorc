@@ -50,6 +50,9 @@ interface Recording {
   capture: Capture | null;
   spoken: Spoken | null;
   limit: ReturnType<typeof setTimeout> | null;
+  /** Whether it ended with all its words in the draft, once it has ended: false when it was cancelled or failed. */
+  finished: Promise<boolean>;
+  settle: (finished: boolean) => void;
 }
 
 let recording: Recording | null = null;
@@ -82,6 +85,7 @@ function heard(event: DictationEvent): void {
   release(current);
   current.spoken?.end(true);
   useDictation.setState({ take: null, notice: event.type === "failed" ? { owner: current.owner, kind: "failed", reason: event.reason } : null });
+  current.settle(event.type === "done");
 }
 
 let connected = false;
@@ -112,7 +116,8 @@ export async function startDictation(owner: string, speak: () => Spoken | undefi
     return;
   }
   const id = crypto.randomUUID();
-  const current: Recording = { id, owner, capture: null, spoken: null, limit: null };
+  const { promise: finished, resolve: settle } = Promise.withResolvers<boolean>();
+  const current: Recording = { id, owner, capture: null, spoken: null, limit: null, finished, settle };
   recording = current;
   useDictation.setState({ take: { id, owner, phase: "starting" }, notice: null });
   try {
@@ -127,30 +132,37 @@ export async function startDictation(owner: string, speak: () => Spoken | undefi
     }
     current.capture = capture;
     current.spoken = speak() ?? null;
-    current.limit = setTimeout(finishDictation, LIMIT_MS);
+    current.limit = setTimeout(() => void finishDictation(), LIMIT_MS);
     useDictation.setState({ take: { id, owner, phase: "listening" } });
   } catch (error) {
     if (recording !== current) return;
     release(current);
     api.cancel(id);
     useDictation.setState({ take: null, notice: { owner, ...noticeOf(error) } });
+    current.settle(false);
   }
 }
 
-/** Stops listening and waits for the model's last words, which end the recording when they arrive. */
-export function finishDictation(): void {
+/**
+ * Stops listening and waits for the model's last words, which end the recording when they arrive. Answers whether it
+ * ended with all its words in the draft, so what waits on them, as a send does, goes only then. A recording that has
+ * not begun to listen is cancelled, having nothing to keep.
+ */
+export function finishDictation(): Promise<boolean> {
   const current = recording;
   const take = useDictation.getState().take;
-  if (!current || !take) return;
-  if (take.phase === "starting") return cancelDictation();
-  if (take.phase !== "listening") return;
-  useDictation.setState({ take: { ...take, phase: "finishing" } });
-  setTimeout(() => {
-    if (recording !== current) return;
-    current.capture?.stop();
-    current.capture = null;
-    window.openorc.dictation.finish(current.id);
-  }, TAIL_MS);
+  if (!current || !take) return Promise.resolve(false);
+  if (take.phase === "starting") cancelDictation();
+  if (take.phase === "listening") {
+    useDictation.setState({ take: { ...take, phase: "finishing" } });
+    setTimeout(() => {
+      if (recording !== current) return;
+      current.capture?.stop();
+      current.capture = null;
+      window.openorc.dictation.finish(current.id);
+    }, TAIL_MS);
+  }
+  return current.finished;
 }
 
 /** Ends the recording and takes its words back out of the draft. */
@@ -161,6 +173,7 @@ export function cancelDictation(): void {
   window.openorc.dictation.cancel(current.id);
   current.spoken?.end(false);
   useDictation.setState({ take: null });
+  current.settle(false);
 }
 
 /** A composer that can be dictated into: where it is on screen, and how its recording starts and finishes. */

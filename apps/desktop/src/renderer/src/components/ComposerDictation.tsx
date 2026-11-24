@@ -1,5 +1,5 @@
 import { Popover } from "@base-ui/react/popover";
-import { useCallback, useEffect, useId, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type RefObject } from "react";
 import { DEFAULT_SPEECH_MODEL, type SpeechModelState } from "../../../shared/dictation";
 import { CoversPreview } from "../lib/browser-preview";
 import {
@@ -15,6 +15,7 @@ import {
 } from "../lib/dictation/dictation";
 import { floatingGround } from "../lib/use-anchor-ground";
 import type { ComposerEditorHandle } from "./composer-editor/ComposerEditor";
+import { useLatest } from "./composer-editor/shared";
 import { useComposerControl } from "./composer-read-only";
 import { DictationMeter } from "./DictationMeter";
 import { Check, Mic, X } from "./icons";
@@ -24,8 +25,6 @@ export interface ComposerDictationState {
   owner: string;
   /** Where this composer's recording is; null while it has none. */
   phase: DictationPhase | null;
-  /** Why the message cannot be sent or typed in while it is being spoken. */
-  block: string | null;
   toggle: () => void;
 }
 
@@ -34,14 +33,14 @@ const typingElsewhere = (target: EventTarget | null, shell: HTMLElement | null) 
 
 /**
  * Dictation for one composer. Spoken words are written into its draft where the caret was, as they are heard; the
- * draft takes no typing meanwhile. Enter finishes, Escape takes the words back out, and the keyboard returns to the
- * draft either way. A draft that becomes another conversation's ends the recording, since its words belong to the first.
+ * draft takes no typing meanwhile. Escape takes the words back out, and the keyboard returns to the draft however the
+ * recording ends. A draft that becomes another conversation's ends the recording, since its words belong to the first.
  */
 export function useComposerDictation(editor: RefObject<ComposerEditorHandle | null>, shell: RefObject<HTMLElement | null>, draftKey: string | undefined): ComposerDictationState {
   const owner = useId();
   const phase = useDictation((s) => (s.take?.owner === owner ? s.take.phase : null));
   const toggle = useCallback(() => {
-    if (useDictation.getState().take?.owner === owner) finishDictation();
+    if (useDictation.getState().take?.owner === owner) void finishDictation();
     else void startDictation(owner, () => editor.current?.speak());
   }, [owner, editor]);
   useEffect(() => (connectDictation() ? registerDictationTarget(owner, { shell, toggle }) : undefined), [owner, shell, toggle]);
@@ -59,17 +58,55 @@ export function useComposerDictation(editor: RefObject<ComposerEditorHandle | nu
   useEffect(() => {
     if (!phase) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.isComposing || typingElsewhere(event.target, shell.current)) return;
-      if (event.key === "Escape") cancelDictation();
-      else if (event.key === "Enter") finishDictation();
-      else return;
+      if (event.key !== "Escape" || typingElsewhere(event.target, shell.current)) return;
+      cancelDictation();
       event.preventDefault();
       event.stopPropagation();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [phase, shell]);
-  return { owner, phase, block: phase ? "Finish dictating to send." : null, toggle };
+  return { owner, phase, toggle };
+}
+
+/**
+ * Sending while dictating. A send asked for mid-recording, by its button or by Enter, finishes the recording first and
+ * goes once the last words are in the draft, the way it was asked for: Enter's, or the other with Command or Control.
+ * A recording that is cancelled or fails sends nothing. The draft has no keyboard while it is spoken into, so Enter is
+ * heard on the window.
+ */
+export function useDictatedSend(dictation: ComposerDictationState, shell: RefObject<HTMLElement | null>, submit: (otherWay: boolean) => void): (otherWay: boolean) => void {
+  const latest = useLatest(submit);
+  // The send that waited, handed on through a render so it goes with the draft as the last words left it.
+  const [due, setDue] = useState<{ otherWay: boolean } | null>(null);
+  const gone = useRef(due);
+  useEffect(() => {
+    if (!due || gone.current === due) return;
+    gone.current = due;
+    latest.current(due.otherWay);
+  }, [due, latest]);
+  const dictating = Boolean(dictation.phase);
+  const send = useCallback(
+    (otherWay: boolean) => {
+      if (!dictating) return latest.current(otherWay);
+      void finishDictation().then((finished) => {
+        if (finished) setDue({ otherWay });
+      });
+    },
+    [dictating, latest],
+  );
+  useEffect(() => {
+    if (!dictating) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Enter" || event.shiftKey || event.isComposing || typingElsewhere(event.target, shell.current)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      send(event.metaKey || event.ctrlKey);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [dictating, shell, send]);
+  return send;
 }
 
 const megabytes = (bytes: number) => `${Math.round(bytes / 1_000_000)} MB`;

@@ -52,6 +52,12 @@ The patched loader uses `tar@7.5.22` under the [Blue Oak Model License 1.0.0](ht
 
 `@pierre/diffs` 1.4.2 is used under Apache-2.0. OpenOrc modifies its `dist/managers/ResizeManager.js` so resize work runs on the next animation frame and skips detached elements; the change is [patches/@pierre\_\_diffs@1.4.2.patch](patches/@pierre__diffs@1.4.2.patch) and is described in [the patch record](docs/dependency-remediation.md). The package's original `LICENSE.md` is retained.
 
+## Dictation
+
+Dictation runs speech models through `transcribe-cpp` 0.4.2 under MIT, Copyright (c) 2026 The transcribe.cpp authors. The package for each platform carries the compiled library and, in its `licenses/` folder, the original MIT notices of ggml and Silero VAD and the miniz notice. The library is called through `koffi` 3.3.8 under MIT, Copyright (C) 2026 Niels Martignène, whose per-platform binding packages ship without a license file. Both original MIT texts are preserved at `licenses/vendor/transcribe-cpp-MIT.txt` and `licenses/vendor/koffi-MIT.txt` and checked by the distribution manifest.
+
+The speech model is not distributed with OpenOrc. A person who turns dictation on downloads Parakeet, by NVIDIA, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), from the `handy-computer/parakeet-unified-en-0.6b-gguf` repository on Hugging Face at a pinned revision. Settings credits the model beside its name.
+
 ## Desktop updater
 
 The desktop updater uses `electron-updater` 6.8.9 under MIT, Copyright (c) 2015 Loopline Systems. Its original LICENSE is preserved in the application archive and checked by the distribution manifest.

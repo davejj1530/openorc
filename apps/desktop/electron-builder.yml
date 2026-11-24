@@ -47,6 +47,9 @@ asarUnpack:
   - node_modules/node-pty/**
   # SQLite loads extensions by physical filename, outside Electron's fs shim.
   - node_modules/sqlite-vec-*/**
+  # Dictation's speech library is loaded by path through its FFI binding; both are native code.
+  - node_modules/@transcribe-cpp/**
+  - node_modules/@koromix/**
 mac:
   icon: build/icon.icns
   category: public.app-category.developer-tools
@@ -54,6 +57,8 @@ mac:
     - dir
   # Local packages stay unsigned. The opt-in release configuration requires signing and notarization.
   identity: null
+  extendInfo:
+    NSMicrophoneUsageDescription: OpenOrc listens while you dictate a message. Your voice stays on this Mac.
 npmRebuild: false
 # Every package, local or released: no running the app as plain Node, no NODE_OPTIONS or --inspect, cookies encrypted
 # with the OS keychain, and code loaded only from the app's archive, checked against the hash packed with it. The

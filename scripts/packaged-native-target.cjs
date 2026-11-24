@@ -2,6 +2,10 @@ const assert = require("node:assert/strict");
 
 const originalFiles = new WeakMap();
 
+/** Dictation's speech library is published as one package per target, named for the target and the backends it was built with. */
+const speechBuilds = { "darwin-arm64": "darwin-arm64-metal", "darwin-x64": "darwin-x64-cpu", "win32-x64": "win32-x64-cpu-vulkan", "linux-x64": "linux-x64-cpu-vulkan" };
+const speechLibraries = { darwin: "libtranscribe.dylib", win32: "transcribe.dll", linux: "libtranscribe.so" };
+
 /** Add exclusions to the existing normalized file sets, without widening the app's include list. */
 function configureNativeFiles({ packager, electronPlatformName: platform }, runtimePatterns = []) {
   const config = packager.config;
@@ -21,6 +25,9 @@ function configureNativeFiles({ packager, electronPlatformName: platform }, runt
     `!**/node_modules/node-pty/prebuilds/!(${target}){,/**}`,
     // Keep package metadata and license notices even for unused sqlite targets.
     `!**/node_modules/sqlite-vec-!(${sqlite})/**/*.{dylib,so,dll}`,
+    // The speech library and the binding that calls it are each one package per target, too.
+    `!**/node_modules/@transcribe-cpp/!(${target}-*)/**/*.{dylib,so,dll}`,
+    `!**/node_modules/@koromix/koffi-!(${target})/**/*.{node,lib}`,
   ];
   if (platform === "linux") {
     exclusions.push(
@@ -50,6 +57,10 @@ function nativeTarget(file) {
   if (onnx) return `${onnx[1]}-${onnx[2]}`;
   const pty = /\/node-pty\/prebuilds\/([^/]+)\//.exec(file);
   if (pty) return pty[1];
+  const speech = /\/@transcribe-cpp\/([a-z0-9]+-[a-z0-9]+)-[^/]+\/.*\.(?:dylib|so|dll)$/.exec(file);
+  if (speech) return speech[1];
+  const binding = /\/@koromix\/koffi-([a-z0-9]+-[a-z0-9]+)\/.*\.node$/.exec(file);
+  if (binding) return binding[1];
   const sqlite = /\/sqlite-vec-([^/]+)\/.*\.(?:dylib|so|dll)$/.exec(file);
   return sqlite?.[1].replace(/^windows-/, "win32-") ?? null;
 }
@@ -76,6 +87,7 @@ function verifyNativeTarget(entries, platform, arch) {
   const sqlite = `node_modules/sqlite-vec-${sqlitePlatform}-${arch}/vec0.${{ darwin: "dylib", win32: "dll", linux: "so" }[platform]}`;
   // node-pty has no Linux prebuild; the install compiles the binding it loads first, from build/Release.
   const required = [`${onnx}onnxruntime_binding.node`, platform === "linux" ? "node_modules/node-pty/build/Release/pty.node" : `${pty}pty.node`, sqlite];
+  required.push(`node_modules/@transcribe-cpp/${speechBuilds[target]}/${speechLibraries[platform]}`, `node_modules/@koromix/koffi-${target}/${platform}_${arch}/koffi.node`);
   if (platform === "darwin") {
     required.push(`${pty}spawn-helper`);
     assert.ok(

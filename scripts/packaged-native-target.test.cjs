@@ -46,6 +46,10 @@ function nativeFixture(host = "darwin-arm64") {
     if (platform === "darwin") extension = "dylib";
     else if (platform === "win32") extension = "dll";
     add(`sqlite-vec-${sqlitePlatform}-${arch}`, `vec0.${extension}`, target);
+    // The speech library names its backends after the target; the binding that calls it is one package per target.
+    const backends = { "darwin-arm64": "metal", "darwin-x64": "cpu", "win32-x64": "cpu-vulkan", "linux-x64": "cpu-vulkan", "linux-arm64": "cpu-vulkan" }[target];
+    if (backends) add(`@transcribe-cpp/${target}-${backends}`, `${platform === "win32" ? "" : "lib"}transcribe.${extension}`, target);
+    add(`@koromix/koffi-${target}`, `${platform}_${arch}/koffi.node`, target);
   }
   if (host.startsWith("linux-")) {
     // Installing node-pty on Linux compiles its binding; the build leaves its makefiles behind.
@@ -171,7 +175,7 @@ test("shipped inventory rejects foreign files and missing runtime libraries/help
       assert.throws(() => verifyNativeTarget([...files, `${prefix}${pkg}/${file}`], "darwin", "arm64"), /Unused Node WebGPU bindings/);
     }
   }
-  for (const suffix of ["spawn-helper", "pty.node", "onnxruntime_binding.node", "libonnxruntime.1.21.0.dylib", "vec0.dylib"]) {
+  for (const suffix of ["spawn-helper", "pty.node", "onnxruntime_binding.node", "libonnxruntime.1.21.0.dylib", "vec0.dylib", "libtranscribe.dylib", "koffi.node"]) {
     assert.throws(
       () =>
         verifyNativeTarget(
@@ -196,7 +200,7 @@ test("a Linux inventory needs node-pty's compiled binding and leaves out GPU pro
   const fixture = nativeFixture("linux-x64");
   const files = fixture.filter((file) => !file.dropped && (!file.target || (file.target === "linux-x64" && file.pkg !== "webgpu"))).map((file) => `node_modules/${file.pkg}/${file.file}`);
   assert.doesNotThrow(() => verifyNativeTarget(files, "linux", "x64"));
-  for (const suffix of ["build/Release/pty.node", "onnxruntime_binding.node", "libonnxruntime.so.1", "vec0.so"]) {
+  for (const suffix of ["build/Release/pty.node", "onnxruntime_binding.node", "libonnxruntime.so.1", "vec0.so", "libtranscribe.so", "koffi.node"]) {
     assert.throws(
       () =>
         verifyNativeTarget(

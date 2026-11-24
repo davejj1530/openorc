@@ -117,6 +117,16 @@
       "name": "typescript",
       "version": "5.9.3",
       "distribution": "desktop"
+    },
+    {
+      "name": "transcribe-cpp",
+      "version": "0.4.2",
+      "distribution": "desktop"
+    },
+    {
+      "name": "koffi",
+      "version": "3.3.8",
+      "distribution": "desktop"
     }
   ],
   "files": [
@@ -706,6 +716,30 @@
         "resource": "licenses/vendor/pi-MIT.txt"
       },
       "website": "licenses/pi-MIT.txt"
+    },
+    {
+      "id": "transcribe-cpp-MIT",
+      "input": "licenses/vendor/transcribe-cpp-MIT.txt",
+      "source": "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/275cd50d2c4104c204009a197ac091b9687668e5/LICENSE",
+      "sha256": "86a53633b56f6b029d3cb42158bcc7aac0cdff898aceb13e83b93e368bbc4ac6",
+      "desktop": {
+        "resource": "licenses/vendor/transcribe-cpp-MIT.txt"
+      },
+      "covers": ["transcribe-cpp", "@transcribe-cpp/darwin-arm64-metal", "@transcribe-cpp/darwin-x64-cpu", "@transcribe-cpp/linux-x64-cpu-vulkan", "@transcribe-cpp/win32-x64-cpu-vulkan"]
+    },
+    {
+      "id": "koffi-MIT",
+      "input": "licenses/vendor/koffi-MIT.txt",
+      "source": {
+        "package": "koffi",
+        "version": "3.3.8",
+        "path": "LICENSE.txt"
+      },
+      "sha256": "22bcbbbacd739b026a8dc484f62a31484ce4c4e31f3408b60b29b4e41d62b290",
+      "desktop": {
+        "resource": "licenses/vendor/koffi-MIT.txt"
+      },
+      "covers": ["koffi", "@koromix/koffi-darwin-arm64", "@koromix/koffi-darwin-x64", "@koromix/koffi-linux-x64", "@koromix/koffi-win32-x64"]
     }
   ],
   "unresolved": [

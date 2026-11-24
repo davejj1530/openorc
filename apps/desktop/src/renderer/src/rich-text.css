@@ -259,15 +259,21 @@
     padding: 8px 10px 8px 0;
   }
 }
-/* Streaming replies: each new word fades in from a slight blur as it arrives (Streamdown's animate plugin stamps
-   the spans; its own stylesheet is not loaded). Only words arriving live animate, and reduced motion zeroes the
-   duration, so the text is there at once. */
+/* Streaming replies: each new word fades in as it arrives (Streamdown's animate plugin stamps the spans; its own
+   stylesheet is not loaded). Only words arriving live animate, and reduced motion zeroes the duration, so the text
+   is there at once. The fade moves a registered number that opacity reads: animating opacity or a filter directly
+   puts every word of the reply on a compositor layer of its own, hundreds at once in a long reply. */
+@property --sd-reveal {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
 @keyframes sd-fadeIn {
   from {
-    opacity: 0;
-    filter: blur(2px);
+    --sd-reveal: 0;
   }
 }
 [data-sd-animate] {
+  opacity: var(--sd-reveal);
   animation: var(--sd-animation, sd-fadeIn) var(--sd-duration, 160ms) var(--ease-out) var(--sd-delay, 0ms) both;
 }

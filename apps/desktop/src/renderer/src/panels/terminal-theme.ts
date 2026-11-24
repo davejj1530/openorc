@@ -52,3 +52,14 @@ export function terminalTheme(tokens: Tokens, dark: boolean): ITheme {
     brightWhite: ink,
   };
 }
+
+/**
+ * How a find marks what it found, from the theme the terminal is drawn in: every match on a quiet step of the ink, and
+ * the one the find stands on ringed in the cursor's colour. The terminal selects that one too, so it can be copied, and
+ * a selection covers any fill beneath it: the ring is what tells it from the rest.
+ */
+export function findMarks(theme: ITheme): { matchBackground: string; matchOverviewRuler: string; activeMatchBorder: string; activeMatchColorOverviewRuler: string } {
+  const match = toHex(`color-mix(in srgb, ${theme.foreground ?? "gray"} 16%, ${theme.background ?? "transparent"})`) ?? "#808080";
+  const active = theme.cursor ?? match;
+  return { matchBackground: match, matchOverviewRuler: match, activeMatchBorder: active, activeMatchColorOverviewRuler: active };
+}

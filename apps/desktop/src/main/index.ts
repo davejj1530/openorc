@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { isAbsolute, join, normalize } from "node:path";
-import { protocol, app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, shell, utilityProcess, type UtilityProcess, type WebContents } from "electron";
+import { protocol, app, BrowserWindow, clipboard, dialog, ipcMain, MessageChannelMain, session, shell, utilityProcess, type UtilityProcess, type WebContents } from "electron";
 import { appOrigin, isExternalWebUrl, permitted } from "./app-origin";
 import electronUpdater from "electron-updater";
 import { AppUpdates } from "./app-updates";
@@ -326,7 +326,7 @@ function createWindow(route?: string): BrowserWindow {
 }
 
 app.whenReady().then(async () => {
-  // The app window may show notifications and copy text; nothing else, and nothing for another page or embedded frame.
+  // The app window may show notifications, and copy and paste text; nothing else, and nothing for another page or embedded frame.
   session.defaultSession.setPermissionRequestHandler((_contents, permission, callback, details) => callback(permitted(permission, details.requestingUrl, isAppOrigin)));
   session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => permitted(permission, details.requestingUrl ?? contents?.getURL() ?? "", isAppOrigin));
   await mcpAppSandbox.start({ session: session.defaultSession, direct: devServer ? [new URL(devServer).host] : [] }).catch((error: unknown) => console.warn("MCP Apps sandbox unavailable:", error));
@@ -409,6 +409,10 @@ app.whenReady().then(async () => {
   // bound, neither of which suits a byte stream nobody asked for. Installed
   // once for the process because a shell outlives the window that opened it.
   installPtyHost(ipcMain, { getWindow: () => BrowserWindow.getAllWindows()[0] ?? null, getWindows: () => BrowserWindow.getAllWindows() });
+  // Linux pastes the last selection with a middle click. A terminal draws its own selection, so the window hands it over.
+  ipcMain.on("terminal:selected", (_event, text: unknown) => {
+    if (process.platform === "linux" && typeof text === "string") void clipboard.selection.writeText(text);
+  });
   installBrowserPane(ipcMain, { getWindow: () => BrowserWindow.getAllWindows()[0] ?? null });
 
   ipcMain.on("window:open", (_event, route: unknown) => {

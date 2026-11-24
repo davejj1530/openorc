@@ -14,6 +14,7 @@ vi.mock("@xterm/xterm", () => ({
     cols = 80;
     rows = 24;
     options = {};
+    unicode = {};
     loadAddon() {}
     open() {}
     write() {}
@@ -57,7 +58,7 @@ beforeEach(() => {
       disconnect() {}
     },
   );
-  window.openorc = { terminal } as unknown as OpenOrcApi;
+  window.openorc = { terminal, platform: "darwin", windowsBuild: null } as unknown as OpenOrcApi;
 });
 afterEach(() => {
   cleanup();

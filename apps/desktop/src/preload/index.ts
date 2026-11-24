@@ -66,6 +66,7 @@ const api: OpenOrcApi = {
     return () => ipcRenderer.off("window:fullscreen", listener);
   },
   platform: process.platform,
+  windowsBuild: process.platform === "win32" ? Number(process.getSystemVersion().split(".")[2]) || null : null,
   host: {
     get: () => ipcRenderer.invoke("host:get"),
     use: (host) => ipcRenderer.invoke("host:use", host),
@@ -134,6 +135,9 @@ const api: OpenOrcApi = {
       };
       ipcRenderer.on("terminal:settled", listener);
       return () => ipcRenderer.off("terminal:settled", listener);
+    },
+    selected(text) {
+      ipcRenderer.send("terminal:selected", text);
     },
   },
   browser: {

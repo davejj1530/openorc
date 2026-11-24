@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { Terminal as Xterm } from "@xterm/xterm";
 import { RotateCcw, Square, Terminal } from "../components/icons";
 import { Button, Empty, IconButton, TextButton } from "../components/ui";
 import { PanelBar, PanelBarMeta, PanelNotice } from "../components/PanelBar";
 import { typeAtPrompt } from "../lib/terminal-requests";
 import { useTheme } from "../lib/theme";
+import { openTerminalScreen, type TerminalScreen } from "./terminal-screen";
 import { terminalTheme } from "./terminal-theme";
-import { followTerminalFont } from "./terminal-font";
-import { isDark, openXterm } from "./xterm";
+import { TerminalSurface } from "./TerminalSurface";
+import { isDark } from "./xterm";
 import "@xterm/xterm/css/xterm.css";
 
 /**
@@ -16,13 +16,8 @@ import "@xterm/xterm/css/xterm.css";
  * only Stop ends it, so switching tabs mid-build loses nothing.
  */
 
-/**
- * The panel slides over 220ms and the observer reports every frame of it. A
- * trailing wait longer than one frame collapses the whole slide into a single
- * resize, which is all the shell wants: the sizes in between belong to an
- * animation, and redrawing for each of them is work for nobody.
- */
-const RESIZE_SETTLE_MS = 150;
+/** The first Windows build whose shells node-pty runs behind ConPTY; older ones get winpty. */
+const CONPTY_BUILD = 18309;
 
 type Status = { kind: "starting" } | { kind: "running" } | { kind: "exited"; code: number | null } | { kind: "error"; message: string };
 
@@ -103,27 +98,20 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
   const [stayedIn, setStayedIn] = useState<string | null>(null);
   const [generation, setGeneration] = useState(0);
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const termRef = useRef<Xterm | null>(null);
+  const [screen, setScreen] = useState<TerminalScreen | null>(null);
 
   useEffect(() => {
     const element = hostRef.current;
     if (!element) return;
     const api = window.openorc.terminal;
-    const { term, fit } = openXterm(element);
-    termRef.current = term;
+    const opened = openTerminalScreen(element, (sized) => api.resize(id, sized.cols, sized.rows));
+    const { term } = opened;
+    // A shell on Windows sits behind a pty that redraws on a resize itself; told which, xterm leaves the wrapping to it.
+    const build = window.openorc.windowsBuild;
+    if (build) term.options.windowsPty = { backend: build >= CONPTY_BUILD ? "conpty" : "winpty", buildNumber: build };
+    setScreen(opened);
 
     const keys = term.onData((data: string) => api.write(id, data));
-    let settle = 0;
-    const resize = (): void => {
-      fit.fit();
-      api.resize(id, term.cols, term.rows);
-    };
-    const observer = new ResizeObserver(() => {
-      window.clearTimeout(settle);
-      settle = window.setTimeout(resize, RESIZE_SETTLE_MS);
-    });
-    observer.observe(element);
-    const stopFont = followTerminalFont(term, resize);
 
     let live = true;
     let offData = (): void => {};
@@ -164,9 +152,6 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
 
     return () => {
       live = false;
-      window.clearTimeout(settle);
-      observer.disconnect();
-      stopFont();
       requests.dispose();
       offData();
       offExit();
@@ -176,8 +161,8 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
       // how main hears that: without it, a `yes` in a tab nobody is looking at
       // keeps posting to this window for the life of the app.
       api.detach(id);
-      term.dispose();
-      termRef.current = null;
+      opened.dispose();
+      setScreen(null);
     };
   }, [id, cwd, generation]);
 
@@ -185,9 +170,8 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
   // edit, so watching it is the whole subscription. DiffView listens to the
   // media query as well because it tracks the choice rather than the result.
   useEffect(() => {
-    const term = termRef.current;
-    if (term) term.options.theme = terminalTheme(getComputedStyle(term.element ?? document.documentElement), isDark());
-  }, [resolved, preset, custom]);
+    if (screen) screen.term.options.theme = terminalTheme(getComputedStyle(screen.term.element ?? document.documentElement), isDark());
+  }, [screen, resolved, preset, custom]);
 
   const restart = (): void => {
     window.openorc.terminal.kill(id);
@@ -204,9 +188,7 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
     <div className="h-full flex flex-col min-h-0">
       <TerminalBar meta={<ShellPath cwd={stayedIn ?? cwd} />} running={status.kind === "running"} onStop={stop} onRestart={restart} />
       <ShellNotice status={status} stayedIn={stayedIn} cwd={cwd} onRestart={restart} />
-      <div className="relative flex-1 min-h-0">
-        {/* The host stays mounted through every state: xterm measures it to lay out, and it still holds the output of a shell that has ended. */}
-        <div ref={hostRef} className="absolute inset-0 pl-5 pr-2.5 pb-2.5" />
+      <TerminalSurface hostRef={hostRef} screen={screen}>
         {status.kind === "error" ? (
           <div className="absolute inset-0 bg-bg">
             <Empty
@@ -222,7 +204,7 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
             </Empty>
           </div>
         ) : null}
-      </div>
+      </TerminalSurface>
     </div>
   );
 }

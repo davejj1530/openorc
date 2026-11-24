@@ -89,6 +89,8 @@ export interface TerminalApi {
   onExit(id: string, cb: (code: number | null) => void): () => void;
   /** A command the user typed into any shell has finished, as far as its output shows. Files it wrote may be new. */
   onSettled(cb: (id: string) => void): () => void;
+  /** Text was selected in a terminal. On Linux it becomes the selection a middle click pastes; nothing happens elsewhere. */
+  selected(text: string): void;
 }
 
 export interface BrowserPaneState {
@@ -183,6 +185,8 @@ export interface OpenOrcApi {
   /** Fires on every enter and leave of fullscreen; returns the unsubscribe. */
   onFullscreen(cb: (fullscreen: boolean) => void): () => void;
   platform: string;
+  /** The Windows build this runs on, 19045 say, which decides how a shell's lines wrap; null on other systems. */
+  windowsBuild: number | null;
   /** Where the core runs: this computer, or a WSL distribution on Windows. Main owns the choice and starts the core there. */
   host: {
     get(): Promise<import("./host").HostState>;

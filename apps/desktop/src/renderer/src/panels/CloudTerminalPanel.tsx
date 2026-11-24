@@ -7,14 +7,12 @@ import { Button, Empty, TextButton } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 import { core } from "../lib/rpc";
 import { useTheme } from "../lib/theme";
-import { followTerminalFont } from "./terminal-font";
 import { TerminalBar } from "./TerminalPanel";
-import { isDark, openXterm } from "./xterm";
+import { openTerminalScreen, type TerminalScreen } from "./terminal-screen";
+import { TerminalSurface } from "./TerminalSurface";
+import { isDark } from "./xterm";
 import { terminalTheme } from "./terminal-theme";
 import { claimTerminal, terminalFor } from "./cloud-terminal-claims";
-
-/** A view slides over 220ms; the shell is told the size it settles at, as on this Mac (TerminalPanel). */
-const RESIZE_SETTLE_MS = 150;
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 const WORDS = { end: "End terminal", endTip: "End this terminal", restart: "Restart terminal", restartTip: "Start a new terminal" };
@@ -163,80 +161,57 @@ function EndedNotice({ message, onStart }: { message: string; onStart: (() => vo
 }
 
 /**
- * An xterm drawn into the screen at `hostRef`, in the theme, fitted to the screen in the selected face. `settled`
- * hears each size the screen settles at: once the view has slid in, and again on every change after.
+ * The screen drawn at `hostRef`, in the theme, once it is open. `settled` hears each size it settles at: once the view
+ * has slid in, and again on every change after.
  */
-function useScreen(hostRef: RefObject<HTMLDivElement | null>, settled: (term: Xterm) => void): RefObject<Xterm | null> {
+function useScreen(hostRef: RefObject<HTMLDivElement | null>, settled: (term: Xterm) => void): TerminalScreen | null {
   const resolved = useTheme((s) => s.resolved);
   const preset = useTheme((s) => s.preset);
   const custom = useTheme((s) => s.custom);
-  const termRef = useRef<Xterm | null>(null);
+  const [screen, setScreen] = useState<TerminalScreen | null>(null);
   const heard = useRef(settled);
   heard.current = settled;
 
   useEffect(() => {
     const element = hostRef.current;
     if (!element) return;
-    const { term, fit } = openXterm(element);
-    termRef.current = term;
-    let settle = 0;
-    const resize = (): void => {
-      fit.fit();
-      heard.current(term);
-    };
-    const observer = new ResizeObserver(() => {
-      window.clearTimeout(settle);
-      settle = window.setTimeout(resize, RESIZE_SETTLE_MS);
-    });
-    observer.observe(element);
-    const stopFont = followTerminalFont(term, resize);
+    const opened = openTerminalScreen(element, (term) => heard.current(term));
+    setScreen(opened);
     return () => {
-      window.clearTimeout(settle);
-      observer.disconnect();
-      stopFont();
-      term.dispose();
-      termRef.current = null;
+      opened.dispose();
+      setScreen(null);
     };
   }, [hostRef]);
 
   useEffect(() => {
-    const term = termRef.current;
-    if (term) term.options.theme = terminalTheme(getComputedStyle(term.element ?? document.documentElement), isDark());
-  }, [resolved, preset, custom]);
+    if (screen) screen.term.options.theme = terminalTheme(getComputedStyle(screen.term.element ?? document.documentElement), isDark());
+  }, [screen, resolved, preset, custom]);
 
-  return termRef;
+  return screen;
 }
 
 /** The screen a terminal is opened from, empty until it is: it opens the terminal at the size it first settles at. */
 function OpeningScreen({ onSettled }: { onSettled: (size: Size) => void }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const asked = useRef(false);
-  useScreen(hostRef, (term) => {
+  const screen = useScreen(hostRef, (term) => {
     if (asked.current) return;
     asked.current = true;
     onSettled({ cols: term.cols, rows: term.rows });
   });
-  return <ScreenHost hostRef={hostRef} />;
-}
-
-function ScreenHost({ hostRef }: { hostRef: RefObject<HTMLDivElement | null> }) {
-  return (
-    <div className="relative flex-1 min-h-0">
-      <div ref={hostRef} className="absolute inset-0 pl-5 pr-2.5 pb-2.5" />
-    </div>
-  );
+  return <TerminalSurface hostRef={hostRef} screen={screen} />;
 }
 
 /** One terminal's screen: its output followed by offset, its opener's keystrokes and size sent on. */
 function CloudTerminalView({ threadId, terminal, typing, onChanged }: { threadId: string; terminal: HostedTerminal; typing: boolean; onChanged: () => void }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const open = terminal.state === "open";
-  const termRef = useScreen(hostRef, (term) => {
+  const screen = useScreen(hostRef, (term) => {
     if (typing && open) void core.call("hosted.terminal.size", { threadId, terminalId: terminal.id, cols: term.cols, rows: term.rows }).catch(() => undefined);
   });
+  const term = screen?.term;
 
   useEffect(() => {
-    const term = termRef.current;
     if (!term) return;
     if (!typing) Object.assign(term.options, { disableStdin: true, cursorInactiveStyle: "none", cursorBlink: false });
     const ids = { threadId, terminalId: terminal.id };
@@ -248,25 +223,23 @@ function CloudTerminalView({ threadId, terminal, typing, onChanged }: { threadId
     };
     // The screen belongs to one terminal; its state changing does not start it again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threadId, terminal.id, typing]);
+  }, [term, threadId, terminal.id, typing]);
 
   // Ended: the screen keeps what it said, with no cursor and nothing to type into.
   useEffect(() => {
-    const term = termRef.current;
     if (!term || terminal.state !== "ended") return;
     Object.assign(term.options, { disableStdin: true, cursorInactiveStyle: "none", cursorBlink: false });
     term.blur();
-  }, [termRef, terminal.state]);
+  }, [term, terminal.state]);
 
   // Open, or opened since the screen was made: the shell is told the view's size, and the opener types in it.
   useEffect(() => {
-    const term = termRef.current;
     if (!term || !open || !typing) return;
     void core.call("hosted.terminal.size", { threadId, terminalId: terminal.id, cols: term.cols, rows: term.rows }).catch(() => undefined);
     term.focus();
-  }, [termRef, open, typing, threadId, terminal.id]);
+  }, [term, open, typing, threadId, terminal.id]);
 
-  return <ScreenHost hostRef={hostRef} />;
+  return <TerminalSurface hostRef={hostRef} screen={screen} />;
 }
 
 /**

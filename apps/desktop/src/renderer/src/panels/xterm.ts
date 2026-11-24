@@ -19,6 +19,8 @@ export function isDark(): boolean {
  */
 export function openXterm(element: HTMLElement): { term: Xterm; fit: FitAddon } {
   const term = new Xterm({
+    // Unicode widths and a find's marks are still proposed API in xterm.
+    allowProposedApi: true,
     cursorBlink: true,
     // The selected face is applied after loading, so xterm never caches its fallback's metrics.
     fontFamily: "monospace",

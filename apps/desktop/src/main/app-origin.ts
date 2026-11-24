@@ -18,8 +18,8 @@ export function appOrigin(options: { packaged: boolean; devUrl: string | undefin
   };
 }
 
-/** Web permissions the app window uses. Every other permission, and any request from another page or frame, is refused. */
-const APP_PERMISSIONS = new Set(["notifications", "clipboard-sanitized-write"]);
+/** Web permissions the app window uses; reading the clipboard is a terminal's Paste. Every other permission, and any request from another page or frame, is refused. */
+const APP_PERMISSIONS = new Set(["notifications", "clipboard-sanitized-write", "clipboard-read"]);
 export function permitted(permission: string, requestingUrl: string, isAppOrigin: (url: string) => boolean): boolean {
   return APP_PERMISSIONS.has(permission) && isAppOrigin(requestingUrl);
 }

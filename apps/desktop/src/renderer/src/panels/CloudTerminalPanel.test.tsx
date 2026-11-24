@@ -2,6 +2,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { HostedTerminal, HostedTerminalPush, HostedTerminals } from "@openorc/protocol";
+import type { OpenOrcApi } from "../../../shared/types";
 import { queryClient } from "../lib/client";
 import { CloudTerminalPanel } from "./CloudTerminalPanel";
 
@@ -12,6 +13,7 @@ vi.mock("@xterm/xterm", () => ({
     rows = screenState.rows;
     options = screenState.options;
     element = undefined;
+    unicode = {};
     loadAddon() {}
     open() {}
     focus() {}
@@ -65,6 +67,7 @@ beforeEach(() => {
       disconnect() {}
     },
   );
+  window.openorc = { platform: "darwin" } as unknown as OpenOrcApi;
   screenState.written = [];
   screenState.options = {};
   screenState.type = () => {};

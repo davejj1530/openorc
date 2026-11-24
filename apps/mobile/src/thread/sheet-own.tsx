@@ -1,4 +1,18 @@
-import { fieldLabel, foldsWords, fromThread, memoryAge, memoryKind, oneLine, relativeTime, taskState, type MemoryRow, type OwnToolView, type TaskRow, type ThreadRow } from "@openorc/client";
+import {
+  fieldLabel,
+  foldsWords,
+  memoryAge,
+  memoryKind,
+  noticeFrom,
+  oneLine,
+  relativeTime,
+  taskState,
+  type MemoryRow,
+  type NoticeFrom,
+  type OwnToolView,
+  type TaskRow,
+  type ThreadRow,
+} from "@openorc/client";
 import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
@@ -231,16 +245,28 @@ function Talk({ messages }: { messages: { role: string; text: string }[] }) {
 function Said({ role, text }: { role: string; text: string }) {
   if (role === "user") return <Bubble text={text} />;
   if (role !== "system") return <Words text={text} />;
-  const from = fromThread(text);
+  const from = noticeFrom(text);
   return (
     <View className="border-line pl-3" style={{ borderLeftWidth: 1.5 }}>
-      {from ? (
-        <TranscriptPressable accessibilityRole="button" onPress={() => router.replace({ pathname: "/thread/[id]", params: { id: from.id } })} className="self-start active:opacity-60">
-          <Text className="text-xs text-ink-2">From {from.title}</Text>
-        </TranscriptPressable>
-      ) : null}
+      {from ? <Sender from={from} /> : null}
       <Words text={from?.text ?? text} plain tone="text-ink-3" />
     </View>
+  );
+}
+
+/** Who a note in a thread is from; a thread's name opens it. */
+function Sender({ from }: { from: NoticeFrom }) {
+  const words = (
+    <Text className="text-xs text-ink-2">
+      {from.lead} {from.name}
+    </Text>
+  );
+  const { threadId } = from;
+  if (!threadId) return words;
+  return (
+    <TranscriptPressable accessibilityRole="button" onPress={() => router.replace({ pathname: "/thread/[id]", params: { id: threadId } })} className="self-start active:opacity-60">
+      {words}
+    </TranscriptPressable>
   );
 }
 

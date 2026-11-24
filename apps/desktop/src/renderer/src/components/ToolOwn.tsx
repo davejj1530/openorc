@@ -1,5 +1,19 @@
 import { useState, type ReactNode } from "react";
-import { fieldLabel, foldsWords, fromThread, memoryAge, memoryKind, oneLine, relativeTime, taskState, type MemoryRow, type OwnToolView, type TaskRow, type ThreadRow } from "@openorc/client";
+import {
+  fieldLabel,
+  foldsWords,
+  memoryAge,
+  memoryKind,
+  noticeFrom,
+  oneLine,
+  relativeTime,
+  taskState,
+  type MemoryRow,
+  type NoticeFrom,
+  type OwnToolView,
+  type TaskRow,
+  type ThreadRow,
+} from "@openorc/client";
 import { openTask, openThread } from "../lib/router";
 import { Globe } from "./icons";
 import { WorkingCube } from "./OpenOrcMark";
@@ -174,16 +188,24 @@ function Talk({ messages }: { messages: { role: string; text: string }[] }) {
 function Said({ role, text }: { role: string; text: string }) {
   if (role === "user") return <div className="own-bubble own-you">{text}</div>;
   if (role !== "system") return <Words text={text} />;
-  const from = fromThread(text);
+  const from = noticeFrom(text);
   return (
     <div className="own-from">
-      {from ? (
-        <button type="button" className="own-from-name" data-tip="Open thread" onClick={() => openThread(from.id)}>
-          From {from.title}
-        </button>
-      ) : null}
+      {from ? <Sender from={from} /> : null}
       <Words text={from?.text ?? text} plain />
     </div>
+  );
+}
+
+/** Who a note in a thread is from; a thread's name opens it. */
+function Sender({ from }: { from: NoticeFrom }) {
+  const words = `${from.lead} ${from.name}`;
+  const { threadId } = from;
+  if (!threadId) return <span className="own-from-name">{words}</span>;
+  return (
+    <button type="button" className="own-from-name" data-tip="Open thread" onClick={() => openThread(threadId)}>
+      {words}
+    </button>
   );
 }
 

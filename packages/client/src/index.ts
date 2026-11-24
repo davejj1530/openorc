@@ -236,7 +236,21 @@ export {
   type LineResult,
   type LineWords,
 } from "./work-lines.js";
-export { foldsWords, fromThread, memoryAge, memoryKind, oneLine, ownToolLine, ownToolView, taskState, type MemoryRow, type OwnToolView, type TaskRow, type ThreadRow } from "./own-tools.js";
+export {
+  foldsWords,
+  memoryAge,
+  memoryKind,
+  noticeFrom,
+  oneLine,
+  ownToolLine,
+  ownToolView,
+  taskState,
+  type MemoryRow,
+  type NoticeFrom,
+  type OwnToolView,
+  type TaskRow,
+  type ThreadRow,
+} from "./own-tools.js";
 export { testReport, type TestCaseFailure, type TestFile, type TestFrame } from "./test-report.js";
 export { fieldLabel, joinPath, toolInputView, toolOutputView, type CommandStep, type Field, type InputView, type OutputView } from "./tool-view.js";
 export { readStep, type StepReading } from "./command-steps.js";

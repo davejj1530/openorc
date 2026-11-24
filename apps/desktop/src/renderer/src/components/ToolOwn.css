@@ -168,7 +168,7 @@ button.own-row:focus-visible,
   text-align: left;
   transition: color var(--duration-quick) var(--ease-out);
 }
-.own-from-name:hover {
+button.own-from-name:hover {
   color: var(--ink);
 }
 .own-from .own-fold,

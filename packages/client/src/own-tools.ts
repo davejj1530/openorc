@@ -252,9 +252,30 @@ const TASK_STATES: Record<string, string> = { working: "Working", waiting: "Wait
 /** Where a task's run stands, in a word; empty when it has none. */
 export const taskState = (state: string | null): string => (state ? (TASK_STATES[state] ?? "") : "");
 
-/** Another thread's note names its thread: `Message from the thread "Title" (id …):`, then what it said. */
-const FROM_THREAD = /^Message from the thread "(.+?)" \(id ([0-9a-f-]{36})\):\s*/;
-export function fromThread(text: string): { title: string; id: string; text: string } | null {
-  const from = FROM_THREAD.exec(text);
-  return from ? { title: from[1]!, id: from[2]!, text: text.slice(from[0].length) } : null;
+/** Who left a notice in a thread, and what it said once the instructions for the agent reading it are set aside. */
+export interface NoticeFrom {
+  /** How the name reads: a message is "From" someone, a thread is "Started by" them. */
+  lead: "From" | "Started by";
+  name: string;
+  /** The thread it came from, when there is one to open. An Orcling's own chat is not. */
+  threadId: string | null;
+  text: string;
+}
+
+const THREAD = String.raw`[Tt]he thread "(?<name>.+?)" \(id (?<id>[0-9a-f-]{36})\)`;
+/** Each opening OpenOrc writes above another thread's or an Orcling's words, as core's thread-message-queue, thread-agent-tools and orcling write them. */
+const NOTICES: { lead: NoticeFrom["lead"]; opening: RegExp }[] = [
+  { lead: "From", opening: new RegExp(String.raw`^Message from ${THREAD}:\s*`) },
+  { lead: "From", opening: /^Message from (?<name>[^\n]+?), the person's Orcling\.[^\n]*:\s*/ },
+  { lead: "Started by", opening: new RegExp(String.raw`^${THREAD} started this thread[^\n]*\s*`) },
+  { lead: "Started by", opening: /^(?<name>[^\n]+?)(?:, the person's Orcling, started this (?:task|thread) for them\.[^\n]*| started this (?:task|thread)\.(?=\n|$))\s*/ },
+];
+
+/** A notice from another thread or an Orcling, read apart. Null for OpenOrc's own notices, which name no one. */
+export function noticeFrom(text: string): NoticeFrom | null {
+  for (const { lead, opening } of NOTICES) {
+    const found = opening.exec(text);
+    if (found) return { lead, name: found.groups!["name"]!, threadId: found.groups!["id"] ?? null, text: text.slice(found[0].length) };
+  }
+  return null;
 }

@@ -42,7 +42,7 @@ import { TaskToolCard } from "./task-online/TaskToolCard";
 import { UsageRecovery } from "./UsageRecovery";
 import { SignInRecovery } from "./SignInRecovery";
 import { TranscriptErrorCard } from "./TranscriptErrorCard";
-import { TextButton } from "./ui";
+import { SystemNotice } from "./SystemNotice";
 import { ImageGenerationRow, ImageViewRow, ThreadImage, ThreadMedia, ThreadRichText, type MediaScope } from "./ThreadImages";
 import { CopyMessage, MessageTime, TurnEnd } from "./MessageActions";
 import { useMessageReveal, type Reveal } from "../lib/message-reveal";
@@ -816,29 +816,6 @@ function ThinkingBody({ id, text }: { id: string; text: string }) {
             {paragraph}
           </p>
         ))}
-      </div>
-    </div>
-  );
-}
-
-/** OpenOrc talking in the thread: a task result, a hand-off. Not the user, not the agent. */
-function SystemNotice({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  const [head, ...rest] = text.split("\n");
-  const details = rest.join("\n").trim();
-  return (
-    <div className="system-notice">
-      <WorkMessage size={16} className="system-notice-icon" />
-      <div className="min-w-0 flex-1">
-        <div className="text-ink-2">{head}</div>
-        {details ? (
-          <>
-            {open ? <pre className="system-notice-details">{details}</pre> : null}
-            <TextButton tone="faint" onClick={() => setOpen((v) => !v)} className="mt-1 text-sm">
-              {open ? "Hide details" : "Show details"}
-            </TextButton>
-          </>
-        ) : null}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ownToolLine, ownToolView } from "./own-tools.js";
+import { noticeFrom, ownToolLine, ownToolView } from "./own-tools.js";
 import type { Block } from "./transcript.js";
 import { workObjects } from "./work-objects.js";
 import { objectOutcome } from "./work-outcomes.js";
@@ -119,4 +119,35 @@ it("gives a call's line what its answer adds: the thing by name, and what it cam
   const [read] = workObjects([call("openorc.thread_read", { id: "t1" }, said({ thread, messages: [{ role: "assistant", text: "Done." }] }))]);
   expect(read).toMatchObject({ kind: "tool", section: "Read thread", named: "Cloud threads", came: "last 1 message" });
   expect(objectOutcome(read!)).toEqual({ text: "last 1 message", failed: false });
+});
+
+describe("noticeFrom", () => {
+  const id = "d3918d7a-6859-4f1a-be06-6ac18ed18ba8";
+
+  it("reads a message from another thread apart from its opening", () => {
+    expect(noticeFrom(`Message from the thread "Dictation "v2" options" (id ${id}):\n\nShipped.\n\nTests pass.`)).toEqual({
+      lead: "From",
+      name: 'Dictation "v2" options',
+      threadId: id,
+      text: "Shipped.\n\nTests pass.",
+    });
+  });
+
+  it("reads the thread that started this one, without the instructions to its agent", () => {
+    const opening = `The thread "iPad release" (id ${id}) started this thread and works in the same folder. Message it with thread_send when you have results or need something from it; don't reply just to acknowledge.`;
+    expect(noticeFrom(`${opening}\n\nBump the version.`)).toEqual({ lead: "Started by", name: "iPad release", threadId: id, text: "Bump the version." });
+  });
+
+  it("reads an Orcling, which has no thread to open", () => {
+    const message = "Message from Mira, the person's Orcling. It reads your replies in this thread and can't be messaged back, so answer here:\n\nHow is it going?";
+    expect(noticeFrom(message)).toEqual({ lead: "From", name: "Mira", threadId: null, text: "How is it going?" });
+    const started = "Mira, the person's Orcling, started this task for them. It reads your replies here and may message you; answer in this thread, since it can't be messaged back.\n\nFix the build.";
+    expect(noticeFrom(started)).toEqual({ lead: "Started by", name: "Mira", threadId: null, text: "Fix the build." });
+    expect(noticeFrom("Mira started this thread.\n\nFix the build.")).toEqual({ lead: "Started by", name: "Mira", threadId: null, text: "Fix the build." });
+  });
+
+  it("leaves OpenOrc's own notices alone", () => {
+    expect(noticeFrom("Switched to Opus at high effort.")).toBeNull();
+    expect(noticeFrom("The task finished.\n\nMira started this thread. Then it stopped.")).toBeNull();
+  });
 });

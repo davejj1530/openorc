@@ -1,4 +1,6 @@
+import { foldsWords, noticeFrom, oneLine, type NoticeFrom } from "@openorc/client";
 import { hostedFileReference } from "@openorc/protocol";
+import { router } from "expo-router";
 import { memo, useMemo } from "react";
 import { Pressable, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
@@ -14,6 +16,7 @@ import { Markdown } from "./Markdown";
 import { replySegments } from "./reply-images";
 import type { ReplyProof } from "./reply-proof";
 import type { MessageBlock, PieceSource } from "./rows";
+import { TranscriptPressable } from "./TranscriptPressable";
 import { useOtherAuthor } from "./thread-authors";
 
 /** The name the person gave an attachment, after the id that keeps it unique. */
@@ -66,42 +69,82 @@ export const Prompt = memo(function Prompt({ block }: { block: MessageBlock }) {
 });
 
 /**
- * OpenOrc talking in the thread, not the person and not the agent: a hand-off, a task's result. Its first line says
- * what happened; the rest (a task's whole report) stays folded behind a faint Show details.
+ * Words in the thread that are not the person's and not the agent's. Another thread's or an Orcling's read as a
+ * message: who it is from, then what it said. OpenOrc's own (a hand-off, a task's result) read by their first line, the
+ * rest (a task's whole report) folded behind a faint Show details.
  */
 export const Notice = memo(function Notice({ block }: { block: MessageBlock }) {
-  const [open, setOpen] = useOpen(`notice:${block.id}`, false);
-  const [head, ...rest] = block.text.split("\n");
-  const details = rest.join("\n").trim();
+  const from = useMemo(() => noticeFrom(block.text), [block.text]);
   return (
     <View className="flex-row items-start gap-2.5 rounded-xl bg-surface-2 px-3.5 py-3">
       <View className="mt-0.5">
         <WorkMessage size={16} className="text-ink-4" />
       </View>
-      <View className="min-w-0 flex-1 gap-1">
-        <Text prose className="text-ink-2">
-          {head}
-        </Text>
-        {details && open ? (
-          <Text prose className="text-ink-3">
-            {details}
-          </Text>
-        ) : null}
-        {details ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded: open }}
-            onPress={() => setOpen(!open)}
-            hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
-            className="self-start active:opacity-60"
-          >
-            <Text className="text-sm text-ink-4">{open ? "Hide details" : "Show details"}</Text>
-          </Pressable>
-        ) : null}
-      </View>
+      <View className="min-w-0 flex-1 gap-1">{from ? <Received id={block.id} from={from} /> : <Told id={block.id} text={block.text} />}</View>
     </View>
   );
 });
+
+function Told({ id, text }: { id: string; text: string }) {
+  const [open, setOpen] = useOpen(`notice:${id}`, false);
+  const [head, ...rest] = text.split("\n");
+  const details = rest.join("\n").trim();
+  return (
+    <>
+      <Text prose className="text-ink-2">
+        {head}
+      </Text>
+      {details && open ? (
+        <Text prose className="text-ink-3">
+          {details}
+        </Text>
+      ) : null}
+      {details ? <Fold open={open} onPress={() => setOpen(!open)} labels={["Show details", "Hide details"]} /> : null}
+    </>
+  );
+}
+
+/** A message from another thread: short ones whole, long ones by their first lines until asked for. */
+function Received({ id, from }: { id: string; from: NoticeFrom }) {
+  const [all, setAll] = useOpen(`notice:${id}`, false);
+  const folds = foldsWords(from.text);
+  return (
+    <>
+      <Sender name={from.name} lead={from.lead} threadId={from.threadId} />
+      {folds && !all ? (
+        <Text prose numberOfLines={4} className="text-ink-3">
+          {oneLine(from.text)}
+        </Text>
+      ) : (
+        <Markdown text={from.text} streaming={false} tone="note" />
+      )}
+      {folds ? <Fold open={all} onPress={() => setAll(!all)} labels={["Show all", "Show less"]} /> : null}
+    </>
+  );
+}
+
+/** Who wrote it. A thread's name opens that thread; an Orcling's chat is not a thread to open. */
+function Sender({ lead, name, threadId }: { lead: string; name: string; threadId: string | null }) {
+  const words = (
+    <Text prose className="text-ink-3">
+      {lead} <Text className="text-ink">{name}</Text>
+    </Text>
+  );
+  if (!threadId) return words;
+  return (
+    <TranscriptPressable accessibilityRole="button" onPress={() => router.push({ pathname: "/thread/[id]", params: { id: threadId } })} className="self-start active:opacity-60">
+      {words}
+    </TranscriptPressable>
+  );
+}
+
+function Fold({ open, onPress, labels }: { open: boolean; onPress: () => void; labels: [closed: string, opened: string] }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={onPress} hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }} className="self-start active:opacity-60">
+      <Text className="text-sm text-ink-4">{labels[open ? 1 : 0]}</Text>
+    </Pressable>
+  );
+}
 
 const pulse = {
   animationName: { from: { opacity: 1 }, to: { opacity: 0.3 } },

@@ -1,5 +1,5 @@
 /*
- * State marks: a thread's cube and a project's sigil, drawn as dots (packages/client state-marks.ts). Each dot scales
+ * State marks: a thread's cube, drawn as dots (packages/client state-marks.ts). Each dot scales
  * from its own centre and wears its mark's colour, from faded into the ground to whole, as its animation says. The
  * colour is the theme's own for what the mark says, so a mark changes with the palette and with light and dark.
  */
@@ -8,32 +8,72 @@
   inherits: false;
   initial-value: 1;
 }
-/* An agent at work, in the theme's working ink. A dot may wear a tone of its own. */
+/* An agent at work, in the theme's working ink. */
 .state-mark {
   flex-shrink: 0;
   overflow: visible;
   --mark-color: var(--working-ink);
 }
-:is(.state-mark, .state-mark circle)[data-tone="think"] {
+.state-mark[data-tone="think"] {
   --mark-color: var(--tone-think);
 }
-:is(.state-mark, .state-mark circle)[data-tone="ink"] {
+.state-mark[data-tone="ink"] {
   --mark-color: var(--ink);
 }
-:is(.state-mark, .state-mark circle)[data-tone="attention"] {
+.state-mark[data-tone="attention"] {
   --mark-color: var(--attention);
 }
-:is(.state-mark, .state-mark circle)[data-tone="bad"] {
+.state-mark[data-tone="bad"] {
   --mark-color: var(--bad);
 }
-:is(.state-mark, .state-mark circle)[data-tone="ok"] {
+.state-mark[data-tone="ok"] {
   --mark-color: var(--ok);
 }
-:is(.state-mark, .state-mark circle)[data-tone="quiet"] {
+.state-mark[data-tone="quiet"] {
   --mark-color: var(--ink-3);
 }
 .state-mark circle {
   transform-box: fill-box;
   transform-origin: center;
   fill: color-mix(in oklab, var(--mark-color) calc(45% + var(--mark-wear) * 55%), var(--bg));
+}
+
+/*
+ * A project's cube: the same cube as an open frame, in the ink of the label it leads. Its top face is empty while the
+ * project is quiet, fills in the theme's working ink while its threads work, breathing slowly, and wears the
+ * attention colour when one of them needs the person.
+ */
+.project-cube {
+  flex-shrink: 0;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.project-cube-top {
+  fill: var(--working-ink);
+  stroke: var(--working-ink);
+  opacity: 0;
+  transition: opacity var(--duration-leave) var(--ease-out);
+}
+.project-cube[data-activity="working"] .project-cube-top {
+  opacity: 1;
+  animation: project-cube-breathe 2.4s ease-in-out infinite;
+}
+.project-cube[data-activity="attention"] .project-cube-top {
+  fill: var(--attention);
+  stroke: var(--attention);
+  opacity: 1;
+}
+@keyframes project-cube-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .project-cube[data-activity="working"] .project-cube-top {
+    animation: none;
+  }
 }

@@ -588,8 +588,8 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   width: 14px;
   height: 14px;
 }
-/* A sigil is dots, not a drawing: it takes the row's 16px so they hold. */
-.sidebar-project-mark > .state-mark {
+/* The cube's frame sits inside its box, so it takes the row's 16px to match the other marks' weight. */
+.sidebar-project-mark > .project-cube {
   width: 16px;
   height: 16px;
 }

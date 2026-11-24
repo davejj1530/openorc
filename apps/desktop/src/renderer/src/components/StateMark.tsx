@@ -38,7 +38,7 @@ export function StateMark({ motion, size = 16, label, className }: { motion: Mar
       {...(label ? { role: "img", "aria-label": label } : { "aria-hidden": true })}
     >
       {motion.dots.map((dot, index) => (
-        <circle key={index} cx={dot.x} cy={dot.y} r={motion.radius} data-tone={dot.tone} style={moment(dot.frames[rest]!) as CSSProperties} />
+        <circle key={index} cx={dot.x} cy={dot.y} r={motion.radius} style={moment(dot.frames[rest]!) as CSSProperties} />
       ))}
     </svg>
   );

@@ -405,7 +405,7 @@ it("leads each project's label with its mark, and No project's with the globe", 
     expect(mark.querySelector("svg, img")).not.toBeNull();
   }
   expect(label("No project").querySelector('.sidebar-project-mark [data-icon="Globe"]')).not.toBeNull();
-  expect(label("First project").querySelector(".sidebar-project-mark .state-mark")).not.toBeNull();
+  expect(label("First project").querySelector(".sidebar-project-mark .project-cube")).not.toBeNull();
 });
 
 it("reaches a project's actions from a button at its label's end, with the keyboard as with a click", async () => {

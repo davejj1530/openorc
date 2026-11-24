@@ -22,22 +22,25 @@ jobs:
     # Keep the existing required-check name while the work runs in parallel.
     name: Typecheck, test, build
     runs-on: ubuntu-24.04
-    needs: [quality, core-tests, linux, linux-tests, linux-desktop-tests, linux-core-tests]
+    needs: [mac-quality, mac-tests, core-tests, linux, lint, linux-tests, linux-desktop-tests, linux-core-tests]
     if: always()
     steps:
       - name: Require all checks and test shards to pass
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
+          # The macOS jobs skip pull requests, and a skipped job is not a failed one.
           for result in $RESULTS; do
-            if [[ "$result" != "success" ]]; then echo "::error::A required job ended as $result"; exit 1; fi
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then echo "::error::A required job ended as $result"; exit 1; fi
           done
 
-  # Typecheck, lint and the format check read the same sources on every system, so Linux runs them once.
-  quality:
-    name: Typecheck, build and workspace tests
-    runs-on: macos-15
-    timeout-minutes: 20
+  # Linux runs everything on every push and pull request: its runners are plentiful and start at once, so the work is
+  # split until no job outlasts lint. Only twenty jobs run at once across the repository, so it is split no further:
+  # two pull requests fit together. Typecheck and lint read the same sources on every system, so only Linux runs them.
+  linux:
+    name: Linux typecheck and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -46,37 +49,20 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check:size
-      - run: node --test scripts/size-limit.test.cjs
+      - run: pnpm -r typecheck
       - run: node --test scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
-      # Core has its own shards. Desktop's jsdom tests time out beside other workspaces and render the same on Linux,
-      # which runs them alone; its main-process tests run here after the rest.
-      - run: pnpm -r --filter '!@openorc/core' --filter '!@openorc/desktop' test
-        env:
-          GIT_AUTHOR_NAME: ci
-          GIT_AUTHOR_EMAIL: ci@openorc.local
-          GIT_COMMITTER_NAME: ci
-          GIT_COMMITTER_EMAIL: ci@openorc.local
-      - run: pnpm --filter @openorc/desktop exec vitest run --project node
-        env:
-          GIT_AUTHOR_NAME: ci
-          GIT_AUTHOR_EMAIL: ci@openorc.local
-          GIT_COMMITTER_NAME: ci
-          GIT_COMMITTER_EMAIL: ci@openorc.local
       - run: pnpm build
         env:
           # Authenticate the website's build-time changelog request.
           GITHUB_TOKEN: ${{ github.token }}
+      # The core the Windows app runs inside a WSL distribution is built on Linux, and otherwise only by a release:
+      # a change that breaks its bundle would first show there, after the tag is pushed.
+      - run: pnpm --filter @openorc/desktop bundle:wsl
 
-  core-tests:
-    name: Core tests (${{ matrix.shard }}/3)
-    runs-on: macos-15
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      # Three shards leave room for quality and bench within five macOS jobs.
-      matrix:
-        shard: [1, 2, 3]
+  lint:
+    name: Linux lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -85,7 +71,82 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @openorc/core test --shard=${{ matrix.shard }}/3
+      # Type-aware ESLint holds every tsconfig's program at once (about 5 GB), more than the 7 GB macOS runner
+      # can spare, so it runs here on the 16 GB Linux runner.
+      - run: pnpm lint
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+  # Hosted and mobile take as long as every other workspace together, so they run apart from the rest. Core and
+  # desktop have their own shards.
+  linux-tests:
+    name: Linux workspace tests (${{ matrix.group }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: hosted and mobile
+            filters: --filter @openorc/hosted --filter @openorc/mobile
+          - group: the rest
+            filters: --filter '!@openorc/core' --filter '!@openorc/desktop' --filter '!@openorc/hosted' --filter '!@openorc/mobile'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r ${{ matrix.filters }} test
+        env:
+          GIT_AUTHOR_NAME: ci
+          GIT_AUTHOR_EMAIL: ci@openorc.local
+          GIT_COMMITTER_NAME: ci
+          GIT_COMMITTER_EMAIL: ci@openorc.local
+
+  # Desktop's jsdom tests wait on rendering and time out when other workspaces share the runner.
+  linux-desktop-tests:
+    name: Linux desktop tests (${{ matrix.shard }}/2)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @openorc/desktop test --shard=${{ matrix.shard }}/2
+        env:
+          GIT_AUTHOR_NAME: ci
+          GIT_AUTHOR_EMAIL: ci@openorc.local
+          GIT_COMMITTER_NAME: ci
+          GIT_COMMITTER_EMAIL: ci@openorc.local
+
+  linux-core-tests:
+    name: Linux core tests (${{ matrix.shard }}/2)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @openorc/core test --shard=${{ matrix.shard }}/2
         env:
           GIT_AUTHOR_NAME: ci
           GIT_AUTHOR_EMAIL: ci@openorc.local
@@ -93,7 +154,7 @@ jobs:
           GIT_COMMITTER_EMAIL: ci@openorc.local
 
   windows:
-    name: Windows typecheck and build
+    name: Windows build and format check
     runs-on: windows-2025
     timeout-minutes: 30
     steps:
@@ -106,8 +167,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:size
       - run: node --test scripts/size-limit.test.cjs
-      - run: pnpm -r typecheck
       - run: node --test scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
+      # Prettier reads the same on every system. It runs here because this job has time to spare, and a Windows
+      # checkout is where line endings would go wrong.
       - run: pnpm format:check
       # The full suite currently includes POSIX-only fixtures (e.g. /bin/sh).
       # Keep running it in the macOS jobs until those tests are portable.
@@ -115,10 +177,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-  linux:
-    name: Linux typecheck, lint and build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
+  # macOS runners are slow and only five run at once, so the macOS jobs wait for a push to main, where they still
+  # hold back a release. A pull request is checked on Linux and Windows. The five jobs are the two below, two core
+  # shards and the benchmark.
+  mac-quality:
+    name: macOS build, and hosted, mobile and desktop main-process tests
+    if: github.event_name != 'pull_request'
+    runs-on: macos-15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -127,25 +193,30 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm -r typecheck
-      # Type-aware ESLint holds every tsconfig's program at once (about 5 GB), more than the 7 GB macOS runner
-      # can spare, so it runs here on the 16 GB Linux runner.
-      - run: pnpm lint
-        env:
-          NODE_OPTIONS: --max-old-space-size=8192
-      - run: pnpm format:check
+      - run: pnpm check:size
+      - run: node --test scripts/size-limit.test.cjs
       - run: node --test scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
+      - run: pnpm -r --filter @openorc/hosted --filter @openorc/mobile test
+        env:
+          GIT_AUTHOR_NAME: ci
+          GIT_AUTHOR_EMAIL: ci@openorc.local
+          GIT_COMMITTER_NAME: ci
+          GIT_COMMITTER_EMAIL: ci@openorc.local
+      # Desktop's jsdom tests render the same on Linux, which runs them; its main-process tests run here too.
+      - run: pnpm --filter @openorc/desktop exec vitest run --project node
+        env:
+          GIT_AUTHOR_NAME: ci
+          GIT_AUTHOR_EMAIL: ci@openorc.local
+          GIT_COMMITTER_NAME: ci
+          GIT_COMMITTER_EMAIL: ci@openorc.local
       - run: pnpm build
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      # The core the Windows app runs inside a WSL distribution is built on Linux, and otherwise only by a release:
-      # a change that breaks its bundle would first show there, after the tag is pushed.
-      - run: pnpm --filter @openorc/desktop bundle:wsl
 
-  # Linux runs the whole suite too, split like macOS: Linux runners are plentiful where macOS runners are not.
-  linux-tests:
-    name: Linux workspace tests
-    runs-on: ubuntu-24.04
+  mac-tests:
+    name: macOS workspace tests (the rest)
+    if: github.event_name != 'pull_request'
+    runs-on: macos-15
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -155,41 +226,22 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm -r --filter '!@openorc/core' --filter '!@openorc/desktop' test
+      - run: pnpm -r --filter '!@openorc/core' --filter '!@openorc/desktop' --filter '!@openorc/hosted' --filter '!@openorc/mobile' test
         env:
           GIT_AUTHOR_NAME: ci
           GIT_AUTHOR_EMAIL: ci@openorc.local
           GIT_COMMITTER_NAME: ci
           GIT_COMMITTER_EMAIL: ci@openorc.local
 
-  # Desktop's jsdom tests wait on rendering and time out when other workspaces share the runner.
-  linux-desktop-tests:
-    name: Linux desktop tests
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @openorc/desktop test
-        env:
-          GIT_AUTHOR_NAME: ci
-          GIT_AUTHOR_EMAIL: ci@openorc.local
-          GIT_COMMITTER_NAME: ci
-          GIT_COMMITTER_EMAIL: ci@openorc.local
-
-  linux-core-tests:
-    name: Linux core tests (${{ matrix.shard }}/3)
-    runs-on: ubuntu-24.04
+  core-tests:
+    name: Core tests (${{ matrix.shard }}/2)
+    if: github.event_name != 'pull_request'
+    runs-on: macos-15
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -198,7 +250,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @openorc/core test --shard=${{ matrix.shard }}/3
+      - run: pnpm --filter @openorc/core test --shard=${{ matrix.shard }}/2
         env:
           GIT_AUTHOR_NAME: ci
           GIT_AUTHOR_EMAIL: ci@openorc.local
@@ -207,6 +259,7 @@ jobs:
 
   bench:
     name: Bridge benchmark
+    if: github.event_name != 'pull_request'
     runs-on: macos-15
     timeout-minutes: 15
     steps:

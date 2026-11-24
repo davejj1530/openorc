@@ -1,10 +1,8 @@
 import {
-  latestActivity,
   MENTION_MARK,
   mentionLeads,
   pullRequestMark,
   relativeTime,
-  rowAge,
   rowFacts,
   rowStarter,
   subagentStatusLabel,
@@ -12,25 +10,25 @@ import {
   threadHeadline,
   threadMark,
   threadPlace,
+  threadStateMark,
   threadStatus,
   type ThreadMark,
+  type ThreadMarkKind,
   type ThreadTreeRow,
   useSidebarNow,
 } from "@openorc/client";
-import { harnessShortName, isHarnessId, isSubagentThread, placeOf, type PrState, type ThreadSummary } from "@openorc/protocol";
+import { harnessShortName, isHarnessId, isSubagentThread, placeOf, type ThreadSummary } from "@openorc/protocol";
 import { Link, router, type Href } from "expo-router";
-import { memo, useMemo, type ComponentType } from "react";
+import { memo, useMemo, useState } from "react";
 import { useWindowDimensions, View } from "react-native";
-import { Cloud, GitMerge, GitPullRequest, GitPullRequestClosed } from "../generated/icons";
+import { Cloud } from "../generated/icons";
 import { useListOpen, useSplit } from "../layout";
 import { cn } from "../ui/cn";
-import type { IconProps } from "../ui/icon";
 import { ListPressable } from "../ui/ListPressable";
 import { PersonFace } from "../ui/PersonFace";
 import { swipeAccessibility, type SwipeAction } from "../ui/swipe";
 import { SwipeRow } from "../ui/SwipeRow";
 import { SweepText } from "../ui/SweepText";
-import { Text } from "../ui/Text";
 import { useCloudOutOfReach } from "../spaces/cloud-reach";
 import { markThreadOpening } from "../thread/perf-probe";
 import { threadMenu, threadSwipes } from "../thread/thread-actions";
@@ -39,13 +37,9 @@ import { useSnoozeClock } from "../thread/snooze-clock";
 import { useThreadActions } from "../thread/use-thread-actions";
 import { useRowRun } from "./row-run";
 import { STILL, type RowMotion } from "./fold-motion";
-import { ACTION_INSET, ACTION_RESERVE, CHROME_SCALE, ROW_INSET, titleMid } from "./grid";
+import { CHROME_SCALE, MARGIN, ROOT_GAP, ROW_INSET, titleMid } from "./grid";
 import { ThreadTreeFrame, treeIndent, TreeToggle } from "./ThreadBranch";
-import { leadReach, RowStatus, ThreadRowHeading } from "./ThreadRowHeading";
-
-const pullIcons: Record<PrState, ComponentType<IconProps>> = { open: GitPullRequest, merged: GitMerge, closed: GitPullRequestClosed };
-// The desktop's pull request tones.
-const pullTones: Record<PrState, string> = { open: "text-ink-4", merged: "text-ok", closed: "text-bad" };
+import { DISCLOSURE_AT, leadReach, RowStatus, RowTitle, ThreadRowHeading } from "./ThreadRowHeading";
 
 /** Where it works, who works on it and when it last moved: the details a row keeps for its menu. */
 function menuFacts(thread: ThreadSummary, where: string): string[] {
@@ -66,35 +60,25 @@ export function cloudPlace(thread: ThreadSummary, project: string | null, outOfR
   };
 }
 
-/** How far a root row's mark reaches past the line's end, so its 28 pt box centers on the action column. */
-const MARK_PULL = ACTION_INSET - ROW_INSET - 14 - ACTION_RESERVE;
-/** The age's column, wide enough for "11mo", so ages end on one line down the list. */
-const AGE_WIDTH = 32;
+/** A row's padding either side, inside its pressed fill: its lead starts and its facts end at the margin. */
+const ROW_PAD = MARGIN - ROW_INSET;
 
 /**
- * A root row's facts, as the desktop's row packs them before its state: who started it when it is someone else, its
- * pull request in its state's tone, and the cloud for an OpenOrc Cloud thread whose group's label does not wear it,
- * dimmed while out of reach. Each sits in a 16 pt slot; absent facts leave their room to the title, while the age and
- * the mark keep their columns. What they say is in the row's label.
+ * A root row's facts, as the desktop's row packs them at its end: who started it when it is someone else, and the cloud
+ * for an OpenOrc Cloud thread whose group's label does not wear it, dimmed while out of reach. Each sits in a 16 pt
+ * slot; absent facts leave their room to the title. What they say is in the row's label.
  */
 function FactSlots({ thread, cloudLabel }: { thread: ThreadSummary; cloudLabel: boolean }) {
   const starter = rowStarter(thread);
-  const pull = pullRequestMark(thread);
   const place = cloudPlace(thread, null, useCloudOutOfReach());
   // Under a group whose label wears the cloud, the label says it, and dims for its rows while out of reach.
   const cloud = cloudLabel ? null : place;
-  const PullIcon = pull ? pullIcons[pull.state] : null;
-  if (!starter && !pull && !cloud) return null;
+  if (!starter && !cloud) return null;
   return (
     <View className="shrink-0 flex-row items-center gap-1" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
       {starter ? (
         <View className="size-4 items-center justify-center">
           <PersonFace name={starter.name} image={starter.image} size="sm" />
-        </View>
-      ) : null}
-      {PullIcon && pull ? (
-        <View className="size-4 items-center justify-center">
-          <PullIcon size={14} className={pullTones[pull.state]} />
         </View>
       ) : null}
       {cloud ? (
@@ -107,27 +91,36 @@ function FactSlots({ thread, cloudLabel }: { thread: ThreadSummary; cloudLabel: 
   );
 }
 
+/** What a row's cube needs: its mark, and the work its live run names. */
+type Lead = { mark: ThreadMark | null; kind: ThreadMarkKind | undefined };
+
 /**
- * A root row's one line, as the desktop sidebar's: the title, lighting up while its agent works, then its facts, its
- * age in a fixed column and its state's mark in a fixed box out in the action column, so ages and marks line up down
- * the list. A parent's disclosure holds the action column, so its facts, age and mark step left of it as one, as the
- * desktop's do. Words the row once said under its title (where it works, what it is doing) are in its label.
+ * A root row's one line, as the desktop sidebar's: its cube in one column down the list, the title, lighting up while
+ * its agent works, a parent's disclosure after it, then its facts at the end. When it last moved, where it works and
+ * what it is doing are in its label and its menu.
  */
-function RootLine({ thread, mark, working, parent, cloudLabel }: { thread: ThreadSummary; mark: ThreadMark | null; working: boolean; parent: boolean; cloudLabel: boolean }) {
-  const age = rowAge(latestActivity(thread), useSidebarNow());
-  const scale = Math.min(useWindowDimensions().fontScale, CHROME_SCALE);
+function RootLine({
+  thread,
+  lead,
+  working,
+  parent,
+  cloudLabel,
+  onTitleEnd,
+}: {
+  thread: ThreadSummary;
+  lead: Lead;
+  working: boolean;
+  parent: boolean;
+  cloudLabel: boolean;
+  onTitleEnd: (x: number) => void;
+}) {
   return (
-    <View className="flex-row items-center gap-3">
-      <SweepText text={thread.title} className="flex-1 text-xl text-ink" sweeping={working} />
+    <View className="flex-row items-center" style={{ gap: ROOT_GAP }}>
+      <RowStatus thread={thread} mark={lead.mark} kind={lead.kind} className="w-5" />
+      <RowTitle parent={parent} onEnd={onTitleEnd}>
+        <SweepText text={thread.title} className="text-xl text-ink" sweeping={working} />
+      </RowTitle>
       <FactSlots thread={thread} cloudLabel={cloudLabel} />
-      <View className="flex-row items-center gap-1">
-        <Text numberOfLines={1} className="text-right text-detail tabular-nums text-ink-4" style={{ width: AGE_WIDTH * scale }}>
-          {age}
-        </Text>
-        <View pointerEvents="none" style={parent ? undefined : { marginRight: MARK_PULL }}>
-          <RowStatus thread={thread} mark={mark} />
-        </View>
-      </View>
     </View>
   );
 }
@@ -140,13 +133,13 @@ function rowLabel(thread: ThreadSummary, { state, about }: { state: string | und
   return [thread.title, state, ...about, ...facts].filter(Boolean).join(", ");
 }
 
-/** What a row says of its thread's state: a root row's pull request has its own slot among its facts. */
+/** What a row says of its thread's state: its status, or its pull request while it rests. */
 function rowMarks(thread: ThreadSummary, compact: boolean) {
   const status = threadStatus(thread);
   const working = !compact && status?.kind === "running";
   // The reader's unread mention stands before a quiet wait or an unread result, as on the desktop.
   if (mentionLeads(thread, status)) return { status, working, mark: MENTION_MARK };
-  return { status, working, mark: compact ? threadMark(thread) : status };
+  return { status, working, mark: threadMark(thread) };
 }
 
 /**
@@ -160,7 +153,7 @@ function treePlace(tree: ThreadTreeRow | undefined, motion: RowMotion, arriving:
   return {
     compact,
     rowClass: cn("mx-3 min-h-touch justify-center rounded-lg px-2 active:bg-surface-2", lit ? "bg-navigation-soft" : "bg-bg", compact ? "py-2.75" : "py-2.5"),
-    rowStyle: { paddingLeft: 8 + treeIndent(tree?.depth ?? 0), paddingRight: ACTION_RESERVE },
+    rowStyle: { paddingLeft: ROW_PAD + treeIndent(tree?.depth ?? 0), paddingRight: ROW_PAD },
     open: Boolean(tree?.expanded && !motion.folding),
     moves: motion.arrive === undefined && arriving ? { ...motion, arrive: 0 } : motion,
   };
@@ -215,6 +208,10 @@ export const ThreadRow = memo(
     const { compact, rowClass, rowStyle, open, moves } = treePlace(tree, motion, arriving, split && shown);
     const child = thread.subagent;
     const { status, working, mark } = rowMarks(thread, compact);
+    const lead: Lead = { mark, kind: threadStateMark(thread, { run })?.kind };
+    const parent = Boolean(tree?.hasChildren && onFold);
+    // Where the title ends on its line, for a parent's disclosure to follow it.
+    const [titleEnd, setTitleEnd] = useState<number | null>(null);
     const place = threadPlace(thread);
     const fontScale = useWindowDimensions().fontScale;
     const cloud = cloudPlace(thread, project);
@@ -232,13 +229,13 @@ export const ThreadRow = memo(
       facts,
     );
     const lines = compact ? (
-      <ThreadRowHeading thread={thread} mark={mark} />
+      <ThreadRowHeading thread={thread} mark={mark} kind={lead.kind} parent={parent} onTitleEnd={setTitleEnd} />
     ) : (
-      <RootLine thread={thread} mark={mark} working={working} parent={Boolean(tree?.hasChildren && onFold)} cloudLabel={cloudLabel} />
+      <RootLine thread={thread} lead={lead} working={working} parent={parent} cloudLabel={cloudLabel} onTitleEnd={setTitleEnd} />
     );
     // A root row's own tree line drops from under its title's first letters.
     const node = compact ? undefined : { mid: titleMid(false, fontScale) + 12 * Math.min(fontScale, CHROME_SCALE), reach: 0 };
-    const toggle = <TreeToggle tree={tree} open={open} compact={compact} onFold={onFold} />;
+    const toggle = <TreeToggle tree={tree} open={open} compact={compact} at={titleEnd === null ? null : ROW_INSET + rowStyle.paddingLeft + titleEnd + DISCLOSURE_AT} onFold={onFold} />;
     return (
       <ThreadTreeFrame tree={tree} reach={leadReach(thread, mark)} node={node} motion={moves} compact={compact}>
         <SwipeRow id={thread.id} leading={leading} trailing={trailing}>

@@ -50,7 +50,7 @@ export type HomeItem =
    * A project's label over its threads, with how many of them wait on the person. `offline` when it is a cloud project
    * none of whose threads OpenOrc Cloud reaches now: its rows leave the cloud to its label, which dims.
    */
-  | { kind: "project"; key: string; project: HomeProject; open: boolean; waiting: number; offline?: true; room?: HeadingRoom }
+  | { kind: "project"; key: string; project: HomeProject; open: boolean; waiting: number; working?: true; offline?: true; room?: HeadingRoom }
   /**
    * `project` is the name a root row's label says, outside its project's group; rows in their group, and sub threads,
    * say none. `cloudLabel` when its group's label wears the cloud already. `arriving` rises it in.
@@ -173,7 +173,15 @@ function groupItems(list: HomeList, options: HomeOptions): HomeItem[] {
       const open = sidebarSectionOpen(options.collapsed, "project", project.id);
       const shown = projectRows(roots, { rows: options.layout.rows.get(project.id) ?? [], open, holdsActive: (root) => active.has(root.id) });
       return [
-        { kind: "project", key, project, open, waiting: waitingRoots(roots, list.days.all), ...(project.cloud && cloudOffline(roots) ? { offline: true as const } : {}) } as const,
+        {
+          kind: "project",
+          key,
+          project,
+          open,
+          waiting: waitingRoots(roots, list.days.all),
+          ...(roots.some((root) => root.activity === "running") ? { working: true as const } : {}),
+          ...(project.cloud && cloudOffline(roots) ? { offline: true as const } : {}),
+        } as const,
         ...treeRows(shown.rows, list, options, { named: false, arriving: options.opened === key, cloudLabel: Boolean(project.cloud) }),
         ...(shown.hidden ? [{ kind: "group-more", key: `group-more:${project.id}`, projectId: project.id, count: shown.hidden } as const] : []),
         ...(roots.length || list.days.pinned.length || list.failed || !list.listed ? [] : [{ kind: "empty", key: "empty" } as const]),

@@ -11,8 +11,11 @@ const GAP = 12;
 export const STEP = LEAD + GAP;
 export const LEAD_CENTER = MARGIN + LEAD / 2;
 export const TEXT_X = MARGIN + STEP;
-/** The center of a root row's 16 pt project glyph at the margin, where the row's tree line leaves for its sub threads. */
-export const ROOT_NODE = MARGIN + 8;
+/** A root row's 20 pt cube and a project's 20 pt sigil, at the margin, and the gap before the title or name. */
+export const ROOT_MARK = 20;
+export const ROOT_GAP = 8;
+/** The center of a root row's cube, where the row's tree line leaves for its sub threads. */
+export const ROOT_NODE = MARGIN + ROOT_MARK / 2;
 /** From the trailing edge to the action column's center: a 40 pt header circle ends at the margin. */
 export const ACTION_INSET = MARGIN + 20;
 /** The 44 pt touch around an action, from the trailing edge. */
@@ -20,8 +23,8 @@ export const ACTION_RIGHT = ACTION_INSET - 22;
 /** A row's pressed fill runs this far outside the margin (mx-3), so the fill has room around the mark. */
 export const ROW_INSET = 12;
 /**
- * What every row keeps clear at its trailing end: the action column. Titles, second lines and a sub thread's fact end
- * where the headings' counts end, at the action's touch; the column holds a disclosure or nothing.
+ * What a row with an action at its end keeps clear there: the action column. A thread's row has none; its facts end
+ * at the margin and a parent's disclosure follows its title.
  */
 export const ACTION_RESERVE = ACTION_RIGHT + 44 - ROW_INSET;
 /** How far interface text grows with the reader's text size (ui/Text.tsx). */

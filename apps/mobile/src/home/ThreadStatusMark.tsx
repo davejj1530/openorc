@@ -1,80 +1,41 @@
-import type { PrState } from "@openorc/protocol";
+import { threadMarkMotion, type ThreadMark, type ThreadMarkKind } from "@openorc/client";
 import { View } from "react-native";
-import Animated from "react-native-reanimated";
-import { AlertCircle, CircleHelp, GitPullRequest, LoaderCircle, Terminal } from "../generated/icons";
-import type { ThreadMark } from "@openorc/client";
-import { useReducedMotion } from "../ui/reduced-motion";
-import { Text } from "../ui/Text";
+import { cn } from "../ui/cn";
+import { StateMark } from "../ui/StateMark";
 
-const pullTone: Record<PrState, string> = { open: "text-ink-4", merged: "text-ok", closed: "text-bad" };
+/** The cube's size in a row, and how far it reaches left of its center on the title line: the tree's lines stop short of it. */
+export const MARK_SIZE = 20;
+export const MARK_REACH = 9;
+/** How far a finished sub thread's 16 pt glyph reaches: a ring (8.5 of 24 plus half the 1.75 stroke), a cross's arm (6 of 24). */
+export const REACH = { ring: 6.25, cross: 4.6 } as const;
 
-/** The desktop's mention mark: an @ in the ink at 15 on a 16 pt line. */
-const MENTION_TYPE = { fontSize: 15, lineHeight: 16 };
-
-// Tailwind's animate-spin, which the desktop's spinner uses.
-const spin = { to: { transform: [{ rotate: "360deg" }] } };
-
-/** The faint spinner of a thread at work, turning unless motion is reduced. */
-export function Spinner() {
-  const still = useReducedMotion();
-  return (
-    <Animated.View style={still ? undefined : { animationName: spin, animationDuration: "1s", animationIterationCount: "infinite", animationTimingFunction: "linear" }}>
-      <LoaderCircle size={16} className="text-ink-4" />
-    </Animated.View>
-  );
-}
-
-function Glyph({ mark }: { mark: ThreadMark }) {
-  switch (mark.kind) {
-    case "waiting":
-      return <CircleHelp size={16} className="text-attention" />;
-    case "waiting-other":
-      return <CircleHelp size={16} className="text-ink-4" />;
-    case "running":
-      return <Spinner />;
-    case "failed":
-      return <AlertCircle size={16} className="text-bad" />;
-    case "unread":
-      return <View className="size-2 rounded-full bg-attention" />;
-    case "background":
-      return <Terminal size={16} className="text-ink-4" />;
-    case "pull":
-      return <GitPullRequest size={16} className={pullTone[mark.state]} />;
-    case "mention":
-      return (
-        <Text maxFontSizeMultiplier={1} className="text-ink" style={MENTION_TYPE}>
-          @
-        </Text>
-      );
-  }
-}
-
-/**
- * How far each kind of 16 pt status glyph reaches left of its center on the title line, stroke included: the rings
- * (8.5 of 24 plus half the 1.75 stroke), the cross's and the pull request's left arms (6 of 24), the terminal's frame
- * (9 of 24 plus half the stroke), the 8 pt unread dot, the @ at 15.
- */
-export const REACH = { ring: 6.25, cross: 4.6, frame: 6.6, dot: 4, at: 6.5 } as const;
-
-const reaches: Record<ThreadMark["kind"], number> = {
-  waiting: REACH.ring,
-  "waiting-other": REACH.ring,
-  running: REACH.ring,
-  failed: REACH.ring,
-  unread: REACH.dot,
-  background: REACH.frame,
-  pull: REACH.cross,
-  mention: REACH.at,
+/** The cube for a mark that says only its thread's state, where no live run names the work. */
+const kindOf = (mark: ThreadMark): ThreadMarkKind => {
+  if (mark.kind === "pull") return mark.state;
+  const kinds: Record<Exclude<ThreadMark["kind"], "pull">, ThreadMarkKind> = {
+    waiting: "question",
+    "waiting-other": "waiting",
+    running: "working",
+    failed: "failed",
+    unread: "done",
+    background: "background",
+    mention: "mention",
+  };
+  return kinds[mark.kind];
 };
 
-/** How far a row's status glyph reaches left of its center, so the tree's lines can stop a set gap short of it. */
-export const markReach = (mark: ThreadMark | null): number | null => (mark ? reaches[mark.kind] : null);
+/** How far a row's cube reaches left of its center, so the tree's lines can stop a set gap short of it. */
+export const markReach = (mark: ThreadMark | null): number | null => (mark ? MARK_REACH : null);
 
-/** A row's status in Home's lead column, its 16 pt glyph centered under the headings' glyphs. Empty when the thread has nothing to report. */
-export function ThreadStatusMark({ mark }: { mark: ThreadMark | null }) {
+/**
+ * A row's cube in Home's lead column, centered under the headings' marks. `kind` is the work its live run names, when
+ * the row holds one. Empty when the thread has nothing to report. `className` sets the column: a sub thread's 28 pt
+ * one unless the row says otherwise.
+ */
+export function ThreadStatusMark({ mark, kind, className = "w-7" }: { mark: ThreadMark | null; kind?: ThreadMarkKind | undefined; className?: string }) {
   return (
-    <View className="h-4 w-7 items-center justify-center" accessible={mark !== null} accessibilityLabel={mark?.label}>
-      {mark ? <Glyph mark={mark} /> : null}
+    <View className={cn("h-5 items-center justify-center", className)} accessible={mark !== null} accessibilityLabel={mark?.label}>
+      {mark ? <StateMark motion={threadMarkMotion(kind ?? kindOf(mark))} size={MARK_SIZE} /> : null}
     </View>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { AlarmClock, ChevronDown, CircleCheck, Cloud, Folder, Globe, Pin } from "../generated/icons";
+import { projectMarkMotion, type ProjectActivity } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import type { ComponentType } from "react";
 import type { IconProps } from "../ui/icon";
@@ -9,18 +10,21 @@ import { ListPressable } from "../ui/ListPressable";
 import { useCloudOutOfReach } from "../spaces/cloud-reach";
 import { useReducedMotion } from "../ui/reduced-motion";
 import { turn } from "../ui/motion";
+import { StateMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import Animated from "react-native-reanimated";
 import { movingStyle, type RowMotion } from "./fold-motion";
 import type { HeadingRoom, HomeItem } from "./home-items";
-import { MARGIN, ROW_INSET, TEXT_X, titleMid } from "./grid";
+import { MARGIN, ROOT_GAP, ROOT_MARK, ROW_INSET, TEXT_X, titleMid } from "./grid";
 import { ThreadBranch, treeIndent } from "./ThreadBranch";
 
 type Section = Extract<HomeItem, { kind: "section" }>;
 type Group = Extract<HomeItem, { kind: "project" }>;
 
-/** Where a root row's title starts, inside the row's inset: labels of the list's parts line up with it. */
+/** Where a row's lead starts, inside the row's inset: the marks of the list's parts line up with the rows' cubes. */
 const LABEL_PAD = MARGIN - ROW_INSET;
+/** Where a root row's title starts, past its cube: the list's words line up with it. */
+const TITLE_PAD = LABEL_PAD + ROOT_MARK + ROOT_GAP;
 
 /** The room above a heading or part: the most after rows end one, none at the top past the bar's own. */
 const rooms: Record<HeadingRoom, string> = { first: "mt-1", "after-rows": "mt-3", "after-heading": "" };
@@ -34,11 +38,11 @@ const partMarks: Record<Section["part"], ComponentType<IconProps>> = { pinned: P
 
 /**
  * A label that folds what is under it, in one shape for every part of the list, as the desktop's sidebar heads its
- * groups: a mark where the rows' titles start, the words, what it counts, the chevron after them turning as it folds,
- * and at the end an amber count of what waits on the person.
+ * groups: a mark in the rows' lead column, the words where their titles start, what it counts, the chevron after them
+ * turning as it folds, and at the end an amber count of what waits on the person.
  */
 function FoldLabel({
-  mark: Mark,
+  mark,
   dim = false,
   words,
   spoken,
@@ -48,7 +52,7 @@ function FoldLabel({
   room,
   onToggle,
 }: {
-  mark: ComponentType<IconProps>;
+  mark: ReactNode;
   /** The mark fades, as a cloud does while OpenOrc Cloud is out of reach. */
   dim?: boolean;
   words: string;
@@ -66,13 +70,11 @@ function FoldLabel({
       accessibilityState={{ expanded: open }}
       accessibilityLabel={spoken}
       onPress={onToggle}
-      className={cn("mx-3 min-h-touch flex-row items-center gap-2 rounded-lg pr-5 active:bg-surface-2", rooms[room])}
-      style={{ paddingLeft: LABEL_PAD }}
+      className={cn("mx-3 min-h-touch flex-row items-center rounded-lg pr-5 active:bg-surface-2", rooms[room])}
+      style={{ paddingLeft: LABEL_PAD, gap: ROOT_GAP }}
     >
-      {/* The glyph takes its ink from its class; its fade is the view's. */}
-      <View className={cn(dim && "opacity-40")}>
-        <Mark size={16} className="text-ink-3" />
-      </View>
+      {/* A glyph takes its ink from its class; its fade is the view's. */}
+      <View className={cn("size-5 items-center justify-center", dim && "opacity-40")}>{mark}</View>
       <Text numberOfLines={1} className="shrink text-detail text-ink-3">
         {words}
       </Text>
@@ -88,9 +90,10 @@ function FoldLabel({
 
 /** Pinned, Snoozed or Resolved: its mark, its label and, for Pinned and Snoozed, how many it holds. */
 export function SectionToggle({ section, room = "after-rows", motion, onToggle }: { section: Section; room?: HeadingRoom; motion: RowMotion; onToggle: () => void }) {
+  const Mark = partMarks[section.part];
   return (
     <FoldLabel
-      mark={partMarks[section.part]}
+      mark={<Mark size={16} className="text-ink-3" />}
       words={section.label}
       spoken={section.count === undefined ? section.label : `${section.label}, ${section.count}`}
       count={section.count}
@@ -101,22 +104,32 @@ export function SectionToggle({ section, room = "after-rows", motion, onToggle }
   );
 }
 
-/** A project's mark: the cloud for one only OpenOrc Cloud has, the globe for No project, else a folder. */
-export function projectMark(project: { id: string; cloud?: true }): ComponentType<IconProps> {
+/** A project's glyph where it has no sigil: the cloud for one only OpenOrc Cloud has, the globe for No project. */
+export function projectGlyph(project: { id: string; cloud?: true }): ComponentType<IconProps> | null {
   if (project.cloud) return Cloud;
-  return project.id === WORKSPACE_ID ? Globe : Folder;
+  return project.id === WORKSPACE_ID ? Globe : null;
+}
+
+/** A project's icon where a list names it with a glyph: its cloud or globe, else a folder. */
+export const projectMark = (project: { id: string; cloud?: true }): ComponentType<IconProps> => projectGlyph(project) ?? Folder;
+
+/** What a project's sigil shows of its threads: one that needs the person before any at work. */
+function activityOf(group: Group): ProjectActivity {
+  if (group.waiting) return "attention";
+  return group.working ? "working" : "quiet";
 }
 
 /**
- * A project's label over its threads: its mark (a folder, or the cloud for a project only OpenOrc Cloud has), its name,
- * and what in it waits on the person. Its rows leave the cloud to it, so its cloud dims for them while out of reach.
+ * A project's label over its threads: its sigil, drawn from its name and stirring with its threads (the cloud for a
+ * project only OpenOrc Cloud has, the globe for No project), its name, and what in it waits on the person. Its rows
+ * leave the cloud to it, so its cloud dims for them while out of reach.
  */
 export function ProjectLabel({ group, room = "after-rows", motion, onToggle }: { group: Group; room?: HeadingRoom; motion: RowMotion; onToggle: () => void }) {
-  const mark = projectMark(group.project);
+  const Glyph = projectGlyph(group.project);
   const outOfReach = useCloudOutOfReach();
   return (
     <FoldLabel
-      mark={mark}
+      mark={Glyph ? <Glyph size={16} className="text-ink-3" /> : <StateMark motion={projectMarkMotion(group.project.name, activityOf(group))} size={ROOT_MARK} />}
       dim={Boolean(group.project.cloud && (group.offline || outOfReach))}
       words={group.project.name}
       spoken={group.waiting ? `${group.project.name}, ${group.waiting} need you` : group.project.name}
@@ -132,7 +145,7 @@ export function ProjectLabel({ group, room = "after-rows", motion, onToggle }: {
 export function ShowMoreInGroup({ count, motion, onPress }: { count: number; motion: RowMotion; onPress: () => void }) {
   return (
     <Moving motion={motion}>
-      <ListPressable accessibilityRole="button" onPress={onPress} className="mx-3 min-h-touch justify-center rounded-lg active:bg-surface-2" style={{ paddingLeft: LABEL_PAD }}>
+      <ListPressable accessibilityRole="button" onPress={onPress} className="mx-3 min-h-touch justify-center rounded-lg active:bg-surface-2" style={{ paddingLeft: TITLE_PAD }}>
         <Text className="text-detail text-ink-4">Show {count} more</Text>
       </ListPressable>
     </Moving>

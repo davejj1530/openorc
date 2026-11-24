@@ -3,7 +3,6 @@ import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ThreadAction } from "../thread/thread-actions";
-import { flatStyle, nativeProps } from "../test-fixtures/react-native";
 import { fixtureThreads } from "./test-fixtures/threads";
 import { cloudPlace, ThreadRow } from "./ThreadRow";
 
@@ -79,34 +78,6 @@ it("lights up a working thread's title and says it works in its label, while an 
   expect(idle.getByText(plan.title)).toBeTruthy();
 });
 
-it("keeps a root row to its title's line: its project, branch and pull request in its label, the pull request's mark in its slot", () => {
-  const canvas = fixtureThreads.find((thread) => thread.id === "t-canvas")!;
-  const view = render(<ThreadRow thread={canvas} project="immaculate" arriving={false} />);
-  expect(view.queryByText("immaculate")).toBeNull();
-  expect(view.queryByText("#93")).toBeNull();
-  expect(label(view)).toContain("Pull request #93, closed");
-  expect(label(view)).toContain("immaculate");
-  cleanup();
-  const notes = fixtureThreads.find((thread) => thread.id === "t-notes")!;
-  const quiet = { ...notes, branch: "fix/menu", prUrl: null, lastActivityAt: Date.now() - 12 * 60_000 };
-  const row = render(<ThreadRow thread={quiet} project="openorc" arriving={false} />);
-  expect(row.getByTestId("opens-thread").textContent).toBe(`${quiet.title}12m`);
-  expect(label(row)).toContain("openorc");
-  expect(label(row)).toContain("fix/menu");
-});
-
-it("keeps the age and the mark in columns of their own on every row, so they line up down the list", () => {
-  const plan = { ...fixtureThreads.find((thread) => thread.id === "t-plan")!, branch: null, prUrl: null };
-  const ages = ["now", "12m", "11mo"];
-  for (const [index, at] of [Date.now(), Date.now() - 12 * 60_000, Date.now() - 340 * 86_400_000].entries()) {
-    const view = render(<ThreadRow thread={{ ...plan, lastActivityAt: at, activity: index ? "idle" : "waiting" }} project={null} arriving={false} />);
-    expect(flatStyle(nativeProps.get(view.getByText(ages[index]!))!.style).width).toBe(32);
-    // The mark's box is there with a mark and without one, so the age ends at one place.
-    expect(Array.from(view.container.querySelectorAll("div")).filter((element) => /\bw-7\b/.test(String(nativeProps.get(element)?.className)))).toHaveLength(1);
-    cleanup();
-  }
-});
-
 it("keeps a parent's disclosure on its own row, beside the link that opens the thread, and asks for the opposite fold", () => {
   const parent = fixtureThreads.find((thread) => thread.id === "t-plan")!;
   const tree = { thread: parent, depth: 0, hasChildren: true, expanded: false, last: true, continuing: [] };
@@ -123,20 +94,6 @@ it("keeps a parent's disclosure on its own row, beside the link that opens the t
   view.rerender(<ThreadRow thread={parent} project={null} arriving={false} tree={{ ...tree, expanded: true }} motion={{ folding: true }} onFold={onFold} />);
   fireEvent.click(view.getByRole("button", { name: `Expand ${parent.title}` }));
   expect(onFold).toHaveBeenLastCalledWith(parent.id, true);
-});
-
-it("leaves the cloud to a group label that wears it, and keeps the age and the mark at their columns with the cloud or without", () => {
-  const plan = { ...fixtureThreads.find((thread) => thread.id === "t-plan")!, branch: null, prUrl: null, lastActivityAt: Date.now() - 12 * 60_000 };
-  const cloud = { ...plan, id: "cloud", unread: true, owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 1 } };
-  for (const cloudLabel of [true, false]) {
-    const view = render(<ThreadRow thread={cloud} project={null} cloudLabel={cloudLabel} arriving={false} />);
-    expect(view.queryByLabelText("Cloud glyph") === null).toBe(cloudLabel);
-    expect(flatStyle(nativeProps.get(view.getByText("12m"))!.style).width).toBe(32);
-    expect(Array.from(view.container.querySelectorAll("div")).filter((element) => /\bw-7\b/.test(String(nativeProps.get(element)?.className)))).toHaveLength(1);
-    // The label still says where it lives.
-    expect(label(view)).toContain("OpenOrc Cloud");
-    cleanup();
-  }
 });
 
 it("marks an OpenOrc Cloud thread with the cloud and the face of the teammate who started it, says where in its label, and organizes it from its menu", () => {

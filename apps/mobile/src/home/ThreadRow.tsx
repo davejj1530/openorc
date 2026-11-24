@@ -12,15 +12,13 @@ import {
   threadPlace,
   threadStateMark,
   threadStatus,
-  type ThreadMark,
-  type ThreadMarkKind,
   type ThreadTreeRow,
   useSidebarNow,
 } from "@openorc/client";
 import { harnessShortName, isHarnessId, isSubagentThread, placeOf, type ThreadSummary } from "@openorc/protocol";
 import { Link, router, type Href } from "expo-router";
 import { memo, useMemo } from "react";
-import { useWindowDimensions, View } from "react-native";
+import { View } from "react-native";
 import { Cloud } from "../generated/icons";
 import { useListOpen, useSplit } from "../layout";
 import { cn } from "../ui/cn";
@@ -37,9 +35,9 @@ import { useSnoozeClock } from "../thread/snooze-clock";
 import { useThreadActions } from "../thread/use-thread-actions";
 import { useRowRun } from "./row-run";
 import { STILL, type RowMotion } from "./fold-motion";
-import { ACTION_RESERVE, CHROME_SCALE, MARGIN, ROOT_GAP, ROW_INSET, titleMid } from "./grid";
+import { ACTION_RESERVE, MARGIN, ROOT_GAP, ROW_INSET } from "./grid";
 import { ThreadTreeFrame, treeIndent, TreeToggle } from "./ThreadBranch";
-import { leadReach, RowStatus, ThreadRowHeading } from "./ThreadRowHeading";
+import { leadReach, RowStatus, ThreadRowHeading, type RowLead } from "./ThreadRowHeading";
 
 /** Where it works, who works on it and when it last moved: the details a row keeps for its menu. */
 function menuFacts(thread: ThreadSummary, where: string): string[] {
@@ -91,18 +89,15 @@ function FactSlots({ thread, cloudLabel }: { thread: ThreadSummary; cloudLabel: 
   );
 }
 
-/** What a row's cube needs: its mark, and the work its live run names. */
-type Lead = { mark: ThreadMark | null; kind: ThreadMarkKind | undefined };
-
 /**
  * A root row's one line, as the desktop sidebar's: its cube in one column down the list, the title, lighting up while
  * its agent works, then its facts, which end before the action column on every row so they line up whether or not a
  * disclosure stands there. When it last moved, where it works and what it is doing are in its label and its menu.
  */
-function RootLine({ thread, lead, working, cloudLabel }: { thread: ThreadSummary; lead: Lead; working: boolean; cloudLabel: boolean }) {
+function RootLine({ thread, lead, working, cloudLabel }: { thread: ThreadSummary; lead: RowLead; working: boolean; cloudLabel: boolean }) {
   return (
     <View className="flex-row items-center" style={{ gap: ROOT_GAP }}>
-      <RowStatus thread={thread} mark={lead.mark} kind={lead.kind} className="w-5" />
+      <RowStatus thread={thread} lead={lead} className="w-5" />
       <SweepText text={thread.title} className="flex-1 text-xl text-ink" sweeping={working} />
       <FactSlots thread={thread} cloudLabel={cloudLabel} />
     </View>
@@ -192,9 +187,9 @@ export const ThreadRow = memo(
     const { compact, rowClass, rowStyle, open, moves } = treePlace(tree, motion, arriving, split && shown);
     const child = thread.subagent;
     const { status, working, mark } = rowMarks(thread, compact);
-    const lead: Lead = { mark, kind: threadStateMark(thread, { run })?.kind };
+    // A row whose sub threads show under it wears the resting cube when it has nothing to say: their tree hangs from it.
+    const lead: RowLead = { mark, kind: threadStateMark(thread, { run })?.kind, resting: open && Boolean(tree?.hasChildren) };
     const place = threadPlace(thread);
-    const fontScale = useWindowDimensions().fontScale;
     const cloud = cloudPlace(thread, project);
     const where = cloud?.spoken ?? [project, place.label].filter(Boolean).join(" · ");
     const facts = menuFacts(thread, where);
@@ -209,12 +204,10 @@ export const ThreadRow = memo(
         : { state: mark?.label, about: [headline?.text, detail, pullRequestMark(thread)?.label] },
       facts,
     );
-    const lines = compact ? <ThreadRowHeading thread={thread} mark={mark} kind={lead.kind} /> : <RootLine thread={thread} lead={lead} working={working} cloudLabel={cloudLabel} />;
-    // A root row's own tree line drops from under its title's first letters.
-    const node = compact ? undefined : { mid: titleMid(false, fontScale) + 12 * Math.min(fontScale, CHROME_SCALE), reach: 0 };
+    const lines = compact ? <ThreadRowHeading thread={thread} lead={lead} /> : <RootLine thread={thread} lead={lead} working={working} cloudLabel={cloudLabel} />;
     const toggle = <TreeToggle tree={tree} open={open} compact={compact} onFold={onFold} />;
     return (
-      <ThreadTreeFrame tree={tree} reach={leadReach(thread, mark)} node={node} motion={moves} compact={compact}>
+      <ThreadTreeFrame tree={tree} reach={leadReach(thread, mark, lead.resting)} motion={moves} compact={compact}>
         <SwipeRow id={thread.id} leading={leading} trailing={trailing}>
           <View>
             <Link

@@ -81,32 +81,15 @@ export function TreeToggle({ tree, open, compact, onFold }: { tree?: ThreadTreeR
   );
 }
 
-/**
- * A row of a tree: it rises in as its fold opens, fades as it folds, and draws its branch over its lead. A root row's
- * own line leaves from its `node`, under its title, rather than from its title line.
- */
-export function ThreadTreeFrame({
-  tree,
-  reach,
-  node,
-  motion,
-  compact,
-  children,
-}: {
-  tree?: ThreadTreeRow;
-  reach: number | null;
-  node?: { mid: number; reach: number };
-  motion: RowMotion;
-  compact: boolean;
-  children: ReactNode;
-}) {
+/** A row of a tree: it rises in as its fold opens, fades as it folds, and draws its branch over its lead. */
+export function ThreadTreeFrame({ tree, reach, motion, compact, children }: { tree?: ThreadTreeRow; reach: number | null; motion: RowMotion; compact: boolean; children: ReactNode }) {
   const still = useReducedMotion();
   const fontScale = useWindowDimensions().fontScale;
   const [height, setHeight] = useState(44);
   return (
     <Animated.View style={movingStyle(motion, still)} onLayout={(event) => setHeight(event.nativeEvent.layout.height)}>
       {children}
-      {tree ? <ThreadBranch row={tree} height={height} mid={node?.mid ?? titleMid(compact, fontScale)} reach={node?.reach ?? reach} /> : null}
+      {tree ? <ThreadBranch row={tree} height={height} mid={titleMid(compact, fontScale)} reach={reach} /> : null}
     </Animated.View>
   );
 }

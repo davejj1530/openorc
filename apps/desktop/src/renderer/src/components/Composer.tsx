@@ -430,11 +430,11 @@ export function Composer(props: ComposerProps) {
                 {activityLabel}
               </span>
             ) : null}
-            {isNewThread ? null : <ComposerCommitChip changes={props.changes} />}
-            <ComposerContext {...props} />
+            <ComposerAside {...props} folded={Boolean(dictation.phase)} />
             {props.presentation === "small" ? null : <ComposerDictation dictation={dictation} />}
             <ComposerSendCluster
               cluster={cluster}
+              quiet={Boolean(dictation.phase)}
               canSend={canSend}
               block={note.isNote ? note.block : composerSendBlock({ disabledReason: props.readOnlyReason ?? props.disabledReason, attachmentBlock })}
               stopping={stopping}
@@ -493,6 +493,22 @@ function ComposerContext({ compacting, context, onCompact, compactDisabledReason
       ) : null}
       {context ? <ContextUsage used={context.used} window={context.window} onCompact={onCompact} compacting={compacting} disabledReason={readOnlyReason ?? compactDisabledReason} /> : null}
     </>
+  );
+}
+
+/**
+ * What the bar says about the work rather than the message: the Commit chip and how full the context is. While the
+ * message is dictated they fold away and take no keyboard, so the bar holds only what a sentence in progress needs,
+ * and they come back when it ends.
+ */
+function ComposerAside({ folded, ...props }: ComposerProps & { folded: boolean }) {
+  return (
+    <span className="composer-aside" data-folded={folded || undefined} inert={folded}>
+      <span>
+        {props.presentation === "new-thread" ? null : <ComposerCommitChip changes={props.changes} />}
+        <ComposerContext {...props} />
+      </span>
+    </span>
   );
 }
 

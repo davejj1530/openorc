@@ -196,6 +196,35 @@
   pointer-events: none;
 }
 
+/* What the bar says about the work rather than the message: the Commit chip and the context. While the message is
+   dictated they fold to nothing, the gap after them with them, and open again when it ends. The clip margin keeps a
+   ringed control's outline. */
+.composer-aside {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-width: 0;
+  transition:
+    grid-template-columns var(--duration-resize) var(--ease-out),
+    margin var(--duration-resize) var(--ease-out),
+    opacity var(--duration-leave) var(--ease-out);
+}
+.composer-aside > span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  overflow: clip;
+  overflow-clip-margin: 4px;
+}
+.composer-aside[data-folded] {
+  grid-template-columns: 0fr;
+  margin-right: -10px;
+  opacity: 0;
+}
+.composer-aside:has(> span:empty) {
+  display: none;
+}
+
 /* The microphone. At rest a bare round key. Dictating, it opens leftward into one pill on the control fill: Cancel,
    the voice, the recording's dot and time come out of a blur as it widens, and the key's glyph turns from the
    microphone to a check in place. Finished, they fade and the pill folds back into the key. */

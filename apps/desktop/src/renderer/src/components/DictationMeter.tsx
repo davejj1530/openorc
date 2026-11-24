@@ -87,7 +87,7 @@ export function DictationMeter({ active }: { active: boolean }) {
   }, [active, still]);
   return (
     <>
-      <canvas ref={canvas} className="composer-dictate-wave" />
+      <canvas ref={canvas} className="composer-dictate-wave" aria-hidden="true" />
       <span className="composer-dictate-clock">
         <span className="composer-dictate-dot" />
         <span ref={time} className="composer-dictate-time">

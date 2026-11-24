@@ -38,7 +38,9 @@ function inkTip(cluster: SendCluster, words: string | null, reason: string | und
  * way waits beside the pill as a quiet word, dimmed with its reason when the turn cannot take it. While an ask waits with
  * nothing typed, the ink is the ask's and Stop stands alone as the white key. In a cloud thread others are in, each says
  * on demand whose sign-in and hours it uses (`payer`). A draft that tags a person makes the pill Post note, which says
- * on demand where the note goes; Stop stays beside it while something runs.
+ * on demand where the note goes; Stop stays beside it while something runs. `quiet`, while the message is dictated,
+ * the cluster keeps only Stop and the arrow: the other way and the pill's word step aside, and the arrow says its way
+ * on demand.
  */
 export function ComposerSendCluster({
   cluster,
@@ -48,8 +50,10 @@ export function ComposerSendCluster({
   onSend,
   onStop,
   payer = null,
+  quiet = false,
 }: {
   cluster: SendCluster;
+  quiet?: boolean;
   canSend: boolean;
   /** Why nothing can be sent, said on demand by the dimmed send. */
   block: string | null;
@@ -63,7 +67,7 @@ export function ComposerSendCluster({
   return (
     <div className="composer-send-cluster">
       {cluster.kind === "asked" || (cluster.kind !== "stop" && cluster.stop) ? <StopKey stopping={stopping} onStop={onStop} tip={payer?.stop ?? "Stop"} /> : null}
-      {cluster.kind === "turn" ? (
+      {cluster.kind === "turn" && !quiet ? (
         <button
           type="button"
           onClick={() => onSend(true)}
@@ -74,7 +78,7 @@ export function ComposerSendCluster({
           {WAY_WORDS[cluster.other.way]}
         </button>
       ) : null}
-      {cluster.kind === "asked" ? null : <InkButton cluster={cluster} canSend={canSend} reason={reason} payer={payer} stopping={stopping} onSend={() => onSend(false)} onStop={onStop} />}
+      {cluster.kind === "asked" ? null : <InkButton cluster={cluster} canSend={canSend} reason={reason} payer={payer} stopping={stopping} quiet={quiet} onSend={() => onSend(false)} onStop={onStop} />}
     </div>
   );
 }
@@ -93,6 +97,7 @@ function InkButton({
   reason,
   payer,
   stopping,
+  quiet,
   onSend,
   onStop,
 }: {
@@ -101,10 +106,13 @@ function InkButton({
   reason: string | undefined;
   payer: SendPayer | null;
   stopping: boolean;
+  quiet: boolean;
   onSend: () => void;
   onStop: () => void;
 }) {
-  const words = inkWords(cluster);
+  const named = inkWords(cluster);
+  // Quiet, the word folds away and the arrow carries it as its name and its tip instead.
+  const words = quiet ? null : named;
   const folding = useFoldingWords(words);
   const stops = cluster.kind === "stop";
   return (
@@ -112,8 +120,8 @@ function InkButton({
       type="button"
       onClick={stops ? onStop : onSend}
       disabled={stops ? stopping : !canSend}
-      aria-label={stops ? "Stop" : (words ?? "Send")}
-      data-tip={inkTip(cluster, words, reason, payer)}
+      aria-label={stops ? "Stop" : (named ?? "Send")}
+      data-tip={quiet && named ? (reason ?? named) : inkTip(cluster, words, reason, payer)}
       data-state={stops ? "stop" : "send"}
       data-words={words ? true : undefined}
       className="composer-send"

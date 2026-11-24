@@ -215,7 +215,8 @@ export function ComposerDictation({ dictation }: { dictation: ComposerDictationS
   return (
     <>
       <div className="composer-dictate" data-state={phase ?? undefined}>
-        <span className="composer-dictate-live">
+        {/* Folded away at rest, its parts take no keyboard and are not read out. */}
+        <span className="composer-dictate-live" inert={!phase}>
           <span>
             <button type="button" className="composer-dictate-cancel" aria-label="Cancel dictation" data-tip="Cancel" disabled={!phase} onClick={cancelDictation}>
               <X size={14} />

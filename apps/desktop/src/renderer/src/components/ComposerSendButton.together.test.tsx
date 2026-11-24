@@ -61,3 +61,14 @@ it("says Send uses the reader's own sign-in and hours with nothing running, and 
   expect(screen.getByRole("button", { name: "Queue" }).getAttribute("data-tip")).toBeNull();
   expect(screen.getByRole("button", { name: "Stop" }).getAttribute("data-tip")).toBe("Stop");
 });
+
+it("keeps only Stop and the arrow while the message is dictated, the arrow still named for its way", () => {
+  render(
+    <ComposerSendCluster cluster={{ kind: "turn", stop: true, enter: "now", other: { way: "queue", blocked: null } }} canSend block={null} stopping={false} quiet onSend={vi.fn()} onStop={vi.fn()} />,
+  );
+  expect(screen.queryByRole("button", { name: "Queue" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
+  const arrow = screen.getByRole("button", { name: "Send now" });
+  expect(arrow.hasAttribute("data-words")).toBe(false);
+  expect(arrow.getAttribute("data-tip")).toBe("Send now");
+});

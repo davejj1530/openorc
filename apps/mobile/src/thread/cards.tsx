@@ -74,7 +74,7 @@ function Pill({ label, primary = false, disabled, onPress }: { label: string; pr
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
-      className={cn("h-touch flex-1 items-center justify-center rounded-full px-4", primary ? "bg-accent active:opacity-80" : "bg-surface-2 active:bg-surface-3", disabled && "opacity-60")}
+      className={cn("h-touch flex-1 items-center justify-center rounded-full px-4", primary ? "bg-accent active:opacity-80" : "bg-key active:bg-surface-3", disabled && "opacity-60")}
     >
       <Text numberOfLines={1} className={cn("text-md", primary && "text-accent-fg")}>
         {label}
@@ -160,7 +160,7 @@ export function ApprovalCard({ block, runId }: { block: ApprovalBlock; runId: st
   return (
     <View className="gap-3 rounded-2xl bg-surface p-4">
       <View className="flex-row items-start gap-3">
-        <View className="size-9 items-center justify-center rounded-md bg-surface-2">
+        <View className="size-9 items-center justify-center rounded-md bg-key">
           <Icon size={16} className="text-ink-3" />
         </View>
         <View className="min-w-0 flex-1 gap-0.5">
@@ -343,7 +343,7 @@ export function QuestionCard({ block, runId }: { block: ApprovalBlock; runId: st
                 onChangeText={(value) => setOther((state) => ({ ...state, [q.key]: value }))}
                 onSubmitEditing={submit}
                 returnKeyType="send"
-                className="min-h-touch rounded-lg bg-surface-2 px-3 font-sans text-base text-ink"
+                className="min-h-touch rounded-lg bg-key px-3 font-sans text-base text-ink"
                 placeholderTextColorClassName="accent-ink-4"
               />
             ) : null}

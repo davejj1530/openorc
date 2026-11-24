@@ -14,11 +14,11 @@ const heading = (step: keyof typeof text, palette: Palette) => ({
   marginBottom: 14,
 });
 
-/** How prose reads: a reply, or a note such as the narration under a step, which the desktop mutes to 13/20 in ink-3. */
+/** How prose reads: a reply, or a note such as the narration under a step, which the desktop mutes a step smaller in ink-3. */
 export type MarkdownTone = "reply" | "note";
 
 /**
- * A reply in the desktop's prose recipe (rich-text.css and the transcript's reply rules): 14/22 in the text face and
+ * A reply in the desktop's prose recipe (rich-text.css and the transcript's reply rules): its reading step in the text face and
  * one weight, bold only for the author's emphasis, muted lists with faint 4 pt dots, inline code at 0.86 em on the
  * content fill, code blocks as r16 fills in 12 pt mono at 1.7, links in content ink, tables with hairline rows.
  * `hairline` is the screen's thinnest line.

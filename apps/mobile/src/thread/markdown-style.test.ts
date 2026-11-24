@@ -1,21 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { colors, fonts } from "../generated/tokens";
+import { colors, fonts, text } from "../generated/tokens";
 import { markdownStyle } from "./markdown-style";
 
 describe("markdownStyle", () => {
   const light = markdownStyle(colors.light, "light", 0.5);
   const dark = markdownStyle(colors.dark, "dark", 0.5);
 
-  it("sets a reply at the desktop's 14/22 in the text face, bold only in the Bold face", () => {
-    expect(light.paragraph).toMatchObject({ fontFamily: fonts.text, fontSize: 14, lineHeight: 22, color: colors.light.ink, marginBottom: 14 });
+  it("sets a reply at the desktop's reading step in the text face, bold only in the Bold face", () => {
+    expect(light.paragraph).toMatchObject({ fontFamily: fonts.text, fontSize: text.md.size, lineHeight: text.md.lineHeight, color: colors.light.ink, marginBottom: 14 });
     expect(light.strong).toEqual({ fontFamily: fonts.bold, fontWeight: "normal", color: colors.light.ink });
-    expect(light.h3).toMatchObject({ fontFamily: fonts.text, fontWeight: "normal", fontSize: 16, lineHeight: 22 });
+    expect(light.h3).toMatchObject({ fontFamily: fonts.text, fontWeight: "normal", fontSize: text.lg.size, lineHeight: text.lg.lineHeight });
     expect(light.table).toMatchObject({ fontFamily: fonts.text, fontWeight: "normal" });
   });
 
   it("mutes lists behind faint 4 pt dots and keeps code in the desktop's fills", () => {
     expect(light.list).toMatchObject({ color: colors.light["ink-2"], bulletColor: colors.light["ink-4"], bulletSize: 4, itemSpacing: 8 });
-    expect(light.code).toMatchObject({ fontFamily: fonts.mono, fontSize: 12, color: colors.light["content-ink"], backgroundColor: colors.light["content-soft"] });
+    // Inline code sits at 0.86 of the words around it.
+    expect(light.code).toMatchObject({ fontFamily: fonts.mono, fontSize: Math.round(text.md.size * 0.86), color: colors.light["content-ink"], backgroundColor: colors.light["content-soft"] });
     expect(light.codeBlock).toMatchObject({ fontFamily: fonts.mono, fontSize: 12, lineHeight: 20.4, borderRadius: 16, backgroundColor: colors.light["surface-2"], borderWidth: 0 });
   });
 
@@ -32,12 +33,13 @@ describe("markdownStyle", () => {
     expect(light.table).toMatchObject({ headerBackgroundColor: colors.light["surface-2"], rowEvenBackgroundColor: colors.light.surface, rowOddBackgroundColor: colors.light.surface });
   });
 
-  it("reads a note (narration under a step) at 13/20 in ink-3, as the desktop's muted note, emphasis still in ink", () => {
+  it("reads a note (narration under a step) a step smaller in ink-3, as the desktop's muted note, emphasis still in ink", () => {
     const note = markdownStyle(colors.light, "light", 0.5, "note");
-    expect(note.paragraph).toMatchObject({ fontFamily: fonts.text, fontSize: 13, lineHeight: 20, color: colors.light["ink-3"], marginBottom: 14 });
-    expect(note.list).toMatchObject({ fontSize: 13, lineHeight: 20, color: colors.light["ink-3"], bulletColor: colors.light["ink-4"] });
+    expect(text.base.size).toBeLessThan(text.md.size);
+    expect(note.paragraph).toMatchObject({ fontFamily: fonts.text, fontSize: text.base.size, lineHeight: text.base.lineHeight, color: colors.light["ink-3"], marginBottom: 14 });
+    expect(note.list).toMatchObject({ fontSize: text.base.size, lineHeight: text.base.lineHeight, color: colors.light["ink-3"], bulletColor: colors.light["ink-4"] });
     expect(note.strong).toEqual(light.strong);
-    expect(note.code).toEqual({ ...light.code, fontSize: 11 });
+    expect(note.code).toEqual({ ...light.code, fontSize: Math.round(text.base.size * 0.86) });
   });
 
   it("follows the mode: dark paints the dark palette and the dark code theme", () => {

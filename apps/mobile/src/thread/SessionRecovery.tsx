@@ -45,7 +45,7 @@ function AccountChoice({ choice, now, going, disabled, onPress }: { choice: Cont
       accessibilityState={{ disabled: off, busy: going }}
       disabled={off}
       onPress={onPress}
-      className="min-h-touch flex-row items-center gap-3 rounded-2xl bg-surface-2 px-3 active:bg-surface-3"
+      className="min-h-touch flex-row items-center gap-3 rounded-2xl bg-key px-3 active:bg-surface-3"
     >
       {going ? <Spinner size={16} /> : <UsageRing left={choice.limited ? 0 : choice.left} stale={false} />}
       <Text numberOfLines={1} className={cn("min-w-0 flex-1 text-md", off && "text-ink-4")}>
@@ -140,7 +140,7 @@ function Stopped({ thread, request, disabled, onSent }: RecoveryProps) {
           accessibilityState={{ disabled: off, busy: going === "restart" }}
           disabled={off}
           onPress={() => start("restart", { restart: true }, RESTART_PROMPT)}
-          className="h-control-md flex-row items-center justify-center gap-2 self-start rounded-full bg-surface-2 px-4 active:bg-surface-3"
+          className="h-control-md flex-row items-center justify-center gap-2 self-start rounded-full bg-key px-4 active:bg-surface-3"
         >
           {going === "restart" ? <Spinner size={14} /> : null}
           <Text className={cn("text-sm text-ink-2", off && "text-ink-4")}>{words.restart}</Text>

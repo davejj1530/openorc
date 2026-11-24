@@ -9,7 +9,7 @@ export function ComposerImages({ images, uploading, onRemove }: { images: DraftI
     <View className="flex-row flex-wrap gap-2">
       {images.map((image) => (
         <View key={image.path}>
-          <Image source={{ uri: image.preview }} accessibilityLabel="Attached image" className="rounded-lg bg-surface-2" style={{ width: 72, height: 72 }} />
+          <Image source={{ uri: image.preview }} accessibilityLabel="Attached image" className="rounded-lg bg-key" style={{ width: 72, height: 72 }} />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Remove image"
@@ -22,7 +22,7 @@ export function ComposerImages({ images, uploading, onRemove }: { images: DraftI
         </View>
       ))}
       {Array.from({ length: uploading }, (_, index) => (
-        <View key={`uploading-${index}`} className="rounded-lg bg-surface-2" style={{ width: 72, height: 72 }} />
+        <View key={`uploading-${index}`} className="rounded-lg bg-key" style={{ width: 72, height: 72 }} />
       ))}
     </View>
   );

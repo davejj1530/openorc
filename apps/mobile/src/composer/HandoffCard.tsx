@@ -41,7 +41,7 @@ export function HandoffCard({ thread, draft, onTag }: { thread: ThreadSummary; d
             disabled={pending}
             onPress={() => void release()}
             hitSlop={6}
-            className="h-control-md justify-center rounded-full bg-surface-2 px-3 active:bg-surface-3"
+            className="h-control-md justify-center rounded-full bg-key px-3 active:bg-surface-3"
           >
             <Text className="text-sm">{handoffLabel(action)}</Text>
           </Pressable>

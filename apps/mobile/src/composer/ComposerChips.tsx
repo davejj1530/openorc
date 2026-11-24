@@ -25,7 +25,7 @@ function Chip({ label, children, onPress }: { label: string; children: ReactNode
         onPress();
       }}
       hitSlop={{ top: 8, bottom: 8 }}
-      className="h-control-sm min-w-0 flex-shrink flex-row items-center gap-1.5 rounded-full bg-surface-2 pl-2 pr-2.5 active:bg-surface-3"
+      className="h-control-sm min-w-0 flex-shrink flex-row items-center gap-1.5 rounded-full bg-key pl-2 pr-2.5 active:bg-surface-3"
     >
       {children}
     </Pressable>

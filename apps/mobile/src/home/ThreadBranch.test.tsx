@@ -22,11 +22,19 @@ it("mounts no SVG for a row without a branch", () => {
 it("paints the tree's line as one opaque color over the ground, so overlapping rows never darken it", async () => {
   const { solid } = await import("./ThreadBranch");
   const { colors } = await import("../generated/tokens");
-  const gray = (color: string) => [1, 3, 5].map((at) => parseInt(color.slice(at, at + 2), 16));
-  // The strong line is 18% ink: over the light tile it lands at 204 of 255, over the dark one at 65.
-  expect(solid(colors.light["line-strong"], colors.light.bg)).toHaveLength(7);
-  expect(gray(solid(colors.light["line-strong"], colors.light.bg))).toEqual([204, 204, 204]);
-  expect(gray(solid(colors.dark["line-strong"], colors.dark.bg))).toEqual([65, 65, 65]);
+  const gray = (color: string) => parseInt(color.slice(1, 3), 16);
+  for (const palette of [colors.light, colors.dark]) {
+    const { ink, bg } = palette;
+    // None of the ink leaves the ground as it is, all of it leaves the ink, and a wash of it lands between the two.
+    expect(solid(`${ink}00`, bg)).toBe(bg);
+    expect(solid(`${ink}ff`, bg)).toBe(ink);
+    const [low, high] = [gray(ink), gray(bg)].sort((a, b) => a - b);
+    const wash = gray(solid(`${ink}2e`, bg));
+    expect(wash).toBeGreaterThan(low!);
+    expect(wash).toBeLessThan(high!);
+    // A palette's own strong line comes out opaque whether or not it began so.
+    expect(solid(palette["line-strong"], bg)).toMatch(/^#[\da-f]{6}$/);
+  }
   expect(solid("currentColor", colors.dark.bg)).toBe("currentColor");
 });
 

@@ -169,7 +169,7 @@ export { taskReferenceFromTool, type TaskToolReference, type TaskToolSource } fr
 export { pruneThreadFolds, threadFoldIds } from "./thread-folds.js";
 export { threadHeadline, type ThreadHeadline } from "./thread-headline.js";
 export { projectActivity, threadStateMark } from "./thread-state-mark.js";
-export { mixHex, projectMarkMotion, restMoment, threadMarkMotion, type DotFrame, type MarkDot, type MarkMotion, type MarkTone, type ProjectActivity, type ThreadMarkKind } from "./state-marks.js";
+export { mixHex, PROJECT_CUBE, restMoment, threadMarkMotion, type DotFrame, type MarkDot, type MarkMotion, type MarkTone, type ProjectActivity, type ThreadMarkKind } from "./state-marks.js";
 export {
   latestActivity,
   MENTION_MARK,

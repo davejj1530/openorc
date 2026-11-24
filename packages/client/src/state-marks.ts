@@ -1,12 +1,11 @@
 /**
- * OpenOrc's state marks: a thread's cube and a project's sigil, each a small lattice of dots whose sizes and colours
- * follow a rule. A thread's mark is the OpenOrc cube as 19 dots under a light: where the light is and how it moves
- * says what the thread is doing. A project's mark is the cube's top face seen from above, a 4 by 4 diamond whose
- * pattern comes from the project's own name, stirring while its threads work. A mark's colour is never its own: it
- * names a role of the theme on screen, by what the mark says.
+ * OpenOrc's state marks. A thread's mark is the OpenOrc cube as 19 dots under a light: where the light is and how it
+ * moves says what the thread is doing. A project's mark is the same cube as an open frame, the place its threads'
+ * solid cubes live in; its top face fills while they work. A mark's colour is never its own: it names a role of the
+ * theme on screen, by what the mark says.
  *
- * Everything here is arithmetic: a mark is its dots and, for each, evenly spaced moments of one loop. The apps draw
- * the dots and play the moments with their own animation, so no frame is computed while a mark runs.
+ * A thread's mark is arithmetic: its dots and, for each, evenly spaced moments of one loop. The apps draw the dots and
+ * play the moments with their own animation, so no frame is computed while a mark runs.
  */
 
 /** One moment of a dot: how full it is, and how much of its colour it wears, from faded into the ground to whole. Both 0 to 1. */
@@ -22,12 +21,11 @@ export interface DotFrame {
  */
 export type MarkTone = "work" | "think" | "ink" | "attention" | "bad" | "ok" | "quiet";
 
-/** A dot in the mark's 24 unit box, centred on 0,0, with its loop. A dot with its own `tone` leaves the mark's. */
+/** A dot in the mark's 24 unit box, centred on 0,0, with its loop. */
 export interface MarkDot {
   x: number;
   y: number;
   frames: DotFrame[];
-  tone?: MarkTone;
 }
 
 /** A mark ready to draw: its dots at `radius` when full, looping every `period` ms. A still mark has one frame and no period. */
@@ -239,86 +237,11 @@ export function restMoment(motion: MarkMotion): number {
 /** What a project's threads are up to, as its mark shows it. */
 export type ProjectActivity = "quiet" | "working" | "attention";
 
-/** A number from a name, the same every time (FNV-1a). */
-function seedOf(name: string): number {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < name.length; index++) hash = Math.imul(hash ^ name.charCodeAt(index), 0x01000193);
-  return hash >>> 0;
-}
-
-/** Numbers from 0 to 1 that follow from a seed (mulberry32). */
-function random(seed: number): () => number {
-  let state = seed;
-  return () => {
-    state = (state + 0x6d2b79f5) | 0;
-    let mixed = Math.imul(state ^ (state >>> 15), 1 | state);
-    mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
-    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-const SIDE = 4;
-const DIAGONAL = 3;
-const SIGIL_RADIUS = 1.95;
-const LEVELS = [0.1, 0.58, 1];
-
-/** A project's sigil: how full each of its 16 dots is, the same either side of its upright axis. */
-function sigilLevels(name: string): number[] {
-  for (let attempt = 0; ; attempt++) {
-    const next = random(seedOf(`${name}/${attempt}`));
-    const levels: number[] = new Array(SIDE * SIDE);
-    for (let i = 0; i < SIDE; i++) {
-      for (let j = i; j < SIDE; j++) {
-        const pick = next();
-        levels[i * SIDE + j] = levels[j * SIDE + i] = LEVELS[Number(pick >= 0.3) + Number(pick >= 0.58)]!;
-      }
-    }
-    // A sigil needs enough of itself to be seen, and enough missing to be its own.
-    const shown = levels.filter((level) => level > LEVELS[0]!).length;
-    if (shown >= 9 && shown <= 14) return levels;
-  }
-}
-
-/** How long a project's mark takes over its loop, by what its threads are up to; still while quiet. */
-const PROJECT_PERIODS: Record<ProjectActivity, number> = { quiet: 0, working: 2200, attention: 1800 };
-
-const projectMotions = new Map<string, MarkMotion>();
-
 /**
- * A project's mark. Quiet, its sigil stands still in the quiet ink, whole at the top and paler toward the foot. While its threads work a swell crosses it. When one of them needs the person, its top dot turns to the
- * attention colour and beats.
+ * A project's cube as paths in a 24 unit box: its frame, the seams between its three faces, and its top face, which
+ * fills while its threads work and wears the attention colour when one needs the person.
  */
-export function projectMarkMotion(name: string, activity: ProjectActivity): MarkMotion {
-  const key = `${activity}:${name}`;
-  const kept = projectMotions.get(key);
-  if (kept) return kept;
-  const levels = sigilLevels(name);
-  const period = PROJECT_PERIODS[activity];
-  const moments = period ? MOMENTS : 1;
-  const dots: MarkDot[] = [];
-  for (let i = 0; i < SIDE; i++) {
-    for (let j = 0; j < SIDE; j++) {
-      const level = levels[i * SIDE + j]!;
-      const down = (i + j) / (2 * (SIDE - 1));
-      const beacon = activity === "attention" && i === 0 && j === 0;
-      dots.push({
-        x: round((i - j) * DIAGONAL),
-        y: round((i + j - (SIDE - 1)) * DIAGONAL),
-        ...(beacon ? { tone: "attention" as const } : {}),
-        frames: Array.from({ length: moments }, (_, moment) => {
-          const at = moment / moments;
-          if (beacon) return { size: round(0.78 + 0.22 * Math.sin(TAU * at)), ramp: 1 };
-          const swell = activity === "working" ? 0.5 + 0.5 * Math.sin(TAU * (at - down * 0.9)) : 0.5;
-          const size = activity === "working" ? level * (0.62 + 0.38 * swell) + (level < 0.2 ? 0.16 * swell : 0) : level;
-          return { size: round(clamp(size) ** 0.8), ramp: round(clamp(1 - down * 0.85 + (swell - 0.5) * 0.5)) };
-        }),
-      });
-    }
-  }
-  const motion: MarkMotion = { tone: activity === "working" ? "work" : "quiet", period, radius: SIGIL_RADIUS, dots };
-  projectMotions.set(key, motion);
-  return motion;
-}
+export const PROJECT_CUBE = { frame: "M12 3l8 4.5v9L12 21l-8-4.5v-9z", seams: "M4 7.5l8 4.5 8-4.5M12 12v9", top: "M12 3l8 4.5-8 4.5-8-4.5z" } as const;
 
 // Colour
 

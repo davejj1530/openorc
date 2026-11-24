@@ -4,6 +4,7 @@ import { PreviewClient } from "./preview-client";
 import { PresenceClient } from "./presence";
 import { DownloadClient } from "./download";
 import { windowPorts, type WindowPort } from "./reply";
+import { coreLogPath, recordUncaughtErrors } from "../shared/crash-log";
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
 import { OpenOrc, WorkerEmbedder, WorkerFormatter, WorkerIntelligence, type Broadcast, type EnvSnapshot, type OpenOrcOptions, type RequestOrigin, type RpcReply, type Transport } from "@openorc/core";
@@ -208,6 +209,8 @@ class CoreServer implements CoreSession {
 
 /** Starts the core in this process and serves it to main and the windows. */
 export function serveCore(host: CoreHost): CoreSession {
+  // Before anything can fail: main starts a core that stopped again, and this log is what says why it stopped.
+  recordUncaughtErrors(coreLogPath(host.dataDir));
   const server = new CoreServer(host);
   process.on("SIGTERM", () => void server.shutdown());
   process.on("SIGINT", () => void server.shutdown());

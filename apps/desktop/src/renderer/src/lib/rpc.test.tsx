@@ -64,3 +64,40 @@ it("hands the window's media port to device streams, including ones that start l
   expect(late).toHaveBeenCalledWith(media);
   stop();
 });
+
+it("fails what a core that stopped never answered, and sends later calls to the core that takes its place", async () => {
+  Object.defineProperty(window, "openorc", { configurable: true, value: { connectBridge: vi.fn() } });
+  core.connect();
+  const port = () => ({ start: vi.fn(), postMessage: vi.fn(), close: vi.fn(), onmessage: null as ((event: MessageEvent) => void) | null });
+  const first = port();
+  window.dispatchEvent(new MessageEvent("message", { data: "openorc:port", source: window, ports: [first as unknown as MessagePort] }));
+  first.onmessage!(new MessageEvent("message", { data: { type: "ready", pid: 1, mcpPort: 9 } }));
+  const unanswered = core.call("threads.messages", { id: "thread" });
+
+  // Only the preload says the core stopped; a frame in the page cannot.
+  const foreign = document.createElement("iframe");
+  document.body.append(foreign);
+  window.dispatchEvent(new MessageEvent("message", { data: "openorc:core-lost", source: foreign.contentWindow }));
+  expect(first.close).not.toHaveBeenCalled();
+  foreign.remove();
+
+  window.dispatchEvent(new MessageEvent("message", { data: "openorc:core-lost", source: window }));
+  await expect(unanswered).rejects.toThrow("OpenOrc stopped before answering");
+  expect(first.close).toHaveBeenCalledOnce();
+  expect(core.startup).toBe("OpenOrc stopped unexpectedly. Starting it again…");
+
+  const later = core.call("threads.messages", { id: "thread" });
+  expect(first.postMessage).toHaveBeenCalledOnce();
+  const heard: ClientPush[] = [];
+  const stop = core.onPush((push) => heard.push(push));
+  const second = port();
+  window.dispatchEvent(new MessageEvent("message", { data: "openorc:port", source: window, ports: [second as unknown as MessagePort] }));
+  const request = second.postMessage.mock.calls[0]![0];
+  expect(request).toMatchObject({ type: "rpc", method: "threads.messages" });
+  second.onmessage!(new MessageEvent("message", { data: { type: "ready", pid: 2, mcpPort: 10 } }));
+  second.onmessage!(new MessageEvent("message", { data: { type: "rpc.result", id: request.id, result: [] } }));
+  await expect(later).resolves.toEqual([]);
+  expect(core.startup).toBeNull();
+  expect(heard).toEqual([{ type: "session", resumed: true }]);
+  stop();
+});

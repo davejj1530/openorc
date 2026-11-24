@@ -35,8 +35,10 @@ import { cancelPtyUpdate, detachAllPtys, installPtyHost, killAllPtys, preparePty
 import { HostPreferences, hostPaths, localPaths, useHostPaths } from "./host";
 import { connectWindow, hostCores, type CoreProcess } from "./host-core";
 import { importProject, installHostControls } from "./host-controls";
-import { CoreLifecycle, type DistroAnswer } from "./core-lifecycle";
+import { CoreLifecycle, type DistroAnswer, type StopsAnswer } from "./core-lifecycle";
+import { keepCoreOutput } from "./core-output";
 import { thisComputer, type HostChoice } from "../shared/host";
+import { coreLogPath } from "../shared/crash-log";
 
 const here = import.meta.dirname;
 const appIcon = join(here, "../../resources/icon.png");
@@ -114,8 +116,7 @@ function forkCore(): UtilityProcess {
     stdio: "pipe",
     env: { ...process.env, OPENORC_DATA_DIR: app.getPath("userData"), OPENORC_FILE_KEY: fileKey },
   });
-  child.stdout?.on("data", (d: Buffer) => process.stdout.write(`[core] ${d}`));
-  child.stderr?.on("data", (d: Buffer) => process.stderr.write(`[core!] ${d}`));
+  keepCoreOutput(child, coreLogPath(app.getPath("userData")), { out: (text) => process.stdout.write(text), err: (text) => process.stderr.write(text) });
   useHostPaths(localPaths(app.getPath("userData")));
   return child;
 }
@@ -147,6 +148,15 @@ async function askAboutDistro(distro: string, reason: string): Promise<DistroAns
   const buttons = ["Try again", `Run on ${thisComputer(process.platform)}`, "Quit OpenOrc"];
   const { response } = await dialog.showMessageBox({ type: "error", message: `OpenOrc could not run in WSL: ${distro}`, detail: reason, buttons, defaultId: 0, cancelId: 2 });
   return (["retry", "local", "quit"] as const)[response] ?? "quit";
+}
+
+/** Asks what to do about a core on this computer that keeps stopping by itself. Closing the question quits. */
+async function askAboutStops(): Promise<StopsAnswer> {
+  const log = coreLogPath(app.getPath("userData"));
+  console.error(`[main] the core keeps stopping; see ${log}`);
+  const detail = `OpenOrc's core stopped by itself several times in the last two minutes, so it was not started again. What it reported is in:\n${log}`;
+  const { response } = await dialog.showMessageBox({ type: "error", message: "OpenOrc keeps stopping", detail, buttons: ["Try again", "Quit OpenOrc"], defaultId: 0, cancelId: 1 });
+  return response === 0 ? "retry" : "quit";
 }
 
 /**
@@ -190,6 +200,12 @@ const lifecycle = new CoreLifecycle<WebContents>({
     connectWindow(core, rpc.port1, media.port1);
     window.postMessage("bridge:port", null, [rpc.port2, media.port2]);
   },
+  // On the same channel as the port, so a window always hears that its core stopped before it is handed the next one.
+  lost(windows) {
+    for (const contents of windows) {
+      if (!contents.isDestroyed()) contents.postMessage("bridge:lost", null);
+    }
+  },
   everyWindow: () => BrowserWindow.getAllWindows().map((win) => win.webContents),
   reload(windows) {
     for (const contents of windows) {
@@ -204,6 +220,7 @@ const lifecycle = new CoreLifecycle<WebContents>({
   },
   shells: { hold: preparePtysForUpdate, release: cancelPtyUpdate },
   ask: askAboutDistro,
+  keepsStopping: askAboutStops,
   chooseLocal: () => hostPreferences.set({ kind: "local" }),
   quit: () => app.quit(),
   importProject,

@@ -3,8 +3,6 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const notice = `Message from the thread "API work" (id …):`;
 ---
 
 <DocsLayout slug="messaging">
@@ -73,7 +71,7 @@ const notice = `Message from the thread "API work" (id …):`;
         <dd>The same agent and model, unless you name others. You can name a model the way you'd say it. If the name fits no model or several, the agent gets the list to choose from.</dd>
       </div>
     </dl>
-    <p>The helper's first message is a notice saying which thread started it and how to reach that thread. Click <strong>Show details</strong> under the notice to read the task it was given. In the thread that started it, a card shows the helper's title, whether it's <strong>Working</strong>, <strong>Needs you</strong> or <strong>Idle</strong>, and its project. Click the card to open the helper.</p>
+    <p>The helper's first message is a notice that reads <strong>Started by</strong> and the name of the thread that started it, followed by the task it was given. Click the name to open that thread. In the thread that started it, a card shows the helper's title, whether it's <strong>Working</strong>, <strong>Needs you</strong> or <strong>Idle</strong>, and its project. Click the card to open the helper.</p>
     <p>The two threads keep in touch with messages. The helper is told to message the thread that started it when it has results or needs something.</p>
     <ul>
       <li>A thread can have up to three helpers working at once. Idle helpers don't count.</li>
@@ -89,9 +87,8 @@ const notice = `Message from the thread "API work" (id …):`;
   <section aria-labelledby="messages">
     <h2 id="messages">Messages between threads</h2>
     <p>A message goes to one thread. If that thread's agent is working, the message joins its current turn. Otherwise the message starts a new turn.</p>
-    <p>In the receiving thread, the message appears as a notice from OpenOrc that names the sender:</p>
-    <pre><code set:text={notice} /></pre>
-    <p>Click <strong>Show details</strong> to read the message. In the sending thread, the agent's work shows a <strong>Sent message</strong> row.</p>
+    <p>In the receiving thread, the message appears as a notice that reads <strong>From</strong> and the sender's name, followed by the message. Click the name to open the sending thread. A long message shows its first lines, and <strong>Show all</strong> shows the rest.</p>
+    <p>In the sending thread, the agent's work shows a <strong>Sent message</strong> row.</p>
     <p>The receiving agent acts on a message with its own thread's permissions, which can be more than the sender has. So a message to a thread in the same or a stricter mode goes straight through. A message to a more permissive thread, such as from Review everything to Autonomous, asks you first. From Plan, an agent can message only threads that are also in Plan. See <a href={docHref("permissions") + "#openorc-tools"}>Modes and permissions</a>.</p>
   </section>
 

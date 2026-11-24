@@ -42,3 +42,19 @@ it("brings a focused filter along to work opened elsewhere, Workspace's under Al
   useLayout.getState().followProject("three");
   expect(useLayout.getState().workspace).toBe(ALL_WORKSPACES);
 });
+
+it("keeps a closed panel shut for agents once the person turns that off, across launches, and still opens it by hand", async () => {
+  const first = await import("./layout");
+  first.useLayout.getState().showForAgent();
+  expect(first.useLayout.getState().panelOpen).toBe(true);
+  first.useLayout.getState().setPanel(false);
+  first.useLayout.getState().setAgentsOpenPanel(false);
+  vi.resetModules();
+  const { useLayout } = await import("./layout");
+  useLayout.getState().showForAgent();
+  useLayout.getState().showForAgent({ id: "thread", tab: "plan" });
+  expect(useLayout.getState()).toMatchObject({ panelOpen: false, panelRequest: null });
+  useLayout.getState().setPanel(true);
+  useLayout.getState().showForAgent({ id: "thread", tab: "plan" });
+  expect(useLayout.getState()).toMatchObject({ panelOpen: true, panelThreadId: "thread", panelTab: "plan" });
+});

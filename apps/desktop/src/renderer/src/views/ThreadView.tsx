@@ -92,7 +92,7 @@ function RevealEmittedPlan({ threadId, focused }: { threadId: string; focused: b
     }
     if (!focused || !planId || observed.current === planId) return;
     observed.current = planId;
-    useLayout.getState().openThreadPanel(threadId, "plan");
+    useLayout.getState().showForAgent({ id: threadId, tab: "plan" });
   }, [isSuccess, planId, focused, threadId]);
   return null;
 }

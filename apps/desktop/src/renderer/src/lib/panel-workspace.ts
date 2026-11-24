@@ -25,7 +25,7 @@ function useDeviceReveal(surface: string | null): void {
   useEffect(() => {
     if (!surface) return;
     return core.onDevicePanel((push) => {
-      if (push.action === "open" && push.surface === surface) useLayout.getState().setPanel(true);
+      if (push.action === "open" && push.surface === surface) useLayout.getState().showForAgent();
     });
   }, [surface]);
 }
@@ -66,7 +66,7 @@ export function usePanelWorkspace(context: PanelContext) {
       const old = existing ? currentPage(existing) : null;
       if (old?.kind === "browser") usePanelSessions.getState().select(scope, id);
       else usePanelSessions.getState().open(scope, { kind: "browser", url: "", title: "" }, id);
-      useLayout.getState().setPanel(true);
+      useLayout.getState().showForAgent();
     },
     [scope],
   );

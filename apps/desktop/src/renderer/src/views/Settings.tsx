@@ -171,6 +171,7 @@ const idleOptions = [null, 5, 10, 30, 60];
 function GeneralSettings() {
   const s = usePreference("app.settings.set");
   const v = s.value;
+  const agentsOpenPanel = useLayout((layout) => layout.agentsOpenPanel);
   return (
     <>
       {s.query.isError && <LoadError retry={() => void s.query.refetch()} />}
@@ -210,6 +211,15 @@ function GeneralSettings() {
             ))}
           </Select>
         </Field>
+      </Section>
+      <Section title="Panel">
+        <Toggle
+          label="Agents open the panel"
+          hint="When an agent opens a preview or a device, or writes a plan."
+          checked={agentsOpenPanel}
+          disabled={false}
+          onChange={(open) => useLayout.getState().setAgentsOpenPanel(open)}
+        />
       </Section>
       <SaveStatus status={s.status} retry={() => void s.retry()} />
     </>

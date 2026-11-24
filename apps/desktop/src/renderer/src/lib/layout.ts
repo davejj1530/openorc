@@ -32,6 +32,8 @@ interface LayoutState {
   panelOpen: boolean;
   panelWidth: number;
   panelSide: PanelSide;
+  /** Whether an agent's browser preview, device or plan may open a closed panel. Opening it by hand always works. */
+  agentsOpenPanel: boolean;
   panelTab: PanelTab;
   /** The tab asked for, and with Commits the one commit to open there. */
   panelRequest: { tab: PanelTab; commit?: string } | null;
@@ -55,6 +57,8 @@ interface LayoutState {
   panelThreadId: string | null;
   toggleThreadPanel: (id: string) => void;
   openThreadPanel: (id: string, tab: PanelTab) => void;
+  /** An agent's browser preview, device or plan asks for the panel, and with `thread` for that thread's tab in it. */
+  showForAgent: (thread?: { id: string; tab: PanelTab }) => void;
   /** One of a thread's commits, in its Commits tab. */
   openCommit: (threadId: string, sha: string) => void;
   /** Only the pinned threads. Never persisted: a relaunch lists them all again. */
@@ -78,6 +82,7 @@ interface LayoutState {
   setPanel: (open: boolean, tab?: PanelTab) => void;
   setPanelWidth: (px: number) => void;
   togglePanelSide: () => void;
+  setAgentsOpenPanel: (agentsOpenPanel: boolean) => void;
   setWorkspace: (id: string) => void;
   /** Work opened in another project brings a focused filter along to it; on All projects the filter stays. */
   followProject: (id: string) => void;
@@ -98,7 +103,7 @@ export const limits = {
 
 const KEY = "openorc.layout";
 
-type Saved = Partial<Pick<LayoutState, "sidebarOpen" | "panelOpen" | "panelWidth" | "panelSide" | "workspace" | "hiddenWorkspaces" | "collapsed" | "previewUrls">> & {
+type Saved = Partial<Pick<LayoutState, "sidebarOpen" | "panelOpen" | "panelWidth" | "panelSide" | "agentsOpenPanel" | "workspace" | "hiddenWorkspaces" | "collapsed" | "previewUrls">> & {
   /** The whole sidebar's width. The rail's layouts saved `sidebarWidth`, the thread list's width beside it, which no longer applies. */
   navigationWidth?: number;
 };
@@ -121,6 +126,7 @@ function persist(s: LayoutState): void {
         panelOpen: s.panelOpen,
         panelWidth: s.panelWidth,
         panelSide: s.panelSide,
+        agentsOpenPanel: s.agentsOpenPanel,
         workspace: navigationScope.active ? read().workspace : s.workspace,
         hiddenWorkspaces: navigationScope.active ? read().hiddenWorkspaces : s.hiddenWorkspaces,
         collapsed: s.collapsed,
@@ -155,6 +161,19 @@ function threadFoldActions(get: () => LayoutState, commit: (patch: Partial<Layou
   };
 }
 
+/** Whether agents may open a closed panel, and their asking for it. */
+function agentPanelActions(get: () => LayoutState, commit: (patch: Partial<LayoutState>) => void): Pick<LayoutState, "setAgentsOpenPanel" | "showForAgent"> {
+  return {
+    setAgentsOpenPanel: (agentsOpenPanel) => commit({ agentsOpenPanel }),
+    showForAgent: (thread) => {
+      const { panelOpen, agentsOpenPanel, openThreadPanel, setPanel } = get();
+      if (!panelOpen && !agentsOpenPanel) return;
+      if (thread) openThreadPanel(thread.id, thread.tab);
+      else setPanel(true);
+    },
+  };
+}
+
 export const useLayout = create<LayoutState>((set, get) => {
   const saved = read();
   const initial = {
@@ -163,6 +182,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     panelOpen: saved.panelOpen ?? false,
     panelWidth: clamp(saved.panelWidth ?? limits.panel.default, limits.panel),
     panelSide: saved.panelSide === "left" ? ("left" as const) : ("right" as const),
+    agentsOpenPanel: saved.agentsOpenPanel !== false,
     panelTab: "newtab" as PanelTab,
     panelRequest: null,
     selectedFile: null,
@@ -241,6 +261,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     toggleCollapsed: (key) => commit({ collapsed: toggleSidebarFold(get().collapsed, key) }),
     toggleThreadChildren: (id, expanded) => commit({ collapsed: toggleThreadTree(get().collapsed, id, expanded) }),
     ...threadFoldActions(get, commit),
+    ...agentPanelActions(get, commit),
     // Bounded because the key is a surface id and threads are unbounded; the
     // oldest entries are the ones whose thread the reader has stopped opening.
     rememberPreviewUrl: (key, url) => {

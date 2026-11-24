@@ -64,13 +64,21 @@ const SKIPPED = new Set([
 /** Skipped steps that still print, so the call's output is not only what its search found. */
 const PRINTERS = /^(echo|printf|pwd|date|pushd|popd|cat|command|type)$/;
 
-/** The actions a whole command took, in order. */
+/** Commands already read. A turn's steps are asked about again for every frame it streams; each is read once. */
+const known = new Map<string, CommandAction[]>();
+const KNOWN_LIMIT = 2000;
+
+/** The actions a whole command took, in order. The same command returns the same array, so callers only read it. */
 export function readCommand(command: string): CommandAction[] {
+  const before = known.get(command);
+  if (before) return before;
   const reader = new ChainReader();
-  const actions = reader.read(unwrapShell(command.trim()));
+  const read = reader.read(unwrapShell(command.trim()));
   // A search's lines are only its matches when it is the one step that printed anything.
-  if (actions.length === 1 && !reader.chatty) return actions;
-  return actions.map((action) => (action.type === "search" ? { ...action, countable: false } : action));
+  const actions = read.length === 1 && !reader.chatty ? read : read.map((action) => (action.type === "search" ? { ...action, countable: false } : action));
+  if (known.size >= KNOWN_LIMIT) known.clear();
+  known.set(command, actions);
+  return actions;
 }
 
 const inner = (text: string) => text.slice(1, -1).replace(/;\s*$/, "");

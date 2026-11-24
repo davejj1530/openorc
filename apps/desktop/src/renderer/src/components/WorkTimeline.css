@@ -141,13 +141,7 @@
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
-/* The step being read, as the line a step draws for it, and the switch that sends its file to the panel. */
+/* The step being read, as the line a step draws for it. */
 .tl-now {
-  display: flex;
-  align-items: start;
-  gap: 12px;
   min-width: 0;
-}
-.tl-now > .work-acts {
-  flex: 1;
 }

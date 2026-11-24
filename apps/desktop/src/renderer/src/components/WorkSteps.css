@@ -486,7 +486,7 @@ button.work-name:focus-visible {
   width: 14px;
   height: 14px;
 }
-/* A quiet pill under the work: the way from the sentences to the timeline and back, and the timeline's Follow. */
+/* A quiet pill under the work: the way from the sentences to the timeline and back. */
 .work-view-swap {
   display: inline-flex;
   align-items: center;
@@ -501,7 +501,7 @@ button.work-name:focus-visible {
   color: var(--ink-3);
   transition: color var(--duration-quick) var(--ease-out);
 }
-.work-view-swap:is(:hover, [aria-pressed="true"]) {
+.work-view-swap:hover {
   color: var(--ink);
 }
 .work-view-swap:focus-visible {

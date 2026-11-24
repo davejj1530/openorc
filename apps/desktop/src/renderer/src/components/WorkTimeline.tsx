@@ -1,13 +1,8 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { workObjects, workTimeline, type Block, type Timeline, type TimelineLane, type TimelineStep, type WorkEntry, objectVerb } from "@openorc/client";
-import { fileReference } from "../../../shared/file-reference";
-import { useLayout } from "../lib/layout";
-import { Eye } from "./icons";
 import { FileGlyph } from "./FileGlyph";
-import { useThreadMedia } from "./ThreadImages";
 import { ActRow } from "./WorkActs";
 import type { RenderBlocks } from "./WorkMarks";
-import { fileHref } from "./WorkRead";
 import "./WorkTimeline.css";
 
 /** The keys that move along the turn, and which way. */
@@ -91,15 +86,13 @@ function useWidth() {
 
 /**
  * The turn drawn in time: one line for the turn, a lane for each file it kept coming back to, a mark for each thing
- * it did. Moving along it reads each step back as its line; pressing one keeps it and opens that line. With Follow on, the file
- * a step touched opens in the panel as the turn reaches it.
+ * it did. Moving along it reads each step back as its line; pressing one keeps it and opens that line.
  */
 export function WorkTimeline({ entries, turn, live, renderBlocks }: { entries: WorkEntry[]; turn: Block[]; live: boolean; renderBlocks: RenderBlocks }) {
   const timeline = useMemo(() => workTimeline(entries.flatMap((entry) => (entry.kind === "phase" ? workObjects(entry.phase.blocks, turn, live) : []))), [entries, turn, live]);
   const [ref, width] = useWidth();
   const [hovered, setHovered] = useState<number | null>(null);
   const [pinned, setPinned] = useState<number | null>(null);
-  const [follow, setFollow] = useState(false);
   const clip = useId();
   const { steps, lanes } = timeline;
   const last = steps.length - 1;
@@ -107,7 +100,6 @@ export function WorkTimeline({ entries, turn, live, renderBlocks }: { entries: W
   const step = steps[view];
   const shape = shapeOf(timeline, width, live);
   const height = ROW * (lanes.length + 1);
-  useFollowed(follow ? step : undefined);
   if (!step) return <div ref={ref} className="work-timeline" />;
   const at = (event: MouseEvent) => Math.max(0, Math.min(last, Math.round((event.clientX - event.currentTarget.getBoundingClientRect().left - LEFT) / (shape.x(1) - shape.x(0))) - 1));
   const onKey = (event: KeyboardEvent) => {
@@ -173,10 +165,6 @@ export function WorkTimeline({ entries, turn, live, renderBlocks }: { entries: W
             renderBlocks={renderBlocks}
           />
         </ol>
-        <button type="button" className="work-view-swap" aria-pressed={follow} onClick={() => setFollow((on) => !on)}>
-          <Eye size={14} />
-          Follow
-        </button>
       </div>
     </div>
   );
@@ -216,15 +204,4 @@ function Lines({ timeline, shape, className }: { timeline: Timeline; shape: Shap
       ))}
     </g>
   );
-}
-
-/** Opens the file a step touched in the panel, at the lines it read, each time the step changes. */
-function useFollowed(step: TimelineStep | undefined) {
-  const { basePath, fileScope } = useThreadMedia();
-  const chip = step?.chip;
-  const href = chip?.path ? fileHref(chip) : null;
-  useEffect(() => {
-    const reference = href && fileScope ? fileReference(href, basePath) : null;
-    if (reference && fileScope) useLayout.getState().openFile({ ...reference, scope: fileScope });
-  }, [href, basePath, fileScope]);
 }

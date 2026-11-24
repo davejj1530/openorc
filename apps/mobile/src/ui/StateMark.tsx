@@ -31,10 +31,10 @@ export const StateMark = memo(function StateMark({ motion, size = 20 }: { motion
   const unit = size / 24;
   const rest = restMoment(motion);
   const moving = motion.period > 0 && !still;
+  const color = colors[ROLES[motion.tone]];
   return (
     <View pointerEvents="none" style={{ width: size, height: size }}>
       {motion.dots.map((dot, index) => {
-        const color = colors[ROLES[dot.tone ?? motion.tone]];
         const disc: ViewStyle = {
           position: "absolute",
           left: (dot.x + 12 - motion.radius) * unit,

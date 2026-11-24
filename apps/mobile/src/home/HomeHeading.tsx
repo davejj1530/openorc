@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { AlarmClock, ChevronDown, CircleCheck, Cloud, Folder, Globe, Pin } from "../generated/icons";
-import { projectMarkMotion, type ProjectActivity } from "@openorc/client";
+import type { ProjectActivity } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import type { ComponentType } from "react";
 import type { IconProps } from "../ui/icon";
@@ -10,7 +10,7 @@ import { ListPressable } from "../ui/ListPressable";
 import { useCloudOutOfReach } from "../spaces/cloud-reach";
 import { useReducedMotion } from "../ui/reduced-motion";
 import { turn } from "../ui/motion";
-import { StateMark } from "../ui/StateMark";
+import { ProjectCube } from "../ui/ProjectCube";
 import { Text } from "../ui/Text";
 import Animated from "react-native-reanimated";
 import { movingStyle, type RowMotion } from "./fold-motion";
@@ -104,7 +104,7 @@ export function SectionToggle({ section, room = "after-rows", motion, onToggle }
   );
 }
 
-/** A project's glyph where it has no sigil: the cloud for one only OpenOrc Cloud has, the globe for No project. */
+/** A project's glyph where it wears no cube: the cloud for one only OpenOrc Cloud has, the globe for No project. */
 export function projectGlyph(project: { id: string; cloud?: true }): ComponentType<IconProps> | null {
   if (project.cloud) return Cloud;
   return project.id === WORKSPACE_ID ? Globe : null;
@@ -113,15 +113,15 @@ export function projectGlyph(project: { id: string; cloud?: true }): ComponentTy
 /** A project's icon where a list names it with a glyph: its cloud or globe, else a folder. */
 export const projectMark = (project: { id: string; cloud?: true }): ComponentType<IconProps> => projectGlyph(project) ?? Folder;
 
-/** What a project's sigil shows of its threads: one that needs the person before any at work. */
+/** What a project's cube shows of its threads: one that needs the person before any at work. */
 function activityOf(group: Group): ProjectActivity {
   if (group.waiting) return "attention";
   return group.working ? "working" : "quiet";
 }
 
 /**
- * A project's label over its threads: its sigil, drawn from its name and stirring with its threads (the cloud for a
- * project only OpenOrc Cloud has, the globe for No project), its name, and what in it waits on the person. Its rows
+ * A project's label over its threads: its open cube, whose top fills while its threads work (the cloud for a project
+ * only OpenOrc Cloud has, the globe for No project), its name, and what in it waits on the person. Its rows
  * leave the cloud to it, so its cloud dims for them while out of reach.
  */
 export function ProjectLabel({ group, room = "after-rows", motion, onToggle }: { group: Group; room?: HeadingRoom; motion: RowMotion; onToggle: () => void }) {
@@ -129,7 +129,7 @@ export function ProjectLabel({ group, room = "after-rows", motion, onToggle }: {
   const outOfReach = useCloudOutOfReach();
   return (
     <FoldLabel
-      mark={Glyph ? <Glyph size={16} className="text-ink-3" /> : <StateMark motion={projectMarkMotion(group.project.name, activityOf(group))} size={ROOT_MARK} />}
+      mark={Glyph ? <Glyph size={16} className="text-ink-3" /> : <ProjectCube activity={activityOf(group)} />}
       dim={Boolean(group.project.cloud && (group.offline || outOfReach))}
       words={group.project.name}
       spoken={group.waiting ? `${group.project.name}, ${group.waiting} need you` : group.project.name}

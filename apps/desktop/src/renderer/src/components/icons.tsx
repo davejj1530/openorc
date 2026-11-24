@@ -92,6 +92,13 @@ const pin = <path d="M9 3.5h6 M10 3.5v6l-3 4v2h10v-2l-3-4v-6 M12 15.5v5" />;
 
 export const Plus = icon("Plus", <path d="M12 5v14 M5 12h14" />);
 export const Minus = icon("Minus", <path d="M5 12h14" />);
+export const Mic = icon(
+  "Mic",
+  <>
+    <rect x="9" y="3" width="6" height="11" rx="3" />
+    <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0 M12 18v3" />
+  </>,
+);
 export const X = icon("X", <path d="m6 6 12 12 M18 6 6 18" />);
 export const Check = icon("Check", <path d="m5 12 4.5 4.5L19 7" />);
 export const ChevronDown = icon("ChevronDown", <path d="m6 9 6 6 6-6" />);

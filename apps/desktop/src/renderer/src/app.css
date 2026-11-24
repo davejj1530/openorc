@@ -64,6 +64,8 @@
   --content-soft: var(--accent-soft);
   /* A skill named in a message: one blue in every palette, deepened in light mode to read at 4.5:1 on its wash. */
   --mention-ink: #1f6bd6;
+  /* The dot of a recording in progress: one red in every palette and both themes, the red recorders show everywhere. */
+  --recording: #e5484d;
   --ok: #157447;
   --warn: #8b5c0a;
   --review: #4f65b5;

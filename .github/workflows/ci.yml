@@ -21,7 +21,7 @@ jobs:
   check:
     # Keep the existing required-check name while the work runs in parallel.
     name: Typecheck, test, build
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: [mac-quality, mac-tests, core-tests, linux, lint, linux-tests, linux-desktop-tests, linux-core-tests]
     if: always()
     steps:
@@ -39,10 +39,10 @@ jobs:
   # two pull requests fit together. Typecheck and lint read the same sources on every system, so only Linux runs them.
   linux:
     name: Linux typecheck and build
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -61,10 +61,10 @@ jobs:
 
   lint:
     name: Linux lint
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -81,7 +81,7 @@ jobs:
   # desktop have their own shards.
   linux-tests:
     name: Linux workspace tests (${{ matrix.group }})
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -92,7 +92,7 @@ jobs:
           - group: the rest
             filters: --filter '!@openorc/core' --filter '!@openorc/desktop' --filter '!@openorc/hosted' --filter '!@openorc/mobile'
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -109,14 +109,14 @@ jobs:
   # Desktop's jsdom tests wait on rendering and time out when other workspaces share the runner.
   linux-desktop-tests:
     name: Linux desktop tests (${{ matrix.shard }}/2)
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2]
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -132,14 +132,14 @@ jobs:
 
   linux-core-tests:
     name: Linux core tests (${{ matrix.shard }}/2)
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2]
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -155,7 +155,7 @@ jobs:
 
   windows:
     name: Windows build and format check
-    runs-on: windows-2025
+    runs-on: blacksmith-4vcpu-windows-2025
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -183,7 +183,7 @@ jobs:
   mac-quality:
     name: macOS build, and hosted, mobile and desktop main-process tests
     if: github.event_name != 'pull_request'
-    runs-on: macos-15
+    runs-on: blacksmith-6vcpu-macos-15
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -216,7 +216,7 @@ jobs:
   mac-tests:
     name: macOS workspace tests (the rest)
     if: github.event_name != 'pull_request'
-    runs-on: macos-15
+    runs-on: blacksmith-6vcpu-macos-15
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -236,7 +236,7 @@ jobs:
   core-tests:
     name: Core tests (${{ matrix.shard }}/2)
     if: github.event_name != 'pull_request'
-    runs-on: macos-15
+    runs-on: blacksmith-6vcpu-macos-15
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -260,7 +260,7 @@ jobs:
   bench:
     name: Bridge benchmark
     if: github.event_name != 'pull_request'
-    runs-on: macos-15
+    runs-on: blacksmith-6vcpu-macos-15
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4

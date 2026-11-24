@@ -59,12 +59,12 @@ defaults:
 
 jobs:
   validate:
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       commit: ${{ steps.source.outputs.commit }}
       platforms: ${{ steps.source.outputs.platforms }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
         with:
           ref: ${{ inputs.tag }}
           # Every release tag, to check this one is newer.
@@ -111,10 +111,10 @@ jobs:
     needs: validate
     name: Build the core for WSL
     # Once, on Linux, which it runs on: the Windows app carries this core.
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
         with:
           ref: ${{ needs.validate.outputs.commit }}
           persist-credentials: false
@@ -340,13 +340,13 @@ jobs:
   release:
     if: inputs.create_draft || inputs.publish
     needs: [validate, build]
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     environment: release
     permissions:
       contents: write
       actions: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
         with:
           ref: ${{ needs.validate.outputs.commit }}
           # The notes cover every commit since the previous release.

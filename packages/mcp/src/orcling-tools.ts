@@ -221,7 +221,7 @@ function registerOrclingWork(mcp: McpServer, tools: OrclingTools, runId: string)
     "orcling_thread_send",
     {
       description:
-        "Send a short message to a thread in any project, to hand it work, steer it or ask what it knows. If its agent is working, the message joins the current turn; otherwise it starts one. Set report_back to hear once when that turn ends. A thread in a more permissive mode than yours acts with its own permissions, so the user is asked first. Pass the same request_key when retrying. After 50 agent messages in a row with no one writing, sending stops until a person writes.",
+        "Send a short message to a thread in any project, to hand it work, steer it or ask what it knows. If its agent is working, the message joins the current turn; otherwise it starts one. The message arrives under your name, so don't open by saying who you are. Set report_back to hear once when that turn ends. A thread in a more permissive mode than yours acts with its own permissions, so the user is asked first. Pass the same request_key when retrying. After 50 agent messages in a row with no one writing, sending stops until a person writes.",
       inputSchema: { thread_id: z.string().min(1), text: z.string().min(1).max(4000), request_key: z.string().min(1).max(200).optional(), report_back: z.boolean().optional() },
     },
     async ({ thread_id, text: message, request_key, report_back }) =>

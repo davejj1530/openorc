@@ -1,5 +1,4 @@
 import type { ChangeComparison, FileDiff, FolderPath } from "@openorc/protocol";
-import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import { ScrollView, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,20 +12,21 @@ import { cutText, diffLine, fileName, omittedText } from "./change-words";
 import { FailedBlock } from "./ChangeRows";
 import { DiffLines } from "./DiffLines";
 import { DiffPerf } from "./DiffPerf";
-import { PanelTitle } from "./PanelTitle";
+import { PanelHeader, usePanelNav, usePanelParams, type PanelTool } from "../panel/host";
 
 type Params = { threadId: string; path: string; comparison?: ChangeComparison };
 
 /** Previous and next file in the list's order, dimmed at either end. */
-function FileSteps({ paths, path }: { paths: string[]; path: string }) {
+function fileSteps(paths: string[], path: string, go: (path: string) => void): PanelTool[] {
   const index = paths.indexOf(path);
-  const go = (to: number) => router.setParams({ path: paths[to] });
-  return (
-    <Stack.Toolbar placement="right">
-      <Stack.Toolbar.Button icon="chevron.up" accessibilityLabel="Previous file" disabled={index <= 0} onPress={() => go(index - 1)} />
-      <Stack.Toolbar.Button icon="chevron.down" accessibilityLabel="Next file" disabled={index < 0 || index >= paths.length - 1} onPress={() => go(index + 1)} />
-    </Stack.Toolbar>
-  );
+  const step = (to: number) => () => {
+    const next = paths[to];
+    if (next !== undefined) go(next);
+  };
+  return [
+    { kind: "button", icon: "chevron.up", label: "Previous file", disabled: index <= 0, onPress: step(index - 1) },
+    { kind: "button", icon: "chevron.down", label: "Next file", disabled: index < 0 || index >= paths.length - 1, onPress: step(index + 1) },
+  ];
 }
 
 function DiffBody({ diff }: { diff: FileDiff }) {
@@ -53,10 +53,12 @@ function DiffBody({ diff }: { diff: FileDiff }) {
  * toolbar steps through the Changes list's files in its order.
  */
 export function DiffScreen() {
-  const { threadId, path, comparison = "head" } = useLocalSearchParams<Params>();
+  const { threadId, path, comparison = "head" } = usePanelParams<Params>();
+  const nav = usePanelNav();
   const insets = useSafeAreaInsets();
   const diff = useRpc("review.threadFileDiff", { threadId, comparison, path: path as FolderPath });
   const list = useRpc("review.threadChanges", { threadId, comparison });
+  const steps = fileSteps(list.data?.files.map((file) => file.path) ?? [], path, (next) => nav.setParams({ path: next }));
   const [sheet] = useState(createSheetWindow);
   const scroller = useRef<ScrollViewInstance>(null);
   const contentHeight = useRef(0);
@@ -71,8 +73,7 @@ export function DiffScreen() {
   else if (diff.error) body = <FailedBlock message={diff.error.message} onRetry={() => void diff.refetch()} />;
   return (
     <SheetWindowContext.Provider value={sheet}>
-      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={fileName(path)} line={diff.data ? diffLine(diff.data) : null} /> }} />
-      <FileSteps paths={list.data?.files.map((file) => file.path) ?? []} path={path} />
+      <PanelHeader title={fileName(path)} line={diff.data ? diffLine(diff.data) : null} tools={steps} />
       <ScrollView
         ref={scroller}
         className="flex-1 bg-bg"

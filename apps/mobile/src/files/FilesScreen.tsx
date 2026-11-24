@@ -1,13 +1,13 @@
 import { panelToolLabels, relativeTime } from "@openorc/client";
 import { placeOf, type FileEntry } from "@openorc/protocol";
-import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ScrollView, TextInput, View } from "react-native";
 import { useRpc } from "../client";
-import { PanelTitle } from "../changes/PanelTitle";
+import { PanelHeader, usePanelNav, usePanelParams } from "../panel/host";
 import { ChevronRight, FilePlain, Folder, Search } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { ListPressable } from "../ui/ListPressable";
+import { Measure } from "../ui/pane";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { FilesNotice, readAt } from "./FilesNotice";
@@ -16,9 +16,6 @@ import { parentPlace, placeName } from "./thread-files";
 
 /** As many names as the desktop's search shows. */
 const NAME_LIMIT = 50;
-
-const openFolder = (threadId: string, path: string) => router.push({ pathname: "/files", params: { threadId, path } });
-const openFile = (threadId: string, path: string) => router.push({ pathname: "/file", params: { threadId, path } });
 
 /** One entry of a folder: a folder opens its own listing, a file opens to read; what git ignores is dimmed, as on the desktop. */
 function EntryRow({ entry, onOpen }: { entry: FileEntry; onOpen: (entry: FileEntry) => void }) {
@@ -41,7 +38,7 @@ function EntryRow({ entry, onOpen }: { entry: FileEntry; onOpen: (entry: FileEnt
 }
 
 /** The files whose names match, best first, as the desktop's search lists them; each opens to read. */
-function NameHits({ threadId, query, source }: { threadId: string; query: string; source: FilesSourceNow }) {
+function NameHits({ threadId, query, source, onOpen }: { threadId: string; query: string; source: FilesSourceNow; onOpen: (path: string) => void }) {
   const names = useNames(threadId, query, NAME_LIMIT, source);
   if (names.error && !names.data) return <FilesNotice text={names.error.message} />;
   if (!names.data) return <View className="items-center py-10">{<Spinner />}</View>;
@@ -53,7 +50,7 @@ function NameHits({ threadId, query, source }: { threadId: string; query: string
         key={path}
         accessibilityRole="button"
         accessibilityLabel={folder ? `${placeName(path, "")}, in ${folder}` : path}
-        onPress={() => openFile(threadId, path)}
+        onPress={() => onOpen(path)}
         className="h-touch flex-row items-center gap-3 px-5 active:bg-surface-2"
       >
         <FilePlain size={16} className="text-ink-4" />
@@ -96,7 +93,8 @@ function SearchField({ query, onChange }: { query: string; onChange: (query: str
  * before stays with when it was read, and one never read waits for the Mac.
  */
 export function FilesScreen() {
-  const { threadId, path = "" } = useLocalSearchParams<{ threadId: string; path?: string }>();
+  const { threadId, path = "" } = usePanelParams<{ threadId: string; path?: string }>();
+  const nav = usePanelNav();
   const thread = useRpc("threads.get", { id: threadId });
   const elsewhere = Boolean(thread.data && placeOf(thread.data).elsewhere);
   const { source, live, host } = useFilesSource(thread.data);
@@ -109,17 +107,22 @@ export function FilesScreen() {
   const saved = savedAt ? `Saved ${relativeTime(Date.parse(savedAt))}` : null;
   const line = path ? parentPlace(path) || null : saved;
   const kept = source === "mac" && !live;
-  const open = (entry: FileEntry) => (entry.kind === "directory" ? openFolder(threadId, entry.path) : openFile(threadId, entry.path));
+  const openFile = (file: string) => nav.open({ name: "file", params: { threadId, path: file } });
+  const open = (entry: FileEntry) => (entry.kind === "directory" ? nav.open({ name: "files", params: { threadId, path: entry.path } }) : openFile(entry.path));
   return (
-    <View className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={title} line={line} fromCloud={source === "cloud"} /> }} />
+    <Measure className="flex-1 bg-bg">
+      <PanelHeader title={title} line={line} fromCloud={source === "cloud"} />
       <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerClassName="pt-2 pb-8">
         {/* A folder refused, as to a reader who may not act in the thread, has no names to find either. */}
         {!path && !folder.data?.unavailable ? <SearchField query={query} onChange={setQuery} /> : null}
         {kept && folder.data ? <Text className="px-5 pb-1 text-sm text-ink-4">{readAt(folder.readAt)}</Text> : null}
-        {searching ? <NameHits threadId={threadId} query={query.trim()} source={source} /> : <Listing folder={folder} reachable={!kept} deciding={source === null} host={host} onOpen={open} />}
+        {searching ? (
+          <NameHits threadId={threadId} query={query.trim()} source={source} onOpen={openFile} />
+        ) : (
+          <Listing folder={folder} reachable={!kept} deciding={source === null} host={host} onOpen={open} />
+        )}
       </ScrollView>
-    </View>
+    </Measure>
   );
 }
 

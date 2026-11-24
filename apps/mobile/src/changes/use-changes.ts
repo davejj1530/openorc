@@ -1,9 +1,9 @@
 import type { ChangeComparison } from "@openorc/protocol";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { useIsFocused } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { link, useLinkState, useRpc } from "../client";
+import { usePanelFocused } from "../panel/host";
 
 /** The Commits section shows this many of the branch's newest commits. */
 const LOG_LIMIT = 10;
@@ -34,7 +34,7 @@ function useReadOnReturn(live: boolean, queries: Pick<UseQueryResult, "refetch">
  * `threaddiff`/`threadlog` push refreshes them through their tags.
  */
 export function useChangesReads(threadId: string, comparison: ChangeComparison) {
-  const focused = useIsFocused();
+  const focused = usePanelFocused();
   const active = useAppActive();
   const live = focused && active;
   const poll = live ? POLL_MS : false;

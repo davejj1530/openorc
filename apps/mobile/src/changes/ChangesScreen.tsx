@@ -3,7 +3,6 @@ import { accessibilityLabel, pickerStyle, tag } from "@expo/ui/swift-ui/modifier
 import { LegendList, type LegendListRef } from "@legendapp/list/react-native";
 import { comparisons, panelToolLabels } from "@openorc/client";
 import type { ChangeComparison } from "@openorc/protocol";
-import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useRef, useState, type RefObject } from "react";
 import { RefreshControl, View } from "react-native";
 import { useLinkState } from "../client";
@@ -11,6 +10,7 @@ import { linkReason } from "../connection/link-reason";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { useMode } from "../ui/mode";
+import { Measure } from "../ui/pane";
 import { Spinner } from "../ui/Spinner";
 import { useLate } from "../ui/use-late";
 import { changesLine } from "./change-words";
@@ -18,7 +18,7 @@ import { changesItems, ITEM_HEIGHTS, type ChangesItem } from "./changes-items";
 import { CommitRow, CommitsHead, FailedBlock, FileRow, NoFilesBlock, UnlistedRow } from "./ChangeRows";
 import { perfEnabled } from "../thread/perf-probe";
 import { ChangesPerf } from "./ChangesPerf";
-import { PanelTitle } from "./PanelTitle";
+import { PanelHeader, usePanelNav, usePanelParams } from "../panel/host";
 import { PublishBar } from "./PublishBar";
 import { useChangesReads, type ChangesReads } from "./use-changes";
 import { usePublish } from "./use-publish";
@@ -72,7 +72,8 @@ function ChangesList({ threadId, reads, comparison, onComparison, footer, dim, l
   const [refreshing, setRefreshing] = useState(false);
   const { changes, log, push, thread } = reads;
   const items = useMemo(() => changesItems(changes.data, log.data, push.data), [changes.data, log.data, push.data]);
-  const open = useCallback((path: string) => router.push({ pathname: "/diff", params: { threadId, path, comparison } }), [threadId, comparison]);
+  const nav = usePanelNav();
+  const open = useCallback((path: string) => nav.open({ name: "diff", params: { threadId, path, comparison } }), [nav, threadId, comparison]);
   if (!changes.data && changes.error) return <FailedBlock message={changes.error.message} onRetry={() => void changes.refetch()} />;
   if (!changes.data) return <View className="flex-1 items-center justify-center">{late ? <Spinner /> : null}</View>;
   const refresh = () => {
@@ -106,7 +107,7 @@ function ChangesList({ threadId, reads, comparison, onComparison, footer, dim, l
  * commits, and a pinned bar whose ink pill is the next step of Commit, Push and PR. Each file opens its diff.
  */
 export function ChangesScreen() {
-  const { threadId } = useLocalSearchParams<{ threadId: string }>();
+  const { threadId } = usePanelParams<{ threadId: string }>();
   const [comparison, setComparison] = useState<ChangeComparison>("head");
   const reads = useChangesReads(threadId, comparison);
   const publish = usePublish(threadId, reads);
@@ -120,13 +121,13 @@ export function ChangesScreen() {
     setComparison(next);
   };
   return (
-    <View className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={panelToolLabels.changes} line={totals ? changesLine(totals) : null} /> }} />
+    <Measure className="flex-1 bg-bg">
+      <PanelHeader title={panelToolLabels.changes} line={totals ? changesLine(totals) : null} />
       <ChangesList threadId={threadId} reads={reads} comparison={comparison} onComparison={choose} footer={footer} dim={dim} list={list} />
       {perfEnabled() ? <ChangesPerf reads={reads} list={list} /> : null}
       <View onLayout={({ nativeEvent }) => setFooter(nativeEvent.layout.height)} className="absolute inset-x-0 bottom-0">
         <PublishBar threadId={threadId} reads={reads} publish={publish} />
       </View>
-    </View>
+    </Measure>
   );
 }

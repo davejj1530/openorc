@@ -1,12 +1,11 @@
 import { panelToolLabels, pageLabel } from "@openorc/client";
 import * as Clipboard from "expo-clipboard";
-import { Stack, useLocalSearchParams } from "expo-router";
-import { useMemo, type ReactElement } from "react";
+import { useMemo } from "react";
 import { View } from "react-native";
 import { PreviewPage } from "./PreviewPage";
 import { useLinkState, useRpc } from "../client";
 import { perfEnabled } from "../thread/perf-probe";
-import { PanelTitle } from "../changes/PanelTitle";
+import { PanelHeader, usePanelParams, type PanelTool } from "../panel/host";
 import { haptic } from "../ui/haptics";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
@@ -66,26 +65,14 @@ function Body({ view, frame, mac, page, connected, onZoom, input }: BodyProps) {
 }
 
 /** The page's own menu: its address to copy, and Safari for a public one, which opens with the phone's own sessions. */
-function pageMenu(address: string, safari: string | null): ReactElement {
+function pageMenu(address: string, safari: string | null): PanelTool {
   const copy = () => void Clipboard.setStringAsync(address).then(() => haptic.tap());
-  const items = [
-    <Stack.Toolbar.MenuAction key="copy" icon="doc.on.doc" onPress={copy}>
-      Copy Address
-    </Stack.Toolbar.MenuAction>,
-  ];
-  if (safari)
-    items.push(
-      <Stack.Toolbar.MenuAction key="safari" icon="safari" onPress={() => openInApp(safari)}>
-        Open in Safari
-      </Stack.Toolbar.MenuAction>,
-    );
-  return (
-    <Stack.Toolbar placement="right">
-      <Stack.Toolbar.Menu icon="ellipsis" accessibilityLabel="Page">
-        {items}
-      </Stack.Toolbar.Menu>
-    </Stack.Toolbar>
-  );
+  return {
+    kind: "menu",
+    icon: "ellipsis",
+    label: "Page",
+    items: [{ label: "Copy Address", icon: "doc.on.doc", onPress: copy }, ...(safari ? [{ label: "Open in Safari", icon: "safari" as const, onPress: () => openInApp(safari) }] : [])],
+  };
 }
 
 /**
@@ -93,7 +80,7 @@ function pageMenu(address: string, safari: string | null): ReactElement {
  * pan, tap, scroll and type into. Tabs, reload and history stay on the Mac.
  */
 export function PreviewScreen() {
-  const { threadId } = useLocalSearchParams<{ threadId: string }>();
+  const { threadId } = usePanelParams<{ threadId: string }>();
   const preview = usePreview(threadId);
   const input = usePreviewInput(threadId, preview.frame);
   markFrameRender();
@@ -105,15 +92,13 @@ export function PreviewScreen() {
   // A refused input's words stand in the line for a moment.
   const line = input.notice ?? previewLine(view, state, read.data);
   const page = state?.open ? pageLabel({ url: state.address, title: state.title }) : panelToolLabels.browser;
-  // Frames arrive twice a second; the header changes only with its words.
-  const options = useMemo(() => ({ headerTitle: () => <PanelTitle title={panelToolLabels.browser} line={line} /> }), [line]);
   const address = state?.open ? state.address : null;
   const safari = safariAddress(state);
-  const menu = useMemo(() => (address === null ? null : pageMenu(address, safari)), [address, safari]);
+  // Frames arrive twice a second; the header changes only with its words and its menu.
+  const tools = useMemo(() => (address === null ? undefined : [pageMenu(address, safari)]), [address, safari]);
   return (
     <View className="flex-1 bg-bg">
-      <Stack.Screen options={options} />
-      {menu}
+      <PanelHeader title={panelToolLabels.browser} line={line} tools={tools} />
       <Body view={view} frame={frame} mac={mac} page={page} connected={connected} onZoom={preview.onZoom} input={input} />
       {perfEnabled() ? <PreviewPerf shown={frame !== null} /> : null}
     </View>

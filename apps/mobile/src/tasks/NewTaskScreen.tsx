@@ -12,6 +12,7 @@ import { useShares } from "../connection/use-shares";
 import { failureMessage } from "../failure";
 import { Folder } from "../generated/icons";
 import { haptic } from "../ui/haptics";
+import { Measure } from "../ui/pane";
 import { Text } from "../ui/Text";
 import { boardPriority, boardStatus } from "./board";
 import { draftProject, newTaskInput, useTaskDraft } from "./new-task";
@@ -103,7 +104,7 @@ export function NewTaskScreen() {
     }
   };
   return (
-    <View className="flex-1 bg-bg">
+    <Measure className="flex-1 bg-bg">
       <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerClassName="gap-5 px-5 pt-3 pb-6">
         <View className="gap-3">
           <TextInput
@@ -150,6 +151,6 @@ export function NewTaskScreen() {
           <SheetPill label={saving ? "Creating…" : "Create task"} dim={!ready} running={saving} onPress={() => void save()} />
         </View>
       </KeyboardStickyView>
-    </View>
+    </Measure>
   );
 }

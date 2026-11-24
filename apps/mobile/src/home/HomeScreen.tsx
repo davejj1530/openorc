@@ -1,6 +1,6 @@
 import { AnimatedLegendList } from "@legendapp/list/reanimated";
 import { router, useGlobalSearchParams, usePathname } from "expo-router";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LegendListRef } from "@legendapp/list/react-native";
 import { Pressable, RefreshControl, View } from "react-native";
 import { LinearTransition, useSharedValue } from "react-native-reanimated";
@@ -11,9 +11,13 @@ import { useChatLease } from "../chat/lease";
 import type { LinkState } from "../connection/manager";
 import { Plus } from "../generated/icons";
 import { motion } from "../generated/tokens";
+import { useListOpen, useSplit } from "../layout";
 import { reportFirstFrame } from "../startup";
 import { usePerfAutoOpen } from "../thread/PerfProbe";
+import { useColors } from "../ui/mode";
 import { ease } from "../ui/motion";
+import { OpenOrcMark } from "../ui/OpenOrcMark";
+import { Measure } from "../ui/pane";
 import { useReducedMotion } from "../ui/reduced-motion";
 import { FootFade } from "../ui/ScrollFade";
 import { swipes } from "../ui/swipe";
@@ -49,14 +53,25 @@ type Fold = (key: string, open: boolean) => void;
 /** Rows slide to their new places as a fold opens or closes, over the desktop's resize time. */
 const slide = LinearTransition.duration(motion.duration.resize).easing(ease.outTiming);
 
-function HomeRow({ item, home, motion, fold }: { item: HomeItem; home: Home; motion: RowMotion; fold: Fold }) {
+function HomeRow({ item, home, motion, fold, shownId }: { item: HomeItem; home: Home; motion: RowMotion; fold: Fold; shownId: string | undefined }) {
   switch (item.kind) {
     case "project":
       return <ProjectLabel group={item} room={item.room} motion={motion} onToggle={() => fold(item.key, !(item.open && !motion.folding))} />;
     case "section":
       return <SectionToggle section={item} room={item.room} motion={motion} onToggle={() => fold(item.key, !(item.open && !motion.folding))} />;
     case "thread":
-      return <ThreadRow thread={item.thread} project={item.project} arriving={item.arriving} tree={item.tree} cloudLabel={item.cloudLabel} motion={motion} onFold={fold} />;
+      return (
+        <ThreadRow
+          thread={item.thread}
+          project={item.project}
+          arriving={item.arriving}
+          tree={item.tree}
+          cloudLabel={item.cloudLabel}
+          motion={motion}
+          onFold={fold}
+          shown={item.thread.id === shownId}
+        />
+      );
     case "more":
       return <ShowMore motion={motion} onPress={home.showMore} />;
     case "group-more":
@@ -91,10 +106,13 @@ function useRefresh() {
   };
 }
 
-/** Home stays mounted under a thread; its selected branch must survive a page refresh there. */
+/**
+ * The thread that is open, or whose panel is: Home stays mounted under it, or beside it where the window splits, and
+ * its selected branch must survive a page refresh there.
+ */
 function useSelectedThreadId(): string | undefined {
-  const params = useGlobalSearchParams<{ id?: string }>();
-  return usePathname().startsWith("/thread/") ? params.id : undefined;
+  const params = useGlobalSearchParams<{ id?: string; threadId?: string }>();
+  return usePathname().startsWith("/thread/") ? params.id : params.threadId;
 }
 
 /** One plain line over the list while the Mac cannot reach OpenOrc Cloud: what the list shows is what it last heard. */
@@ -109,10 +127,24 @@ function OutOfReachLine({ state }: { state: Paired }) {
 }
 
 /** Home's foot: the tabs with their action, or, for a Mac too old for Orclings and task lists, New thread alone. */
-function HomeFoot({ tabs, tab, onTab, badge, action }: { tabs: HomeTab[]; tab: HomeTab; onTab: (tab: HomeTab) => void; badge: number; action: ReturnType<typeof useNewAction> }) {
+function HomeFoot({
+  tabs,
+  tab,
+  onTab,
+  badge,
+  action,
+  onNew,
+}: {
+  tabs: HomeTab[];
+  tab: HomeTab;
+  onTab: (tab: HomeTab) => void;
+  badge: number;
+  action: ReturnType<typeof useNewAction>;
+  onNew: () => void;
+}) {
   if (tabs.length > 1) return <BottomBar tab={tab} tabs={tabs} onTab={onTab} badge={badge} action={action} />;
   return (
-    <Pressable accessibilityRole="button" onPress={newThread} className="mb-2 h-12 flex-row items-center gap-2 rounded-full bg-accent pl-5 pr-6 active:opacity-80">
+    <Pressable accessibilityRole="button" onPress={onNew} className="mb-2 h-12 flex-row items-center gap-2 rounded-full bg-accent pl-5 pr-6 active:opacity-80">
       <Plus size={18} className="text-accent-fg" />
       <Text className="text-lg text-accent-fg">New thread</Text>
     </Pressable>
@@ -132,7 +164,8 @@ function ClosedSpace({ words }: { words: string }) {
 
 function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; header: ReactNode }) {
   const insets = useSafeAreaInsets();
-  const home = useHomeItems(state.kind === "connected", { selectedId: useSelectedThreadId() });
+  const selectedId = useSelectedThreadId();
+  const home = useHomeItems(state.kind === "connected", { selectedId });
   const list = useRef<LegendListRef>(null);
   // The bars hide the list's ends: a row under either reads as past that edge.
   const covered = useMemo(() => ({ top: insets.top + HOME_BAR_HEIGHT, bottom: insets.bottom + BOTTOM_BAR_ROOM + 4 }), [insets.top, insets.bottom]);
@@ -143,6 +176,8 @@ function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; heade
   const refresh = useRefresh();
   // One object for the list's life: a new one each render would make the list resubscribe and rewrite the offset.
   const sharedValues = useMemo(() => ({ scrollOffset: scrollY }), [scrollY]);
+  // What a row draws beyond its item: a fold's motion, and whether its thread is the one open.
+  const drawn = useMemo(() => ({ motions: folds.motions, selectedId }), [folds.motions, selectedId]);
   return (
     <>
       <AnimatedLegendList<HomeItem>
@@ -152,8 +187,8 @@ function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; heade
         getItemType={(item) => item.kind}
         recycleItems
         itemLayoutAnimation={still ? undefined : slide}
-        extraData={folds.motions}
-        renderItem={({ item }) => <HomeRow item={item} home={home} motion={rowMotion(folds.motions, item.key)} fold={folds.toggle} />}
+        extraData={drawn}
+        renderItem={({ item }) => <HomeRow item={item} home={home} motion={rowMotion(folds.motions, item.key)} fold={folds.toggle} shownId={selectedId} />}
         ListHeaderComponent={
           <View onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
             {header}
@@ -173,8 +208,6 @@ function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; heade
 
 /** The bar and the 8 under it, and the fade above it that rows pass into. */
 const PILL_ROOM = BOTTOM_BAR_ROOM + 32;
-
-const newThread = () => router.push("/new");
 
 /**
  * A paired Mac's threads by project on the tile ground, under the pinned bar, with New thread as the screen's
@@ -202,15 +235,18 @@ function PairedHome({ state }: { state: Paired }) {
   const [chosen, setTab] = useState<HomeTab>("threads");
   // A Mac too old for Orclings and task lists keeps Home as it was: threads alone, under the New thread pill.
   const tab = tabs.includes(chosen) ? chosen : "threads";
-  const action = useNewAction(tab, newThread);
+  const open = useListOpen();
+  const newThread = useCallback(() => open("/new"), [open]);
+  const newTask = useCallback(() => open("/new-task"), [open]);
+  const action = useNewAction(tab, { newThread, newTask });
   const standing = spaceStanding(account, state.mac.name, Date.now());
   const closed = standing?.kind === "closed";
   return (
-    <View className="flex-1 bg-bg" onMagicTap={closed ? undefined : newThread} onTouchStart={swipes.touched}>
+    <Measure className="flex-1 bg-bg" onMagicTap={closed ? undefined : newThread} onTouchStart={swipes.touched}>
       <View pointerEvents="box-none" className="absolute inset-x-0 bottom-0 z-10 items-center" style={{ paddingBottom: insets.bottom }}>
         <FootFade height={insets.bottom + PILL_ROOM} />
         <UpdateReady />
-        {closed ? null : <HomeFoot tabs={tabs} tab={tab} onTab={setTab} badge={faces ? 0 : orclings.chats.filter(needsYou).length} action={action} />}
+        {closed ? null : <HomeFoot tabs={tabs} tab={tab} onTab={setTab} badge={faces ? 0 : orclings.chats.filter(needsYou).length} action={action} onNew={newThread} />}
       </View>
       {/* The bar over the status bar's room, so rows scroll under it. */}
       <View className="absolute inset-x-0 top-0 z-10 bg-bg" style={{ paddingTop: insets.top }}>
@@ -231,8 +267,23 @@ function PairedHome({ state }: { state: Paired }) {
           />
         </CloudOutOfReach.Provider>
       )}
+    </Measure>
+  );
+}
+
+/** What stands beside the list while nothing is open: OpenOrc's mark, quiet on the ground. */
+function NothingOpen() {
+  const colors = useColors();
+  return (
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" className="flex-1 items-center justify-center bg-bg">
+      <OpenOrcMark size={40} color={colors["line-strong"]} working={false} />
     </View>
   );
+}
+
+/** Home's place in the stack: Home itself, or nothing open where the window shows Home beside the stack. */
+export function HomeRoute() {
+  return useSplit() ? <NothingOpen /> : <HomeScreen />;
 }
 
 /** Home: the shown Mac's threads, or pairing when there is none. */

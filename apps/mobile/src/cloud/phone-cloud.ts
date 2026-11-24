@@ -1,8 +1,9 @@
 import { createHosted, signInVerifier, type Hosted, type HostedDeps } from "@openorc/hosted";
 import type { CloudSessionGrant, CloudSessionOwner } from "@openorc/protocol";
+import { DEVICE } from "../device";
 
 /** What the sign-in page and the account's sessions call this phone. */
-export const PHONE_DEVICE = "OpenOrc on iPhone";
+export const PHONE_DEVICE = `OpenOrc on ${DEVICE}`;
 
 /** The phone's session as it keeps it: the server it belongs to, and the package's opaque value (its token in it). */
 export interface CloudRecord {

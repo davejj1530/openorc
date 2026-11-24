@@ -3,6 +3,7 @@ import type { OrclingLook, OrclingLookPart } from "@openorc/protocol";
 import { Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
+import { useOwnWidth } from "../ui/pane";
 import { Text } from "../ui/Text";
 import { OrclingFace } from "./OrclingFace";
 
@@ -48,10 +49,11 @@ export function PartTabs({ part, onPick }: { part: OrclingLookPart; onPick: (par
 
 /** Each choice for one part, drawn on this Orcling as it would look with it. */
 export function Options({ look, part, onChange }: { look: OrclingLook; part: OrclingLookPart; onChange: (look: OrclingLook) => void }) {
-  const tile = Math.floor((useWindowDimensions().width - PADDING * 2 - GAP * (COLUMNS - 1)) / COLUMNS);
+  const row = useOwnWidth(useWindowDimensions().width - PADDING * 2);
+  const tile = Math.floor((row.width - GAP * (COLUMNS - 1)) / COLUMNS);
   const current = PARTS.find((entry) => entry.part === part)!;
   return (
-    <View accessibilityRole="radiogroup" accessibilityLabel={current.label} className="flex-row flex-wrap" style={{ gap: GAP }}>
+    <View ref={row.ref} onLayout={row.onLayout} accessibilityRole="radiogroup" accessibilityLabel={current.label} className="flex-row flex-wrap" style={{ gap: GAP }}>
       {current.options.map((option, index) => {
         const on = look[part] === index;
         return (

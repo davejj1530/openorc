@@ -1,7 +1,7 @@
 import { Button, Host, Image, Menu, RNHostView } from "@expo/ui/swift-ui";
 import { accessibilityAddTraits, accessibilityLabel, frame, glassEffect, onTapGesture } from "@expo/ui/swift-ui/modifiers";
 import { useEffect, type ComponentType, type ReactNode } from "react";
-import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
@@ -11,6 +11,7 @@ import { GlassCapsule, liquidGlass } from "../ui/Glass";
 import { haptic } from "../ui/haptics";
 import type { IconProps } from "../ui/icon";
 import { useColors, useMode } from "../ui/mode";
+import { usePaneWidth } from "../ui/pane";
 import { useReducedMotion } from "../ui/reduced-motion";
 import { Text } from "../ui/Text";
 import type { NewAction } from "./new-action";
@@ -284,7 +285,7 @@ function NewButton({ action }: { action: NewAction }) {
  */
 export function BottomBar({ tab, tabs, onTab, badge, action }: { tab: HomeTab; tabs: readonly HomeTab[]; onTab: (tab: HomeTab) => void; badge: number; action: NewAction }) {
   const shown = TABS.filter((each) => tabs.includes(each.tab));
-  const width = tabWidth(useWindowDimensions().width, shown.length);
+  const width = tabWidth(usePaneWidth(), shown.length);
   const index = Math.max(
     0,
     shown.findIndex((each) => each.tab === tab),

@@ -13,6 +13,7 @@ import { Composer } from "../composer/Composer";
 import { useShareSettings } from "../composer/settings-bridge";
 import { useOwnCloud } from "../cloud/use-own-cloud";
 import { useCoverHome } from "../home/home-cover";
+import { useFrontOfPane } from "../panel/pane";
 import { useThreadOnScreen } from "../notifications/on-screen";
 import { chatFor, useOrclingChats } from "../orclings/orcling-chats";
 import { OrclingChatPane } from "../orclings/OrclingChatPane";
@@ -209,6 +210,7 @@ export function ThreadScreen() {
   const together = threadTogetherOf(thread);
   useMarkSeen(thread);
   useCoverHome();
+  useFrontOfPane(id);
   const voices = useVoices(runs, thread);
   const [disclosure] = useState(createDisclosure);
   const [{ live, working, generatingImage }, setActivity] = useState(IDLE);

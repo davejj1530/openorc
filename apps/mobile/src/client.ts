@@ -32,6 +32,7 @@ import { CloudAlerts } from "./cloud/cloud-alerts";
 import { cloudKeys, keptIn, keychainVault } from "./cloud/native";
 import { knowCloudSender } from "./notifications/on-screen";
 import { PhoneCloud } from "./cloud/phone-cloud";
+import { DEVICE } from "./device";
 import { RoutedConnection } from "./cloud/routed-connection";
 import { timeFrame } from "./thread/perf-probe";
 import { BUNDLE_RELEASE, whatsNewAtLaunch } from "./whats-new/whats-new";
@@ -56,7 +57,7 @@ export const link = new ConnectionManager({
   clock: systemClock,
   random: Math.random,
   keys: keychainKeys,
-  deviceName: Constants.deviceName ?? "iPhone",
+  deviceName: Constants.deviceName ?? DEVICE,
   reachesInternet,
   macs,
   forgetCache: (macId) => {

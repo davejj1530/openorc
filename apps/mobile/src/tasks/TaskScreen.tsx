@@ -10,6 +10,7 @@ import { useLinkWords } from "../connection/use-link-words";
 import { ArrowUpRight, GitBranch, MessageSquare } from "../generated/icons";
 import { Markdown } from "../thread/Markdown";
 import { arrive } from "../ui/motion";
+import { Measure } from "../ui/pane";
 import { useReducedMotion } from "../ui/reduced-motion";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
@@ -191,7 +192,7 @@ export function TaskScreen() {
   const project = projects.data?.find((each) => each.id === shown?.projectId)?.name ?? null;
   const title = useTitleUnder();
   return (
-    <View className="flex-1 bg-bg">
+    <Measure className="flex-1 bg-bg">
       <Stack.Screen options={{ headerTitle: () => <TaskBarTitle task={shown} project={project} shown={title.under} /> }} />
       {shown ? (
         <ScrollView
@@ -214,6 +215,6 @@ export function TaskScreen() {
           ) : null}
         </View>
       )}
-    </View>
+    </Measure>
   );
 }

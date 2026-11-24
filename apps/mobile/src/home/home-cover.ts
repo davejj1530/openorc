@@ -1,5 +1,6 @@
 import { useNavigation, type NativeStackNavigationProp } from "expo-router";
 import { useEffect, useSyncExternalStore } from "react";
+import { useSplit } from "../layout";
 
 let covering = 0;
 const listeners = new Set<() => void>();
@@ -21,11 +22,13 @@ export function useHomeCovered(): boolean {
 
 /**
  * For a thread screen: it hides Home from when it opens until it starts to leave, so a swipe back shows Home as it
- * starts, and hides it again if the reader turns back.
+ * starts, and hides it again if the reader turns back. Beside Home, where the window splits, it hides nothing.
  */
 export function useCoverHome(): void {
   const navigation = useNavigation<NativeStackNavigationProp<Record<string, object | undefined>>>();
+  const split = useSplit();
   useEffect(() => {
+    if (split) return;
     let covers = false;
     const set = (next: boolean) => {
       if (next === covers) return;
@@ -38,5 +41,5 @@ export function useCoverHome(): void {
       stop.forEach((unsubscribe) => unsubscribe());
       set(false);
     };
-  }, [navigation]);
+  }, [navigation, split]);
 }

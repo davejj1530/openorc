@@ -1,13 +1,14 @@
 import { relativeTime, threadMark } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpc } from "../client";
-import { PanelTitle } from "../changes/PanelTitle";
+import { PanelHeader, usePanelParams } from "../panel/host";
 import { ACTION_RESERVE, MARGIN, ROW_INSET } from "../home/grid";
 import { ThreadStatusMark } from "../home/ThreadStatusMark";
 import { ListPressable } from "../ui/ListPressable";
+import { Measure } from "../ui/pane";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { useSubthreads } from "./subthreads";
@@ -41,14 +42,14 @@ function SubthreadRow({ thread, open }: { thread: ThreadSummary; open: (id: stri
 
 /** The threads started from one thread, by the person or its agent, newest first; each opens as its own thread. */
 export function SubthreadsScreen() {
-  const { threadId } = useLocalSearchParams<{ threadId: string }>();
+  const { threadId } = usePanelParams<{ threadId: string }>();
   const insets = useSafeAreaInsets();
   const parent = useRpc("threads.get", { id: threadId }).data ?? null;
   const { subthreads, loading } = useSubthreads(parent);
   const open = (id: string) => router.push({ pathname: "/thread/[id]", params: { id } });
   return (
-    <View className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => <PanelTitle title="Subthreads" line={parent?.title ?? null} /> }} />
+    <Measure className="flex-1 bg-bg">
+      <PanelHeader title="Subthreads" line={parent?.title ?? null} />
       {subthreads.length ? (
         <ScrollView contentContainerClassName="pt-2" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
           {subthreads.map((thread) => (
@@ -58,6 +59,6 @@ export function SubthreadsScreen() {
       ) : (
         <View className="flex-1 items-center justify-center">{loading || !parent ? <Spinner /> : <Text className="text-lg text-ink-3">No subthreads</Text>}</View>
       )}
-    </View>
+    </Measure>
   );
 }

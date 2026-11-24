@@ -9,6 +9,7 @@ import { ComposerPlane } from "../composer/ComposerPlane";
 import { SendButton } from "../composer/SendButton";
 import { useShareSettings } from "../composer/settings-bridge";
 import { Cloud, FolderOpen, Globe } from "../generated/icons";
+import { Measure } from "../ui/pane";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { useNewSubthread } from "./use-new-subthread";
@@ -49,7 +50,7 @@ function SubthreadForm({ parent }: { parent: ThreadSummary }) {
     router.replace({ pathname: "/thread/[id]", params: { id: threadId } });
   };
   return (
-    <View className="flex-1 justify-end bg-bg">
+    <Measure className="flex-1 justify-end bg-bg">
       <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
         <View className="gap-4" style={{ paddingBottom: insets.bottom + 8 }}>
           <View className="gap-2">
@@ -87,7 +88,7 @@ function SubthreadForm({ parent }: { parent: ThreadSummary }) {
           </View>
         </View>
       </KeyboardStickyView>
-    </View>
+    </Measure>
   );
 }
 

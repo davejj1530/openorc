@@ -16,9 +16,9 @@ const ORCLING_MAKING = "orcling-edits";
  * New for the tab in front: a thread on Threads; on Orclings, a menu to make an Orcling or start a thread, where the
  * Mac lets a phone make one, else a thread; on Tasks, a new task.
  */
-export function newAction(tab: HomeTab, { newThread, makesOrclings }: { newThread: () => void; makesOrclings: boolean }): NewAction {
+export function newAction(tab: HomeTab, { newThread, newTask, makesOrclings }: { newThread: () => void; newTask: () => void; makesOrclings: boolean }): NewAction {
   const thread: NewAction = { kind: "press", label: "New thread", onPress: newThread };
-  if (tab === "tasks") return { kind: "press", label: "New task", onPress: () => router.push("/new-task") };
+  if (tab === "tasks") return { kind: "press", label: "New task", onPress: newTask };
   if (tab !== "orclings" || !makesOrclings) return thread;
   return {
     kind: "menu",
@@ -30,6 +30,6 @@ export function newAction(tab: HomeTab, { newThread, makesOrclings }: { newThrea
   };
 }
 
-export function useNewAction(tab: HomeTab, newThread: () => void): NewAction {
-  return newAction(tab, { newThread, makesOrclings: useShares(ORCLING_MAKING) === true });
+export function useNewAction(tab: HomeTab, starts: { newThread: () => void; newTask: () => void }): NewAction {
+  return newAction(tab, { ...starts, makesOrclings: useShares(ORCLING_MAKING) === true });
 }

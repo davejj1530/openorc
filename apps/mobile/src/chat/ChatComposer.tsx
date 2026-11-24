@@ -9,6 +9,7 @@ import { tagWordAt } from "../composer/note-draft";
 import { SendButton } from "../composer/SendButton";
 import { OrclingFace } from "../orclings/OrclingFace";
 import { haptic } from "../ui/haptics";
+import { Measure } from "../ui/pane";
 import { Text } from "../ui/Text";
 
 /** Four rows and half of the next, so a longer list shows it scrolls. */
@@ -79,34 +80,36 @@ export function ChatComposer({
   };
   return (
     <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
-      <View className="gap-2 bg-bg px-3 pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
-        {failure ? <Text className="px-2 text-sm text-bad">{failure}</Text> : null}
-        {draft.replyTo ? (
-          <View className="flex-row items-center gap-2 px-2">
-            <Text numberOfLines={1} className="min-w-0 flex-1 text-sm text-ink-3">
-              {`Replying to ${answeredName(draft.replyTo, self)}: ${draft.replyTo.excerpt}`}
-            </Text>
-            <Pressable accessibilityRole="button" accessibilityLabel="Don't reply" onPress={() => teamChat.drafts.reply(target, null)} hitSlop={8} className="active:opacity-60">
-              <Text className="text-sm text-ink-2">Cancel</Text>
-            </Pressable>
+      <View className="bg-bg pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
+        <Measure className="gap-2 px-3">
+          {failure ? <Text className="px-2 text-sm text-bad">{failure}</Text> : null}
+          {draft.replyTo ? (
+            <View className="flex-row items-center gap-2 px-2">
+              <Text numberOfLines={1} className="min-w-0 flex-1 text-sm text-ink-3">
+                {`Replying to ${answeredName(draft.replyTo, self)}: ${draft.replyTo.excerpt}`}
+              </Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Don't reply" onPress={() => teamChat.drafts.reply(target, null)} hitSlop={8} className="active:opacity-60">
+                <Text className="text-sm text-ink-2">Cancel</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {picks.length ? <OrclingPicker picks={picks} onPick={pick} /> : null}
+          <View className="flex-row items-end gap-2 rounded-3xl bg-composer-input py-2 pl-4 pr-2">
+            <TextInput
+              multiline
+              value={draft.text}
+              onChangeText={(text) => teamChat.drafts.write(target, text)}
+              onSelectionChange={({ nativeEvent }) => setCaret(nativeEvent.selection.end)}
+              onFocus={onFocus}
+              placeholder={`Message ${title}…`}
+              accessibilityLabel="Message"
+              className="min-h-touch flex-1 py-2.5 font-sans text-md leading-5 text-ink"
+              placeholderTextColorClassName="accent-ink-4"
+              style={{ maxHeight: 120 }}
+            />
+            <SendButton state="send" disabled={!draft.text.trim()} onPress={onSend} />
           </View>
-        ) : null}
-        {picks.length ? <OrclingPicker picks={picks} onPick={pick} /> : null}
-        <View className="flex-row items-end gap-2 rounded-3xl bg-composer-input py-2 pl-4 pr-2">
-          <TextInput
-            multiline
-            value={draft.text}
-            onChangeText={(text) => teamChat.drafts.write(target, text)}
-            onSelectionChange={({ nativeEvent }) => setCaret(nativeEvent.selection.end)}
-            onFocus={onFocus}
-            placeholder={`Message ${title}…`}
-            accessibilityLabel="Message"
-            className="min-h-touch flex-1 py-2.5 font-sans text-md leading-5 text-ink"
-            placeholderTextColorClassName="accent-ink-4"
-            style={{ maxHeight: 120 }}
-          />
-          <SendButton state="send" disabled={!draft.text.trim()} onPress={onSend} />
-        </View>
+        </Measure>
       </View>
     </KeyboardStickyView>
   );

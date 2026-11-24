@@ -4,6 +4,7 @@ import { Image, Pressable, useWindowDimensions, View } from "react-native";
 import { whatsNew } from "../client";
 import { cn } from "../ui/cn";
 import { useMode } from "../ui/mode";
+import { useOwnWidth } from "../ui/pane";
 import { Text } from "../ui/Text";
 import chatDark from "./pictures/chat-dark.webp";
 import chatLight from "./pictures/chat-light.webp";
@@ -49,17 +50,19 @@ const close = () => router.back();
 
 /** The steps on what the update brought, one at a time, stepped with Next or the dots; however the sheet goes, they are settled. */
 export function WhatsNewSheet() {
-  const { width } = useWindowDimensions();
+  const window = useWindowDimensions().width;
+  const sheet = useOwnWidth(window);
   const mode = useMode();
   const [page, setPage] = useState(0);
   useEffect(() => () => whatsNew.close(), []);
   const step = steps[page]!;
   const last = page === steps.length - 1;
-  // A sheet sizes to its content, so the picture takes a size of its own, not a share of a width still unknown.
-  const picture = { width: width - 2 * SIDE, height: (width - 2 * SIDE) / PICTURE_RATIO };
+  // A sheet sizes to its content, so the picture takes a size of its own: the sheet's width, less the room either side.
+  const picture = { width: sheet.width - 2 * SIDE, height: (sheet.width - 2 * SIDE) / PICTURE_RATIO };
   return (
-    // The sheet keeps the home indicator's room under its content itself, about the room over the picture.
-    <View className="gap-5 bg-bg pt-8" style={{ paddingHorizontal: SIDE }} onAccessibilityEscape={close}>
+    // The sheet keeps the home indicator's room under its content itself, about the room over the picture. On an iPad
+    // it floats as a card narrower than the window, with no such room, so the page keeps its own.
+    <View ref={sheet.ref} onLayout={sheet.onLayout} className="gap-5 bg-bg pt-8" style={{ paddingHorizontal: SIDE, paddingBottom: sheet.width < window ? SIDE : 0 }} onAccessibilityEscape={close}>
       <View className="overflow-hidden rounded-3xl border border-line">
         <Image source={mode === "dark" ? step.dark : step.light} accessibilityLabel={step.alt} style={picture} />
       </View>

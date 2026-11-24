@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Square } from "../generated/icons";
 import { SessionRecovery } from "../thread/SessionRecovery";
 import { cn } from "../ui/cn";
+import { Measure } from "../ui/pane";
 import { Text } from "../ui/Text";
 import { ComposerPlane } from "./ComposerPlane";
 import { SendButton } from "./SendButton";
@@ -71,52 +72,54 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
   const failure = composer.error ?? settings.error?.message ?? settings.permissionError;
   return (
     <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
-      <View onLayout={onLayout} className="gap-2 bg-bg px-3 pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
-        <ThreadQueue thread={thread} queued={queued} canSteer={input.canSteer} typing={typing} onSent={input.onSent} />
-        {typing || input.working ? null : <SessionRecovery thread={thread} request={input.request} disabled={input.disabledReason !== null} onSent={input.onSent} />}
-        <HandoffCard thread={thread} draft={composer.draft.text} onTag={composer.stage} />
-        <ComposerNotice failure={failure} dim={composer.dimReason} />
-        <ComposerPlane
-          composerId={thread.id}
-          skillScope={{ kind: "thread", id: thread.id }}
-          settings={settings}
-          draft={composer.draft}
-          uploading={composer.uploading}
-          onFocusChange={setTyping}
-          placeholder={to ? `Message ${to}…` : conversationPlaceholder({ firstTaskRun: false, working: input.working, canSteer: input.canSteer, agent: settings.choice?.agent ?? thread.agent })}
-          onText={composer.setText}
-          onRemoveImage={composer.removeImage}
-          onAttach={composer.chooseImages}
-          attachDimmed={composer.attachDimmed}
-          chips={!to}
-          tagging={notes && { threadId: notes.threadId, viewerId: notes.viewerId, onPick: composer.pickTag }}
-        >
-          {activity ? <Text className="text-sm text-ink-4">{activity}</Text> : null}
-          {controls.stop ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Stop"
-              disabled={composer.stopping}
-              onPress={composer.stop}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
-              className="h-control-sm w-7 items-center justify-center rounded-full active:bg-surface-2"
-            >
-              <Square size={14} className="text-ink-4" />
-            </Pressable>
-          ) : null}
-          {controls.queue && !to ? (
-            <Pressable
-              accessibilityRole="button"
-              disabled={!controls.canSend}
-              onPress={composer.queue}
-              hitSlop={{ top: 8, bottom: 8 }}
-              className="h-control-sm justify-center rounded-full px-2.5 active:bg-surface-2"
-            >
-              <Text className={cn("text-sm text-ink-2", !controls.canSend && "text-ink-4")}>Queue</Text>
-            </Pressable>
-          ) : null}
-          <SendButton state={controls.primary} disabled={!controls.primaryEnabled} onPress={composer.primary} onDimPress={composer.explainDim} />
-        </ComposerPlane>
+      <View onLayout={onLayout} className="bg-bg pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
+        <Measure className="gap-2 px-3">
+          <ThreadQueue thread={thread} queued={queued} canSteer={input.canSteer} typing={typing} onSent={input.onSent} />
+          {typing || input.working ? null : <SessionRecovery thread={thread} request={input.request} disabled={input.disabledReason !== null} onSent={input.onSent} />}
+          <HandoffCard thread={thread} draft={composer.draft.text} onTag={composer.stage} />
+          <ComposerNotice failure={failure} dim={composer.dimReason} />
+          <ComposerPlane
+            composerId={thread.id}
+            skillScope={{ kind: "thread", id: thread.id }}
+            settings={settings}
+            draft={composer.draft}
+            uploading={composer.uploading}
+            onFocusChange={setTyping}
+            placeholder={to ? `Message ${to}…` : conversationPlaceholder({ firstTaskRun: false, working: input.working, canSteer: input.canSteer, agent: settings.choice?.agent ?? thread.agent })}
+            onText={composer.setText}
+            onRemoveImage={composer.removeImage}
+            onAttach={composer.chooseImages}
+            attachDimmed={composer.attachDimmed}
+            chips={!to}
+            tagging={notes && { threadId: notes.threadId, viewerId: notes.viewerId, onPick: composer.pickTag }}
+          >
+            {activity ? <Text className="text-sm text-ink-4">{activity}</Text> : null}
+            {controls.stop ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Stop"
+                disabled={composer.stopping}
+                onPress={composer.stop}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
+                className="h-control-sm w-7 items-center justify-center rounded-full active:bg-surface-2"
+              >
+                <Square size={14} className="text-ink-4" />
+              </Pressable>
+            ) : null}
+            {controls.queue && !to ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={!controls.canSend}
+                onPress={composer.queue}
+                hitSlop={{ top: 8, bottom: 8 }}
+                className="h-control-sm justify-center rounded-full px-2.5 active:bg-surface-2"
+              >
+                <Text className={cn("text-sm text-ink-2", !controls.canSend && "text-ink-4")}>Queue</Text>
+              </Pressable>
+            ) : null}
+            <SendButton state={controls.primary} disabled={!controls.primaryEnabled} onPress={composer.primary} onDimPress={composer.explainDim} />
+          </ComposerPlane>
+        </Measure>
       </View>
     </KeyboardStickyView>
   );

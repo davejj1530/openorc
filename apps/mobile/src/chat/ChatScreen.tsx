@@ -9,6 +9,7 @@ import { teamChat } from "../client";
 import { Pin } from "../generated/icons";
 import { Spinner } from "../ui/Spinner";
 import { cn } from "../ui/cn";
+import { useMeasuredSides } from "../ui/pane";
 import { Text } from "../ui/Text";
 import { openInApp } from "../ui/web";
 import { chatItems, type ChatItem } from "./chat-items";
@@ -214,6 +215,7 @@ function useMessageMoves(lease: TeamChatLease, target: TeamChatTarget): { moves:
 /** One conversation of the organization's chat, in the desktop's shape: its messages live, earlier ones a tap away, and a composer that keeps its draft. */
 function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: TeamChatLease; conversationId: string; title: string; newFrom: number | null; jump: ChatJump | null }) {
   const insets = useSafeAreaInsets();
+  const sides = useMeasuredSides(12);
   const target = useMemo(() => ({ accountId: lease.accountId, spaceId: lease.spaceId, conversationId }), [lease, conversationId]);
   teamChat.useWatch(lease, conversationId);
   const timeline = teamChat.useTimeline(lease, conversationId);
@@ -262,7 +264,7 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
           scrollEventThrottle={64}
           onContentSizeChange={() => atEnd.current && list.current?.scrollToEnd({ animated: false })}
           keyboardDismissMode="interactive"
-          contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12 }}
+          contentContainerStyle={{ paddingHorizontal: sides, paddingTop: 12, paddingBottom: 12 }}
         >
           {timeline.data?.older ? (
             <Pressable accessibilityRole="button" onPress={() => void teamChat.earlier(lease, conversationId)} className="items-center py-3 active:opacity-60">

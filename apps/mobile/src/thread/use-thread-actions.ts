@@ -4,8 +4,9 @@ import { router } from "expo-router";
 import { useMemo } from "react";
 import { Alert } from "react-native";
 import { useRpcMutation } from "../client";
+import { isPanelName, pane } from "../panel/pane";
 import { openInApp } from "../ui/web";
-import { DELETE_CLOUD_THREAD, type OrganizePatch, type ThreadAction } from "./thread-actions";
+import { DELETE_CLOUD_THREAD, type OrganizePatch, type ThreadAction, type ThreadScreenPath } from "./thread-actions";
 
 /** The rename prompt: the title to edit, shown in full above the field when it is too long to read there. */
 function promptRename(title: string, save: (title: string) => void): void {
@@ -26,6 +27,13 @@ function promptRename(title: string, save: (title: string) => void): void {
     "plain-text",
     title,
   );
+}
+
+/** One of a thread's screens: a side panel tool beside the thread where the window has room, any of them over it otherwise. */
+function openScreen(pathname: ThreadScreenPath, threadId: string): void {
+  const name = pathname.slice(1);
+  if (isPanelName(name)) pane.open({ name, params: { threadId } });
+  else router.push({ pathname, params: { threadId } });
 }
 
 /**
@@ -56,7 +64,7 @@ export function useThreadActions(thread: ThreadSummary | null, { onUnread, onDel
       else if (action.kind === "rename") rename();
       else if (action.kind === "open") openInApp(action.url);
       else if (action.kind === "parent") router.push({ pathname: "/thread/[id]", params: { id: action.threadId } });
-      else if (action.kind === "screen") router.push({ pathname: action.pathname, params: { threadId: thread.id } });
+      else if (action.kind === "screen") openScreen(action.pathname, thread.id);
       else if (action.kind === "delete") confirmDelete(thread.id);
       else if (action.kind === "compact") void compact?.().catch((failure: Error) => Alert.alert("Couldn’t compact this thread", failure.message));
     };

@@ -1,9 +1,8 @@
 import { formatBytes } from "@openorc/client";
-import { Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useRpc } from "../client";
-import { PanelTitle } from "../changes/PanelTitle";
+import { PanelHeader, usePanelParams } from "../panel/host";
 import { FilePlain } from "../generated/icons";
 import { CloudThreadFileTile, ImageTile } from "../thread/images";
 import { createSheetWindow, SheetWindowContext, windowScroll } from "../thread/sheet-window";
@@ -50,7 +49,7 @@ function ReadFile({ threadId, read, source }: { threadId: string; read: FileView
  * Mac, and nothing shows in its place.
  */
 export function FileScreen() {
-  const { threadId, path } = useLocalSearchParams<{ threadId: string; path: string }>();
+  const { threadId, path } = usePanelParams<{ threadId: string; path: string }>();
   const thread = useRpc("threads.get", { id: threadId });
   const { source, live, host } = useFilesSource(thread.data);
   const read = useFile(threadId, path, source);
@@ -60,7 +59,7 @@ export function FileScreen() {
   const [sheet] = useState(createSheetWindow);
   return (
     <SheetWindowContext.Provider value={sheet}>
-      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={placeName(path, "")} line={folder || null} fromCloud={source === "cloud"} /> }} />
+      <PanelHeader title={placeName(path, "")} line={folder || null} fromCloud={source === "cloud"} />
       <ScrollView className="flex-1 bg-bg" {...windowScroll(sheet)}>
         <View ref={sheet.content} className="gap-2 px-3 pt-2 pb-8">
           {kept && read.data ? <Text className="px-2 text-sm text-ink-4">{readAt(read.readAt)}</Text> : null}

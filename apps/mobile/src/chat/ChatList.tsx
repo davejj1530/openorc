@@ -1,9 +1,9 @@
 import { teamChatList, type TeamChatLease, type TeamChatListRow } from "@openorc/client";
-import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { call, teamChat } from "../client";
+import { useListOpen } from "../layout";
 import { failureMessage } from "../failure";
 import { ListPressable } from "../ui/ListPressable";
 import { Text } from "../ui/Text";
@@ -43,11 +43,12 @@ export function ChatList({ lease, top, bottom }: { lease: TeamChatLease; top: nu
   const presence = teamChat.usePresence(lease, Boolean(chat?.features.includes("presence")));
   const [query, setQuery] = useState("");
   const searching = query.trim().length >= SHORTEST_SEARCH;
+  const openBeside = useListOpen();
   const open = async (row: TeamChatListRow) => {
     setFailure(null);
     try {
       const conversation = row.conversation ?? (await call("teamChat.openDm", { spaceId: lease.spaceId, userIds: [row.id] }));
-      router.push({ pathname: "/chat/[id]", params: { id: conversation.id } });
+      openBeside({ pathname: "/chat/[id]", params: { id: conversation.id } });
     } catch (error) {
       setFailure(failureMessage(error));
     }

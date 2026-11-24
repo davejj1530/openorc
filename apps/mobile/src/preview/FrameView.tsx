@@ -1,7 +1,8 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { Image, useWindowDimensions, View, type AccessibilityActionEvent } from "react-native";
+import { Image, View, type AccessibilityActionEvent } from "react-native";
 import { usePanGesture, useTapGesture } from "react-native-gesture-handler";
 import { cn } from "../ui/cn";
+import { usePaneWidth } from "../ui/pane";
 import { ZoomView, type ZoomViewHandle } from "../ui/ZoomView";
 import { fitFrame, frameDistance, framePoint, type FrameFit, type FramePoint } from "./frame-fit";
 import { markFrameShown } from "./preview-perf";
@@ -91,8 +92,8 @@ function useFrameGestures({
  * another tab's first frame zooms back out.
  */
 export function FrameView({ frame, label, dim, onZoom, onTap, onScroll }: FrameViewProps) {
-  const window = useWindowDimensions();
-  const [view, setView] = useState({ width: window.width, height: Infinity });
+  const pane = usePaneWidth();
+  const [view, setView] = useState({ width: pane, height: Infinity });
   const zoom = useRef<ZoomViewHandle>(null);
   const [zoomed, setZoomed] = useState(false);
   const { slots, front, shown, loaded } = useFrontFrame(frame, zoom);

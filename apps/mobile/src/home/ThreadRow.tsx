@@ -18,10 +18,11 @@ import {
   useSidebarNow,
 } from "@openorc/client";
 import { harnessShortName, isHarnessId, isSubagentThread, placeOf, type PrState, type ThreadSummary } from "@openorc/protocol";
-import { Link } from "expo-router";
+import { Link, router, type Href } from "expo-router";
 import { memo, useMemo, type ComponentType } from "react";
 import { useWindowDimensions, View } from "react-native";
 import { Cloud, GitMerge, GitPullRequest, GitPullRequestClosed } from "../generated/icons";
+import { useListOpen, useSplit } from "../layout";
 import { cn } from "../ui/cn";
 import type { IconProps } from "../ui/icon";
 import { ListPressable } from "../ui/ListPressable";
@@ -154,11 +155,11 @@ function rowMarks(thread: ThreadSummary, compact: boolean) {
  * Tapping it pushes the thread; holding it opens the thread's menu; swiping marks it read or unread, or archives it.
  */
 /** How a row sits in its project's tree: its padding, its disclosure's state and how it moves. One height for every row. */
-function treePlace(tree: ThreadTreeRow | undefined, motion: RowMotion, arriving: boolean) {
+function treePlace(tree: ThreadTreeRow | undefined, motion: RowMotion, arriving: boolean, lit: boolean) {
   const compact = Boolean(tree?.depth);
   return {
     compact,
-    rowClass: cn("mx-3 min-h-touch justify-center rounded-lg bg-bg px-2 active:bg-surface-2", compact ? "py-2.75" : "py-2.5"),
+    rowClass: cn("mx-3 min-h-touch justify-center rounded-lg px-2 active:bg-surface-2", lit ? "bg-navigation-soft" : "bg-bg", compact ? "py-2.75" : "py-2.5"),
     rowStyle: { paddingLeft: 8 + treeIndent(tree?.depth ?? 0), paddingRight: ACTION_RESERVE },
     open: Boolean(tree?.expanded && !motion.folding),
     moves: motion.arrive === undefined && arriving ? { ...motion, arrive: 0 } : motion,
@@ -189,6 +190,7 @@ export const ThreadRow = memo(
     motion = STILL,
     cloudLabel = false,
     onFold,
+    shown = false,
   }: {
     thread: ThreadSummary;
     project: string | null;
@@ -199,13 +201,18 @@ export const ThreadRow = memo(
     motion?: RowMotion;
     /** Opens or folds a parent's sub threads: its id, and whether to open them. */
     onFold?: (id: string, open: boolean) => void;
+    /** Its thread is the one open. Its row is lit where the window shows the list beside it. */
+    shown?: boolean;
   }) {
     const run = useRowRun(thread.liveRunId ?? undefined);
+    const href = useMemo<Href>(() => ({ pathname: "/thread/[id]", params: { id: thread.id } }), [thread.id]);
     // In a cloud thread someone else is in, whose turn or ask it is says more than "Working", as the thread's header does.
     const headline = useMemo(() => togetherActivity(thread) ?? threadHeadline(thread, run), [thread, run]);
     const actions = useThreadActions(thread);
     const now = useSnoozeClock();
-    const { compact, rowClass, rowStyle, open, moves } = treePlace(tree, motion, arriving);
+    const split = useSplit();
+    const openBeside = useListOpen();
+    const { compact, rowClass, rowStyle, open, moves } = treePlace(tree, motion, arriving, split && shown);
     const child = thread.subagent;
     const { status, working, mark } = rowMarks(thread, compact);
     const place = threadPlace(thread);
@@ -236,7 +243,20 @@ export const ThreadRow = memo(
       <ThreadTreeFrame tree={tree} reach={leadReach(thread, mark)} node={node} motion={moves} compact={compact}>
         <SwipeRow id={thread.id} leading={leading} trailing={trailing}>
           <View>
-            <Link href={{ pathname: "/thread/[id]", params: { id: thread.id } }} push dangerouslySingular asChild onPress={() => markThreadOpening(thread.id)}>
+            <Link
+              href={href}
+              push
+              dangerouslySingular
+              asChild
+              onPress={(event) => {
+                markThreadOpening(thread.id);
+                if (!split) return;
+                // Beside the list the thread takes the place of what was open; its own row brings it back from under a panel.
+                event.preventDefault();
+                if (shown) router.dismissTo(href);
+                else openBeside(href);
+              }}
+            >
               <Link.Trigger>
                 <ListPressable accessibilityRole="button" accessibilityLabel={label} {...swipeAccessibility([leading, trailing])} className={rowClass} style={rowStyle}>
                   {lines}
@@ -258,5 +278,6 @@ export const ThreadRow = memo(
     before.arriving === next.arriving &&
     before.motion === next.motion &&
     before.onFold === next.onFold &&
+    before.shown === next.shown &&
     sameTree(before.tree, next.tree),
 );

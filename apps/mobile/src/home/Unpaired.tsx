@@ -6,6 +6,7 @@ import { showDemo } from "../client";
 import type { LinkState, LostMac } from "../connection/manager";
 import { haptic } from "../ui/haptics";
 import { LineAction } from "../ui/LineAction";
+import { Measure } from "../ui/pane";
 import { Text } from "../ui/Text";
 import { HomeBar } from "./header/HomeBar";
 import { LostLine } from "./header/MacLine";
@@ -24,7 +25,7 @@ export function Unpaired({ state }: { state: Extract<LinkState, { kind: "unpaire
     haptic.warn();
   }, [lost]);
   return (
-    <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
+    <Measure className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
       <HomeBar state={state} />
       {lost ? <LostLine lost={lost} /> : null}
       <View className="flex-1 items-center justify-center gap-2 px-10">
@@ -41,6 +42,6 @@ export function Unpaired({ state }: { state: Extract<LinkState, { kind: "unpaire
           <LineAction label="Try the demo" onPress={showDemo} />
         </View>
       </View>
-    </View>
+    </Measure>
   );
 }

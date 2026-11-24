@@ -11,6 +11,7 @@ import { SendButton } from "../composer/SendButton";
 import { useShareSettings } from "../composer/settings-bridge";
 import { projectChoices, spaceChoices, type ProjectChoice } from "../projects";
 import { useSpaces } from "../spaces/use-spaces";
+import { Measure } from "../ui/pane";
 import { Text } from "../ui/Text";
 import { rememberedProject, rememberProject } from "./drafts";
 import { openingProject } from "./new-thread-state";
@@ -47,7 +48,7 @@ function NewThreadForm({ project, choices, onProject }: FormProps) {
   // A cloud start shows as the thread it is becoming until the server holds it; a failure brings the composer back.
   if (form.cloudStart) return <NewThreadStarting start={form.cloudStart} />;
   return (
-    <View className="flex-1 justify-end bg-bg">
+    <Measure className="flex-1 justify-end bg-bg">
       <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
         <View className="gap-4" style={{ paddingBottom: insets.bottom + 8 }}>
           <Text accessibilityRole="header" className="px-5 text-xl">
@@ -83,7 +84,7 @@ function NewThreadForm({ project, choices, onProject }: FormProps) {
           </View>
         </View>
       </KeyboardStickyView>
-    </View>
+    </Measure>
   );
 }
 

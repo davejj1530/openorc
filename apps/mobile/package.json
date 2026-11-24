@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "license": "Apache-2.0",
   "private": true,
-  "description": "OpenOrc for iPhone: control the desktop app running on your Mac.",
+  "description": "OpenOrc for iPhone and iPad: control the desktop app running on your Mac.",
   "main": "index.ts",
   "scripts": {
     "start": "expo start --dev-client",

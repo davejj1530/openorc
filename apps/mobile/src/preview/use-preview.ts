@@ -1,11 +1,12 @@
 import type { PreviewFrame, PreviewPace, PreviewState } from "@openorc/protocol";
-import { useIsFocused } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, useWindowDimensions } from "react-native";
+import { AppState } from "react-native";
 import { fromByteArray } from "react-native-quick-base64";
 import { link, useLinkState } from "../client";
 import { DROPPED } from "../connection/link-connection";
 import type { LinkRoute } from "../connection/manager";
+import { usePanelFocused } from "../panel/host";
+import { usePaneWidth } from "../ui/pane";
 import { timeConvert } from "./preview-perf";
 
 /** A frame the phone holds, in memory only, and the tab it shows. */
@@ -129,12 +130,12 @@ const routePace: Record<LinkRoute["kind"], PreviewPace> = { lan: "lan", demo: "l
  * and when the app leaves the front.
  */
 export function usePreview(threadId: string) {
-  const focused = useIsFocused();
+  const focused = usePanelFocused();
   const active = useForeground();
   const linkState = useLinkState();
   const serial = linkState.kind === "connected" ? linkState.serial : null;
   const pace: PreviewPace = linkState.kind === "connected" ? routePace[linkState.route.kind] : "lan";
-  const { width: points } = useWindowDimensions();
+  const points = usePaneWidth();
   const [deep, setDeep] = useState(false);
   const width = watchWidth(points, deep);
   const live = focused && active;

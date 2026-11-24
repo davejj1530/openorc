@@ -13,7 +13,7 @@
       "icon": "./assets/OpenOrc.icon",
       "bundleIdentifier": "app.openorc.mobile",
       "appleTeamId": "8VR6L6XPS9",
-      "supportsTablet": false,
+      "supportsTablet": true,
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "OpenOrc connects to your Mac on this network.",
         "ITSAppUsesNonExemptEncryption": false,

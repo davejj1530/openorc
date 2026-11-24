@@ -1,10 +1,11 @@
 import { relativeTime } from "@openorc/client";
 import type { BoardTask } from "@openorc/protocol";
 import * as Clipboard from "expo-clipboard";
-import { Link, router } from "expo-router";
+import { Link, router, type Href } from "expo-router";
 import { useState, type ReactElement } from "react";
 import { View } from "react-native";
 import { ACTION_INSET, ACTION_RESERVE, MARGIN, ROW_INSET } from "../home/grid";
+import { useListOpen, useSplit } from "../layout";
 import { cn } from "../ui/cn";
 import { ListPressable } from "../ui/ListPressable";
 import { Text } from "../ui/Text";
@@ -76,6 +77,8 @@ function taskMenu(task: BoardTask, facts: string[]): ReactElement {
  */
 export function TaskRow({ task, section, project }: { task: BoardTask; section: BoardSection; project: string | undefined }) {
   const [explained, setExplained] = useState(false);
+  const split = useSplit();
+  const openBeside = useListOpen();
   const facts = taskFacts(task, project);
   const label = [task.title, ...facts].join(", ");
   if (section.copiedAt !== null)
@@ -85,9 +88,19 @@ export function TaskRow({ task, section, project }: { task: BoardTask; section: 
       </ListPressable>
     );
   const thread = taskThread(task);
-  const params = { id: task.id, ...(thread ? { thread } : {}) };
+  const href: Href = { pathname: "/task/[id]", params: { id: task.id, ...(thread ? { thread } : {}) } };
   return (
-    <Link href={{ pathname: "/task/[id]", params }} push asChild>
+    <Link
+      href={href}
+      push
+      asChild
+      onPress={(event) => {
+        if (!split) return;
+        // Beside the list the task takes the place of what was open.
+        event.preventDefault();
+        openBeside(href);
+      }}
+    >
       <Link.Trigger>
         <ListPressable accessibilityRole="button" accessibilityLabel={label} className={rowClass} style={rowStyle}>
           <TaskLines task={task} project={project} />

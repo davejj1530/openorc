@@ -117,7 +117,8 @@ export function PairScreen() {
           <X size={18} className="text-ink-3" />
         </Pressable>
       </View>
-      <View className="mt-4 aspect-square overflow-hidden rounded-xl bg-surface">
+      {/* The square gives up height where the screen is short, as on an iPad on its side, and stays in the middle. */}
+      <View className="mt-4 aspect-square w-full flex-shrink self-center overflow-hidden rounded-xl bg-surface">
         <Scanner />
       </View>
       <View className="mt-3 min-h-touch flex-row items-center gap-3">

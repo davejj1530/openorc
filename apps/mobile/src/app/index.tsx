@@ -1,3 +1,3 @@
-import { HomeScreen } from "../home/HomeScreen";
+import { HomeRoute } from "../home/HomeScreen";
 
-export default HomeScreen;
+export default HomeRoute;

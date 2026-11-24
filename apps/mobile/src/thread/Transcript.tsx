@@ -9,6 +9,7 @@ import Animated, { useAnimatedStyle, useReducedMotion, type SharedValue } from "
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowDown } from "../generated/icons";
 import { arrive } from "../ui/motion";
+import { useMeasuredSides, usePaneWidth } from "../ui/pane";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { AgentPresence } from "./AgentPresence";
@@ -213,6 +214,29 @@ function NewChip({ composerInset, onPress }: { composerInset: SharedValue<number
   );
 }
 
+/**
+ * A column that changes width rewraps every row: an iPad turned, a panel opened beside the thread. A reader at the end
+ * stays at the end. Returns what the list calls once it first lays out, which places the frames as before and gives
+ * the end once more where the width changed before the list had.
+ */
+function useEndAcrossWidths(following: boolean, listRef: RefObject<LegendListRef | null>, place: () => void): () => void {
+  const width = usePaneWidth();
+  const laidOut = useRef(width);
+  const endOwed = useRef(false);
+  useEffect(() => {
+    if (laidOut.current === width) return;
+    laidOut.current = width;
+    if (!following) return;
+    endOwed.current = true;
+    void listRef.current?.scrollToEnd({ animated: false });
+  }, [width, following, listRef]);
+  return useCallback(() => {
+    place();
+    if (endOwed.current) void listRef.current?.scrollToEnd({ animated: false });
+    endOwed.current = false;
+  }, [place, listRef]);
+}
+
 export interface TranscriptProps {
   blocks: Block[];
   /** The newest turn may still run. */
@@ -319,6 +343,8 @@ export function Transcript({
     void listRef.current?.scrollToEnd({ animated: false });
   }, [followKey, onFollow, listRef]);
 
+  const loaded = useEndAcrossWidths(following, listRef, place);
+
   const reveal = useCardReveal(rows, listRef);
 
   return (
@@ -337,7 +363,7 @@ export function Transcript({
             onScroll={onScroll}
             onGrab={grab}
             onSettle={settle}
-            onLoad={place}
+            onLoad={loaded}
           />
         </FrameWindowContext.Provider>
       </RevealCard.Provider>
@@ -365,7 +391,6 @@ interface RowListProps {
 
 const keyOf = (row: Row) => row.key;
 const kindOf = (row: Row) => row.kind;
-const contentStyle = { paddingHorizontal: 12 };
 const footer = <View className="h-4" />;
 
 /** The list itself, which renders only when its rows or its place change: a streamed word reaches only its piece. */
@@ -373,6 +398,8 @@ const RowList = memo(function RowList({ rows, arrivals, hasOlder, filled, follow
   const insets = useSafeAreaInsets();
   const renderItem = useCallback(({ item }: { item: Row }) => <ListRow row={item} arrivals={arrivals} />, [arrivals]);
   const alwaysRender = useMemo(() => ({ keys: unsentRows(rows) }), [rows]);
+  const sides = useMeasuredSides(12);
+  const contentStyle = useMemo(() => ({ paddingHorizontal: sides }), [sides]);
   return (
     <KeyboardAwareLegendList
       ref={listRef}

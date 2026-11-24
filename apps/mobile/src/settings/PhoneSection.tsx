@@ -2,6 +2,7 @@ import { Host, Menu, Picker, RNHostView, Text as MenuText } from "@expo/ui/swift
 import { accessibilityLabel, accessibilityValue, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
 import { Switch, View } from "react-native";
 import { APPEARANCES, chooseAppearance, useAppearance, type AppearanceChoice } from "../appearance";
+import { DEVICE } from "../device";
 import { ChevronsUpDown, Orclings, SunMoon } from "../generated/icons";
 import { setOrclingFaces, useOrclingFaces } from "../orclings/face-row";
 import { useOrclingChats } from "../orclings/orcling-chats";
@@ -84,7 +85,7 @@ function OrclingFacesRow() {
 export function PhoneSection({ notifications }: { notifications: boolean }) {
   const orclings = useOrclingChats().supported;
   return (
-    <Section title="This iPhone">
+    <Section title={`This ${DEVICE}`}>
       <Card>
         <AppearanceRow />
         {orclings ? (

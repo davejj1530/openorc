@@ -1,6 +1,6 @@
 import { hostedActionLine, hostedPublishReason, panelToolLabels } from "@openorc/client";
 import { HOSTED_REASONS, type HostedReviewState, type HostedThreadChanges, type HostedThreadCommits, type ThreadSummary } from "@openorc/protocol";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,7 +12,7 @@ import { Text } from "../ui/Text";
 import { openInApp } from "../ui/web";
 import { changesLine } from "./change-words";
 import { CommitRow, CommitsHead, FailedBlock, FileRow, NoFilesBlock, UnlistedRow } from "./ChangeRows";
-import { PanelTitle } from "./PanelTitle";
+import { PanelHeader, usePanelNav, usePanelParams } from "../panel/host";
 import { BarButton } from "./PublishBar";
 import { pullWords, type BarPill } from "./publish-state";
 
@@ -136,11 +136,12 @@ function useChangesOff(threadId: string): string | null | undefined {
 
 /** What the branch holds: its files since the thread started, or why none are listed. */
 function Files({ threadId, changes, error, retry }: { threadId: string; changes: HostedThreadChanges | undefined; error: Error | null; retry: () => void }) {
+  const nav = usePanelNav();
   if (error) return <FailedBlock message={error.message} onRetry={retry} />;
   if (!changes) return <View className="items-center py-10">{<Spinner />}</View>;
   if (changes.state !== "recorded") return <Text className="px-5 py-10 text-center text-ink-4">{changes.line}</Text>;
   if (!changes.files.length && !changes.unlisted) return <NoFilesBlock />;
-  const open = (path: string) => router.push({ pathname: "/cloud-diff", params: { threadId, path } });
+  const open = (path: string) => nav.open({ name: "cloud-diff", params: { threadId, path } });
   return (
     <>
       {changes.files.map((file) => (
@@ -156,7 +157,7 @@ function Files({ threadId, changes, error, retry }: { threadId: string; changes:
  * opening its diff; its commits; and Commit, Push and the pull request, which OpenOrc Cloud carries out on its machine.
  */
 export function CloudChangesScreen() {
-  const { threadId } = useLocalSearchParams<{ threadId: string }>();
+  const { threadId } = usePanelParams<{ threadId: string }>();
   const thread = useRpc("threads.get", { id: threadId });
   const off = useChangesOff(threadId);
   const changes = useRpc("hosted.review.changes", { threadId }, { enabled: off === null });
@@ -166,7 +167,7 @@ export function CloudChangesScreen() {
   const recorded = changes.data?.state === "recorded" ? changes.data : null;
   return (
     <View className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={panelToolLabels.changes} line={recorded ? changesLine(recorded.totals) : null} fromCloud /> }} />
+      <PanelHeader title={panelToolLabels.changes} line={recorded ? changesLine(recorded.totals) : null} fromCloud />
       <ScrollView contentContainerStyle={{ paddingBottom: footer + 12 }}>
         {/* A server that says it does not serve changes is answered by its reason alone: nothing failed to retry. */}
         {off ? <Text className="px-5 py-10 text-center text-ink-4">{off}</Text> : <Files threadId={threadId} changes={changes.data} error={changes.error} retry={() => void changes.refetch()} />}

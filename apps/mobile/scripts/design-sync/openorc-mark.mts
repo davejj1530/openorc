@@ -8,22 +8,36 @@ function found(match: RegExpExecArray | null, what: string): string {
 
 /**
  * OpenOrc's mark from the desktop's OpenOrcMark.tsx (the cube's outline and its three faces), and the working mark's
- * turn from workspace-design.css: the light moves around the cube, one face at a time.
+ * turn: the light moves around the cube, one face at a time. The desktop names the lit face on a clock (how long a face
+ * has, when the first hands over, and in which order) and its stylesheet crosses to it; the phone plays the same turn
+ * as one loop a face, each started a face later.
  */
 export async function renderOpenOrcMark(renderer: string): Promise<string> {
   const source = await readFile(resolve(renderer, "components/OpenOrcMark.tsx"), "utf8");
   const outline = found(/const outline =\s*"([^"]+)"/.exec(source), "OpenOrcMark.tsx's outline");
   const face = (name: string) => found(new RegExp(`${name}: "([^"]+)"`).exec(source), `OpenOrcMark.tsx's ${name} face`);
+  const turn = Number(found(/const TURN_MS = (\d+);/.exec(source), "how long a face is lit"));
+  const firstCross = Number(found(/const CROSS_AT_MS = (\d+);/.exec(source), "when the first face hands over"));
+  const order = [...found(/const LIT_ORDER = \[([^\]]+)\]/.exec(source), "the order the faces light in").matchAll(/"(\w+)"/g)].map(([, name]) => name!);
+  if (order.join() !== "top,right,left") throw new Error(`design-sync reads the faces lit top, right, left; the desktop lights ${order.join(", ")}`);
   const css = await readFile(resolve(renderer, "workspace-design.css"), "utf8");
-  const duration = Number(found(/\.openorc-mark-face \{\s*animation: openorc-mark-face (\d+)ms ease-in-out infinite;/.exec(css), "the mark's turn"));
-  const delay = (name: string) => Number(found(new RegExp(`\\.openorc-mark-face\\[data-face="${name}"\\] \\{\\s*animation-delay: (-?\\d+)ms;`).exec(css), `the ${name} face's delay`));
-  const keyframes = found(/@keyframes openorc-mark-face \{([\s\S]*?)\n\}/.exec(css), "the mark's keyframes");
-  const stops = [...keyframes.matchAll(/((?:\d+%,?\s*)+)\{\s*opacity: ([\d.]+);\s*\}/g)].flatMap(([, at, opacity]) => at!.match(/\d+/g)!.map((percent) => [Number(percent), Number(opacity)]));
-  if (stops.length < 2) throw new Error("design-sync no longer finds the mark's keyframes the way it reads them");
+  const cross = Number(found(/\.openorc-mark-face \{\s*transition: opacity (\d+)ms ease-in-out;/.exec(css), "the mark's cross"));
+  const durationMs = turn * order.length;
+  const at = (ms: number) => Math.round((ms / durationMs) * 100);
   const mark = {
     outline,
     faces: { top: face("top"), right: face("right"), left: face("left") },
-    turn: { durationMs: duration, delayMs: { top: 0, right: delay("right"), left: delay("left") }, stops },
+    turn: {
+      durationMs,
+      // Each face runs the top's loop, begun as many faces ago as it is from its own turn.
+      delayMs: { top: 0, right: turn - durationMs, left: 2 * turn - durationMs },
+      stops: [
+        [0, 1],
+        [at(firstCross), 1],
+        [at(firstCross + cross), 0],
+        [at(durationMs - cross), 0],
+      ],
+    },
   };
   return `export const openOrcMark = ${JSON.stringify(mark)} as const;`;
 }

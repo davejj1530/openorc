@@ -8,6 +8,8 @@ export type Scales = {
   radius: Record<string, number>;
   /** Tailwind height utilities over the control ramp, named as the desktop's `@theme inline` names them. */
   height: Record<string, number>;
+  /** The desktop's reading measures, which cap a column on a screen wider than a phone's. */
+  container: Record<string, number>;
   motion: { ease: Record<string, Bezier>; duration: Record<string, number>; stagger: number; arrive: Record<string, number> };
 };
 
@@ -48,7 +50,7 @@ function bezier(value: string, name: string): Bezier {
   return points as Bezier;
 }
 
-type Families = Omit<Scales, "height"> & { control: Record<string, number> };
+type Families = Omit<Scales, "height" | "container"> & { control: Record<string, number> };
 
 /**
  * Each `@theme static` family the phone reads, by prefix. A declaration matching none of them fails the run, so a new
@@ -126,8 +128,12 @@ function readScales(statics: Declarations, inline: Declarations): Scales {
     if (size === undefined) throw new Error(`${name} points at --control-${control}, which @theme static does not define`);
     height[name.slice("--height-".length)] = size;
   }
+  const container: Record<string, number> = {};
+  for (const [name, value] of Object.entries(inline)) {
+    if (name.startsWith("--container-")) container[name.slice("--container-".length)] = px(value, name);
+  }
   const { control: _control, ...scales } = read;
-  return { ...scales, height };
+  return { ...scales, height, container };
 }
 
 /** Everything the phone reads from app.css: the cascade under every palette, and the scales. */

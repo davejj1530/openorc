@@ -66,6 +66,7 @@ function themeCss(colors: Colors, scales: Scales, fonts: Fonts): string {
     ...text,
     ...Object.entries(scales.radius).map(([step, value]) => `--radius-${step}: ${value}px;`),
     ...Object.entries(scales.height).map(([step, value]) => `--height-${step}: ${value}px;`),
+    ...Object.entries(scales.container).map(([step, value]) => `--container-${step}: ${value}px;`),
     "}",
   ].join("\n");
 }
@@ -80,6 +81,7 @@ function tokensTs(colors: Colors, scales: Scales, fonts: Fonts, syntax: Syntax):
     "export type TextStep = keyof typeof text;",
     constant("radius", scales.radius),
     constant("height", scales.height),
+    constant("container", scales.container),
     constant("motion", scales.motion),
     constant("fonts", fonts),
     constant("syntax", syntax),

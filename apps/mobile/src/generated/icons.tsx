@@ -41,6 +41,7 @@ export const ArchiveRestore = icon(
   </>,
 );
 export const ArrowDown = icon("ArrowDown", <Path d="M12 4v16m-6-6 6 6 6-6" />);
+export const ArrowDownUp = icon("ArrowDownUp", <Path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4m-3.5 3.5L17 4l3.5 3.5" />);
 export const ArrowLeft = icon("ArrowLeft", <Path d="M20 12H4m6-6-6 6 6 6" />);
 export const ArrowLeftRight = icon("ArrowLeftRight", <Path d="M4 8h16m-4-4 4 4-4 4 M20 16H4m4-4-4 4 4 4" />);
 export const ArrowRight = icon("ArrowRight", <Path d="M4 12h16m-6-6 6 6-6 6" />);
@@ -90,6 +91,14 @@ export const CircleReview = icon(
   <>
     <Circle cx="12" cy="12" r="8.5" />
     <Path d="M8.5 10h7 M8.5 14h5" />
+  </>,
+);
+export const CircleUser = icon(
+  "CircleUser",
+  <>
+    <Circle cx="12" cy="12" r="8.5" />
+    <Circle cx="12" cy="10" r="3" />
+    <Path d="M6.6 18.4a6.5 6.5 0 0 1 10.8 0" />
   </>,
 );
 export const Clock = icon(
@@ -218,6 +227,7 @@ export const Globe = icon(
   </>,
 );
 export const Hammer = icon("Hammer", <Path d="m3 19 9-9 3 3-9 9Z M9 6l4-4 8 8-4 4-3-3 1-1-3-3-1 1Z" />);
+export const Hash = icon("Hash", <Path d="m10 3-3 18m10-18-3 18M4 8h16M3 16h16" />);
 export const Heading2 = icon("Heading2", <Path d="M4 5v14 M13 5v14 M4 12h9 M17 15a2 2 0 0 1 4 0c0 2-4 2.5-4 5h4" />);
 export const History = icon("History", <Path d="M3 10a9 9 0 1 1 1 7 M3 4v6h6 M12 7v5l4 2" />);
 export const Home = icon("Home", <Path d="m3 10 9-7 9 7 M5 8.5v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-10 M9.5 20.5v-7h5v7" />);
@@ -229,7 +239,6 @@ export const Image = icon(
     <Path d="m3.5 17 5-5 4 4 3-3 5 5" />
   </>,
 );
-export const Inbox = icon("Inbox", <Path d="m3 12 4-8h10l4 8v7a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z M3 12h5l2 3h4l2-3h5" />);
 export const Italic = icon("Italic", <Path d="M10 4h9 M5 20h9 M15 4 9 20" />);
 export const Laptop = icon("Laptop", <Path d="M5 16V5.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5V16 M5 16h14l3 4H2Z" />);
 export const LayoutGrid = icon(
@@ -250,9 +259,23 @@ export const ListOrdered = icon("ListOrdered", <Path d="M10 6h10 M10 12h10 M10 1
 export const ListTodo = icon("ListTodo", <Path d="M14 3.5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9Z M7 9l1 1 2-2 M13 9h3 M7 14h2 M13 14h3 M7 17h2 M13 17h3" />);
 export const Loader2 = icon("Loader2", <Path d="M12 3.5A8.5 8.5 0 1 1 3.5 12" />);
 export const LoaderCircle = icon("LoaderCircle", <Path d="M12 3.5A8.5 8.5 0 1 1 3.5 12" />);
+export const Lock = icon(
+  "Lock",
+  <>
+    <Rect x="5" y="10" width="14" height="11" rx="3" />
+    <Path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2" />
+  </>,
+);
 export const MailOpen = icon("MailOpen", <Path d="m3 10 9-7 9 7v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z M3 10l9 6 9-6 M3.5 20l5.5-6 M20.5 20 15 14" />);
 export const Maximize2 = icon("Maximize2", <Path d="M14 4h6v6 M20 4l-6 6 M10 20H4v-6 M4 20l6-6" />);
 export const MessageSquare = icon("MessageSquare", <Path d="M5.5 4h13A2.5 2.5 0 0 1 21 6.5v10a2.5 2.5 0 0 1-2.5 2.5H9l-6 3V6.5A2.5 2.5 0 0 1 5.5 4Z" />);
+export const Mic = icon(
+  "Mic",
+  <>
+    <Rect x="9" y="3" width="6" height="11" rx="3" />
+    <Path d="M5.5 11.5a6.5 6.5 0 0 0 13 0 M12 18v3" />
+  </>,
+);
 export const Minimize2 = icon("Minimize2", <Path d="M4 14h6v6 M10 14l-6 6 M20 10h-6V4 M14 10l6-6" />);
 export const Minus = icon("Minus", <Path d="M5 12h14" />);
 export const Monitor = icon(
@@ -321,6 +344,13 @@ export const People = icon(
     <Path d="M17 14.6c1.9.6 3.15 2.1 3.5 4.4" />
   </>,
 );
+export const PersonPlus = icon(
+  "PersonPlus",
+  <>
+    <Circle cx="8.5" cy="8" r="3.25" />
+    <Path d="M3 19c.6-3.25 2.8-5 5.5-5s4.9 1.75 5.5 5 M18.5 7v6 M15.5 10h6" />
+  </>,
+);
 export const Pin = icon("Pin", <Path d="M9 3.5h6 M10 3.5v6l-3 4v2h10v-2l-3-4v-6 M12 15.5v5" />);
 export const PinOff = icon("PinOff", <Path d="M10 3.5h5 M14 3.5v5 M8.5 10l-1.5 3.5v2h7 M12 15.5v5 M3 3l18 18" />);
 export const Play = icon("Play", <Path d="M7 4.5 20 12 7 19.5Z" />);
@@ -359,6 +389,13 @@ export const ShieldCheck = icon(
   <>
     <Path d="m12 3 8 3v6c0 4-4 7.2-8 9-4-1.8-8-5-8-9V6Z" />
     <Path d="m8 12 2.5 2.5 5.5-5.5" />
+  </>,
+);
+export const ShieldOff = icon(
+  "ShieldOff",
+  <>
+    <Path d="m12 3 8 3v6c0 4-4 7.2-8 9-4-1.8-8-5-8-9V6Z" />
+    <Path d="M5 20 19 4" />
   </>,
 );
 export const ShieldQuestion = icon(
@@ -428,6 +465,7 @@ export const SquareSlash = icon(
     <Path d="m8 16 8-8" />
   </>,
 );
+export const Star = icon("Star", <Path d="M12 4l2.35 4.76 5.25.77-3.8 3.7.9 5.23L12 15.99l-4.7 2.47.9-5.23-3.8-3.7 5.25-.77z" />);
 export const Strikethrough = icon("Strikethrough", <Path d="M18 6c-1-2-3-3-6-3-4 0-6 2-6 4 0 3 4 4 6 5 M6 18c1 2 3 3 6 3 4 0 6-2 6-4 0-2-2-3-4-4 M3 12h18" />);
 export const Sun = icon(
   "Sun",

@@ -150,4 +150,7 @@
   --height-control-hero: 40px;
   --height-control-send: 32px;
   --height-control-send-hero: 34px;
+  --container-chat: 760px;
+  --container-document: 800px;
+  --container-palette: 600px;
 }

@@ -116,6 +116,7 @@ export const height = {
   "control-send": 32,
   "control-send-hero": 34,
 } as const;
+export const container = { chat: 760, document: 800, palette: 600 } as const;
 export const motion = {
   ease: { out: [0.22, 1, 0.36, 1], overshoot: [0.24, 1.34, 0.38, 1] },
   duration: { quick: 120, leave: 160, arrive: 220, confirm: 260, swap: 320, roll: 360, resize: 420 },

@@ -175,8 +175,7 @@ export function Transcript({
     const first = el.querySelector<HTMLElement>("[data-turn]")?.dataset["turn"];
     const olderArrived = firstTurn.current !== undefined && first !== firstTurn.current;
     firstTurn.current = first;
-    // Pinned, the size observer follows the tail once the browser has laid the new content out. Measuring here too
-    // would lay the conversation out for every streamed frame, including those that arrive between two paints.
+    // Pinned, the size observer follows the tail after layout; measuring here too lays it out for every streamed frame.
     if (pinned.current) return;
     if (olderArrived && anchor.current && Math.abs(el.scrollTop - anchor.current.scrollTop) < 1) {
       const turn = el.querySelector(`[data-turn="${CSS.escape(anchor.current.id)}"]`);

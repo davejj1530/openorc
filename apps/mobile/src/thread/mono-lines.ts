@@ -1,4 +1,5 @@
 import type { MatchGroup } from "@openorc/client";
+import { text } from "../generated/tokens";
 
 /** Lines shown until the reader asks for all of them. */
 const SHOWN_LINES = 200;
@@ -14,14 +15,18 @@ const BREAKS = /[\v\f\u0085\u2028\u2029]/g;
 /** A terminal's tab stops, every 8 columns. */
 const TAB = 8;
 
+/** JetBrains Mono advances this share of its size for every character. */
+const ADVANCE = 0.6;
+
 /**
  * How the sheet's monospace text measures at the reader's text size (`fontScale`, from the iOS Text Size setting): a
- * line of 12 pt JetBrains Mono, which advances 0.6 em, on 20 pt lines, both scaled.
+ * line of JetBrains Mono at the scale's xs size (ui/Mono's MONO), on 20 pt lines, both scaled. The size is read from
+ * the tokens, so a column sized in characters stays wide enough when the scale changes.
  */
 export function monoMetrics(fontScale: number) {
   const line = 20 * fontScale;
   const chunkLines = Math.max(1, Math.floor(CHUNK_LINES / fontScale));
-  return { line, char: 7.2 * fontScale, chunkLines, chunkHeight: chunkLines * line, lineChars: Math.max(2, Math.floor(LINE_CHARS / fontScale)) };
+  return { line, char: text.xs.size * ADVANCE * fontScale, chunkLines, chunkHeight: chunkLines * line, lineChars: Math.max(2, Math.floor(LINE_CHARS / fontScale)) };
 }
 
 export type MonoMetrics = ReturnType<typeof monoMetrics>;

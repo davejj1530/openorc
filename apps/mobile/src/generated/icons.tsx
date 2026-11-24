@@ -357,6 +357,13 @@ export const Play = icon("Play", <Path d="M7 4.5 20 12 7 19.5Z" />);
 export const Plug = icon("Plug", <Path d="M9 3v4.5 M15 3v4.5 M6.5 7.5h11v3.5a5.5 5.5 0 0 1-11 0z M12 16.5V21" />);
 export const Plus = icon("Plus", <Path d="M12 5v14 M5 12h14" />);
 export const Power = icon("Power", <Path d="M12 3v8 M7.4 6.2a7.5 7.5 0 1 0 9.2 0" />);
+export const Queue = icon(
+  "Queue",
+  <>
+    <Rect x="4" y="11" width="16" height="9" rx="2.5" />
+    <Path d="M7 7.5h10 M10 4h4" />
+  </>,
+);
 export const Quote = icon("Quote", <Path d="M4 7h6v7H5c0 3 1 4 3 5 M14 7h6v7h-5c0 3 1 4 3 5" />);
 export const RefreshCw = icon("RefreshCw", <Path d="M3.5 10A8.5 8.5 0 0 1 18 6l2.5 3 M20.5 3v6h-6 M20.5 14A8.5 8.5 0 0 1 6 18l-2.5-3 M3.5 21v-6h6" />);
 export const RotateCcw = icon("RotateCcw", <Path d="M3 10a9 9 0 1 1 1 7 M3 4v6h6" />);

@@ -117,6 +117,14 @@ export const ChevronsUpDown = icon("ChevronsUpDown", <path d="m7 8 5-5 5 5 M7 16
 export const ArrowRight = icon("ArrowRight", <path d="M4 12h16m-6-6 6 6-6 6" />);
 export const ArrowLeft = icon("ArrowLeft", <path d="M20 12H4m6-6-6 6 6 6" />);
 export const ArrowUp = icon("ArrowUp", <path d="M12 20V4m-6 6 6-6 6 6" />);
+/** The pile queued messages wait in: the front card, and two behind it. */
+export const Queue = icon(
+  "Queue",
+  <>
+    <rect x="4" y="11" width="16" height="9" rx="2.5" />
+    <path d="M7 7.5h10 M10 4h4" />
+  </>,
+);
 export const ArrowDown = icon("ArrowDown", <path d="M12 4v16m-6-6 6 6 6-6" />);
 export const ArrowDownUp = icon("ArrowDownUp", <path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4m-3.5 3.5L17 4l3.5 3.5" />);
 export const ArrowLeftRight = icon("ArrowLeftRight", <path d="M4 8h16m-4-4 4 4-4 4 M20 16H4m4-4-4 4 4 4" />);

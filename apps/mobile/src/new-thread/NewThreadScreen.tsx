@@ -9,6 +9,7 @@ import { useRpc } from "../client";
 import { ComposerPlane } from "../composer/ComposerPlane";
 import { SendButton } from "../composer/SendButton";
 import { useShareSettings } from "../composer/settings-bridge";
+import { useDictatedSend } from "../dictation/use-composer-dictation";
 import { projectChoices, spaceChoices, type ProjectChoice } from "../projects";
 import { useSpaces } from "../spaces/use-spaces";
 import { Measure } from "../ui/pane";
@@ -45,6 +46,8 @@ function NewThreadForm({ project, choices, onProject }: FormProps) {
     if (!threadId || !navigation.isFocused()) return;
     router.replace({ pathname: "/thread/[id]", params: { id: threadId } });
   };
+  // Started while dictating, the thread waits for the last words.
+  const startSpoken = useDictatedSend(COMPOSER_ID, () => void start());
   // A cloud start shows as the thread it is becoming until the server holds it; a failure brings the composer back.
   if (form.cloudStart) return <NewThreadStarting start={form.cloudStart} />;
   return (
@@ -79,7 +82,7 @@ function NewThreadForm({ project, choices, onProject }: FormProps) {
               onAttach={form.chooseImages}
             >
               {activity ? <Text className="text-sm text-ink-4">{activity}</Text> : null}
-              <SendButton state="send" label="Start" disabled={!form.controls.canSend} onPress={() => void start()} onDimPress={form.explainDim} />
+              <SendButton state="send" label="Start" disabled={!form.controls.canSend} onPress={startSpoken} onDimPress={form.explainDim} />
             </ComposerPlane>
           </View>
         </View>

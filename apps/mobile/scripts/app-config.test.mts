@@ -42,3 +42,14 @@ it("lets only the extension read the app's Keychain group", () => {
     entitlements: { "keychain-access-groups": [`$(AppIdentifierPrefix)${PHONE_APP.bundleId}`] },
   });
 });
+
+// The camera and photo plugins take the microphone's sentence out of the app unless they are given it, and iOS ends
+// an app that asks for the microphone without one. Dictation asks, so all three say the same sentence.
+it("says why it uses the microphone, in one sentence every plugin that writes it agrees on", () => {
+  const said = ["expo-camera", "expo-image-picker", "expo-speech-recognition"].map((name) => {
+    const plugin = plugins.find((each) => Array.isArray(each) && each[0] === name) as [string, { microphonePermission?: unknown }];
+    return plugin[1].microphonePermission;
+  });
+  expect(typeof said[0]).toBe("string");
+  expect(new Set(said).size).toBe(1);
+});

@@ -1,13 +1,16 @@
 import { answeredName, type TeamChatTarget } from "@openorc/client";
 import type { TeamChatOrclingPick } from "@openorc/protocol";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, TextInput, View } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { teamChat } from "../client";
 import { tagWordAt } from "../composer/note-draft";
 import { SendButton } from "../composer/SendButton";
+import { DictationKey, DictationNotice, DictationPill } from "../dictation/DictationControls";
+import { useComposerDictation, useDictatedSend } from "../dictation/use-composer-dictation";
 import { OrclingFace } from "../orclings/OrclingFace";
+import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { Measure } from "../ui/pane";
 import { Text } from "../ui/Text";
@@ -78,6 +81,11 @@ export function ChatComposer({
     teamChat.drafts.callOrcling(target, orcling);
     setCaret(word.start + tag.length);
   };
+  const owner = `chat:${target.conversationId}`;
+  const write = useCallback((text: string) => teamChat.drafts.write(target, text), [target]);
+  const dictation = useComposerDictation({ owner, text: draft.text, onText: write, onCaret: setCaret });
+  // Sent while dictating, the message waits for the last words.
+  const send = useDictatedSend(owner, onSend);
   return (
     <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
       <View className="bg-bg pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
@@ -94,20 +102,39 @@ export function ChatComposer({
             </View>
           ) : null}
           {picks.length ? <OrclingPicker picks={picks} onPick={pick} /> : null}
-          <View className="flex-row items-end gap-2 rounded-3xl bg-composer-input py-2 pl-4 pr-2">
+          {dictation.notice ? (
+            <View className="px-2">
+              <DictationNotice kind={dictation.notice} />
+            </View>
+          ) : null}
+          {/* Dictating, the words keep the plane's width and the recording takes a row of its own under them. */}
+          <View className={cn("gap-2 rounded-3xl bg-composer-input py-2 pl-4 pr-2", !dictation.phase && "flex-row items-end")}>
             <TextInput
+              ref={dictation.input}
               multiline
               value={draft.text}
-              onChangeText={(text) => teamChat.drafts.write(target, text)}
-              onSelectionChange={({ nativeEvent }) => setCaret(nativeEvent.selection.end)}
+              // Spoken into, the draft takes no typing: the words would land in two places at once.
+              editable={!dictation.phase}
+              onChangeText={write}
+              onSelectionChange={({ nativeEvent }) => {
+                dictation.onSelection(nativeEvent.selection);
+                setCaret(nativeEvent.selection.end);
+              }}
               onFocus={onFocus}
               placeholder={`Message ${title}…`}
               accessibilityLabel="Message"
-              className="min-h-touch flex-1 py-2.5 font-sans text-md leading-5 text-ink"
+              className={cn("min-h-touch py-2.5 font-sans text-md leading-5 text-ink", !dictation.phase && "flex-1")}
               placeholderTextColorClassName="accent-ink-4"
               style={{ maxHeight: 120 }}
             />
-            <SendButton state="send" disabled={!draft.text.trim()} onPress={onSend} />
+            <View className="h-control-send flex-row items-center gap-2">
+              {dictation.phase ? (
+                <DictationPill phase={dictation.phase} since={dictation.since} onFinish={dictation.toggle} onCancel={dictation.cancel} />
+              ) : (
+                <DictationKey onPress={dictation.toggle} />
+              )}
+              <SendButton state="send" disabled={!draft.text.trim()} onPress={send} />
+            </View>
           </View>
         </Measure>
       </View>

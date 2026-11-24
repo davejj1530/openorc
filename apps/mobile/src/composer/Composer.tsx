@@ -4,6 +4,7 @@ import { useImperativeHandle, useState, type Ref } from "react";
 import { Pressable, View, type LayoutChangeEvent } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useDictatedSend } from "../dictation/use-composer-dictation";
 import { Square } from "../generated/icons";
 import { SessionRecovery } from "../thread/SessionRecovery";
 import { cn } from "../ui/cn";
@@ -70,6 +71,9 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
   const { controls } = composer;
   const activity = composerActivity({ stopping: composer.stopping, submitting: composer.sending, generatingImage });
   const failure = composer.error ?? settings.error?.message ?? settings.permissionError;
+  // A send or a queue asked for while dictating waits for the last words. Stop is the run's, and goes at once.
+  const send = useDictatedSend(thread.id, composer.primary);
+  const queue = useDictatedSend(thread.id, composer.queue);
   return (
     <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
       <View onLayout={onLayout} className="bg-bg pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
@@ -110,14 +114,14 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
               <Pressable
                 accessibilityRole="button"
                 disabled={!controls.canSend}
-                onPress={composer.queue}
+                onPress={queue}
                 hitSlop={{ top: 8, bottom: 8 }}
                 className="h-control-sm justify-center rounded-full px-2.5 active:bg-surface-2"
               >
                 <Text className={cn("text-sm text-ink-2", !controls.canSend && "text-ink-4")}>Queue</Text>
               </Pressable>
             ) : null}
-            <SendButton state={controls.primary} disabled={!controls.primaryEnabled} onPress={composer.primary} onDimPress={composer.explainDim} />
+            <SendButton state={controls.primary} disabled={!controls.primaryEnabled} onPress={controls.primary === "stop" ? composer.primary : send} onDimPress={composer.explainDim} />
           </ComposerPlane>
         </Measure>
       </View>

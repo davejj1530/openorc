@@ -14,6 +14,7 @@ packageExtensionsChecksum: sha256-mJCZEdqpXKBp91GaB1nkbY/Bt9hEBgZQiSqUQ/pNmXo=
 patchedDependencies:
   '@legendapp/list@3.6.0': 324ae8ddb7849b097e234208082315ea13f775367ad83326c4a814241544d409
   '@pierre/diffs@1.4.2': e54d4018d404c3c60c355ef7102c2a9071d6962a913f29e1f9627d12f91fd247
+  expo-speech-recognition@58.0.1: 82518befdd9f9ced83b9522ae5a270c1364bdfdabda3e230584302fa2df84eea
   fastembed@2.1.0: fd226f3b860b9f30c87a0a66ce6bd63cdbce457d46844e0e2e9f1a5e3e2e7161
   react-native-enriched-markdown@1.1.1: e2f1e5e567f694484ff1f6de5960c100a878d93013b04ca5d66edd3dce4f4fa2
   react-native-webview@14.0.1: 25a14c9bf230036dd19079e4320ffb50b0cc4b0c412a3cc26d8b6b5db99fa630
@@ -407,6 +408,9 @@ importers:
       expo-secure-store:
         specifier: ~58.0.2
         version: 58.0.2(expo@58.0.17)
+      expo-speech-recognition:
+        specifier: ~58.0.1
+        version: 58.0.1(patch_hash=82518befdd9f9ced83b9522ae5a270c1364bdfdabda3e230584302fa2df84eea)(expo@58.0.17)(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
       expo-status-bar:
         specifier: ~58.0.4
         version: 58.0.4(expo@58.0.17)(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0)
@@ -5783,6 +5787,13 @@ packages:
   expo-server@58.0.5:
     resolution: {integrity: sha512-FHYecxfGOuAhacHcanR6qCN8Cln9S+FFulcYetLu3ddDg55ohuCsMZ9U4Egzwdm+A2o6N+MdSoJKquBC5F9NIg==}
     engines: {node: ^22.13.0 || ^24.3.0 || ^26.0.0 || >=27.0.0}
+
+  expo-speech-recognition@58.0.1:
+    resolution: {integrity: sha512-ycDe1BxXblqFGsXxedjBKn3tVQO8Vnj/BtBIycdMjXkXueTYto1LaenkjeBGycJmnS/6mOWC8oQcyBSbZsueFg==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: '*'
 
   expo-status-bar@58.0.4:
     resolution: {integrity: sha512-e6JJHziSSNb1v1VSzmDrAPf6GFoPRdVOIDrTCcK3bHfbJEAZGZ3YZXfqlorZtUFDT0z6NcjaZf0mPWifJZcqew==}
@@ -15044,6 +15055,12 @@ snapshots:
       expo: 58.0.17(ef5d1bb3b062854aca9b527254e02010)
 
   expo-server@58.0.5: {}
+
+  expo-speech-recognition@58.0.1(patch_hash=82518befdd9f9ced83b9522ae5a270c1364bdfdabda3e230584302fa2df84eea)(expo@58.0.17)(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0):
+    dependencies:
+      expo: 58.0.17(ef5d1bb3b062854aca9b527254e02010)
+      react: 19.3.0
+      react-native: 0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
 
   expo-status-bar@58.0.4(expo@58.0.17)(react-native@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1))(react@19.3.0):
     dependencies:

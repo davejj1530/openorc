@@ -1,6 +1,8 @@
 import type { FileScope } from "@openorc/protocol";
 import { useState, type ReactNode } from "react";
 import { Keyboard, Text as NativeText, Pressable, TextInput, View } from "react-native";
+import { DictationKey, DictationNotice, DictationPill } from "../dictation/DictationControls";
+import { useComposerDictation } from "../dictation/use-composer-dictation";
 import { Plus } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { fonts } from "../generated/tokens";
@@ -48,6 +50,29 @@ export interface Tagging {
   onPick: (person: DraftTag, word: { start: number }, caret: number) => number;
 }
 
+/** The prompt's own runs, so a skill in the Bold face moves nothing out from under the caret, and a tagged person reads as one. */
+function promptRuns(segments: readonly { text: string; skill?: unknown }[], tags: readonly DraftTag[]) {
+  return segments.map((segment, index) =>
+    segment.skill ? (
+      <NativeText key={index} className="text-mention-ink" style={{ fontFamily: fonts.bold }}>
+        {segment.text}
+      </NativeText>
+    ) : (
+      <NativeText key={index}>
+        {tagRuns(segment.text, tags).map((run, at) =>
+          run.tag ? (
+            <NativeText key={at} className="text-mention-ink">
+              {run.text}
+            </NativeText>
+          ) : (
+            run.text
+          ),
+        )}
+      </NativeText>
+    ),
+  );
+}
+
 /**
  * The composer's one r20 plane, for a thread and for a new one: the draft's images, the prompt, and a bar with attach,
  * model and mode on the left and the actions on the right. While the prompt has the keyboard, a `/` word opens the
@@ -73,6 +98,7 @@ export function ComposerPlane({
   const [focused, setFocused] = useState(Boolean(autoFocus));
   const picker = useSkillPicker({ scope: skillScope, agent: settings.choice?.agent, claudeAccountId: settings.claudeAccount?.chosen ?? settings.claudeAccountId, text: draft.text, onText });
   const word = tagging ? tagWordAt(draft.text, picker.caret) : null;
+  const dictation = useComposerDictation({ owner: composerId, text: draft.text, onText, onCaret: picker.place });
   return (
     <>
       {focused && tagging && word ? (
@@ -87,11 +113,17 @@ export function ComposerPlane({
       <View className="gap-3.5 rounded-3xl bg-composer-input pb-3 pl-4 pr-3 pt-3.5">
         <ComposerImages images={draft.images} uploading={uploading} onRemove={onRemoveImage} />
         <TextInput
+          ref={dictation.input}
           multiline
           autoFocus={autoFocus}
+          // Spoken into, the draft takes no typing: the words would land in two places at once.
+          editable={!dictation.phase}
           onChangeText={onText}
           selection={picker.selection}
-          onSelectionChange={(event) => picker.onSelectionChange(event.nativeEvent.selection.end)}
+          onSelectionChange={(event) => {
+            dictation.onSelection(event.nativeEvent.selection);
+            picker.onSelectionChange(event.nativeEvent.selection.end);
+          }}
           onFocus={() => {
             setFocused(true);
             onFocusChange?.(true);
@@ -106,29 +138,12 @@ export function ComposerPlane({
           placeholderTextColorClassName="accent-ink-4"
           style={{ maxHeight: PROMPT_MAX }}
         >
-          {/* The prompt draws its own runs, so a skill in the Bold face moves nothing out from under the caret. */}
-          {picker.segments.map((segment, index) =>
-            segment.skill ? (
-              <NativeText key={index} className="text-mention-ink" style={{ fontFamily: fonts.bold }}>
-                {segment.text}
-              </NativeText>
-            ) : (
-              <NativeText key={index}>
-                {tagRuns(segment.text, draft.tags ?? []).map((run, at) =>
-                  run.tag ? (
-                    <NativeText key={at} className="text-mention-ink">
-                      {run.text}
-                    </NativeText>
-                  ) : (
-                    run.text
-                  ),
-                )}
-              </NativeText>
-            ),
-          )}
+          {promptRuns(picker.segments, draft.tags ?? [])}
         </TextInput>
+        {dictation.notice ? <DictationNotice kind={dictation.notice} /> : null}
         <View className="flex-row items-center justify-between gap-2">
-          <View className="min-w-0 flex-1 flex-row items-center gap-1.5">
+          {dictation.phase ? <DictationPill phase={dictation.phase} since={dictation.since} onFinish={dictation.toggle} onCancel={dictation.cancel} /> : null}
+          <View className={cn("min-w-0 flex-1 flex-row items-center gap-1.5", dictation.phase && "hidden")}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Attach image"
@@ -144,7 +159,10 @@ export function ComposerPlane({
             </Pressable>
             {chips ? <ComposerChips composerId={composerId} settings={settings} /> : null}
           </View>
-          <View className="flex-row items-center gap-2.5">{children}</View>
+          <View className="flex-row items-center gap-2.5">
+            {dictation.phase ? null : <DictationKey onPress={dictation.toggle} />}
+            {children}
+          </View>
         </View>
       </View>
     </>

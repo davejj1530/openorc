@@ -35,7 +35,7 @@
         "expo-camera",
         {
           "cameraPermission": "OpenOrc uses the camera to scan the pairing code on your Mac and to take photos you attach.",
-          "microphonePermission": false,
+          "microphonePermission": "OpenOrc uses the microphone to write what you say into a message. Your voice stays on this device.",
           "recordAudioAndroid": false
         }
       ],
@@ -44,13 +44,20 @@
         {
           "photosPermission": "OpenOrc attaches the photos you choose to your messages.",
           "cameraPermission": "OpenOrc uses the camera to scan the pairing code on your Mac and to take photos you attach.",
-          "microphonePermission": false
+          "microphonePermission": "OpenOrc uses the microphone to write what you say into a message. Your voice stays on this device."
         }
       ],
       [
         "expo-secure-store",
         {
           "faceIDPermission": false
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "OpenOrc uses the microphone to write what you say into a message. Your voice stays on this device.",
+          "speechRecognitionPermission": "OpenOrc turns what you say into text for a message, on this device."
         }
       ],
       "react-native-quick-crypto",

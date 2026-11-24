@@ -14,6 +14,7 @@ export default defineConfig({
       "expo-clipboard": fixture("clipboard.ts"),
       "expo-haptics": fixture("haptics.ts"),
       "expo-notifications": fixture("notifications.ts"),
+      "expo-speech-recognition": fixture("speech-recognition.ts"),
       "expo-status-bar": fixture("status-bar.ts"),
       "expo-web-browser": fixture("web-browser.ts"),
       "react-native-gesture-handler/ReanimatedSwipeable": fixture("swipeable.tsx"),

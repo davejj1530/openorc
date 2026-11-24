@@ -1,0 +1,55 @@
+diff --git a/ios/ExpoSpeechRecognitionModule.swift b/ios/ExpoSpeechRecognitionModule.swift
+index 9dc90826634fe3424c0c143eb7cfd72efe90498a..1d5c90b9434099502db6bf02019b454c819e3fca 100644
+--- a/ios/ExpoSpeechRecognitionModule.swift
++++ b/ios/ExpoSpeechRecognitionModule.swift
+@@ -204,6 +204,18 @@ public class ExpoSpeechRecognitionModule: Module {
+             )
+           }
+ 
++          // On-device only means on-device or nothing: a language with no model on the device must not fall back to
++          // recognition over the network.
++          if options.requiresOnDeviceRecognition {
++            guard onDeviceLocales().contains(where: { $0.identifier == resolveLocale(localeIdentifier: options.lang)?.identifier }) else {
++              sendErrorAndStop(
++                error: "service-not-allowed",
++                message: "On-device speech recognition is not available for \(options.lang)."
++              )
++              return
++            }
++          }
++
+           if !options.requiresOnDeviceRecognition {
+             guard await SFSpeechRecognizer.hasAuthorizationToRecognize() else {
+               sendErrorAndStop(
+@@ -354,6 +366,11 @@ public class ExpoSpeechRecognitionModule: Module {
+       return recognizer?.supportsOnDeviceRecognition ?? false
+     }
+ 
++    /** The locales the device can recognize without the network, as it stands now. */
++    AsyncFunction("getOnDeviceLocales") { () -> [String] in
++      return self.onDeviceLocales().map { $0.identifier }.sorted()
++    }
++
+     Function("supportsRecording") { () -> Bool in
+       return true
+     }
+@@ -415,6 +432,19 @@ public class ExpoSpeechRecognitionModule: Module {
+     }
+   }
+ 
++  /**
++   The locales with a speech model on the device. A simulator names locales it holds no model for, and may have no
++   microphone to open, so it has none.
++   */
++  func onDeviceLocales() -> [Locale] {
++    #if targetEnvironment(simulator)
++      return []
++    #else
++      return SFSpeechRecognizer.supportedLocales()
++        .filter { SFSpeechRecognizer(locale: $0)?.supportsOnDeviceRecognition ?? false }
++    #endif
++  }
++
+   /** Normalizes the locale for compatibility between Android and iOS */
+   func resolveLocale(localeIdentifier: String) -> Locale? {
+     // The supportedLocales() method returns the locales in the format with dashes, e.g. "en-US"

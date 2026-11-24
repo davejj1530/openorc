@@ -8,6 +8,7 @@ import { useRpc } from "../client";
 import { ComposerPlane } from "../composer/ComposerPlane";
 import { SendButton } from "../composer/SendButton";
 import { useShareSettings } from "../composer/settings-bridge";
+import { useDictatedSend } from "../dictation/use-composer-dictation";
 import { Cloud, FolderOpen, Globe } from "../generated/icons";
 import { Measure } from "../ui/pane";
 import { Spinner } from "../ui/Spinner";
@@ -49,6 +50,8 @@ function SubthreadForm({ parent }: { parent: ThreadSummary }) {
     if (!threadId || !navigation.isFocused()) return;
     router.replace({ pathname: "/thread/[id]", params: { id: threadId } });
   };
+  // Started while dictating, the thread waits for the last words.
+  const startSpoken = useDictatedSend(composerId, () => void start());
   return (
     <Measure className="flex-1 justify-end bg-bg">
       <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
@@ -83,7 +86,7 @@ function SubthreadForm({ parent }: { parent: ThreadSummary }) {
               onAttach={form.chooseImages}
             >
               {activity ? <Text className="text-sm text-ink-4">{activity}</Text> : null}
-              <SendButton state="send" label="Start" disabled={!form.controls.canSend} onPress={() => void start()} onDimPress={form.explainDim} />
+              <SendButton state="send" label="Start" disabled={!form.controls.canSend} onPress={startSpoken} onDimPress={form.explainDim} />
             </ComposerPlane>
           </View>
         </View>

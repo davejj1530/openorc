@@ -55,7 +55,7 @@ export const subagents = {
           `WITH RECURSIVE children(id) AS (
       SELECT id FROM threads WHERE parent_thread_id = ?
       UNION SELECT t.id FROM threads t JOIN children c ON t.parent_thread_id = c.id
-    ) SELECT 1 FROM subagents s JOIN children c ON c.id = s.thread_id WHERE s.status = 'running' LIMIT 1`,
+    ) SELECT 1 FROM children c WHERE EXISTS (SELECT 1 FROM subagents s WHERE s.thread_id = c.id AND s.status = 'running') LIMIT 1`,
         )
         .get(threadId),
     );

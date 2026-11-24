@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef } from "react";
+import { useId, useLayoutEffect } from "react";
 import { cn } from "../lib/cn";
 
 const outline =
@@ -12,25 +12,51 @@ const faces = {
 /** OpenOrc's mark as one path: a cube seen from above, solid but for its lit top face. */
 export const openOrcMarkPath = `${outline}${faces.top}`;
 
+const LIT_ORDER = ["top", "right", "left"] as const;
+/** A face's turn, the cross to the next one included. */
+const TURN_MS = 800;
+/** How far into a turn the cross to the next face begins; the stylesheet's transition carries it to the turn's end. */
+const CROSS_AT_MS = 624;
+
+let workingMarks = 0;
+let nextCross: ReturnType<typeof setTimeout> | undefined;
+
+/** Names the face the document's clock has reached on the root element, and wakes when the next cross begins. */
+function lightFace(): void {
+  const now = performance.now();
+  const crosses = now < CROSS_AT_MS ? 0 : Math.floor((now - CROSS_AT_MS) / TURN_MS) + 1;
+  document.documentElement.dataset["litFace"] = LIT_ORDER[crosses % LIT_ORDER.length];
+  nextCross = setTimeout(lightFace, CROSS_AT_MS + crosses * TURN_MS - now);
+}
+
+/** Keeps the lit face named while any working mark is on screen. Returns the mark's leave. */
+function joinFaceClock(): () => void {
+  workingMarks += 1;
+  if (workingMarks === 1) lightFace();
+  return () => {
+    workingMarks -= 1;
+    if (workingMarks > 0) return;
+    clearTimeout(nextCross);
+    delete document.documentElement.dataset["litFace"];
+  };
+}
+
 /**
  * OpenOrc's mark; the surrounding UI supplies its color. While an agent works the light moves around the cube, one
  * face at a time. The faces are cut through a mask, so the mark still shows whatever it sits on. Every working cube in
- * the window keeps one clock: its faces count from the document's start, not from when the cube appeared.
+ * the window keeps one clock, counted from the document's start, not from when the cube appeared: the root element
+ * names the lit face and the stylesheet crosses to it, so nothing is restyled while a face holds.
  */
 export function OpenOrcMark({ size = 30, working = false, className }: { size?: number; working?: boolean; className?: string }) {
   const mask = `openorc-mark-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
-  const svg = useRef<SVGSVGElement>(null);
-  useLayoutEffect(() => {
-    if (!working || typeof svg.current?.getAnimations !== "function") return;
-    for (const animation of svg.current.getAnimations({ subtree: true })) animation.startTime = 0;
-  }, [working]);
+  useLayoutEffect(() => (working ? joinFaceClock() : undefined), [working]);
   return (
-    <svg ref={svg} width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" className={className}>
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" className={className}>
       {working ? (
         <>
           <mask id={mask}>
             <path fill="white" d={outline} />
-            {(["top", "right", "left"] as const).map((face) => (
+            {LIT_ORDER.map((face) => (
               <path key={face} className="openorc-mark-face" data-face={face} fill="black" d={faces[face]} />
             ))}
           </mask>

@@ -1,30 +1,39 @@
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { OpenOrcMark, WorkingCube } from "./OpenOrcMark";
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+});
 
 afterEach(() => {
   cleanup();
-  vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
-it("puts every working cube's faces on the document's clock, so cubes that appear later turn in step", () => {
-  const faces: { startTime: number | null }[] = [];
-  Object.defineProperty(SVGElement.prototype, "getAnimations", {
-    configurable: true,
-    value() {
-      const own = [{ startTime: 812 }, { startTime: 812 }, { startTime: 812 }];
-      faces.push(...own);
-      return own;
-    },
-  });
-  render(
-    <>
-      <WorkingCube />
-      <OpenOrcMark size={24} working />
-      <OpenOrcMark size={16} />
-    </>,
-  );
-  expect(faces).toHaveLength(6);
-  expect(faces.every((face) => face.startTime === 0)).toBe(true);
-  delete (SVGElement.prototype as { getAnimations?: unknown }).getAnimations;
+const lit = () => document.documentElement.dataset["litFace"];
+
+it("moves the light around every working cube on the document's clock, so cubes that appear later turn in step", () => {
+  vi.setSystemTime(0);
+  const first = render(<WorkingCube />);
+  expect(lit()).toBe("top");
+  vi.advanceTimersByTime(624);
+  expect(lit()).toBe("right");
+  // A cube that appears mid-turn takes the face the clock is on, not a turn of its own.
+  vi.advanceTimersByTime(400);
+  const second = render(<OpenOrcMark size={24} working />);
+  expect(lit()).toBe("right");
+  vi.advanceTimersByTime(400);
+  expect(lit()).toBe("left");
+  vi.advanceTimersByTime(800);
+  expect(lit()).toBe("top");
+  first.unmount();
+  expect(lit()).toBe("top");
+  second.unmount();
+  expect(lit()).toBeUndefined();
+});
+
+it("leaves the clock alone for a mark at rest", () => {
+  render(<OpenOrcMark size={16} />);
+  expect(lit()).toBeUndefined();
 });

@@ -34,8 +34,9 @@ async function repository(root: string) {
   return { clone, base, head };
 }
 
-function detail(head: string, base: string) {
+function detail(head: string, base: string, fromFork = false) {
   return JSON.stringify({
+    isCrossRepository: fromFork,
     number: 7,
     title: "Add retries",
     url,
@@ -89,6 +90,7 @@ function setup(
     startFails?: Error;
     repo?: Awaited<ReturnType<typeof repository>>;
     head?: () => string;
+    fromFork?: boolean;
   } = {},
 ) {
   const source = overrides.repo ?? repo;
@@ -96,7 +98,7 @@ function setup(
   const project = projects.insert(db, { name: "App", rootPath: source.clone, gitRemote: "https://github.com/acme/app.git", defaultBranch: "main", settings: {} });
   const posted = overrides.posted ?? [];
   const gh: GhRunner = async (_cwd, args, input) => {
-    if (args[0] === "pr" && args[1] === "view") return detail(overrides.head?.() ?? source.head, source.base);
+    if (args[0] === "pr" && args[1] === "view") return detail(overrides.head?.() ?? source.head, source.base, overrides.fromFork);
     if (args[0] === "api" && args[1] === "user") return "ada\n";
     if (args[0] === "api" && args[1] === "--method") {
       posted.push({ args, ...(input === undefined ? {} : { input }) });
@@ -141,6 +143,7 @@ function setup(
   const update = vi.fn((id: string) => threads.get(db, id)!);
   const queueFollowUp = vi.fn(() => ({ messageId: "follow-up" }));
   const appPosts: { url: string; review: ReviewSubmission }[] = [];
+  const readyCheckout = vi.fn(async () => undefined);
   const service = new PullRequestService(db, {
     dataDir: path.join(root, `data-${project.id}`),
     github: new GitHubPulls(gh),
@@ -157,9 +160,10 @@ function setup(
       },
     },
     writers: new WorkspaceWriters(),
+    workspaces: { readyCheckout },
     invalidate,
   });
-  return { db, key: { projectId: project.id, number: 7 }, service, start, update, queueFollowUp, invalidate, started: () => started, appPosts };
+  return { db, key: { projectId: project.id, number: 7 }, service, start, update, queueFollowUp, invalidate, started: () => started, appPosts, readyCheckout };
 }
 
 const yours = { path: "app.ts", startLine: null, startSide: null, line: 3, side: "new" as const, lineText: "  const retries = 3;", body: "Make this configurable." };
@@ -257,11 +261,13 @@ describe("draft reviews", () => {
 });
 
 describe("model reviews", () => {
-  it("reviews in a Plan conversation on a detached checkout of the head", async () => {
-    const { service, key, start, db } = setup();
+  it("reviews on a detached checkout of the head that it can run, with the permission new work starts with", async () => {
+    const { service, key, start, db, readyCheckout } = setup();
     const { threadId } = await service.start(key, { agent: "claude", model: "claude-opus-5-5", effort: "high", fastMode: false });
     const input = start.mock.calls[0]![0];
-    expect(input).toMatchObject({ mode: "plan", permissionMode: "review", model: "claude-opus-5-5", effort: "high", title: "Review #7: Add retries" });
+    expect(input).toMatchObject({ mode: "act", permissionMode: "autonomous", model: "claude-opus-5-5", effort: "high", title: "Review #7: Add retries" });
+    // The copy is readied as the conversation's own worktree would be, before its agent starts.
+    expect(readyCheckout).toHaveBeenCalledWith(expect.objectContaining({ id: key.projectId }), { worktreePath: input.checkout!.path, id: input.id });
     expect(input.prompt).toContain("Retry the listener three times.");
     // The conversation's own changes count from the head; the review keeps where the pull request's changes start.
     expect(input.checkout!.baseSha).toBe(repo.head);
@@ -269,7 +275,29 @@ describe("model reviews", () => {
     expect((await git(input.checkout!.path, ["symbolic-ref", "--quiet", "HEAD"], { okCodes: [0, 1] })).code).toBe(1);
     expect(pullReviews.get(db, key)).toMatchObject({ commitId: repo.head, threadId, baseCommit: repo.base });
     expect(threads.get(db, threadId)).toMatchObject({ branch: null, prUrl: url, prState: "open" });
-    expect(service.brief(threads.get(db, threadId)!)).toContain("pull request #7");
+    const thread = threads.get(db, threadId)!;
+    expect(service.brief(thread, "act")).toContain("pull request #7");
+    expect(service.brief(thread, "act")).toContain("Then run it.");
+    // A turn that only plans, as an Orcling held to reading does, is told to read.
+    expect(service.brief(thread, "plan")).toContain("the code is not run");
+  });
+
+  it("reads a fork's pull request without running it", async () => {
+    const { service, key, start, readyCheckout } = setup({ fromFork: true });
+    await service.start(key, { agent: "claude", model: "claude-opus-5-5", effort: null, fastMode: false });
+    expect(start.mock.calls[0]![0]).toMatchObject({ mode: "plan", permissionMode: "review" });
+    expect(readyCheckout).not.toHaveBeenCalled();
+  });
+
+  it("follows the permission new work starts with, planning on an agent that can't work on it", async () => {
+    const { service, key, start, db } = setup();
+    new AppSettingsService(db).set({ defaultPermissionMode: "trusted" });
+    await service.start(key, { agent: "claude", model: "claude-opus-5-5", effort: null, fastMode: false });
+    expect(start.mock.calls[0]![0]).toMatchObject({ mode: "act", permissionMode: "trusted" });
+    const other = setup();
+    new AppSettingsService(other.db).set({ defaultPermissionMode: "trusted" });
+    await other.service.start(other.key, { agent: "opencode", model: "gpt-6", effort: null, fastMode: false });
+    expect(other.start.mock.calls[0]![0]).toMatchObject({ mode: "plan", permissionMode: "review" });
   });
 
   it("removes the checkout when the conversation could not start", async () => {
@@ -356,6 +384,10 @@ describe("model reviews", () => {
     const { threadId } = await service.start(key, { agent: "claude", model: "claude-opus-5-5", effort: null, fastMode: false });
     await service.submit(key, { event: "comment", summary: "Retries need a backoff.", as: "you" });
     const first = head;
+    // What the first round left in its copy while testing: a changed file and a throwaway test.
+    const copy = threads.get(db, threadId)!.worktreePath!;
+    await writeFile(path.join(copy, "app.ts"), "export function start() {}\n");
+    await writeFile(path.join(copy, "scratch.test.ts"), "// throwaway\n");
     head = await push(again, "export function start() {\n  const port = 3000;\n  const retries = 3;\n  const backoff = 100;\n  return port;\n}\n");
 
     await expect(service.start(key, { agent: "claude", model: "claude-haiku-4-5", effort: null, fastMode: false })).resolves.toEqual({ threadId });
@@ -363,6 +395,7 @@ describe("model reviews", () => {
     const thread = threads.get(db, threadId)!;
     expect(thread.baseSha).toBe(head);
     expect((await git(thread.worktreePath!, ["rev-parse", "HEAD"])).stdout.trim()).toBe(head);
+    expect((await git(copy, ["status", "--porcelain"])).stdout).toBe("");
     expect(pullReviews.get(db, key)).toMatchObject({ commitId: head, threadId, baseCommit: again.base });
     // The new code is the next turn's starting point, so the agent isn't credited with the author's commits.
     expect(checkpoints.listForThread(db, threadId).at(-1)).toMatchObject({ runId: null, note: `Pull request #7 at ${head.slice(0, 7)}` });
@@ -573,6 +606,7 @@ describe("a project only OpenOrc Cloud has", () => {
       github: new GitHubPulls(gh),
       system: { info: async () => ({ gh: { installed: true, path: "/usr/bin/gh" } }) as SystemInfo },
       threads: { start: vi.fn(), update: vi.fn(), queueFollowUp: vi.fn() },
+      workspaces: { readyCheckout: vi.fn() },
       runs: { threadActivity: () => "idle", models: async () => [] },
       reviewerApp: { submitReview: vi.fn() },
       writers: new WorkspaceWriters(),
@@ -621,6 +655,7 @@ describe("a project only OpenOrc Cloud has", () => {
       github: new GitHubPulls(gh),
       system: { info: async () => ({ gh: { installed: true, path: "/usr/bin/gh" } }) as SystemInfo },
       threads: { start: vi.fn(), update: vi.fn(), queueFollowUp: vi.fn() },
+      workspaces: { readyCheckout: vi.fn() },
       runs: { threadActivity: () => "idle", models: async () => [] },
       reviewerApp: { submitReview: vi.fn() },
       writers: new WorkspaceWriters(),

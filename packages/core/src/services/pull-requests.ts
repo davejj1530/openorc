@@ -6,6 +6,8 @@ import type { PullReviewTools } from "@openorc/mcp";
 import {
   PULL_REVIEW_NEEDS_FOLDER,
   WORKSPACE_ID,
+  executionModeAvailable,
+  executionModeSettings,
   harnessName,
   isHarnessId,
   patchFiles,
@@ -28,18 +30,22 @@ import {
   type PullRequestSummary,
   type RpcParams,
   type Run,
+  type RunMode,
   type Thread,
 } from "@openorc/protocol";
 import { ACCOUNTS_KEPT_SEPARATE, accountsSeparate, threadAccount } from "./claude-account-separation.js";
 import { projectAccountPolicy, startingAccount } from "./project-claude-accounts.js";
+import { againPrompt, reviewBrief, reviewPrompt } from "./pull-request-brief.js";
 import { addReviewCheckout, fetchPullRequestHead, moveReviewCheckout } from "./pull-request-checkout.js";
 import { REVIEW_DIFF, agentAnchor, agentDiff, agentDraft, changedSince } from "./pull-request-diff.js";
 import type { ReviewerAppService } from "./reviewer-app.js";
 import type { RunService } from "./runs.js";
+import { AppSettingsService } from "./settings.js";
 import type { SystemService } from "./system.js";
 import type { StartThreadInput } from "./thread-inputs.js";
 import type { ThreadService } from "./threads.js";
 import type { WorkspaceWriters } from "./workspace-writers.js";
+import type { WorkspaceService } from "./workspace.js";
 
 export interface PullRequestServiceOptions {
   /** Where review checkouts live, beside the app's other worktrees. */
@@ -51,6 +57,8 @@ export interface PullRequestServiceOptions {
   runs: Pick<RunService, "threadActivity" | "models">;
   /** Serializes changes to a review conversation's copy with its own turns. */
   writers: Pick<WorkspaceWriters, "withLease">;
+  /** Readies a review's copy to run, as a new worktree of the project is. */
+  workspaces: Pick<WorkspaceService, "readyCheckout">;
   /** Posts reviews as the user's GitHub App instead of their gh account. */
   reviewerApp: Pick<ReviewerAppService, "submitReview">;
   /** A project only OpenOrc Cloud has, with no folder on this Mac: its pull requests are read on GitHub by name. */
@@ -69,28 +77,7 @@ type ReviewModel = Pick<ModelExecutionSettings, "agent"> & { claudeAccountId?: s
 
 /** Review diffs kept for agents between tool calls. */
 const CACHED_DIFFS = 16;
-const PROMPT_BODY_LIMIT = 20_000;
 const NO_DRAFT_COMMENT = "No comment of the draft has that id. Read the draft with pull_request_draft.";
-
-/** The first message of a review conversation: what the author asked for, as the reviewer would read it on GitHub. */
-function reviewPrompt(detail: PullRequestDetail): string {
-  const body = detail.body.trim() ? detail.body.trim().slice(0, PROMPT_BODY_LIMIT) : "No description.";
-  return `Review pull request #${detail.number}: ${detail.title}\n${detail.url}\n\nBy @${detail.author}, merging ${detail.headRefName} into ${detail.baseRefName}.\n\n${body}`;
-}
-
-/** The message that starts another round in the same conversation, which remembers the last one. */
-function againPrompt(detail: PullRequestDetail, previous: string | null): string {
-  const lines = [`Review pull request #${detail.number} again: ${detail.title}`];
-  if (previous && previous !== detail.headSha) {
-    lines.push(
-      `New commits since your last review: ${previous.slice(0, 7)}..${detail.headSha.slice(0, 7)}. Your copy now has the latest code, and pull_request_diff with since "${previous}" shows only what changed.`,
-    );
-    lines.push("", "Check whether your earlier findings were addressed. Comment only on what still needs work or is new.");
-  } else {
-    lines.push("No commits were added since your last review. Look again, and add only findings you haven't made.");
-  }
-  return lines.join("\n");
-}
 
 /** An archived conversation, or one whose copy was removed, was put away: the next round starts fresh. */
 function reviewGoesOn(conversation: Thread | null): conversation is Thread {
@@ -110,6 +97,17 @@ export function reviewRound(db: Db, conversation: Thread | null, orcling: Pick<O
   const asked = askedAccount(db, orcling, model);
   if (reviewGoesOn(conversation) && (!asked || threadAccount(conversation) === asked)) return { goesOn: conversation, claudeAccountId: threadAccount(conversation) };
   return { goesOn: null, claudeAccountId: asked };
+}
+
+/**
+ * How a fresh review conversation works. It acts, with the permission new work starts with, so it can run the code it
+ * reviews. A fork's code comes from someone who can't write to the repository, so it is read and not run; the user can
+ * change that in the conversation. An agent that can't work on that permission plans.
+ */
+function reviewAccess(db: Db, detail: PullRequestDetail, agent: Reviewer["agent"]): Pick<StartThreadInput, "mode" | "permissionMode"> {
+  if (detail.fromFork) return executionModeSettings("plan");
+  const permission = new AppSettingsService(db).get().defaultPermissionMode;
+  return executionModeSettings(executionModeAvailable(agent, permission) ? permission : "plan");
 }
 
 /**
@@ -147,8 +145,8 @@ function cloudRepository(project: Project): string {
  * GitHub pull requests for a project, and the reviews drafted for them. Lists,
  * diffs and posting go through the user's own gh; drafts stay in the ledger
  * until the user posts or discards them. A model reviews in a conversation of
- * its own, in Plan mode, on a detached checkout of the pull request: no branch
- * is created and the user's checkout is never touched.
+ * its own, on a detached checkout of the pull request that it can run: no
+ * branch is created and the user's checkout is never touched.
  */
 export class PullRequestService {
   private readonly github: GitHubPulls;
@@ -245,8 +243,8 @@ export class PullRequestService {
 
   /**
    * Starts a model reviewing the pull request's current head. The first round
-   * opens a Plan-mode conversation of its own; later rounds continue it, so the
-   * model can check its earlier findings against the new commits.
+   * opens a conversation of its own; later rounds continue it, so the model
+   * can check its earlier findings against the new commits.
    */
   async start(key: PullReviewKey, chosen: ModelExecutionSettings, orclingId?: string, claudeAccountId?: string): Promise<{ threadId: string }> {
     const cloud = this.drafts(key.projectId);
@@ -288,18 +286,21 @@ export class PullRequestService {
     const startsOn = freshAccount(this.db, project.id, reviewer, account);
     const mergeBase = await fetchPullRequestHead(project, detail);
     const checkoutPath = await addReviewCheckout(this.options.dataDir, project, detail);
+    const access = reviewAccess(this.db, detail, reviewer.agent);
+    const id = randomUUID();
     let admitted = false;
     try {
+      if (access.mode === "act") await this.options.workspaces.readyCheckout(project, { worktreePath: checkoutPath, id });
       const { thread } = await this.options.threads.start(
         {
           ...startsOn,
+          ...access,
+          id,
           projectId: project.id,
           agent: reviewer.agent,
           model: reviewer.model,
           effort: reviewer.effort ?? undefined,
           fastMode: reviewer.fastMode,
-          mode: "plan",
-          permissionMode: "review",
           // The conversation's own changes count from the head it checked out; the pull request's start from the merge base.
           checkout: { path: checkoutPath, baseSha: detail.headSha },
           prompt: reviewPrompt(detail),
@@ -404,19 +405,11 @@ export class PullRequestService {
     return orcling ? `${orcling.name} (${model})` : model;
   }
 
-  /** What a conversation reviewing a pull request is told on every turn; null for any other conversation. */
-  brief(thread: Thread): string | null {
+  /** What a conversation reviewing a pull request is told on a turn in `mode`; null for any other conversation. */
+  brief(thread: Thread, mode: RunMode): string | null {
     const review = pullReviews.forThread(this.db, thread.id);
-    if (!review) return null;
-    return [
-      `This conversation reviews GitHub pull request #${review.number} for the user. Its code is checked out in your working folder at commit ${(thread.baseSha ?? "").slice(0, 12)}, on no branch. Its changes start from commit ${(review.baseCommit ?? "").slice(0, 12)}.`,
-      "Read the changes with pull_request_diff, and the surrounding code in the checkout as needed. Look for bugs, security problems, data loss, races, missing error handling and missing tests, and for code that will be hard to change. Skip style points a formatter or linter would catch.",
-      "Record each finding with pull_request_comment on the changed line it is about: one finding per comment, saying what is wrong, why it matters and a concrete fix. Finish with pull_request_summary, a short overall assessment.",
-      "Read the draft as it stands with pull_request_draft, the user's own comments included. When the user asks, or a finding no longer holds, change what a comment says with pull_request_edit_comment and remove one with pull_request_delete_comment.",
-      "Reviewing is the whole task: do not propose an implementation plan. Your comments and summary are drafts. The user edits them and decides what to post to GitHub; you cannot post, push or change files. Keep your reply short: the findings live in the draft.",
-    ].join("\n");
+    return review ? reviewBrief(review, thread, mode) : null;
   }
-
   /** The review tools, offered only to runs of a conversation that reviews a pull request. */
   agentTools(): PullReviewTools {
     return {

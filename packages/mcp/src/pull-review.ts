@@ -61,7 +61,7 @@ export function registerPullReviewTools(mcp: McpServer, tools: PullReviewTools, 
     "pull_request_comment",
     {
       description:
-        "Add one finding to the user's draft review, on a line of the pull request's diff. side is new for an added or unchanged line (its number in the new file) and old for a removed line. For a range, start_line and start_side mark the first line, and the range must stay within one hunk. The user edits and decides what to post.",
+        "Add one finding to the user's draft review, on a line of the pull request's diff: its severity, what is wrong, the evidence and a concrete fix. side is new for an added or unchanged line (its number in the new file) and old for a removed line. For a range, start_line and start_side mark the first line, and the range must stay within one hunk. The user edits and decides what to post.",
       inputSchema: {
         path: z.string().min(1),
         line: z.number().int().positive(),
@@ -94,7 +94,7 @@ export function registerPullReviewTools(mcp: McpServer, tools: PullReviewTools, 
     "pull_request_summary",
     {
       description:
-        "Set the draft review's overall summary: your assessment and the most important findings. Each call replaces your previous summary. A summary the user wrote is kept, and yours is offered beside it.",
+        "Set the draft review's overall summary: your verdict, what the pull request does, what you ran and what it showed, and the most important findings. Each call replaces your previous summary. A summary the user wrote is kept, and yours is offered beside it.",
       inputSchema: { body },
     },
     async ({ body }) => text(await tools.summary(runId, body)),

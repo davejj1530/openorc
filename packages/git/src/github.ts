@@ -307,6 +307,7 @@ interface RawPullRequestDetail extends RawPullRequest {
   body: string | null;
   headRefOid: string;
   baseRefOid: string;
+  isCrossRepository?: boolean;
 }
 
 const decisions: Record<string, PullRequestReviewDecision> = { APPROVED: "approved", CHANGES_REQUESTED: "changes_requested", REVIEW_REQUIRED: "review_required" };
@@ -552,13 +553,13 @@ export class GitHubPulls {
 
   async get(at: PullsAt, number: number): Promise<PullRequestDetail> {
     const [out, viewer] = await Promise.all([
-      this.gh(cwdOf(at), ["pr", "view", String(number), ...repoFlag(at), "--json", `${SUMMARY_FIELDS},body,headRefOid,baseRefOid`]).catch((error: unknown) => {
+      this.gh(cwdOf(at), ["pr", "view", String(number), ...repoFlag(at), "--json", `${SUMMARY_FIELDS},body,headRefOid,baseRefOid,isCrossRepository`]).catch((error: unknown) => {
         throw ghFailure(error, `Pull request #${number}`);
       }),
       this.viewer(at),
     ]);
     const raw = JSON.parse(out) as RawPullRequestDetail;
-    return { ...pullRequestSummary(raw), body: raw.body ?? "", headSha: raw.headRefOid, baseSha: raw.baseRefOid, viewer };
+    return { ...pullRequestSummary(raw), body: raw.body ?? "", headSha: raw.headRefOid, baseSha: raw.baseRefOid, fromFork: raw.isCrossRepository === true, viewer };
   }
 
   /**

@@ -42,7 +42,7 @@ export class RunBriefs {
     if (orclings.forThread(this.db, thread.id)) return this.orclingHomeBrief(project, mode);
     const own = tasks.list(this.db, { threadId: thread.id }).filter((t) => t.status !== "archived");
     const lines = [this.threadLocation(thread, project)];
-    const context = this.hooks.threadContext?.(thread);
+    const context = this.hooks.threadContext?.(thread, mode);
     if (context) lines.push("", context);
     lines.push(
       "",

@@ -147,6 +147,8 @@ export interface PullRequestDetail extends Omit<PullRequestSummary, "comments"> 
   body: string;
   headSha: string;
   baseSha: string;
+  /** Whether its branch is in another repository, so its author may have no write access to this one. */
+  fromFork: boolean;
   /** The gh account that posts reviews; null when gh could not say. */
   viewer: string | null;
 }
@@ -274,7 +276,7 @@ export const pullRequestRpcParams = {
   /** Saves the draft's summary; a draft that does not exist yet starts at `commitId`. */
   "pulls.review.summary": z.object({ ...PullRequestRef, commitId: CommitId, summary: z.string().max(REVIEW_TEXT_LIMIT) }).strict(),
   "pulls.review.discard": z.object(PullRequestRef).strict(),
-  /** Starts a model reviewing the pull request in a read-only conversation of its own. */
+  /** Starts a model reviewing the pull request in a conversation of its own, on a copy it can run. A fork's is read-only. */
   /** With `orclingId`, that Orcling reviews with its own model, instructions and memory. */
   /** With `claudeAccountId`, a Claude model reviews on that account; a later round on another one starts a fresh conversation there. */
   "pulls.review.start": z.object({ ...PullRequestRef, reviewer: ModelExecutionSettings, orclingId: z.string().min(1).optional(), claudeAccountId: ClaudeAccountId.optional() }).strict(),

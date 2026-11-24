@@ -304,6 +304,26 @@ export class WorkspaceService {
     );
   }
 
+  /**
+   * Readies a checkout made elsewhere, such as a pull request's, to run: the project's included files, submodules and
+   * setup script, as a new worktree gets. A setup that fails is logged and the checkout stays: whoever runs the code
+   * next meets the failure where it can be read.
+   */
+  async readyCheckout(project: Project, checkout: { worktreePath: string; id: string }): Promise<void> {
+    this.assertOpen();
+    await this.track(
+      (async () => {
+        await this.copyIncludes(project, checkout.worktreePath);
+        await this.initSubmodules(checkout.worktreePath);
+        if (!project.settings.setupScript) return;
+        await this.runSetup(project, checkout).catch((error: unknown) => {
+          this.assertOpen();
+          this.log.warn(`setup failed in ${checkout.worktreePath}: ${error instanceof Error ? error.message : String(error)}`);
+        });
+      })(),
+    );
+  }
+
   /** A new worktree with the project's included files, submodules and a hooks check. */
   private async makeWorktree(project: Project, worktreePath: string, branch: string, startPoint: string): Promise<void> {
     await worktree.add(project.rootPath, { path: worktreePath, branch, startPoint });

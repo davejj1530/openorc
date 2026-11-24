@@ -871,7 +871,14 @@ function pageStates({ mode, now, project, orclings, patch }: { mode: string; now
     if (method === "pulls.choices") return params.projectId === "studio" ? choices[String(params.kind)] : [];
     if (method === "pulls.counts") return Object.fromEntries(Object.keys(states).map((state) => [state, params.projectId === "studio" ? narrowed({ ...params, state }).length : 0]));
     if (method === "pulls.get")
-      return { ...pulls[0], body: "Connect a project, then start a conversation.\n\n- A short welcome\n- One clear next step", headSha: "a".repeat(40), baseSha: "b".repeat(40), viewer: "you" };
+      return {
+        ...pulls[0],
+        body: "Connect a project, then start a conversation.\n\n- A short welcome\n- One clear next step",
+        headSha: "a".repeat(40),
+        baseSha: "b".repeat(40),
+        fromFork: false,
+        viewer: "you",
+      };
     if (method === "pulls.diff") return { patch, headSha: "a".repeat(40) };
     if (method === "pulls.review.get") return null;
     if (method === "memory.list") return memories;

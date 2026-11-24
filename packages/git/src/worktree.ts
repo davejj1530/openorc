@@ -59,9 +59,13 @@ export async function addDetached(root: string, options: { path: string; commit:
   await git(root, ["worktree", "add", "--detach", options.path, options.commit]);
 }
 
-/** Moves a detached worktree to another commit. */
-export async function checkoutDetached(worktreePath: string, commit: string): Promise<void> {
-  await git(worktreePath, ["checkout", "--quiet", "--detach", commit]);
+/**
+ * Moves a detached worktree to another commit. With `discard`, what the worktree changed and the files it added are
+ * dropped first; ignored files, such as installed dependencies, stay.
+ */
+export async function checkoutDetached(worktreePath: string, commit: string, options: { discard?: boolean } = {}): Promise<void> {
+  await git(worktreePath, ["checkout", "--quiet", "--detach", ...(options.discard ? ["--force"] : []), commit]);
+  if (options.discard) await git(worktreePath, ["clean", "--quiet", "-fd"]);
 }
 
 /**

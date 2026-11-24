@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { access, mkdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import { checkpoints, threads, type Db } from "@openorc/db";
-import { diffStat, fetchPullRequest, git, isDirty, pinObject, pullRequestSource, treeHash, worktree } from "@openorc/git";
+import { diffStat, fetchPullRequest, git, pinObject, pullRequestSource, treeHash, worktree } from "@openorc/git";
 import type { Project, PullRequestDetail, Thread } from "@openorc/protocol";
 import { checkpointRefs } from "./checkpoint-refs.js";
 import type { WorkspaceWriters } from "./workspace-writers.js";
@@ -28,10 +28,11 @@ export async function addReviewCheckout(dataDir: string, project: Project, detai
 
 /**
  * Moves a review conversation's copy to the pull request's new head for another
- * round. The copy is read-only work, so changes in it stop the move rather than
- * being lost. The new code is saved as a labelled checkpoint, which the next
- * turn's changes count from: otherwise the agent would be credited with the
- * pull request's new commits.
+ * round. What the last round left in the copy while testing is dropped: none of
+ * it belongs to the pull request, and each turn's checkpoint still holds it.
+ * The new code is saved as a labelled checkpoint, which the next turn's changes
+ * count from: otherwise the agent would be credited with the pull request's new
+ * commits.
  */
 export async function moveReviewCheckout(deps: { db: Db; writers: Pick<WorkspaceWriters, "withLease"> }, project: Project, thread: Thread, detail: PullRequestDetail): Promise<void> {
   const cwd = thread.worktreePath!;
@@ -44,9 +45,7 @@ export async function moveReviewCheckout(deps: { db: Db; writers: Pick<Workspace
       await worktree.prune(project.rootPath);
       await worktree.addDetached(project.rootPath, { path: cwd, commit: detail.headSha });
     } else {
-      if (await isDirty(cwd))
-        throw new Error("The review conversation's copy of the pull request has changes, so it can't move to the new commits. Resolve that conversation to review in a fresh one.");
-      await worktree.checkoutDetached(cwd, detail.headSha);
+      await worktree.checkoutDetached(cwd, detail.headSha, { discard: true });
     }
     const tree = await treeHash(cwd);
     await pinObject(cwd, `${checkpointRefs(thread.id)}${tree}`, tree);

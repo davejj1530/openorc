@@ -34,6 +34,55 @@ import { docHref } from "../../data/docs";
     <p>When a command you typed finishes, the <strong>Changes</strong> tab refreshes, so edits you make by hand show up next to the agent's.</p>
   </section>
 
+  <section aria-labelledby="clipboard">
+    <h2 id="clipboard">Copy, paste, and find</h2>
+    <p>
+      Drag to select text, or double-click a word. Right-click the terminal for <strong>Copy</strong>, <strong>Paste</strong>, <strong>Select all</strong>, and <strong>Find</strong>.
+    </p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Action</th>
+            <th scope="col">macOS</th>
+            <th scope="col">Windows</th>
+            <th scope="col">Linux</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Copy</td>
+            <td><kbd>⌘C</kbd></td>
+            <td><kbd>Ctrl+C</kbd> with text selected, or <kbd>Ctrl+Shift+C</kbd></td>
+            <td><kbd>Ctrl+Shift+C</kbd></td>
+          </tr>
+          <tr>
+            <td>Paste</td>
+            <td><kbd>⌘V</kbd></td>
+            <td><kbd>Ctrl+V</kbd> or <kbd>Ctrl+Shift+V</kbd></td>
+            <td><kbd>Ctrl+Shift+V</kbd></td>
+          </tr>
+          <tr>
+            <td>Find</td>
+            <td><kbd>⌘F</kbd></td>
+            <td><kbd>Ctrl+Shift+F</kbd></td>
+            <td><kbd>Ctrl+Shift+F</kbd></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      On Windows, <kbd>Ctrl+C</kbd> with nothing selected still interrupts the running command. On Linux, the text you select is also what a middle click pastes.
+    </p>
+    <p>
+      Find searches everything the terminal still holds, starting from the newest output. Press <kbd>Enter</kbd> for the match before and <kbd>Shift+Enter</kbd> for the match after.
+    </p>
+    <p>
+      A web address in the output opens with <kbd>⌘</kbd>-click on macOS and <kbd>Ctrl</kbd>-click on Windows and Linux. It opens in the <a href={docHref("browser")}>Preview</a>. You can also right-click an address and choose
+      <strong>Open link</strong> or <strong>Copy link</strong>.
+    </p>
+  </section>
+
   <section aria-labelledby="lifetime">
     <h2 id="lifetime">How long a shell runs</h2>
     <p>

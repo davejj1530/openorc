@@ -301,6 +301,29 @@ describe("model reviews", () => {
     expect(tools.available(runId)).toBe(true);
   });
 
+  it("lets the reviewing agent read the draft and change or remove any comment in it, the user's included", async () => {
+    const { service, key, db, started } = setup();
+    await service.start(key, { agent: "codex", model: "gpt-6", effort: null, fastMode: false });
+    const runId = `run-${started()!.id}`;
+    const tools = service.agentTools();
+    expect(await tools.draft(runId)).toBe("No summary yet.\n\nNo comments yet.");
+    const theirs = service.comment({ ...key, commitId: repo.head, ...yours });
+    await tools.comment(runId, { path: "app.ts", line: 3, side: "new", body: "Name the retry count." });
+    await tools.summary(runId, "One small change.");
+    const own = pullReviews.get(db, key)!.comments.find((comment) => comment.author)!;
+    expect(await tools.draft(runId)).toBe(
+      ["Summary:\nOne small change.", "Comments: 2", `${theirs.id} on app.ts:3, written by the user\n${theirs.body}`, `${own.id} on app.ts:3, written by gpt-6\nName the retry count.`].join("\n\n"),
+    );
+    expect(await tools.editComment(runId, theirs.id, "Reworded for the user.")).toBe(`Draft comment on app.ts:3 changed.`);
+    expect(await tools.deleteComment(runId, own.id)).toBe("Draft comment removed.");
+    expect(pullReviews.get(db, key)!.comments).toMatchObject([{ id: theirs.id, body: "Reworded for the user.", author: null }]);
+    await expect(tools.editComment(runId, own.id, "Gone.")).rejects.toThrow("No comment of the draft has that id.");
+    await expect(tools.deleteComment(runId, own.id)).rejects.toThrow("No comment of the draft has that id.");
+    // A summary the user wrote shows with the model's beside it.
+    service.setSummary(key, repo.head, "Ship it.");
+    expect(await tools.draft(runId)).toContain("Summary:\nShip it.\n\nThe model's summary, offered beside it:\nOne small change.");
+  });
+
   it("keeps a summary the user wrote when the model sums up again, offering the model's beside it", async () => {
     const { service, key, db, started } = setup();
     await service.start(key, { agent: "codex", model: "gpt-6", effort: null, fastMode: false });

@@ -277,16 +277,25 @@ void test("pull request review tools exist only for runs reviewing a pull reques
   host.pullReview = {
     available: (runId) => runId === "review-run",
     diff: async (runId, { path, since }) => `diff for ${runId} ${path ?? "all"}${since ? ` since ${since}` : ""}`,
+    draft: async (runId) => `draft for ${runId}`,
     comment: async (runId, comment) => {
       received.push({ runId, comment });
       return "Draft comment saved.";
+    },
+    editComment: async (runId, id, body) => {
+      received.push({ runId, id, body });
+      return "Draft comment changed.";
+    },
+    deleteComment: async (runId, id) => {
+      received.push({ runId, id });
+      return "Draft comment removed.";
     },
     summary: async (runId, body) => {
       received.push({ runId, body });
       return "Summary saved.";
     },
   };
-  const names = ["pull_request_diff", "pull_request_comment", "pull_request_summary"];
+  const names = ["pull_request_diff", "pull_request_draft", "pull_request_comment", "pull_request_edit_comment", "pull_request_delete_comment", "pull_request_summary"];
   for (const name of names) assert.ok(internalToolNames.includes(name));
   const reviewer = await connect("review-run");
   assert.deepEqual(
@@ -301,10 +310,16 @@ void test("pull request review tools exist only for runs reviewing a pull reques
   await reviewer.callTool({ name: "pull_request_comment", arguments: { path: "src/app.ts", line: 12, body: "Close the server." } });
   await reviewer.callTool({ name: "pull_request_comment", arguments: { path: "src/app.ts", line: 12, side: "old", start_line: 10, body: "Keep the guard." } });
   assert.equal((await reviewer.callTool({ name: "pull_request_comment", arguments: { path: "src/app.ts", line: 0, body: "Nowhere." } })).isError, true);
+  assert.equal(resultText(await reviewer.callTool({ name: "pull_request_draft", arguments: {} })), "draft for review-run");
+  await reviewer.callTool({ name: "pull_request_edit_comment", arguments: { id: "comment-1", body: " Close the server first. " } });
+  assert.equal((await reviewer.callTool({ name: "pull_request_edit_comment", arguments: { id: "comment-1", body: " " } })).isError, true);
+  await reviewer.callTool({ name: "pull_request_delete_comment", arguments: { id: "comment-2" } });
   await reviewer.callTool({ name: "pull_request_summary", arguments: { body: "Nearly there." } });
   assert.deepEqual(received, [
     { runId: "review-run", comment: { path: "src/app.ts", line: 12, side: "new", body: "Close the server." } },
     { runId: "review-run", comment: { path: "src/app.ts", line: 12, side: "old", startLine: 10, startSide: "old", body: "Keep the guard." } },
+    { runId: "review-run", id: "comment-1", body: "Close the server first." },
+    { runId: "review-run", id: "comment-2" },
     { runId: "review-run", body: "Nearly there." },
   ]);
 });

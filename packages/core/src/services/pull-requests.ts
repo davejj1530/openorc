@@ -33,7 +33,7 @@ import {
 import { ACCOUNTS_KEPT_SEPARATE, accountsSeparate, threadAccount } from "./claude-account-separation.js";
 import { projectAccountPolicy, startingAccount } from "./project-claude-accounts.js";
 import { addReviewCheckout, fetchPullRequestHead, moveReviewCheckout } from "./pull-request-checkout.js";
-import { REVIEW_DIFF, agentAnchor, agentDiff, changedSince } from "./pull-request-diff.js";
+import { REVIEW_DIFF, agentAnchor, agentDiff, agentDraft, changedSince } from "./pull-request-diff.js";
 import type { ReviewerAppService } from "./reviewer-app.js";
 import type { RunService } from "./runs.js";
 import type { SystemService } from "./system.js";
@@ -70,6 +70,7 @@ type ReviewModel = Pick<ModelExecutionSettings, "agent"> & { claudeAccountId?: s
 /** Review diffs kept for agents between tool calls. */
 const CACHED_DIFFS = 16;
 const PROMPT_BODY_LIMIT = 20_000;
+const NO_DRAFT_COMMENT = "No comment of the draft has that id. Read the draft with pull_request_draft.";
 
 /** The first message of a review conversation: what the author asked for, as the reviewer would read it on GitHub. */
 function reviewPrompt(detail: PullRequestDetail): string {
@@ -411,6 +412,7 @@ export class PullRequestService {
       `This conversation reviews GitHub pull request #${review.number} for the user. Its code is checked out in your working folder at commit ${(thread.baseSha ?? "").slice(0, 12)}, on no branch. Its changes start from commit ${(review.baseCommit ?? "").slice(0, 12)}.`,
       "Read the changes with pull_request_diff, and the surrounding code in the checkout as needed. Look for bugs, security problems, data loss, races, missing error handling and missing tests, and for code that will be hard to change. Skip style points a formatter or linter would catch.",
       "Record each finding with pull_request_comment on the changed line it is about: one finding per comment, saying what is wrong, why it matters and a concrete fix. Finish with pull_request_summary, a short overall assessment.",
+      "Read the draft as it stands with pull_request_draft, the user's own comments included. When the user asks, or a finding no longer holds, change what a comment says with pull_request_edit_comment and remove one with pull_request_delete_comment.",
       "Reviewing is the whole task: do not propose an implementation plan. Your comments and summary are drafts. The user edits them and decides what to post to GitHub; you cannot post, push or change files. Keep your reply short: the findings live in the draft.",
     ].join("\n");
   }
@@ -425,6 +427,7 @@ export class PullRequestService {
         if (since === undefined) return agentDiff(full, filePath);
         return agentDiff(changedSince(full, await this.reviewDiff(review.projectId, since, head, true)), filePath, `this pull request since ${since}`);
       },
+      draft: async (runId) => agentDraft(this.requireReview(runId).review),
       comment: async (runId, comment) => {
         const { review, run, head } = this.requireCurrent(runId);
         const file = patchFiles(await this.reviewDiff(review.projectId, review.baseCommit, head)).find((entry) => entry.path === comment.path);
@@ -438,6 +441,17 @@ export class PullRequestService {
         });
         this.changed();
         return `Draft comment saved on ${reviewCommentPlace(added)}.`;
+      },
+      editComment: async (runId, id, body) => {
+        const edited = pullReviews.editComment(this.db, this.requireReview(runId).review, id, body);
+        if (!edited) throw new Error(NO_DRAFT_COMMENT);
+        this.changed();
+        return `Draft comment on ${reviewCommentPlace(edited)} changed.`;
+      },
+      deleteComment: async (runId, id) => {
+        if (!pullReviews.removeComment(this.db, this.requireReview(runId).review, id)) throw new Error(NO_DRAFT_COMMENT);
+        this.changed();
+        return "Draft comment removed.";
       },
       summary: async (runId, body) => {
         const { review } = this.requireCurrent(runId);

@@ -146,9 +146,11 @@ export const pullReviews = {
     const row = db.stmt("SELECT * FROM pull_request_review_comments WHERE id = ?").get(id) as unknown as CommentRow;
     return commentFromRow(row);
   },
-  removeComment(db: Db, key: PullReviewKey, id: string): void {
-    db.stmt("DELETE FROM pull_request_review_comments WHERE id = ? AND project_id = ? AND number = ?").run(id, key.projectId, key.number);
+  /** False when the comment is not in this review. */
+  removeComment(db: Db, key: PullReviewKey, id: string): boolean {
+    const removed = db.stmt("DELETE FROM pull_request_review_comments WHERE id = ? AND project_id = ? AND number = ?").run(id, key.projectId, key.number);
     touch(db, key, Date.now());
+    return removed.changes > 0;
   },
   /**
    * Removes what a posted review carried, as the draft stood when it was sent. A comment edited or added while it

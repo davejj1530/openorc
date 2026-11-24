@@ -36,7 +36,7 @@ Everything else is allowed in every mode, because it changes nothing outside Ope
 - Reading: `task_list`, `task_get`, `thread_list`, `thread_read`, `memory_search`, `task_context`, `execution_context`, the Orcling reads `orcling_recall`, `orcling_history`, `orcling_projects`, `orcling_project` and `orcling_thread_read`, browser `open`, `snapshot`, `screenshot` and `scroll`, and `device` `list` and `screenshot`.
 - Asking you: `ask_user`.
 - Documents: `task_create` in the backlog, `orcling_task_create`, `task_update`, `plan_write`, and `visualize`, which adds a view to the conversation.
-- Pull request reviews: `pull_request_diff`, and `pull_request_comment` and `pull_request_summary`, which write the review's drafts for you to post.
+- Pull request reviews: `pull_request_diff` and `pull_request_draft`, which read, and `pull_request_comment`, `pull_request_edit_comment`, `pull_request_delete_comment` and `pull_request_summary`, which write, change and remove the review's drafts, your own comments included, for you to post.
 - Task comments: `task_comment_intent`, which records whether a comment asks for work. The work itself starts only after the agent's reply.
 - Task Refine: `task_suggest`, which hands back a suggested title, description and labels. Beside `approve`, it is the only OpenOrc tool a Refine run has; the run is read-only, and the task changes only when you use the suggestion.
 - `approve`: Claude Code's permission prompt. Claude Code calls it, not the model, to hand each tool request to OpenOrc's approvals and mode rules.

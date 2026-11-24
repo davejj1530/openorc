@@ -235,7 +235,10 @@ export const internalToolNames = [
   "execution_context",
   "execution_switch",
   "pull_request_diff",
+  "pull_request_draft",
   "pull_request_comment",
+  "pull_request_edit_comment",
+  "pull_request_delete_comment",
   "pull_request_summary",
   ...orclingToolNames,
 ];

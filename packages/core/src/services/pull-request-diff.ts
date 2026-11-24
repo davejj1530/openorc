@@ -1,4 +1,4 @@
-import { commentAnchor, patchFiles, type CommentAnchor } from "@openorc/protocol";
+import { commentAnchor, patchFiles, reviewCommentPlace, type CommentAnchor, type PullRequestReview } from "@openorc/protocol";
 import type { PullReviewComment } from "@openorc/mcp";
 
 /** How much of a diff one tool result carries before the agent is asked to read it a file at a time. */
@@ -122,4 +122,18 @@ export function changedSince(full: string, since: string): string {
     })
     .map((file) => `${file}\n`)
     .join("");
+}
+
+/** The draft as a reviewing agent reads it: the summary, then each comment under its id, its lines and who wrote it. */
+export function agentDraft(review: Pick<PullRequestReview, "summary" | "modelSummary" | "comments">): string {
+  const summary = review.summary.trim();
+  const offered = review.modelSummary !== null && review.modelSummary !== review.summary ? review.modelSummary.trim() : "";
+  const parts = [summary ? `Summary:\n${summary}` : "No summary yet."];
+  if (offered) parts.push(`The model's summary, offered beside it:\n${offered}`);
+  parts.push(review.comments.length === 0 ? "No comments yet." : `Comments: ${review.comments.length}`);
+  for (const comment of review.comments) {
+    const writer = comment.author ? (comment.author.model ?? comment.author.agent) : "the user";
+    parts.push(`${comment.id} on ${reviewCommentPlace(comment)}, written by ${writer}\n${comment.body}`);
+  }
+  return parts.join("\n\n");
 }

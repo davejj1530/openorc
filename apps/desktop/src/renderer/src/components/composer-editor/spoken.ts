@@ -1,5 +1,6 @@
 import { HISTORY_MERGE_TAG, HISTORY_PUSH_TAG, type LexicalEditor } from "lexical";
 import { $readDraft, $selectionSpan, $writeDraft } from "./draft";
+import { SPOKEN } from "./shared";
 
 /** Words being dictated into the draft: `say` rewrites them as more is heard, `end` keeps them or takes them back out. */
 export interface Spoken {
@@ -10,7 +11,8 @@ export interface Spoken {
 /**
  * Starts spoken words where the caret was, in place of what was selected, with a space on either side where the
  * message needs one. However often they are rewritten, they undo as one step. The draft is not editable while it is
- * spoken into, so the page keeps no caret to follow: words spoken at the end keep the end in view.
+ * spoken into, so the page keeps no caret to follow: words spoken at the end keep the end in view, and each write
+ * says it is spoken, for the mark that stands in for the caret.
  */
 export function speakInto(editor: LexicalEditor): Spoken {
   const { text, span } = editor.getEditorState().read(() => ({ text: $readDraft().text, span: $selectionSpan() }));
@@ -19,9 +21,11 @@ export function speakInto(editor: LexicalEditor): Spoken {
   const after = span ? text.slice(Math.max(span.anchor, span.focus)) : "";
   let said = false;
   const write = (next: string, caret: number) => {
-    editor.update(() => $writeDraft(next, caret), { discrete: true, tag: said ? HISTORY_MERGE_TAG : HISTORY_PUSH_TAG });
+    editor.update(() => $writeDraft(next, caret), { discrete: true, tag: [SPOKEN, said ? HISTORY_MERGE_TAG : HISTORY_PUSH_TAG] });
     said = true;
   };
+  // Nothing is heard yet: the caret alone goes where the words will start, which is no step to undo.
+  editor.update(() => $writeDraft(text, from), { discrete: true, tag: [SPOKEN, HISTORY_MERGE_TAG] });
   return {
     say(words) {
       // Nothing heard, or nothing any more: what was selected stays as it was.

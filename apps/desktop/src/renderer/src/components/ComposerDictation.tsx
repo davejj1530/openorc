@@ -7,7 +7,6 @@ import {
   connectDictation,
   dismissDictationNotice,
   finishDictation,
-  onLevel,
   registerDictationTarget,
   startDictation,
   useDictation,
@@ -17,7 +16,8 @@ import {
 import { floatingGround } from "../lib/use-anchor-ground";
 import type { ComposerEditorHandle } from "./composer-editor/ComposerEditor";
 import { useComposerControl } from "./composer-read-only";
-import { Mic } from "./icons";
+import { DictationMeter } from "./DictationMeter";
+import { Check, Mic, X } from "./icons";
 import { Button } from "./ui";
 
 export interface ComposerDictationState {
@@ -136,9 +136,10 @@ function NoticeWords({ notice, model }: { notice: DictationNotice; model: Speech
 }
 
 /**
- * The composer's microphone, beside send. At rest it is the glyph; recording, it is four bars that move with the
- * person's voice, and pressing it finishes. What it has to say opens above it: the model to download the first time,
- * the microphone refused, or why a recording stopped.
+ * The composer's microphone, beside send. At rest it is the glyph. Dictating, the key opens into a pill: the voice as
+ * it was just heard, how long it has listened, and a check where the microphone was, since pressing it finishes.
+ * Cancel arrives beside it, so taking the words back is in reach without knowing Escape does it. What the microphone
+ * has to say opens above it: the model to download the first time, the microphone refused, or why a recording stopped.
  */
 export function ComposerDictation({ dictation }: { dictation: ComposerDictationState }) {
   const control = useComposerControl();
@@ -146,7 +147,6 @@ export function ComposerDictation({ dictation }: { dictation: ComposerDictationS
   const model = useDictation((s) => s.models[DEFAULT_SPEECH_MODEL.id]);
   const notice = useDictation((s) => (s.notice?.owner === dictation.owner ? s.notice : null));
   const { phase } = dictation;
-  useEffect(() => (phase ? onLevel((level) => button.current?.style.setProperty("--dictation-level", level.toFixed(2))) : undefined), [phase]);
   // The download the person asked for here has arrived: the offer has nothing left to say.
   const arrived = notice?.kind === "model" && model?.phase === "ready";
   useEffect(() => {
@@ -156,28 +156,36 @@ export function ComposerDictation({ dictation }: { dictation: ComposerDictationS
   const label = phase ? "Finish dictating" : "Dictate";
   return (
     <>
-      <button
-        ref={button}
-        type="button"
-        className="composer-icon-button composer-dictate"
-        data-state={phase ?? undefined}
-        aria-label={label}
-        aria-pressed={Boolean(phase)}
-        data-tip={control.reason ?? label}
-        disabled={control.disabled || phase === "finishing"}
-        onClick={dictation.toggle}
-      >
-        {phase ? (
-          <span className="composer-dictate-bars" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
+      <div className="composer-dictate-group" data-state={phase ?? undefined}>
+        <button type="button" className="composer-dictate-cancel" aria-label="Cancel dictation" data-tip="Cancel" disabled={!phase} onClick={cancelDictation}>
+          <X size={14} />
+        </button>
+        <button
+          ref={button}
+          type="button"
+          className="composer-dictate"
+          data-state={phase ?? undefined}
+          aria-label={label}
+          aria-pressed={Boolean(phase)}
+          data-tip={control.reason ?? label}
+          disabled={control.disabled || phase === "finishing"}
+          onClick={dictation.toggle}
+        >
+          <span className="composer-dictate-live" aria-hidden="true">
+            <span>
+              <DictationMeter active={Boolean(phase)} />
+            </span>
           </span>
-        ) : (
-          <Mic size={16} />
-        )}
-      </button>
+          <span className="composer-dictate-glyph" aria-hidden="true">
+            <span data-layer="rest">
+              <Mic size={16} />
+            </span>
+            <span data-layer="live">
+              <Check size={16} />
+            </span>
+          </span>
+        </button>
+      </div>
       <Popover.Root
         open={Boolean(notice)}
         onOpenChange={(open) => {

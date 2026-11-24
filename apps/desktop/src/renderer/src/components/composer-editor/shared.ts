@@ -7,6 +7,9 @@ export const EXTERNAL = "composer-external";
 /** An update that writes a pick from a list into the draft; the pills it makes land with a pop. */
 export const PICKED = "composer-picked";
 
+/** An update that writes dictated words into the draft; the mark of where they land follows it. */
+export const SPOKEN = "composer-spoken";
+
 /** Whether the person is in the draft now. An update made while they are not must not take focus or move the page's selection. */
 export const hasFocus = (editor: LexicalEditor): boolean => {
   const root = editor.getRootElement();

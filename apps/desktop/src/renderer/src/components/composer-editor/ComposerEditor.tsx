@@ -11,6 +11,7 @@ import { KeyboardPlugin } from "./plugins/KeyboardPlugin";
 import { LandingPlugin } from "./plugins/LandingPlugin";
 import { MarksPlugin } from "./plugins/MarksPlugin";
 import { ReadyPlugin } from "./plugins/ReadyPlugin";
+import { SpokenCaret } from "./plugins/SpokenCaretPlugin";
 import { PICKED } from "./shared";
 import { speakInto, type Spoken } from "./spoken";
 
@@ -134,6 +135,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         <EditorPlaceholder>
           <span className="composer-placeholder">{props.placeholder}</span>
         </EditorPlaceholder>
+        <SpokenCaret />
       </div>
       {/* Marks registers how it reads the words before Draft writes the first message in. */}
       <MarksPlugin sources={props.sources} />

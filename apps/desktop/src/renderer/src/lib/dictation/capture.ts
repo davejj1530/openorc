@@ -6,6 +6,8 @@ const SAMPLE_RATE = 16_000;
 
 export interface Capture {
   stop(): void;
+  /** How loud the microphone is at this moment, from 0 to 1. */
+  level(): number;
 }
 
 /**
@@ -27,17 +29,32 @@ export async function captureMicrophone(deviceId: string | null, onBlock: (pcm: 
     await context.audioWorklet.addModule(workletUrl);
     const blocks = new AudioWorkletNode(context, "pcm-capture", { numberOfOutputs: 0, channelCount: 1, channelCountMode: "explicit" });
     blocks.port.onmessage = (event: MessageEvent<Float32Array>) => onBlock(event.data);
-    context.createMediaStreamSource(stream).connect(blocks);
-    return { stop };
+    // The last thirtieth of a second, read whenever a frame is drawn, so what shows the voice moves as smoothly as the screen does.
+    const heard = new AnalyserNode(context, { fftSize: 512, smoothingTimeConstant: 0 });
+    const latest = new Float32Array(heard.fftSize);
+    const source = context.createMediaStreamSource(stream);
+    source.connect(blocks);
+    source.connect(heard);
+    const level = () => {
+      heard.getFloatTimeDomainData(latest);
+      return loudness(latest);
+    };
+    return { stop, level };
   } catch (error) {
     stop();
     throw error;
   }
 }
 
-/** How loud a block is, from 0 to 1, on a scale where ordinary speech fills most of it. */
-export function loudness(pcm: Float32Array): number {
+/** The hum of a quiet room, which reads as silence. */
+const ROOM = 0.003;
+
+/**
+ * How loud samples are, from 0 to 1. The scale follows the ear more than the meter: quiet speech already shows, and
+ * ordinary speech fills most of it without a raised voice pinning it at the top.
+ */
+function loudness(pcm: Float32Array): number {
   let sum = 0;
   for (const sample of pcm) sum += sample * sample;
-  return Math.min(1, Math.sqrt(sum / pcm.length) * 8);
+  return Math.min(1, Math.sqrt(Math.max(0, Math.sqrt(sum / pcm.length) - ROOM) * 4));
 }

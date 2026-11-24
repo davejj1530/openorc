@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { DEFAULT_SPEECH_MODEL, type DictationEvent, type SpeechModelState } from "../../../../shared/dictation";
 import type { Spoken } from "../../components/composer-editor/ComposerEditor";
-import { captureMicrophone, loudness, type Capture } from "./capture";
+import { captureMicrophone, type Capture } from "./capture";
 
 /** A recording opens the microphone, hears the person, then waits for the model's last words. */
 export type DictationPhase = "starting" | "listening" | "finishing";
@@ -53,13 +53,9 @@ interface Recording {
 }
 
 let recording: Recording | null = null;
-const meters = new Set<(level: number) => void>();
 
-/** How loud the microphone is, block by block, for whoever draws it; returns the unsubscribe. */
-export function onLevel(meter: (level: number) => void): () => void {
-  meters.add(meter);
-  return () => void meters.delete(meter);
-}
+/** How loud the microphone is at this moment, from 0 to 1, for whoever draws it; 0 while nothing records. */
+export const dictationLevel = (): number => recording?.capture?.level() ?? 0;
 
 class MicrophoneRefused extends Error {}
 
@@ -123,11 +119,7 @@ export async function startDictation(owner: string, speak: () => Spoken | undefi
     if ((await api.microphone()) === "denied") throw new MicrophoneRefused();
     if (recording !== current) return;
     await api.start(id, DEFAULT_SPEECH_MODEL.id);
-    const capture = await captureMicrophone(microphone, (pcm) => {
-      api.audio(id, pcm);
-      const level = loudness(pcm);
-      for (const meter of meters) meter(level);
-    });
+    const capture = await captureMicrophone(microphone, (pcm) => api.audio(id, pcm));
     if (recording !== current) {
       capture.stop();
       api.cancel(id);

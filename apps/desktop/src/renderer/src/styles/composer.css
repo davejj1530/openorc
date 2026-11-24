@@ -196,14 +196,9 @@
   pointer-events: none;
 }
 
-/* The microphone. At rest a bare round key. Dictating, it opens leftward into a pill on the control fill: the voice
-   and the time come out of a blur as it widens, and its glyph turns from the microphone to a check in place. Finished,
-   they blur away first and the pill folds back. */
-.composer-dictate-group {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
+/* The microphone. At rest a bare round key. Dictating, it opens leftward into one pill on the control fill: Cancel,
+   the voice, the recording's dot and time come out of a blur as it widens, and the key's glyph turns from the
+   microphone to a check in place. Finished, they fade and the pill folds back into the key. */
 .composer-dictate {
   position: relative;
   isolation: isolate;
@@ -212,11 +207,7 @@
   flex-shrink: 0;
   height: var(--control-sm);
   border-radius: var(--radius-pill);
-  color: var(--ink-4);
-  transition:
-    background-color var(--duration-quick) var(--ease-out),
-    color var(--duration-quick) var(--ease-out),
-    padding var(--duration-resize) var(--ease-out);
+  transition: padding var(--duration-resize) var(--ease-out);
 }
 /* The pill's fill is a layer of its own, so it stays while the pill folds and goes only once it is nearly a key again. */
 .composer-dictate::before {
@@ -233,27 +224,46 @@
   opacity: 1;
   transition: opacity var(--duration-quick) var(--ease-out);
 }
-.composer-dictate:hover:not(:disabled) {
+/* Cancel sits two points in from the pill's edge, a circle inside its round end. */
+.composer-dictate[data-state] {
+  padding-left: 2px;
+}
+.composer-dictate-key,
+.composer-dictate-cancel {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.composer-dictate-key {
+  width: var(--control-sm);
+  height: var(--control-sm);
+  color: var(--ink-4);
+}
+.composer-dictate-cancel {
+  width: 24px;
+  height: 24px;
+  color: var(--ink-3);
+}
+.composer-dictate[data-state] > .composer-dictate-key {
+  color: var(--ink);
+}
+:is(.composer-dictate-key, .composer-dictate-cancel):hover:not(:disabled) {
   background-color: var(--surface-2);
   color: var(--ink);
 }
-.composer-dictate:disabled {
+.composer-dictate-key:disabled {
   opacity: 0.6;
   pointer-events: none;
 }
-.composer-dictate[data-state] {
-  padding-left: 10px;
-  background-color: transparent;
-  color: var(--ink);
-}
-.composer-dictate[data-state]:hover:not(:disabled)::before {
-  background-image: linear-gradient(var(--surface-2), var(--surface-2));
-}
 /* The words are still arriving: the pill keeps its place and its ink, and takes no press. */
-.composer-dictate[data-state]:disabled {
+.composer-dictate[data-state] > .composer-dictate-key:disabled {
   opacity: 1;
 }
-/* The voice and the time open to their own width: a grid track from 0fr to 1fr. */
+/* What the pill holds opens to its own width: a grid track from 0fr to 1fr. */
 .composer-dictate-live {
   display: grid;
   grid-template-columns: 0fr;
@@ -269,7 +279,7 @@
   min-width: 0;
   overflow: hidden;
 }
-/* They arrive out of a blur once the pill has room for them, the time a beat after the voice, and leave by fading
+/* The parts arrive out of a blur once the pill has room for them, one a beat after another, and leave by fading
    alone: a blur would be cut off square by the pill as it folds. */
 .composer-dictate-live > span > * {
   flex-shrink: 0;
@@ -293,7 +303,38 @@
 .composer-dictate-wave {
   width: 64px;
   height: 16px;
+  color: var(--ink);
   mask-image: linear-gradient(to right, transparent, #000 20px, #000 calc(100% - 6px), transparent);
+}
+.composer-dictate-clock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* The dot every recorder shows. It breathes while the microphone is open and rests dim before and after. */
+.composer-dictate-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--recording);
+  opacity: 0.35;
+}
+.composer-dictate[data-state="listening"] .composer-dictate-dot {
+  animation: composer-dictate-breathe 1.6s ease-in-out infinite alternate;
+}
+@keyframes composer-dictate-breathe {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.5;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer-dictate[data-state="listening"] .composer-dictate-dot {
+    animation: none;
+    opacity: 1;
+  }
 }
 .composer-dictate-time {
   min-width: 28px;
@@ -302,14 +343,7 @@
   line-height: 16px;
   font-variant-numeric: tabular-nums;
 }
-.composer-dictate-glyph {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: var(--control-sm);
-  height: var(--control-sm);
-}
-.composer-dictate-glyph > [data-layer] {
+.composer-dictate-key > [data-layer] {
   grid-area: 1 / 1;
   display: grid;
   place-items: center;
@@ -319,40 +353,10 @@
     opacity var(--duration-leave) var(--ease-out),
     transform var(--duration-confirm) var(--ease-overshoot);
 }
-.composer-dictate:not([data-state]) > .composer-dictate-glyph > [data-layer="rest"],
-.composer-dictate[data-state] > .composer-dictate-glyph > [data-layer="live"] {
+.composer-dictate:not([data-state]) > .composer-dictate-key > [data-layer="rest"],
+.composer-dictate[data-state] > .composer-dictate-key > [data-layer="live"] {
   opacity: 1;
   transform: none;
-}
-/* Cancel: a bare round key that takes no room at rest and lands beside the pill as it opens. */
-.composer-dictate-cancel {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  overflow: hidden;
-  width: 0;
-  height: var(--control-sm);
-  border-radius: var(--radius-pill);
-  color: var(--ink-4);
-  opacity: 0;
-  transform: scale(0.6);
-  transition:
-    width var(--duration-resize) var(--ease-out),
-    margin var(--duration-resize) var(--ease-out),
-    opacity var(--duration-leave) var(--ease-out),
-    transform var(--duration-confirm) var(--ease-overshoot),
-    background-color var(--duration-quick) var(--ease-out),
-    color var(--duration-quick) var(--ease-out);
-}
-.composer-dictate-group[data-state] > .composer-dictate-cancel {
-  width: var(--control-sm);
-  margin-right: 4px;
-  opacity: 1;
-  transform: none;
-}
-.composer-dictate-cancel:hover:not(:disabled) {
-  background-color: var(--surface-2);
-  color: var(--ink);
 }
 /* What the microphone has to say: a title, a line under it, and its one action at the end. */
 .composer-dictate-popup {

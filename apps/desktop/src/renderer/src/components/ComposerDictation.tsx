@@ -193,11 +193,11 @@ function NoticeWords({ notice, model }: { notice: DictationNotice; model: Speech
 }
 
 /**
- * The composer's microphone, beside send. At rest it is the glyph. Dictating, the key opens into a pill: the voice as
- * it was just heard, how long it has listened, and a check where the microphone was, since pressing it finishes.
- * Cancel arrives beside it, so taking the words back is in reach without knowing Escape does it. What the microphone
- * has to say opens above it: the model to download the first time, the key OpenAI needs, the microphone refused, or
- * why a recording stopped.
+ * The composer's microphone, beside send. At rest it is the glyph. Dictating, the key opens into one pill: Cancel at
+ * its start, so taking the words back is in reach without knowing Escape does it, then the voice as it was just
+ * heard, the red dot of a recording with how long it has listened, and a check where the microphone was, which
+ * finishes. What the microphone has to say opens above it: the model to download the first time, the key OpenAI
+ * needs, the microphone refused, or why a recording stopped.
  */
 export function ComposerDictation({ dictation }: { dictation: ComposerDictationState }) {
   const control = useComposerControl();
@@ -214,33 +214,30 @@ export function ComposerDictation({ dictation }: { dictation: ComposerDictationS
   const label = phase ? "Finish dictating" : "Dictate";
   return (
     <>
-      <div className="composer-dictate-group" data-state={phase ?? undefined}>
-        <button type="button" className="composer-dictate-cancel" aria-label="Cancel dictation" data-tip="Cancel" disabled={!phase} onClick={cancelDictation}>
-          <X size={14} />
-        </button>
+      <div className="composer-dictate" data-state={phase ?? undefined}>
+        <span className="composer-dictate-live">
+          <span>
+            <button type="button" className="composer-dictate-cancel" aria-label="Cancel dictation" data-tip="Cancel" disabled={!phase} onClick={cancelDictation}>
+              <X size={14} />
+            </button>
+            <DictationMeter active={Boolean(phase)} />
+          </span>
+        </span>
         <button
           ref={button}
           type="button"
-          className="composer-dictate"
-          data-state={phase ?? undefined}
+          className="composer-dictate-key"
           aria-label={label}
           aria-pressed={Boolean(phase)}
           data-tip={control.reason ?? label}
           disabled={control.disabled || phase === "finishing"}
           onClick={dictation.toggle}
         >
-          <span className="composer-dictate-live" aria-hidden="true">
-            <span>
-              <DictationMeter active={Boolean(phase)} />
-            </span>
+          <span data-layer="rest">
+            <Mic size={16} />
           </span>
-          <span className="composer-dictate-glyph" aria-hidden="true">
-            <span data-layer="rest">
-              <Mic size={16} />
-            </span>
-            <span data-layer="live">
-              <Check size={16} />
-            </span>
+          <span data-layer="live">
+            <Check size={16} />
           </span>
         </button>
       </div>

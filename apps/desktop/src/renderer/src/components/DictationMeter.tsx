@@ -41,7 +41,7 @@ function draw(canvas: HTMLCanvasElement, bars: readonly Bar[], now: number): voi
 
 /**
  * What dictation hears, as it hears it: the voice of the last moments as bars moving off to the left, and how long it
- * has listened. The bars are the microphone's real loudness, so a pause is a row of dots and a failed microphone looks
+ * has listened, behind the red dot of a recording. The bars are the microphone's real loudness, so a pause is a row of dots and a failed microphone looks
  * like one. Drawn outside React, a frame at a time. When the recording ends the last frame stays, for the pill to fold
  * over. Under reduced motion the strip holds still as dots and only the time counts.
  */
@@ -88,8 +88,11 @@ export function DictationMeter({ active }: { active: boolean }) {
   return (
     <>
       <canvas ref={canvas} className="composer-dictate-wave" />
-      <span ref={time} className="composer-dictate-time">
-        0:00
+      <span className="composer-dictate-clock">
+        <span className="composer-dictate-dot" />
+        <span ref={time} className="composer-dictate-time">
+          0:00
+        </span>
       </span>
     </>
   );

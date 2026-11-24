@@ -5,7 +5,7 @@
  */
 import "../../styles/hero-scene.css";
 import ChangeLine from "../hero/ChangeLine.astro";
-import ProductIcon from "../hero/ProductIcon.astro";
+import Notice from "../hero/Notice.astro";
 import Prose from "../hero/Prose.astro";
 import Receipt from "../hero/Receipt.astro";
 import ThreadPane from "../hero/ThreadPane.astro";
@@ -19,13 +19,7 @@ const { a } = threads;
 <div class="hs-mock hs-mock-message">
   <ThreadPane id="a" title={a.title} model={{ harness: a.harness, label: a.label, effort: a.effort }} permission={a.permission} placeholder={`Message ${a.agent}…`} changes changeStat={a.change}>
     <div class="hs-turn">
-      <div class="hs-notice">
-        <ProductIcon name="workMessage" />
-        <span class="hs-notice-body">
-          <span class="hs-notice-head">{a.notice.head}</span>
-          <span class="hs-notice-toggle">Show details</span>
-        </span>
-      </div>
+      <Notice from={a.notice.from} text={a.notice.text} />
       <Receipt changes={`+${a.change.added} in 1 file`} />
       <div class="hs-reply"><Prose text={a.result} /></div>
       <ChangeLine files={1} added={a.change.added} removed={a.change.removed} undo />

@@ -12,6 +12,7 @@
  */
 import ChangeLine from "./ChangeLine.astro";
 import FileChips from "./FileChips.astro";
+import Notice from "./Notice.astro";
 import ProductIcon from "./ProductIcon.astro";
 import Prose from "./Prose.astro";
 import Receipt from "./Receipt.astro";
@@ -97,13 +98,7 @@ const head = { journey: handoff };
 
       <!-- The answer starts a new turn that builds the page against the new shape; the notice opens it. -->
       <div class="hs-turn" data-grow {...at(">bSent")}>
-        <div class="hs-notice" data-anchor="a-notice">
-          <ProductIcon name="workMessage" />
-          <span class="hs-notice-body">
-            <span class="hs-notice-head">{a.notice.head}</span>
-            <span class="hs-notice-toggle">Show details</span>
-          </span>
-        </div>
+        <Notice data-anchor="a-notice" from={a.notice.from} text={a.notice.text} />
         <Receipt
           {...head}
           grow
@@ -118,7 +113,7 @@ const head = { journey: handoff };
         </ol>
         <div class="hs-reply" data-grow {...at(">aResultStart")}><Prose text={a.result} stream="aResultStart~aResultEnd" /></div>
         <ChangeLine grow {...at(">aFinish")} files={1} added={a.change.added} removed={a.change.removed} undo />
-        <TurnEnd {...head} data-grow {...at(">aWork")} clock={{ from: "aWork", writing: "aResultStart", to: "aFinish" }} />
+        <TurnEnd {...head} data-grow="" {...at(">aWork")} clock={{ from: "aWork", writing: "aResultStart", to: "aFinish" }} />
       </div>
     </ThreadPane>
 
@@ -150,15 +145,7 @@ const head = { journey: handoff };
           </Step>
           <Step {...head} grow {...at(">bDone")} title={b.phases.resume} live=">bDone" />
         </ol>
-        <div class="hs-notice" data-grow data-anchor="b-notice" {...at(">aSent")}>
-          <ProductIcon name="workMessage" />
-          <span class="hs-notice-body">
-            <span class="hs-notice-head">{b.notice.head}</span>
-            <span class="hs-notice-details" data-grow {...at(">bDetails")}>{b.notice.details}</span>
-            <span class="hs-notice-toggle" {...at("<bDetails")}>Show details</span>
-            <span class="hs-notice-toggle" {...at(">bDetails")}>Hide details</span>
-          </span>
-        </div>
+        <Notice grow data-anchor="b-notice" {...at(">aSent")} from={b.notice.from} text={b.notice.text} />
         <TurnEnd {...head} clock={{ from: "bStart" }} />
       </div>
     </ThreadPane>

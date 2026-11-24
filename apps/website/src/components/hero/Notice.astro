@@ -1,0 +1,20 @@
+---
+/** A message from another thread, as the app's SystemNotice draws it: who it is from, then what it said. */
+import ProductIcon from "./ProductIcon.astro";
+
+interface Props extends Record<string, unknown> {
+  /** The block opens and closes with the scene (scripts/hero-motion.ts). */
+  grow?: boolean;
+  from: string;
+  text: string;
+}
+const { from, text, grow, ...rest } = Astro.props;
+---
+
+<div class="hs-notice" data-grow={grow ? "" : undefined} {...rest}>
+  <ProductIcon name="workMessage" />
+  <span class="hs-notice-body">
+    <span class="hs-notice-from">From <span class="hs-notice-name">{from}</span></span>
+    <span class="hs-notice-words">{text}</span>
+  </span>
+</div>

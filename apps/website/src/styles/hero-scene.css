@@ -1027,15 +1027,14 @@
   min-width: 0;
   color: var(--hs-muted);
 }
-.hs-notice-details {
-  margin-top: calc(4 * var(--u));
-  white-space: pre-wrap;
-}
-.hs-notice-toggle {
-  margin-top: calc(4 * var(--u));
+.hs-notice-from {
   color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+}
+.hs-notice-name {
+  color: var(--hs-ink);
+}
+.hs-notice-words {
+  margin-top: calc(4 * var(--u));
 }
 
 /* A turn's edits closed to one line (ChangeCard.tsx). */

@@ -5,13 +5,10 @@
  * on is changing there, and asks that thread with thread_send before building.
  * The message joins Codex's running turn; Codex answers from its unmerged work
  * and goes back to the migration, and the page is built against the new shape.
- * Notices carry the sender's full thread id, as `threads.send` writes them.
+ * A message reads as the app draws it: who it is from, then what it said.
  */
 import type { Journey, Timeline } from "./timeline";
 import { models } from "./workspace";
-
-const billingId = "8d3f1a9c-2b47-4e6d-9a51-c07e3b2f6d18";
-const plansId = "4b7e2c90-6f1d-4a38-b5c2-9e0d71a3f845";
 
 export const threads = {
   a: {
@@ -28,8 +25,8 @@ export const threads = {
     typo: { at: "Build the billing page: cur".length, key: "t" },
     asked: "This page reads `user.plan`, but the **Plans migration** thread is reworking it right now in its own worktree. I asked for the new shape before building.",
     notice: {
-      head: `Message from the thread "Plans migration" (id ${plansId}):`,
-      details: 'It becomes user.subscription (plan, status, trialEndsAt) when this migration lands. Trial users have no card yet, so hide invoices while the status is "trialing".',
+      from: "Plans migration",
+      text: 'It becomes user.subscription (plan, status, trialEndsAt) when this migration lands. Trial users have no card yet, so hide invoices while the status is "trialing".',
     },
     /** The message as it travels, shortened to fit its chip. */
     flight: "What does the plan look like after your migration?",
@@ -48,8 +45,8 @@ export const threads = {
     /** Still working on this when the scene opens. */
     request: "Move plans into subscriptions with a status.",
     notice: {
-      head: `Message from the thread "Billing page" (id ${billingId}):`,
-      details: "The billing page is about to read the user’s plan. What does it look like after your migration?",
+      from: "Billing page",
+      text: "The billing page is about to read the user’s plan. What does it look like after your migration?",
     },
     flight: "user.subscription, and no invoices on trials",
     answer: "It becomes `user.subscription`, with `status` and `trialEndsAt`. Trial users have no card yet, so I told Billing page to hide invoices for them. Back to the migration.",
@@ -87,7 +84,6 @@ const wide: Timeline = {
   /** When the migration turn began, before the scene opens. */
   bStart: -38,
   bWork: 7.4,
-  bDetails: 8.3,
   bThought: 8.5,
   bSending: 9.5,
   bSent: 10.2,

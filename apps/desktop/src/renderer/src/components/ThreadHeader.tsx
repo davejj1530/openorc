@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { snoozeWakeLabel, threadActivity } from "@openorc/client";
+import { snoozeWakeLabel, threadActivity, togetherActivity } from "@openorc/client";
 import type { ThreadSummary as Thread } from "@openorc/protocol";
 import { isSubagentThread } from "@openorc/protocol";
 import { useCallback, useRef } from "react";
@@ -139,10 +139,13 @@ function ThreadMenu({ thread, renaming, onRename }: { thread: Thread; renaming: 
   );
 }
 
-/** Activity, the pull request and snooze, as faint words with small marks. */
+/**
+ * Activity, the pull request and snooze, as faint words with small marks. A running turn is the tab's and the work
+ * rail's to show, so it is named here only when a teammate is in the thread and the words say whose turn it is.
+ */
 function ThreadFacts({ thread: t }: { thread: Thread }) {
   const snoozed = t.snoozedUntil && t.snoozedUntil > Date.now();
-  const activity = threadActivity(t);
+  const activity = t.activity === "running" ? togetherActivity(t) : threadActivity(t);
   return (
     <>
       {!t.teamInstanceId && activity ? (

@@ -5,6 +5,7 @@ import {
   ownerMark,
   rowFacts,
   subagentStatusLabel,
+  threadMarkMotion,
   threadStatus,
   threadTreeStatus,
   useSidebarNow,
@@ -24,6 +25,7 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { useMentionWords } from "../lib/mention-words";
 import { AccountFace } from "./AccountFace";
 import { ThreadMenuItems, type MenuParts } from "./ThreadActions";
+import { StateMark } from "./StateMark";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import { CircleCheck, CircleDashed, Cloud, X } from "./icons";
 import { menuPopup } from "./menu";
@@ -31,7 +33,15 @@ import { menuPopup } from "./menu";
 /** The project a sidebar row names, in a group that holds many projects. */
 export type RowProject = { name: string };
 
-type ThreadRowProps = { thread: ThreadSummary; subthreads?: ThreadStatus | null; active: boolean; project?: RowProject; compact?: boolean };
+type ThreadRowProps = {
+  thread: ThreadSummary;
+  subthreads?: ThreadStatus | null;
+  active: boolean;
+  project?: RowProject;
+  compact?: boolean;
+  /** Its sub threads show under it: with no state of its own it wears the resting cube, for their tree to hang from. */
+  roots?: boolean;
+};
 
 /** Whether a row has a state to mark: its own or its sub threads' status, a subagent's result, an unread mention, or a pull request. */
 export function rowHasState(thread: ThreadSummary, subthreads: ThreadStatus | null): boolean {
@@ -43,7 +53,7 @@ export function rowHasState(thread: ThreadSummary, subthreads: ThreadStatus | nu
  * A row's state, its title, then right-aligned facts. The state leads every row in one column, where a sub thread's
  * branch ends. Parent status includes its children; all open panes share the selected fill.
  */
-export function ThreadRow({ thread, subthreads = null, active, project, compact = false }: ThreadRowProps) {
+export function ThreadRow({ thread, subthreads = null, active, project, compact = false, roots = false }: ThreadRowProps) {
   const navigate = useRouter((s) => s.navigate);
   const addPane = useRouter((s) => s.addThreadPane);
   // Every visible work pane is marked alike; aria-current names only the focused one.
@@ -83,7 +93,7 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
           />
         }
       >
-        <ThreadLine thread={thread} subthreads={subthreads} facts={facts} run={run} />
+        <ThreadLine thread={thread} subthreads={subthreads} facts={facts} run={run} roots={roots} />
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <CoversPreview />
@@ -105,7 +115,19 @@ function rowDescription(thread: ThreadSummary, detail: string): string {
 }
 
 /** Every row keeps the lead slot, marked or not, so titles share one line and states one column. */
-function ThreadLine({ thread, subthreads, facts, run }: { thread: ThreadSummary; subthreads: ThreadStatus | null; facts: ReturnType<typeof rowFacts>; run: RunTranscript | undefined }) {
+function ThreadLine({
+  thread,
+  subthreads,
+  facts,
+  run,
+  roots,
+}: {
+  thread: ThreadSummary;
+  subthreads: ThreadStatus | null;
+  facts: ReturnType<typeof rowFacts>;
+  run: RunTranscript | undefined;
+  roots: boolean;
+}) {
   const { starter, cloud } = facts;
   const slots = [
     { kind: "starter", mark: starter ? <AccountFace name={starter.name} image={starter.image} className="thread-preview-face" /> : null },
@@ -118,10 +140,13 @@ function ThreadLine({ thread, subthreads, facts, run }: { thread: ThreadSummary;
       ) : null,
     },
   ].filter((slot) => slot.mark !== null);
+  // With nothing to say, a row whose sub threads show still wears the resting cube: their tree hangs from it.
+  const resting = roots ? <StateMark motion={threadMarkMotion("resting")} /> : null;
+  const lead = rowHasState(thread, subthreads) ? <SidebarThreadMark thread={thread} subthreads={subthreads} run={run} /> : resting;
   return (
     <span className="thread-preview-heading">
       <span className="thread-lead-slot" data-fact="state">
-        {rowHasState(thread, subthreads) ? <SidebarThreadMark thread={thread} subthreads={subthreads} run={run} /> : null}
+        {lead}
       </span>
       <span className="thread-preview-title" data-tip-title>
         {thread.title}

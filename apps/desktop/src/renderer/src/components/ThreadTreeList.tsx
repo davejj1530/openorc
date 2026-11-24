@@ -40,8 +40,8 @@ export function ThreadTreeList({
     const below = subthreads.get(thread.id) ?? null;
     return (
       <div key={thread.id} className="sidebar-tree-node" data-child={depth > 0 || undefined}>
-        <BranchRow row={row} marked={rowHasState(thread, below)} onToggle={hasChildren ? () => toggle(thread.id, expanded) : undefined}>
-          <ThreadRow thread={thread} subthreads={below} active={activeId === thread.id} compact={depth > 0} project={project} />
+        <BranchRow row={row} marked={rowHasState(thread, below) || (hasChildren && expanded)} onToggle={hasChildren ? () => toggle(thread.id, expanded) : undefined}>
+          <ThreadRow thread={thread} subthreads={below} active={activeId === thread.id} compact={depth > 0} project={project} roots={hasChildren && expanded} />
         </BranchRow>
         {expanded && hasChildren ? (
           <div className="sidebar-tree-children" data-capped={depth >= 3 || undefined}>

@@ -11,6 +11,7 @@ flowchart LR
   UI[React renderer] <-->|Typed RPC and pushes over MessagePort| CORE[Core utility process]
   MAIN[Electron main] -->|Creates windows and transfers ports| UI
   MAIN -->|Starts and shuts down| CORE
+  MAIN -->|Starts while someone dictates| SPEECH[Speech utility process]
   UI <-->|Preload bridge| MAIN
   CORE --> DB[(Local SQLite ledger)]
   CORE --> WORKERS[Embedding, formatting, and code intelligence workers]
@@ -23,7 +24,7 @@ flowchart LR
   PHONE <-->|Its own session, HTTPS and a live socket| CLOUD
 ```
 
-- **Main** owns windows, OS integration, terminal and browser panes, the device screen stream, and protected storage for every secret the core saves. It starts the utility process and hands MessagePorts to renderers.
+- **Main** owns windows, OS integration, terminal and browser panes, the device screen stream, and protected storage for every secret the core saves. It starts the utility process and hands MessagePorts to renderers. Dictation is main's as well: it keeps the speech models in the profile and runs them in a second utility process, started by the first recording and ended after a quiet while, so dictation is the same wherever the core runs. A window records the microphone and sends samples; the words come back to that window. Where the person chose OpenAI for dictation, main sends the samples to OpenAI's live transcription over a socket it holds, on the person's own API key, which main keeps in protected storage and no window reads.
 - **Preload** exposes desktop capabilities to the sandboxed, context-isolated renderer.
 - **Renderer** presents application state, sends RPC requests, and consumes frames and invalidations. Its client state comes from `@openorc/client`, which the phone shares: query tags, the transcript projection, and thread, model, and theme logic. TanStack Query holds requested data; streaming state is maintained separately for live transcripts.
 - **Core utility process** hosts application workflows, persistence, provider processes, the MCP server, the phone listener, and the OpenOrc Cloud account. Embedding, Prettier formatting, and the TypeScript language service for the code editor run in worker threads. The Electron entry point supplies transport, protected-storage adapters, a terminal for interactive CLIs, and these workers to `OpenOrc.create`.

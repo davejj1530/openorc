@@ -638,7 +638,7 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   container: thread-row / inline-size;
 }
 .thread-preview-title {
-  flex: 0 1 auto;
+  flex: 1;
   min-width: 0;
   font-size: var(--text-base);
   line-height: 16px;
@@ -660,7 +660,6 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
 /* Present facts pack against the count line; absent facts leave their space to the title. */
 .thread-facts {
   display: grid;
-  margin-left: auto;
   grid-auto-flow: column;
   grid-auto-columns: 16px;
   gap: 4px;

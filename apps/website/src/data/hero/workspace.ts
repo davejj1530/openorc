@@ -16,6 +16,8 @@ export const projects: { name: string; folded?: boolean }[] = [{ name: "studio" 
  * `true`. Waiting outranks working, as the app's status does.
  */
 export interface SidebarRow {
+  /** The day its latest work files it under in its project. Today's rows lead with no label. */
+  day?: "yesterday";
   /** Rows the scene addresses: the current view, or a thread whose state changes. */
   id?: string;
   title: string;
@@ -47,6 +49,6 @@ export const branches = {
 export const otherThreads: SidebarRow[] = [
   { title: "Make the first five minutes count" },
   { title: "Simplify the design tokens", branch: branches.tokens },
-  { title: "Build a thoughtful onboarding" },
+  { title: "Build a thoughtful onboarding", day: "yesterday" },
   { title: "Tell the product story", project: "website" },
 ];

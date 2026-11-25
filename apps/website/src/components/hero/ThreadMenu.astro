@@ -13,19 +13,19 @@ interface Props {
 const { branch, place = "Worktree" } = Astro.props;
 type Row = { icon: IconName; label: string; tag?: string; more?: boolean; danger?: boolean };
 const groups: Row[][] = [
-  [{ icon: "branch", label: branch, tag: place, more: true }],
+  [{ icon: "gitBranch", label: branch, tag: place, more: true }],
   [
     { icon: "pencil", label: "Rename" },
     { icon: "pin", label: "Pin" },
     { icon: "alarmClock", label: "Snooze", more: true },
   ],
   [
-    { icon: "compose", label: "New subthread" },
+    { icon: "penSquare", label: "New subthread" },
     { icon: "gitFork", label: "Fork" },
     { icon: "appWindow", label: "Open in new window" },
   ],
   [{ icon: "circleCheck", label: "Resolve" }],
-  [{ icon: "trash", label: "Delete", danger: true }],
+  [{ icon: "trash2", label: "Delete", danger: true }],
 ];
 ---
 

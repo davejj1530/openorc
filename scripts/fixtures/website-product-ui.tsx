@@ -268,6 +268,7 @@ async function main() {
     if (method === "tasks.get") return tasks.find((t) => t.id === params.id) ?? tasks[0];
     if (method === "tasks.update") return Object.assign(tasks.find((t) => t.id === params.id) ?? tasks[0], params.patch, { updatedAt: Date.now() });
     if (method === "tasks.executionThread") return null;
+    if (method === "tasks.refine.get") return null;
     if (method === "review.threadDiff" || method === "review.projectDiff" || method === "review.diff") return String(params.threadId).startsWith("orcling-") ? { ...diff, files: [], patch: "" } : diff;
     if (method === "git.threadPushState") return { branch: "main", blocked: null, published: true, unpushedCount: 0, unpushed: [], busy: false };
     if (method === "agents.models") return models;
@@ -558,7 +559,21 @@ function addWorkingStates({ base, threads, now, response, seed, running }: { bas
       id: "w-edit",
       kind: "tool",
       name: "Edit",
-      input: { file_path: "/Projects/studio/src/Welcome.tsx", old_string: "<p>No projects yet.</p>", new_string: "<h1>Make yourself at home.</h1>" },
+      // The same change the Changes panel shows, so the step, the proof and the change card count alike.
+      input: {
+        file_path: "/Projects/studio/src/Welcome.tsx",
+        edits: [
+          { old_string: "import { ProjectPicker } from './ProjectPicker';", new_string: "import { ProjectPicker } from './ProjectPicker';\nimport { Button } from './ui';" },
+          {
+            old_string: '    <main className="empty">\n      <p>No projects yet.</p>',
+            new_string: '    <main className="welcome">\n      <h1>Make yourself at home.</h1>\n      <p>Connect a project to start building.</p>',
+          },
+          {
+            old_string: "      <ProjectPicker />",
+            new_string: "      <ProjectPicker />\n      <Button onClick={startConversation}>\n        Start a conversation\n      </Button>\n      <KeyboardHint />",
+          },
+        ],
+      },
       done: true,
       at: at(570),
     },
@@ -887,7 +902,7 @@ function pageStates({ mode, now, project, orclings, patch }: { mode: string; now
   };
 }
 
-/** No-op browser and terminal bridges, so the panel's browser and terminal render without Electron. */
+/** No-op browser, terminal and dictation bridges, so the panel's pages and the composer's Dictate render without Electron. */
 function panelBridges() {
   const page = { url: "http://localhost:5173/", title: "localhost:5173", canGoBack: true, canGoForward: false, loading: false, error: null };
   const off = () => () => {};
@@ -917,8 +932,29 @@ function panelBridges() {
       resize: noop,
       kill: noop,
     },
+    dictation: {
+      settings: async () => dictationSettings,
+      setEngine: async () => dictationSettings,
+      setOpenAiKey: async () => dictationSettings,
+      onSettings: off,
+      models: async () => ({}),
+      download: async () => {},
+      cancelDownload: async () => {},
+      remove: async () => {},
+      onModel: off,
+      microphone: async () => "granted" as const,
+      openMicrophoneSettings: noop,
+      start: async () => {},
+      audio: noop,
+      finish: noop,
+      cancel: noop,
+      onEvent: off,
+    },
   };
 }
+
+/** Dictation as a fresh install has it: on this computer, with no OpenAI key saved. */
+const dictationSettings = { engine: "local" as const, openaiKey: false };
 
 /**
  * A project that started about seven months ago: busy weekdays, quiet weekends, a few days off. Seeded, so every capture

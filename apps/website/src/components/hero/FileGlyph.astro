@@ -1,9 +1,11 @@
 ---
 /**
  * A file's mark as the app's FileGlyph picks it: TypeScript and React files show their language's mark, prose the
- * outline text file, anything else the outline code file. The marks are drawn here at chip size rather than copied
- * from the app's icon set.
+ * outline text file, anything else the outline code file. The language marks are drawn here at chip size; the outlines
+ * are the app's own.
  */
+import { productIcons } from "../../data/product-icons";
+
 interface Props {
   path: string;
 }
@@ -27,8 +29,5 @@ const kind = /^(ts|mts|cts)$/.test(extension) ? "typescript" : /^(tsx|jsx)$/.tes
     <circle cx="8" cy="8" r="1.4" fill="#61dafb" />
   </svg>
 ) : (
-  <svg class="hs-file-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M14 3.5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9Z M14 3.5v6h6" />
-    <path d={kind === "text" ? "M8 13h8 M8 17h6" : "m9 12-3 3 3 3 M15 12l3 3-3 3"} />
-  </svg>
+  <svg class="hs-file-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={productIcons[kind === "text" ? "fileText" : "fileCode2"]} />
 )}

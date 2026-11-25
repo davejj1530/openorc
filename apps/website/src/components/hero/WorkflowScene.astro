@@ -8,17 +8,18 @@
 import BrandMark from "../BrandMark.astro";
 import ChangeLine from "./ChangeLine.astro";
 import Composer from "./Composer.astro";
-import FileChips from "./FileChips.astro";
 import ProductIcon from "./ProductIcon.astro";
 import Prose from "./Prose.astro";
 import Receipt from "./Receipt.astro";
 import SceneFrame from "./SceneFrame.astro";
-import Step from "./Step.astro";
 import TaskPane from "./TaskPane.astro";
 import TaskProperties from "./TaskProperties.astro";
 import ThreadHeader from "./ThreadHeader.astro";
 import ThreadPane from "./ThreadPane.astro";
 import TurnEnd from "./TurnEnd.astro";
+import Work from "./Work.astro";
+import WorkAct from "./WorkAct.astro";
+import WorkLine from "./WorkLine.astro";
 import { activity } from "../../data/hero/activity";
 import { busy, workflow, workflowJourney } from "../../data/hero/workflow";
 import { branches, models, project } from "../../data/hero/workspace";
@@ -31,6 +32,12 @@ const { label } = Astro.props;
 const { thread, task, work } = workflow;
 const at = (windows: string) => timed(workflowJourney, windows);
 const head = { journey: workflowJourney };
+const name = (path: string) => path.slice(path.lastIndexOf("/") + 1);
+/** A line's verb while its thing is under way, then once it is done. */
+const verbs = (during: string, after: string, done: string) => [
+  { text: during, show: `<${done}` },
+  { text: after, show: `>${done}` },
+];
 const waiting = { a: "aQuestion~aPick" };
 const rows = [
   { id: "a", title: thread.title, busy: busy.a, waiting: waiting.a, show: ">aSend" },
@@ -54,7 +61,7 @@ const comments = [
 <SceneFrame id="workflow" journey={workflowJourney} label={label} rows={rows}>
   <div class="hs-panes" data-views>
     <section class="hs-pane" data-pane="new">
-      <ThreadHeader tabs={[{ label: "New thread", icon: "compose", current: true }]} fresh />
+      <ThreadHeader tabs={[{ label: "New thread", icon: "penSquare", current: true }]} fresh />
       <div class="hs-new-body">
         <div class="hs-new-column">
           <span class="hs-new-mark"><BrandMark /></span>
@@ -78,6 +85,7 @@ const comments = [
       permission={models.codex.permission}
       placeholder="Message Codex…"
     >
+      <!-- One turn: the question joins it part way, so it stays under way until the tasks are made, then folds its work. -->
       <div class="hs-turn" data-grow {...at(">aSend")}>
         <div class="hs-user"><div class="hs-bubble">{thread.prompt}</div></div>
         <Receipt
@@ -86,79 +94,81 @@ const comments = [
             { text: "Thinking", show: "<aThought" },
             { text: "Thought 1s", show: ">aThought" },
           ]}
-          steps={[{ text: "1 step", show: ">aThought" }]}
+          steps={[
+            { text: "1 step", show: "aThought~aPick" },
+            { text: "2 steps", show: ">aPick" },
+          ]}
         />
-        <ol class="hs-steps" data-grow {...at("aSend~aDone")}>
-          <Step
-            {...head}
-            title={[
-              { text: "Thinking", show: "<aThought" },
-              { text: thread.phase, show: ">aThought" },
-            ]}
-            live="<aRan"
-            done=">aRan"
-            meta={{ text: "6 files · 1 command", show: ">aRan" }}
-            open="aThought~aRan"
-          >
-            <div data-grow {...at("aThought~aRead")}><FileChips label="Reading" files={thread.reads.map((path) => ({ path }))} /></div>
-            <div data-grow {...at("aRead~aRan")}><FileChips label="Read" files={thread.reads.map((path) => ({ path }))} /></div>
-            <div class="hs-group" data-grow {...at("aRead~aRan")}>
-              <span class="hs-group-label">Running</span>
-              <div class="hs-chips"><span class="hs-chip" data-live><ProductIcon name="terminal" class="hs-file-glyph" /><span class="hs-chip-label">{thread.command}</span></span></div>
-            </div>
-          </Step>
-        </ol>
-        <div class="hs-reply" data-grow {...at(">aIntroStart")}>
-          <Prose text={thread.intro} stream="aIntroStart~aIntroEnd" />
-          <div class="hs-table-wrap" data-grow {...at(">aTable")}>
-            <div class="hs-table-tools"><span><ProductIcon name="copy" /></span><span><ProductIcon name="download" /></span><span><ProductIcon name="maximize" /></span></div>
-            <table class="hs-table">
-              <thead><tr>{thread.table.head.map((cell) => <th>{cell}</th>)}</tr></thead>
-              <tbody>
-                {thread.table.rows.map((row) => (
-                  <tr>{row.map((cell) => <td>{code(cell).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</td>)}</tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div data-grow {...at(">aOutroStart")}><Prose text={thread.outro} stream="aOutroStart~aOutroEnd" /></div>
-        </div>
-        <div class="hs-question" data-grow {...at(">aQuestion")}>
-          <div class="hs-question-ask"><svg class="hs-logo" data-provider="codex" aria-hidden="true"><use href="#hs-logo-codex" /></svg>{thread.question.text}</div>
-          <div class="hs-question-options">
-            {thread.question.options.map((option, i) => (
-              <div class="hs-question-option" {...flagged(workflowJourney, i === 0 ? { picked: "aSelect~aPick", chosen: ">aPick" } : { dropped: ">aPick" })}>
-                <span class="hs-question-option-label"><span>{option.label}</span><span class="hs-question-option-description">{option.description}</span></span>
-                <ProductIcon name="check" class="hs-question-check" />
+        <Work grow {...at("aSend~aCreated")}>
+          <WorkLine {...head} title={[{ text: thread.phase, show: ">aThought" }]} running="<aRan">
+            <WorkAct {...head} grow {...at("<aThought")} live icon="lightbulb" name="Thinking" />
+            <WorkAct {...head} grow {...at(">aThought")} file={thread.reads[0]} verb={verbs("Reading", "Read", "aRead")} name={`${thread.reads.slice(0, 2).map(name).join(", ")} and ${thread.reads.length - 2} more`} running="<aRead" />
+            <WorkAct {...head} grow {...at(">aRead")} icon="terminal" verb={verbs("Running", "Ran", "aRan")} name={thread.command} mono running="<aRan" />
+          </WorkLine>
+          <!-- What it wrote before asking reads as the reply while it is the newest thing said, and as a note in the work once the work goes on. -->
+          <WorkLine {...head} grow {...at(">aIntroStart")}>
+            <div slot="head" class="hs-work-reply" {...flagged(workflowJourney, { said: ">aPick" })}>
+              <Prose text={thread.intro} stream="aIntroStart~aIntroEnd" />
+              <div class="hs-table-wrap" data-grow {...at(">aTable")}>
+                <table class="hs-table">
+                  <thead><tr>{thread.table.head.map((cell) => <th>{cell}</th>)}</tr></thead>
+                  <tbody>
+                    {thread.table.rows.map((row) => (
+                      <tr>{row.map((cell) => <td>{code(cell).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</td>)}</tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+              <div data-grow {...at(">aOutroStart")}><Prose text={thread.outro} stream="aOutroStart~aOutroEnd" /></div>
+            </div>
+          </WorkLine>
+          <WorkLine {...head} grow {...at(">aPick")}>
+            <div slot="head" class="hs-question">
+              <div class="hs-question-ask"><svg class="hs-logo" data-provider="codex" aria-hidden="true"><use href="#hs-logo-codex" /></svg>{thread.question.text}</div>
+              <div class="hs-question-options">
+                {thread.question.options.map((option, i) => (
+                  <div class="hs-question-option" data-chosen={i === 0 ? "" : undefined}>
+                    <span class="hs-question-option-label"><span>{option.label}</span><span class="hs-question-option-description">{option.description}</span></span>
+                    <ProductIcon name="check" class="hs-question-check" />
+                  </div>
+                ))}
+              </div>
+              <div class="hs-question-foot">Sent to Codex</div>
+            </div>
+          </WorkLine>
+          <WorkLine {...head} grow {...at(">aPick")} title="Creating the three tasks" running="aPick~aCreatedStart">
+            {workflow.tasks.map((item, i) => (
+              <WorkAct {...head} icon="workDelegate" verb={verbs("Creating task", "Created task", "aCreatedStart")} name={item.title} running={i === workflow.tasks.length - 1 ? "<aCreatedStart" : undefined} />
             ))}
-          </div>
-          <div class="hs-question-foot" {...at("<aPick")}>
-            <span>Pick one</span>
-            <span class="hs-text-button">Decline</span>
-            <span class="hs-button hs-button-ink" {...flagged(workflowJourney, { disabled: "<aSelect" })}>Answer</span>
-          </div>
-          <div class="hs-question-foot" {...at(">aPick")}>Sent to Codex</div>
-        </div>
-        <TurnEnd {...head} clock={{ from: "aSend", writing: "aIntroStart", to: "aDone" }} />
-      </div>
-      <div class="hs-turn" data-grow {...at(">aPick")}>
-        <Receipt {...head} steps="1 step" />
-        <ol class="hs-steps" data-grow {...at("aPick~aCreatedStart")}>
-          <Step {...head} title="Creating the three tasks" live=">aPick" />
-        </ol>
+          </WorkLine>
+        </Work>
         <div class="hs-reply" data-grow {...at(">aCreatedStart")}><Prose text={thread.created} stream="aCreatedStart~aCreatedEnd" /></div>
         {workflow.tasks.map((item, i) => (
           <div class="hs-task-card" data-grow {...at(`>aCard${i + 1}`)}>
             <div class="hs-task-card-row">
-              <ProductIcon name="delegate" />
+              <ProductIcon name="workDelegate" />
               <span class="hs-task-card-title">{item.title}</span>
               <ProductIcon name="arrowUpRight" class="hs-task-card-open" />
             </div>
-            <div class="hs-task-card-meta"><span>Backlog</span><span class="hs-task-card-branch"><ProductIcon name="branch" />{project.branch}</span><span>just now</span></div>
+            <div class="hs-task-card-meta"><span>Backlog</span><span class="hs-task-card-branch"><ProductIcon name="gitBranch" />{project.branch}</span><span>just now</span></div>
           </div>
         ))}
-        <TurnEnd {...head} clock={{ from: "aPick", writing: "aCreatedStart", to: "aCreated" }} />
+        <TurnEnd {...head} clock={{ from: "aSend", to: "aCreated" }} />
+      </div>
+      <div slot="ask" class="hs-ask" data-grow {...at("aQuestion~aPick")}>
+        <div class="hs-ask-top">
+          <span class="hs-ask-head"><svg class="hs-logo" data-provider="codex" aria-hidden="true"><use href="#hs-logo-codex" /></svg>{thread.question.text}</span>
+          <span class="hs-ask-way">Decline</span>
+        </div>
+        <div class="hs-ask-choices">
+          {thread.question.options.map((option, i) => (
+            <div class="hs-ask-choice" {...(i === 0 ? flagged(workflowJourney, { picked: "aSelect~aPick" }) : {})}>
+              <span>{option.label}</span>
+              <span class="hs-ask-choice-description">{option.description}</span>
+            </div>
+          ))}
+          <div class="hs-ask-line">Something else</div>
+        </div>
       </div>
     </ThreadPane>
 
@@ -246,13 +256,23 @@ const comments = [
           ]}
           changes={[{ text: `+${added} −${removed} in ${work.change.files.length} files`, show: ">bEdited" }]}
         />
-        <ol class="hs-steps" data-grow {...at("<bDone")}>
-          <Step {...head} title={work.phases.read} live="<bRead" done=">bRead" meta={{ text: "4 files", show: ">bRead" }} />
-          <Step {...head} grow {...at(">bRead")} title={work.phases.edit} live="<bEdited" done=">bEdited" meta={{ text: "3 files", show: ">bEdited" }} open="<bEdited">
-            <FileChips label="Editing" files={work.change.files} live={work.change.files.at(-1)?.path} />
-          </Step>
-        </ol>
-        <div class="hs-reply" data-grow {...at(">bReplyStart")}><Prose text={work.reply} stream="bReplyStart~bReplyEnd" /></div>
+        <Work grow {...at("<bDone")} journey={workflowJourney} timeline=">bEdited">
+          <WorkLine {...head} title={work.phases.read} running="<bRead">
+            <WorkAct {...head} file={work.change.files[0]!.path} verb={verbs("Reading", "Read", "bRead")} name={`${work.change.files.slice(0, 2).map((file) => name(file.path)).join(", ")} and 2 more`} running="<bRead" />
+          </WorkLine>
+          <WorkLine {...head} grow {...at(">bRead")} title={work.phases.edit} running="<bEdited">
+            {work.change.files.map((file, i) =>
+              i < work.change.files.length - 1 ? (
+                <WorkAct file={file.path} verb="Edited" name={name(file.path)} added={file.added} removed={file.removed} />
+              ) : (
+                <WorkAct {...head} file={file.path} verb={verbs("Editing", "Edited", "bEdited")} name={name(file.path)} added={file.added} removed={file.removed} settled=">bEdited" running="<bEdited" />
+              ),
+            )}
+          </WorkLine>
+        </Work>
+        <div class="hs-reply" data-grow {...at(">bReplyStart")}>
+          <Prose text={work.reply} stream="bReplyStart~bReplyEnd" proof={{ text: `${work.change.files.length} files +${added} −${removed}`, show: at(">bDone") }} />
+        </div>
         <ChangeLine grow {...at(">bDone")} files={work.change.files.length} added={added} removed={removed} undo />
         <TurnEnd {...head} clock={{ from: "bStart", writing: "bReplyStart", to: "bDone" }} />
       </div>

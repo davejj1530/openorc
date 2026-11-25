@@ -1,8 +1,9 @@
 ---
 /**
- * The message composer as the app draws it (Composer.tsx): one plane with the prompt over a bar of attach, model and
- * mode pills, the context share and send. A conversation with uncommitted lines shows the Commit chip over the plane's
- * left edge. The new-thread page's composer is larger, and where the thread works is a branch button after attach.
+ * The message composer as the app draws it (Composer.tsx): one plane with the prompt over a bar of attach, the model
+ * with its week's usage, and the mode; at the bar's end the uncommitted lines as Commit, the context share, Dictate
+ * and send. The new-thread page's composer is larger, and where the thread works is a branch button after attach.
+ * What waits on the person, such as an agent's question, docks over the prompt in the `ask` slot.
  */
 import Counts from "./Counts.astro";
 import ProductIcon from "./ProductIcon.astro";
@@ -22,46 +23,49 @@ interface Props {
   prompt?: { text: string; typo: { at: number; key: string }; window: string; typed: string };
   /** How much of the context window the conversation uses, as its share shows it. */
   context?: number | null;
+  /** How much of the week is left on the account the model runs on, as a percent. */
+  week?: number;
   layout?: "thread" | "new";
 }
-const { journey, placeholder, model, permission, changes, changeStat = { added: 8, removed: 2 }, prompt, context = 18, layout = "thread" } = Astro.props;
+const { journey, placeholder, model, permission, changes, changeStat = { added: 8, removed: 2 }, prompt, context = 18, week = 64, layout = "thread" } = Astro.props;
 const fresh = layout === "new";
 ---
 
 <div class="hs-composer" data-layout={layout} {...(prompt && journey ? flagged(journey, { typed: prompt.typed }) : {})}>
-  {!fresh && changes ? (
-    <div class="hs-changes-bar" {...(typeof changes === "string" && journey ? timed(journey, changes) : {})}>
-      <span class="hs-commit">
-        <span class="hs-commit-label">Commit</span>
-        <Counts {...changeStat} />
-      </span>
-    </div>
-  ) : null}
   <div class="hs-shell">
+    <slot name="ask" />
     <div class="hs-prompt">
       <span class="hs-placeholder hs-placeholder-idle">{placeholder}</span>
       <span class="hs-placeholder hs-placeholder-busy">Say it during this turn…</span>
       {prompt && journey ? <span class="hs-typed" data-type={prompt.window} data-text={prompt.text} data-typo={`${prompt.typo.at}:${prompt.typo.key}`} {...timed(journey, prompt.typed)} /> : null}
       {prompt ? <span class="hs-caret" /> : null}
     </div>
-    <div class="hs-bar">
+    <div class="hs-bar" data-fit="whole">
       <span class="hs-bar-tools">
         <span class="hs-attach"><ProductIcon name="plus" /></span>
-        {fresh ? <span class="hs-attach hs-place"><ProductIcon name="branch" /></span> : null}
+        {fresh ? <span class="hs-attach hs-place"><ProductIcon name="gitBranch" /></span> : null}
         <span class="hs-pill hs-model">
           <svg class="hs-logo" data-provider={model.harness} aria-hidden="true"><use href={`#hs-logo-${model.harness}`} /></svg>
           <span class="hs-model-name">{model.label}</span>
           <span class="hs-model-effort">{model.effort}</span>
+          <span class="hs-model-usage"><SharePie fraction={week / 100} /></span>
         </span>
         <span class="hs-pill hs-mode"><ProductIcon name="shieldCheck" /><span>{permission}</span></span>
       </span>
       <span class="hs-bar-end">
+        {!fresh && changes ? (
+          <span class="hs-commit" {...(typeof changes === "string" && journey ? timed(journey, changes) : {})}>
+            <span class="hs-commit-label">Commit</span>
+            <Counts {...changeStat} />
+          </span>
+        ) : null}
         {!fresh && context !== null ? (
           <span class="hs-context">
             <SharePie fraction={context / 100} />
             <span>{context}%</span>
           </span>
         ) : null}
+        <span class="hs-attach hs-dictate"><ProductIcon name="mic" /></span>
         <span class="hs-send">
           <ProductIcon name="arrowUp" class="hs-send-arrow" />
           <span class="hs-send-stop" />
@@ -70,3 +74,9 @@ const fresh = layout === "new";
     </div>
   </div>
 </div>
+
+<script>
+  import { fitComposers } from "../../scripts/composer-fit";
+
+  fitComposers();
+</script>

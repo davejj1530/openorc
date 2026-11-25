@@ -1,10 +1,11 @@
 ---
 /**
- * A conversation pane's header on the window's top line (ThreadHeader.tsx). The first pane holds the sidebar toggle,
- * the work column's tabs and New thread; a pane split beside it names its thread instead. Then the faint facts ("Working" while the agent works),
- * Close pane in a split, the thread's actions as vertical dots, and its tools: the panel's side while the panel is
- * open, and the panel toggle. A new thread's header keeps only its tab and the panel toggle.
+ * A conversation pane's header on the window's top line (ThreadHeader.tsx, TopBar.tsx). The first pane holds the work
+ * column's tabs and New thread; a pane split beside it names its thread instead. At its end: the person's Orcling on
+ * the last pane, Close pane in a split, the thread's actions as dots, and its tools: the panel's side while the panel
+ * is open, and the panel toggle. A new thread's header keeps only its tab, the Orcling and the panel toggle.
  */
+import OrclingFace from "./OrclingFace.astro";
 import ProductIcon from "./ProductIcon.astro";
 import WorkTab, { type Tab } from "./WorkTab.astro";
 import type { Journey } from "../../data/hero/timeline";
@@ -19,31 +20,29 @@ interface Props {
   panel?: boolean;
   /** The new-thread page's header. */
   fresh?: boolean;
-  /** The thread's menu is open, so its ⋯ shows as pressed. */
+  /** The thread's menu is open, so its dots show as pressed. */
   menu?: boolean;
+  /** Another pane stands after this one, so the Orcling's face waits at that one's end. */
+  more?: boolean;
 }
-const { journey, tabs, title, tablist, panel, fresh, menu } = Astro.props;
+const { journey, tabs, title, tablist, panel, fresh, menu, more } = Astro.props;
 ---
 
 <header class="hs-header" data-kind={tabs ? "tabs" : "title"}>
   {tabs ? (
-    <span class="hs-round hs-sidebar-toggle" aria-hidden="true"><ProductIcon name="panelLeft" /></span>
     <div class="hs-tabs-row">
       <div class="hs-tabs" role={tablist ? "tablist" : undefined} aria-label={tablist}>
         {tabs.map((tab) => <WorkTab journey={journey} {...tab} />)}
       </div>
-      <span class="hs-round" aria-hidden="true"><ProductIcon name="compose" /></span>
+      <span class="hs-round" aria-hidden="true"><ProductIcon name="penSquare" /></span>
     </div>
   ) : (
-    <>
-      <span class="hs-title">{title}</span>
-      <span class="hs-facts" aria-hidden="true"><span class="hs-fact-working"><i></i>Working</span></span>
-    </>
+    <span class="hs-title">{title}</span>
   )}
   <span class="hs-header-actions" aria-hidden="true">
-    {tabs && !fresh ? <span class="hs-facts"><span class="hs-fact-working"><i></i>Working</span></span> : null}
-    {fresh ? null : <span class="hs-round hs-close-pane"><ProductIcon name="close" /></span>}
-    {fresh ? null : <span class="hs-round hs-more" data-on={menu ? "" : undefined}><ProductIcon name="more" /></span>}
+    {more ? null : <span class="hs-round hs-header-orcling"><OrclingFace /></span>}
+    {fresh ? null : <span class="hs-round hs-close-pane"><ProductIcon name="x" /></span>}
+    {fresh ? null : <span class="hs-round hs-more" data-on={menu ? "" : undefined}><ProductIcon name="moreHorizontal" /></span>}
     <span class="hs-tools">
       {panel ? <span class="hs-round"><ProductIcon name="arrowLeftRight" /></span> : null}
       <span class="hs-round" data-on={panel ? "" : undefined}><ProductIcon name="panelRight" /></span>

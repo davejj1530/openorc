@@ -1,6 +1,6 @@
 ---
 /**
- * The panel's Terminal page (TerminalPanel.tsx): the shell's folder in the bar with stop and restart, then what it
+ * The panel's Terminal page (TerminalPanel.tsx): the shell's folder in the bar with End and Restart, then what it
  * printed, in the code font. Faint text is what the program printed dim.
  */
 import ProductIcon from "./ProductIcon.astro";
@@ -16,8 +16,8 @@ const { folder, lines } = Astro.props;
 <div class="hs-panel-bar">
   <span class="hs-panel-title">Terminal</span>
   <span class="hs-panel-meta hs-panel-path">{folder}</span>
-  <span class="hs-round hs-panel-refresh"><ProductIcon name="square" /></span>
-  <span class="hs-round"><ProductIcon name="rotateCcw" /></span>
+  <span class="hs-round hs-panel-tool hs-panel-refresh"><ProductIcon name="square" /></span>
+  <span class="hs-round hs-panel-tool"><ProductIcon name="rotateCcw" /></span>
 </div>
 <div class="hs-terminal">
   {lines.map((line) => <div>{typeof line === "string" ? line : <><span class="hs-terminal-dim">{line[0]}</span>{line[1]}</>}</div>)}

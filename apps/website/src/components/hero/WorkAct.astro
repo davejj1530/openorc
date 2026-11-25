@@ -1,0 +1,84 @@
+---
+/**
+ * One thing a step did, on its own line, as the app's ActRow writes it: a mark (the file's own for a file, else what
+ * kind of thing it is), a quiet verb, the thing, and how it came out at the line's end: an edit's size, a few words, or
+ * the cube at work while it is still going. The thing under way opens on a piece of its own, with the slot under its
+ * line. A line with `live` is what the turn is doing between its calls: its words shimmer.
+ */
+import Counts from "./Counts.astro";
+import FileGlyph from "./FileGlyph.astro";
+import ProductIcon, { type IconName } from "./ProductIcon.astro";
+import StateMark from "./StateMark.astro";
+import { flagged, timed, type Journey } from "../../data/hero/timeline";
+
+interface Props extends Record<string, unknown> {
+  /** The block opens and closes with the scene (scripts/hero-motion.ts). */
+  grow?: boolean;
+  journey?: Journey;
+  /** The mark of what kind of thing it is. */
+  icon?: IconName;
+  /** A file's path, for a line about one file: its own mark leads. */
+  file?: string;
+  /** The quiet verb before the thing, or verbs that follow the scene's windows ("Reading", then "Read"). */
+  verb?: string | { text: string; show: string }[];
+  name: string;
+  /** The name is a command as written, which stays code. */
+  mono?: boolean;
+  /** How it came out, in a few words. */
+  result?: string;
+  /** An edit's size, and whether the edit wrote a new file. */
+  added?: number;
+  removed?: number;
+  created?: boolean;
+  /** Window from which the line says how it came out, for one that begins under way. */
+  settled?: string;
+  /** Window while it is under way, or `true` in a still. */
+  running?: string | true;
+  /** Window while it stands open on a piece of its own, or `true` in a still; its body is the slot. */
+  open?: string | true;
+  /** The line is what the turn is doing between calls: the cube at work leads it, or `icon` for a thought. */
+  live?: boolean;
+}
+const { journey, icon, file, verb, name, mono, result, added, removed, created, settled, running, open, live, grow, ...rest } = Astro.props;
+const at = (windows: string | true) => (journey && windows !== true ? timed(journey, windows) : {});
+const windows = Object.fromEntries(Object.entries({ running, open }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+const states = {
+  ...(running === true ? { "data-running": "" } : {}),
+  ...(open === true ? { "data-open": "" } : {}),
+  ...(journey && Object.keys(windows).length ? flagged(journey, windows) : {}),
+};
+/** Each block is ok while it stays under the added share, bad up to the edit's size on a log scale, else empty. */
+const blocks = (plus = 0, minus = 0) => {
+  const total = plus + minus;
+  const scale = total ? Math.min(5, Math.max(1, Math.ceil(Math.log2(total + 1) / 1.6))) : 0;
+  const good = total ? Math.round((plus / total) * scale) : 0;
+  return Array.from({ length: 5 }, (_, index) => (index < good ? "ok" : index < scale ? "bad" : undefined));
+};
+const sized = Boolean(added || removed);
+---
+
+<li class="hs-work-act" data-grow={grow ? "" : undefined} {...states} {...rest}>
+  <span class="hs-work-act-head">
+    {icon ? <ProductIcon name={icon} /> : live ? <StateMark /> : file ? <FileGlyph path={file} /> : null}
+    <span class="hs-work-act-words" data-mono={mono ? "" : undefined}>
+      {typeof verb === "string" ? <span class="hs-work-act-verb">{verb} </span> : verb?.map((word) => <span class="hs-work-act-verb" {...at(word.show)}>{word.text} </span>)}
+      <span class:list={["hs-work-act-name", { "hs-work-live-words": live }]}>{name}</span>
+    </span>
+    <span class="hs-work-act-result">
+      {result || sized ? (
+        <span class="hs-work-act-end" {...(settled ? at(settled) : {})}>
+          {result ? <span>{result}</span> : null}
+          {created ? <span>New</span> : null}
+          {sized ? <span class="hs-size-blocks" aria-hidden="true">{blocks(added, removed).map((tone) => <i data-tone={tone} />)}</span> : null}
+          {sized ? <Counts added={added} removed={removed} /> : null}
+        </span>
+      ) : null}
+      {running ? <StateMark {...at(running)} /> : null}
+    </span>
+  </span>
+  {open ? (
+    <div class="hs-work-act-body" data-grow {...at(open)}>
+      <slot />
+    </div>
+  ) : null}
+</li>

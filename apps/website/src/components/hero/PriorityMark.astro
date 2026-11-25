@@ -1,0 +1,13 @@
+---
+/** A task's priority as the app's PriorityIcon draws it: four signal bars, faint until the level lights them. */
+interface Props {
+  priority: "Low" | "Medium" | "High" | "Urgent";
+}
+const { priority } = Astro.props;
+const bars = ["M5 20v-3", "M10 20v-7", "M15 20V9", "M20 20V5"];
+const lit = { Low: 1, Medium: 2, High: 3, Urgent: 4 }[priority];
+---
+
+<svg class="hs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true">
+  {bars.map((bar, index) => <path d={bar} opacity={index < lit ? 1 : 0.28} />)}
+</svg>

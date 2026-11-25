@@ -1,10 +1,11 @@
 ---
 /**
- * The Tasks page, still, as views/TaskList.tsx lays it out with the product fixture's tasks: the breadcrumb, the filter
- * and New task on the top line, then the tasks grouped by status under quiet headings, Ready for review first with its
- * count. A row is its status mark and title, then its label, its project and when it last moved, and at its end Review
- * for a task that waits on you or the comment mark for one that has a discussion.
+ * The Tasks page, still, as views/TaskList.tsx lays it out with the product fixture's tasks: the crumbs, the person's
+ * Orcling, the filter and New task on the top line, then the tasks grouped by status under quiet headings, Ready for
+ * review first with its count. A row is its status mark and title, then its label, its project and when it last moved,
+ * and at its end Review for a task that waits on you or the comment mark for one that has a discussion.
  */
+import OrclingFace from "../hero/OrclingFace.astro";
 import ProductIcon from "../hero/ProductIcon.astro";
 import StatusMark from "../hero/StatusMark.astro";
 import "../../styles/hero-scene.css";
@@ -35,11 +36,13 @@ const groups: { status: Status; label: string; count?: boolean; tasks: Task[] }[
 
 <div class="hs-mock hs-mock-tasks">
   <header class="hs-header">
-    <span class="hs-round hs-sidebar-toggle"><ProductIcon name="panelLeft" /></span>
-    <span class="hs-crumb hs-crumb-scope"><ProductIcon name="folders" />All projects</span>
-    <span class="hs-crumb-sep">/</span>
-    <span class="hs-title">Tasks</span>
+    <span class="hs-crumbs-row">
+      <span class="hs-crumb"><ProductIcon name="folders" />All projects</span>
+      <span class="hs-crumb-sep">/</span>
+      <span class="hs-crumb-current">Tasks</span>
+    </span>
     <span class="hs-header-actions">
+      <span class="hs-round"><OrclingFace /></span>
       <span class="hs-round"><ProductIcon name="funnel" /></span>
       <span class="hs-button hs-button-lg hs-button-ink"><ProductIcon name="plus" />New task</span>
     </span>
@@ -59,13 +62,13 @@ const groups: { status: Status; label: string; count?: boolean; tasks: Task[] }[
               </span>
               <span class="hs-task-row-title">{task.title}</span>
               {task.label ? <span class="hs-task-row-label">{task.label}</span> : null}
-              <span class="hs-task-row-meta">
+              <span class="hs-task-row-meta hs-task-row-project">
                 <ProductIcon name="folder" />
                 studio
               </span>
               <span class="hs-task-row-meta hs-task-row-time">just now</span>
               <span class="hs-task-row-end">
-                {group.status === "review" ? <span class="hs-button hs-task-review">Review</span> : null}
+                {group.status === "review" ? <span class="hs-button hs-button-sm hs-task-review">Review</span> : null}
                 {group.status === "backlog" ? <ProductIcon name="messageSquare" /> : null}
               </span>
             </div>

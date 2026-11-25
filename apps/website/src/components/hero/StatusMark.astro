@@ -1,5 +1,5 @@
 ---
-/** A task's status as the app's status mark draws it: an empty ring in the backlog, a quarter arc in progress, a dot in review. */
+/** A task's status as the app's StatusIcon draws it: an empty ring in the backlog, a quarter arc in progress, a solid disc in review. */
 interface Props extends Record<string, unknown> {
   status: "backlog" | "in_progress" | "review";
   class?: string;
@@ -15,5 +15,5 @@ const { status, class: className, ...rest } = Astro.props;
       <circle cx="8" cy="8" r="6" stroke-width="2" stroke-linecap="round" stroke-dasharray="15 37.7" transform="rotate(-90 8 8)" stroke="currentColor" />
     </>
   ) : null}
-  {status === "review" ? <circle cx="8" cy="8" r="4" fill="currentColor" /> : null}
+  {status === "review" ? <circle cx="8" cy="8" r="6.5" fill="currentColor" /> : null}
 </svg>

@@ -10,6 +10,9 @@ import Prose from "../hero/Prose.astro";
 import Receipt from "../hero/Receipt.astro";
 import ThreadPane from "../hero/ThreadPane.astro";
 import TurnEnd from "../hero/TurnEnd.astro";
+import Work from "../hero/Work.astro";
+import WorkAct from "../hero/WorkAct.astro";
+import WorkLine from "../hero/WorkLine.astro";
 import { handoff, threads } from "../../data/hero/handoff";
 import { duration, elapsed } from "../../data/hero/timeline";
 
@@ -21,7 +24,12 @@ const { a } = threads;
     <div class="hs-turn">
       <Notice from={a.notice.from} text={a.notice.text} />
       <Receipt changes={`+${a.change.added} in 1 file`} />
-      <div class="hs-reply"><Prose text={a.result} /></div>
+      <Work timeline>
+        <WorkLine title={a.phases.build}>
+          <WorkAct file={a.change.path} verb="Wrote" name="Billing.tsx" added={a.change.added} removed={a.change.removed} created />
+        </WorkLine>
+      </Work>
+      <div class="hs-reply"><Prose text={a.result} proof={`Billing.tsx +${a.change.added}`} /></div>
       <ChangeLine files={1} added={a.change.added} removed={a.change.removed} undo />
       <TurnEnd took={duration(elapsed(handoff, "aWork", "aFinish"))} />
     </div>

@@ -1,6 +1,6 @@
 # OpenOrc website
 
-Static Astro website for OpenOrc. The site speaks the desktop app's design language ([DESIGN.md](../desktop/DESIGN.md)): a white page, gray tiles the product stands on, white planes inside them, no borders or shadows, one weight, and one ink pill. The product demos are rebuilt in HTML and CSS from the desktop renderer's styles and shown frameless on their tiles, since each tile is the app's own ground. Every link, button, tab and toggle makes a small sound, synthesized with the Web Audio API (`src/scripts/sounds.ts`, after Immaculate's site); the header's speaker turns them off and the choice is remembered. David's custom Immaculate Gothic is self-hosted in Text (450) and Bold (700), and the product demos match the app's Immaculate Gothic default with JetBrains Mono for code; the page ships no React runtime. Google Analytics loads from Google to measure website visits.
+Static Astro website for OpenOrc. The site speaks the desktop app's design language ([DESIGN.md](../desktop/DESIGN.md)): a white page, gray tiles the product stands on, white planes inside them, no borders or shadows, one weight, and one ink pill. The product demos are rebuilt in HTML and CSS from the desktop renderer's styles and shown frameless on their tiles, since each tile is the app's own ground. Every link, button, tab and toggle makes a small sound, synthesized with the Web Audio API (`src/scripts/sounds.ts`, after Immaculate's site); the header's speaker turns them off and the choice is remembered. David's custom Immaculate Gothic is self-hosted in Text (450) and Bold (700). The product demos choose their face as the app does, a Mac's own on a Mac and Immaculate Gothic elsewhere, with JetBrains Mono for code; the page ships no React runtime. Google Analytics loads from Google to measure website visits.
 
 ```sh
 pnpm install
@@ -37,7 +37,15 @@ When setting up Vercel, import this repository with `apps/website` as the Root D
 
 The homepage shows the app rebuilt in HTML and CSS from the desktop renderer's tokens, icons, and component geometry, with sample projects and conversations. Text stays live text, so every picture is sharp at every size, and the site uses no screenshots.
 
-- The hero's `src/components/mocks/AppPreview.astro` is a still of the app at rest: the sidebar, a finished Codex thread, and the Changes panel beside it.
+Three parts come straight from the app's source, so they cannot drift:
+
+- Icons: `src/data/product-icons.ts` is generated from the desktop's `icons.tsx`. Run `pnpm --filter @openorc/website icons:sync` after the app's icons change; `icons:check` fails when the file is behind.
+- State marks: a thread's cube of dots and a project's open cube are drawn from `packages/client/src/state-marks.ts`, the same arithmetic the app uses (`hero/StateMark.astro`, `hero/ProjectCube.astro`, `scripts/state-marks.ts`).
+- A narrow composer gives up its chips' words in the app's order (`scripts/composer-fit.ts`).
+
+Everything else in `src/styles/hero-scene.css` is measured from the app: colors and type from its tokens, sizes and spacing from its rendered layout. When the app's look changes, measure it again in the product fixture rather than adjusting by eye.
+
+- The hero's `src/components/mocks/AppPreview.astro` is the app at rest in a 1512 × 982 window: the sidebar, three threads in tabs with a finished Codex thread open and its work shown line by line, and the Changes panel beside it at 460 wide.
 - `Showcase.astro` is a row of cards that scrolls sideways. Each card holds a still from `src/components/mocks/`: a message between threads, the task list, a worktree thread, the code editor, and imported sessions. The Slack card holds `SlackDemo.astro`, a scene that plays once when pressed.
 - "Watch it work." (`WatchItWork.astro`) holds three animated scenes from `src/components/hero/`: Across threads, Task discussion, and Plan to commit. Each rests on its last moment until a visitor picks its tab or presses the stage. Nothing plays by itself, and reduced motion keeps every scene at rest.
 - The three "Your setup stays yours." cards in `SetupGrid.astro` each carry a small still of the part of the app they describe.

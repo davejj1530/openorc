@@ -1,16 +1,21 @@
 ---
 /**
- * Assistant prose with the app's **bold** and `code` markup. A streamed message
- * wraps each word so the scene can reveal it the way replies arrive; inline
- * code arrives as one word.
+ * Assistant prose with the app's **bold** and `code` markup. A file a reply names in code is a link to it, as the app
+ * makes it. A sentence that says what the turn did can end in its `proof`: the pill that names the edit or the run
+ * behind it (ReplyProof.tsx). A streamed message wraps each word so the scene can reveal it the way replies arrive;
+ * inline code arrives as one word.
  */
+import ProductIcon from "./ProductIcon.astro";
+
 interface Props {
   text: string;
   /** Window over which the words arrive, in the hero journey's moments. */
   stream?: string;
+  /** What backs the sentence, at its end. Proofs come once the turn has ended, so a streamed reply's proof waits for `show`. */
+  proof?: string | { text: string; show: Record<string, string | undefined> };
   class?: string;
 }
-const { text, stream, class: className } = Astro.props;
+const { text, stream, proof, class: className } = Astro.props;
 type Kind = "text" | "strong" | "code";
 const parts = text
   .split(/(\*\*[^*]+\*\*|`[^`]+`)/)
@@ -19,12 +24,17 @@ const parts = text
     part.startsWith("**") ? { text: part.slice(2, -2), kind: "strong" } : part.startsWith("`") ? { text: part.slice(1, -1), kind: "code" } : { text: part, kind: "text" },
   );
 const words = parts.flatMap((part) => (part.kind === "code" ? [part] : part.text.split(/(?<=\s)/).map((word) => ({ text: word, kind: part.kind }))));
+const isFile = (code: string) => /^[\w./-]+\/[\w.-]+\.\w{1,5}$/.test(code);
+const link = (code: string) => (isFile(code) ? "" : undefined);
+const proofText = typeof proof === "string" ? proof : proof?.text;
+const proofShow = typeof proof === "object" ? proof.show : {};
 ---
 
-{stream ? (
-  <div class:list={["hs-prose", className]} data-stream={stream}>
-    {words.map((word) => (word.kind === "code" ? <span class="hs-word"><code>{word.text}</code></span> : <span class:list={["hs-word", { "hs-strong": word.kind === "strong" }]}>{word.text}</span>))}
-  </div>
-) : (
-  <div class:list={["hs-prose", className]}>{parts.map((part) => (part.kind === "strong" ? <span class="hs-strong">{part.text}</span> : part.kind === "code" ? <code>{part.text}</code> : part.text))}</div>
-)}
+<div class:list={["hs-prose", className]} data-stream={stream}>
+  {
+    stream
+      ? words.map((word) => (word.kind === "code" ? <span class="hs-word"><code data-link={link(word.text)}>{word.text}</code></span> : <span class:list={["hs-word", { "hs-strong": word.kind === "strong" }]}>{word.text}</span>))
+      : parts.map((part) => (part.kind === "strong" ? <span class="hs-strong">{part.text}</span> : part.kind === "code" ? <code data-link={link(part.text)}>{part.text}</code> : part.text))
+  }
+  {proofText ? <>{" "}<span class="hs-proof" {...proofShow}><ProductIcon name="check" />{proofText}</span></> : null}
+</div>

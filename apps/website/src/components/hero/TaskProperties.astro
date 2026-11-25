@@ -1,5 +1,9 @@
 ---
-/** A task's properties as the document's chips (TaskDocument.tsx): status until work starts and after, priority, project. */
+/**
+ * A task's properties as the document's chips (TaskDocument.tsx): status until work starts and after, priority,
+ * project. Then the editor's controls: insert, image, and at the end Refine and the Markdown switch.
+ */
+import PriorityMark from "./PriorityMark.astro";
 import ProductIcon from "./ProductIcon.astro";
 import StatusMark from "./StatusMark.astro";
 import { project } from "../../data/hero/workspace";
@@ -17,11 +21,14 @@ const { journey, start, priority } = Astro.props;
 <div class="hs-props">
   <span class="hs-prop hs-prop-select" {...timed(journey, `<${start}`)}><StatusMark status="backlog" /><span>Backlog</span><ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
   <span class="hs-prop hs-prop-select" {...timed(journey, `>${start}`)}><StatusMark status="in_progress" /><span>In progress</span><ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
-  <span class="hs-prop hs-prop-select"><ProductIcon name={priority === "High" ? "signalHigh" : "signalMedium"} /><span>{priority}</span><ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
+  <span class="hs-prop hs-prop-select"><PriorityMark priority={priority} /><span>{priority}</span><ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
   <span class="hs-prop">{project.name}</span>
 </div>
 <div class="hs-editor-controls">
   <span class="hs-round"><ProductIcon name="plus" /></span>
   <span class="hs-round"><ProductIcon name="image" /></span>
-  <span class="hs-editor-mode">Markdown</span>
+  <span class="hs-editor-end">
+    <span class="hs-editor-mode">Refine</span>
+    <span class="hs-editor-mode">Markdown</span>
+  </span>
 </div>

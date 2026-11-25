@@ -1,7 +1,7 @@
 ---
 /**
  * A conversation under its header (ThreadView.tsx): the transcript, pinned to its newest line and ending in the
- * OpenOrc cube, then the composer.
+ * OpenOrc cube, then the composer, with what waits on the person docked onto it from the `ask` slot.
  */
 import Composer from "./Composer.astro";
 import PresenceMark from "./PresenceMark.astro";
@@ -17,5 +17,5 @@ type Props = Omit<ComponentProps<typeof Composer>, "layout">;
   </div>
 </div>
 <div class="hs-composer-area" aria-hidden="true">
-  <Composer {...Astro.props} />
+  <Composer {...Astro.props}><slot name="ask" slot="ask" /></Composer>
 </div>

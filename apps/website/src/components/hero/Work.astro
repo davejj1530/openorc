@@ -1,0 +1,27 @@
+---
+/**
+ * A turn's work, open under its receipt, as the app's WorkSteps writes it: a step a line, in the slot, and under them
+ * the way to the same work drawn in time, which the app offers once a turn has changed a file.
+ */
+import ProductIcon from "./ProductIcon.astro";
+import { timed, type Journey } from "../../data/hero/timeline";
+
+interface Props extends Record<string, unknown> {
+  /** The block opens and closes with the scene (scripts/hero-motion.ts). */
+  grow?: boolean;
+  journey?: Journey;
+  /** The turn changed a file: `true` in a still, or the window from which it has. */
+  timeline?: string | true;
+}
+const { grow, journey, timeline, ...rest } = Astro.props;
+---
+
+<div class="hs-work" data-grow={grow ? "" : undefined} {...rest}>
+  <ol class="hs-work-lines"><slot /></ol>
+  {timeline ? (
+    <span class="hs-work-swap" data-grow={journey ? "" : undefined} {...(journey && timeline !== true ? timed(journey, timeline) : {})}>
+      <ProductIcon name="workflow" />
+      Timeline
+    </span>
+  ) : null}
+</div>

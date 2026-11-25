@@ -1,0 +1,43 @@
+---
+/**
+ * One step of a turn's work, as the app's WorkSteps writes it: its name, in ink while it runs, what the agent said of
+ * it, and in the slot a line for each thing it did. A step that is one call has no name: its line stands alone. A
+ * name given with windows shows only during them, so a step can begin as a thought and take its name after. The `head`
+ * slot stands in place of a name: what the agent wrote in the middle of its work, or a block of the turn's own such as
+ * an answered question.
+ */
+import { flagged, timed, type Journey } from "../../data/hero/timeline";
+
+interface Props extends Record<string, unknown> {
+  /** The block opens and closes with the scene (scripts/hero-motion.ts). */
+  grow?: boolean;
+  journey?: Journey;
+  /** The step's name, or names that follow the scene's windows. */
+  title?: string | { text: string; show: string }[];
+  /** What the agent said of the step, under its name. */
+  detail?: string;
+  /** Window while the step runs, or `true` in a still. */
+  running?: string | true;
+}
+const { journey, title, detail, running, grow, ...rest } = Astro.props;
+const at = (windows: string) => (journey ? timed(journey, windows) : {});
+const state = running === true ? { "data-running": "" } : running && journey ? flagged(journey, { running }) : {};
+---
+
+<li class="hs-work-line" data-grow={grow ? "" : undefined} {...state} {...rest}>
+  {typeof title === "string" ? <span class="hs-work-name">{title}</span> : null}
+  {Array.isArray(title) ? (
+    <span class="hs-work-name" data-grow {...at(title.map((item) => item.show).join(" "))}>
+      {title.map((item) => (
+        <span {...at(item.show)}>{item.text}</span>
+      ))}
+    </span>
+  ) : null}
+  <slot name="head" />
+  {detail || Astro.slots.has("default") ? (
+    <div class="hs-work-opened">
+      {detail ? <p class="hs-work-detail">{detail}</p> : null}
+      <ol class="hs-work-acts"><slot /></ol>
+    </div>
+  ) : null}
+</li>

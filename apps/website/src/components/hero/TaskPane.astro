@@ -1,9 +1,10 @@
 ---
 /**
- * The task view (TaskView.tsx, TaskDocument.tsx): the sidebar toggle and the breadcrumb on the top line with the task's status mark, the tab
- * track, the scrolling document in the slot, and the footer. The task waits in the backlog until its work starts,
- * then runs in its own worktree on `branch`.
+ * The task view (TaskView.tsx, TaskDocument.tsx): the crumbs on the top line with the task's status mark and the
+ * person's Orcling at its end, the tab track, the scrolling document in the slot, and the footer. The task waits in the
+ * backlog until its work starts, then runs in its own worktree on `branch`.
  */
+import OrclingFace from "./OrclingFace.astro";
 import ProductIcon from "./ProductIcon.astro";
 import StatusMark from "./StatusMark.astro";
 import { project } from "../../data/hero/workspace";
@@ -26,12 +27,18 @@ const tabs = ["Overview", "Activity", "Changes", "Commits", "Memory"];
 
 <section class="hs-pane" data-pane={id}>
   <header class="hs-header hs-task-header">
-    <span class="hs-round hs-sidebar-toggle" aria-hidden="true"><ProductIcon name="panelLeft" /></span>
-    <span class="hs-crumb">Tasks</span>
-    <span class="hs-crumb-sep">/</span>
-    <StatusMark status="backlog" {...waiting} />
-    <StatusMark status="in_progress" {...started} />
-    <span class="hs-title">{title}</span>
+    <span class="hs-crumbs-row">
+      <span class="hs-crumb">Tasks</span>
+      <span class="hs-crumb-sep">/</span>
+      <span class="hs-crumb-current">
+        <StatusMark status="backlog" {...waiting} />
+        <StatusMark status="in_progress" {...started} />
+        <span class="hs-title">{title}</span>
+      </span>
+    </span>
+    <span class="hs-header-actions" aria-hidden="true">
+      <span class="hs-round"><OrclingFace /></span>
+    </span>
   </header>
   <nav class="hs-task-tabs">
     <span class="hs-track">{tabs.map((tab, i) => <span data-selected={i === 0 ? "" : undefined}>{tab}</span>)}</span>
@@ -43,7 +50,11 @@ const tabs = ["Overview", "Activity", "Changes", "Commits", "Memory"];
   </div>
   <footer class="hs-doc-footer">
     <span><ProductIcon name="check" />Saved</span>
-    <span class="hs-doc-branch"><ProductIcon name="branch" /><span {...waiting}>{project.branch}</span><span {...started}>{branch}</span></span>
-    <span class="hs-button hs-open-thread">Open thread<ProductIcon name="arrowUpRight" /></span>
+    <span class="hs-doc-branch"><ProductIcon name="gitBranch" /><span {...waiting}>{project.branch}</span><span {...started}>{branch}</span></span>
+    <span class="hs-doc-actions">
+      <span class="hs-round"><ProductIcon name="slidersHorizontal" /></span>
+      <span class="hs-button hs-open-thread">Open thread<ProductIcon name="arrowUpRight" /></span>
+      <span class="hs-round"><ProductIcon name="chevronDown" /></span>
+    </span>
   </footer>
 </section>

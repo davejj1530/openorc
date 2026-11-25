@@ -1,0 +1,18 @@
+---
+/**
+ * A project's mark as the app's ProjectCube draws it: the OpenOrc cube as an open frame. Its top face fills while the
+ * project's threads work and wears the attention colour when one needs the person.
+ */
+import { PROJECT_CUBE, type ProjectActivity } from "../../../../../packages/client/src/state-marks";
+
+interface Props {
+  activity?: ProjectActivity;
+}
+const { activity = "quiet" } = Astro.props;
+---
+
+<svg class="hs-project-cube" viewBox="0 0 24 24" data-activity={activity} aria-hidden="true">
+  <path class="hs-project-cube-top" d={PROJECT_CUBE.top}></path>
+  <path d={PROJECT_CUBE.frame}></path>
+  <path d={PROJECT_CUBE.seams}></path>
+</svg>

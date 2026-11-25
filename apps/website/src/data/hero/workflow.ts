@@ -94,7 +94,8 @@ export const workflow = {
   },
 };
 
-export const busy = { a: "aSend~aDone aPick~aCreated", b: "bStart~bDone" };
+/** Thread a's turn runs from the prompt until the tasks are made: the question joins it part way. */
+export const busy = { a: "aSend~aCreated", b: "bStart~bDone" };
 
 const wide: Timeline = {
   typeStart: 0.8,
@@ -109,7 +110,6 @@ const wide: Timeline = {
   aOutroStart: 11.2,
   aOutroEnd: 12.6,
   aQuestion: 12.9,
-  aDone: 13.1,
   aSelect: 14.6,
   aPick: 15.6,
   aCreatedStart: 16,

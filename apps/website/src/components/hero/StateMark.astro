@@ -1,0 +1,26 @@
+---
+/**
+ * A thread's state as the app's StateMark draws it: the OpenOrc cube as 19 dots under a light, from the same
+ * arithmetic the app uses (packages/client/src/state-marks.ts). It is drawn at the moment that says most about it, and
+ * scripts/state-marks.ts plays a moving mark's loop.
+ */
+import { restMoment, threadMarkMotion, type ThreadMarkKind } from "../../../../../packages/client/src/state-marks";
+
+interface Props extends Record<string, unknown> {
+  kind?: ThreadMarkKind;
+  class?: string;
+}
+const { kind = "working", class: className, ...rest } = Astro.props;
+const motion = threadMarkMotion(kind);
+const moment = restMoment(motion);
+---
+
+<svg class:list={["hs-state-mark", className]} viewBox="-12 -12 24 24" data-tone={motion.tone} data-state-mark={motion.period ? kind : undefined} aria-hidden="true" {...rest}>
+  {motion.dots.map((dot) => <circle cx={dot.x} cy={dot.y} r={motion.radius} style={`transform: scale(${dot.frames[moment]!.size}); --hs-mark-wear: ${dot.frames[moment]!.ramp}`} />)}
+</svg>
+
+<script>
+  import { playStateMarks } from "../../scripts/state-marks";
+
+  playStateMarks();
+</script>

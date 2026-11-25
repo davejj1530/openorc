@@ -1,8 +1,8 @@
 /*
- * The product scenes and stills. Values come from the desktop app's OpenOrc palette and its component geometry
- * (apps/desktop/DESIGN.md, app.css, styles/*.css), measured in its design preview. Everything is laid out in design
- * pixels (--u) and scales with its frame, so text is rendered, never scaled as an image. A scene is the app's tile
- * ground with no frame of its own; the page's tile clips it. Depth is a step in fill: tile, plane, fill.
+ * The product scenes and stills. Values come from the desktop app's OpenOrc palette, its type scale and its component
+ * geometry (apps/desktop/DESIGN.md, app.css, styles/*.css), measured in its design preview. Everything is laid out in
+ * design pixels (--u) and scales with its frame, so text is rendered, never scaled as an image. A scene is the app's
+ * ground with no frame of its own; the page's window clips it. Depth is a step in fill: ground, plane, fill.
  */
 @import "@fontsource-variable/jetbrains-mono";
 
@@ -11,50 +11,59 @@
   inherits: true;
   initial-value: 1px;
 }
+@property --hs-mark-wear {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
 
-/* Static mocks share the scene's tokens; each sets its own canvas width in --hs-canvas. */
+/* Static mocks share the scene's tokens; each sets its own canvas width in --hs-canvas. The names follow the app's:
+   four inks, the ground, the plane and its two fills, the line and the strong line. */
 .hero-scene,
 .hs-mock {
-  --u: calc(100cqi / 1360);
+  --u: calc(100cqi / 1512);
   --hs-bg: #f5f5f2;
   --hs-plane: #ffffff;
   --hs-fill: #ecece9;
   --hs-fill-strong: #e5e5e3;
-  /* The fill over the tile, opaque, for a message in flight over moving content. */
+  /* The fill over the ground, opaque, for a message in flight over moving content. */
   --hs-fill-solid: #ecece9;
   --hs-line: #e5e5e3;
+  --hs-line-strong: #d8d8d6;
+  /* The partitions beside the conversation and the line over the sidebar's foot: halfway from the line to the strong line. */
+  --hs-seam: color-mix(in srgb, var(--hs-line), var(--hs-line-strong));
   --hs-ink: #171717;
+  --hs-ink-2: #515150;
+  --hs-ink-3: #626261;
+  --hs-ink-4: #676766;
   --hs-prose: #515150;
   --hs-bubble: #ffffff;
   --hs-current: #ffffff;
   --hs-lit: 0 0 0 calc(0.5 * var(--u)) rgb(23 23 23 / 0.06), 0 var(--u) calc(2 * var(--u)) rgb(23 23 23 / 0.05), 0 calc(10 * var(--u)) calc(24 * var(--u)) calc(-12 * var(--u)) rgb(23 23 23 / 0.2);
+  --hs-lit-strong: 0 var(--u) calc(2 * var(--u)) rgb(23 23 23 / 0.2), 0 calc(10 * var(--u)) calc(22 * var(--u)) calc(-10 * var(--u)) rgb(23 23 23 / 0.45);
   --hs-key: #f4f4f2;
   --hs-line-number: #868684;
-  --hs-muted: #515150;
-  --hs-faint: #626261;
   --hs-accent: #171717;
   --hs-on-accent: #ffffff;
-  --hs-code: #ecece9;
+  --hs-working: #171717;
+  --hs-think: #7c5cd6;
+  --hs-code: #e3e3e3;
   --hs-ok: #1e7359;
   --hs-bad: #9b5050;
   --hs-ok-soft: #e4f0ea;
   --hs-bad-soft: #f7eae8;
   --hs-attention: #b26a00;
   --hs-warn: #8f5408;
-  /* Secondary controls rest on the plane on the tile, and on the fill inside a plane (the Contextual Fill Rule). */
+  /* Secondary controls rest on the plane on the ground, and on the fill inside a plane (the Contextual Fill Rule). */
   --hs-control: var(--hs-plane);
   --hs-mono: "JetBrains Mono Variable", "SF Mono", Menlo, Consolas, monospace;
   --hs-ease: cubic-bezier(0.2, 0, 0, 1);
   color: var(--hs-ink);
-  font-family:
-    "Immaculate Gothic",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-  font-size: calc(13 * var(--u));
-  font-weight: 450;
-  line-height: calc(20 * var(--u));
+  /* As the app chooses its face: a Mac's own leads there, and the bundled one everywhere else. */
+  font-family: -apple-system, BlinkMacSystemFont, "Immaculate Gothic", "Segoe UI", sans-serif;
+  font-size: calc(16 * var(--u));
+  font-weight: 400;
+  line-height: calc(23 * var(--u));
   letter-spacing: -0.005em;
   text-align: left;
   -webkit-font-smoothing: antialiased;
@@ -64,28 +73,33 @@
 }
 /* The site and product pictures follow the same appearance choice. */
 :root[data-theme="dark"] :is(.hero-scene, .hs-mock) {
-  --hs-bg: #050505;
-  --hs-plane: #101010;
-  --hs-fill: #161616;
-  --hs-fill-strong: #1e1e1e;
-  --hs-fill-solid: #161616;
-  --hs-line: #181818;
+  --hs-bg: #141414;
+  --hs-plane: #1c1c1c;
+  --hs-fill: #222222;
+  --hs-fill-strong: #2a2a2a;
+  --hs-fill-solid: #222222;
+  --hs-line: #242424;
+  --hs-line-strong: #363636;
   --hs-ink: #ededeb;
-  --hs-prose: #dededb;
-  --hs-bubble: #131313;
-  --hs-current: #191919;
+  --hs-ink-2: #bdbdba;
+  --hs-ink-3: #999996;
+  --hs-ink-4: #8e8e8b;
+  --hs-prose: #dededc;
+  --hs-bubble: #1f1f1f;
+  --hs-current: #272727;
   --hs-lit: inset 0 var(--u) 0 rgb(255 255 255 / 0.1), 0 0 calc(28 * var(--u)) calc(-10 * var(--u)) rgb(255 255 255 / 0.22);
-  --hs-key: #1a1a1a;
-  --hs-line-number: #6a6a67;
-  --hs-muted: #b9b9b6;
-  --hs-faint: #8f8f8c;
+  --hs-lit-strong: inset 0 var(--u) 0 rgb(255 255 255 / 0.6), 0 0 calc(32 * var(--u)) calc(-6 * var(--u)) rgb(255 255 255 / 0.36);
+  --hs-key: #262626;
+  --hs-line-number: #737370;
   --hs-accent: #ffffff;
-  --hs-on-accent: #050505;
-  --hs-code: #161616;
+  --hs-on-accent: #141414;
+  --hs-working: #ffffff;
+  --hs-think: #a891ff;
+  --hs-code: #373737;
   --hs-ok: #58b98a;
   --hs-bad: #d98a7e;
-  --hs-ok-soft: #12201a;
-  --hs-bad-soft: #241715;
+  --hs-ok-soft: #222c27;
+  --hs-bad-soft: #2f2726;
   --hs-attention: #f0b35a;
   --hs-warn: #f0b35a;
 }
@@ -104,7 +118,7 @@
   background: var(--hs-bg);
 }
 /* Planes restate the contextual fills, as the app's data-plane does. */
-:is(.hs-shell, .hs-steps, .hs-change, .hs-question, .hs-comment-composer, .hs-task-card, .hs-mock-changes) {
+:is(.hs-shell, .hs-change, .hs-question, .hs-comment-composer, .hs-task-card, .hs-mock-changes) {
   --hs-control: var(--hs-fill);
 }
 .hs-sprite {
@@ -121,8 +135,8 @@
 }
 .hs-logo {
   flex: none;
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
 }
 /* Codex and OpenCode marks are dark, so the app's dark theme inverts them; the scenes do the same. */
 :root[data-theme="dark"] .hs-logo:is([data-provider="codex"], [data-provider="opencode"]) {
@@ -137,8 +151,8 @@
 .hs-lights {
   position: absolute;
   z-index: 3;
-  top: calc(13 * var(--u));
-  left: calc(14 * var(--u));
+  top: calc(15 * var(--u));
+  left: calc(16 * var(--u));
   display: flex;
   gap: calc(9 * var(--u));
 }
@@ -155,6 +169,74 @@
   background: #28c840;
 }
 
+/* State marks (state-marks.css): a thread's cube as dots, each scaled from its own centre and wearing its mark's
+   colour from faded into the ground to whole. The colour is the theme's own for what the mark says. */
+.hs-state-mark {
+  display: block;
+  flex: none;
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+  overflow: visible;
+  --hs-mark-color: var(--hs-working);
+}
+.hs-state-mark[data-tone="think"] {
+  --hs-mark-color: var(--hs-think);
+}
+.hs-state-mark[data-tone="ink"] {
+  --hs-mark-color: var(--hs-ink);
+}
+.hs-state-mark[data-tone="attention"] {
+  --hs-mark-color: var(--hs-attention);
+}
+.hs-state-mark[data-tone="bad"] {
+  --hs-mark-color: var(--hs-bad);
+}
+.hs-state-mark[data-tone="ok"] {
+  --hs-mark-color: var(--hs-ok);
+}
+.hs-state-mark[data-tone="quiet"] {
+  --hs-mark-color: var(--hs-ink-3);
+}
+.hs-state-mark circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  fill: color-mix(in oklab, var(--hs-mark-color) calc(45% + var(--hs-mark-wear) * 55%), var(--hs-bg));
+}
+/* A project's cube: the same cube as an open frame in the ink of the name it leads. Its top face fills in the working
+   ink and breathes while the project's threads work, and wears the attention colour when one needs the person. */
+.hs-project-cube {
+  display: block;
+  flex: none;
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.hs-project-cube-top {
+  fill: var(--hs-working);
+  stroke: var(--hs-working);
+  opacity: 0;
+}
+.hs-project-head[data-busy] .hs-project-cube-top {
+  opacity: 1;
+  animation: hs-cube-breathe 2.4s ease-in-out infinite;
+}
+.hs-project-head[data-waiting] .hs-project-cube-top {
+  fill: var(--hs-attention);
+  stroke: var(--hs-attention);
+  opacity: 1;
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hs-project-head[data-busy] .hs-project-cube-top {
+    animation: none;
+  }
+}
+
 /* Controls: round icon buttons, pills, and the segmented track with its raised knob. */
 .hs-round {
   display: grid;
@@ -163,36 +245,36 @@
   width: calc(30 * var(--u));
   height: calc(30 * var(--u));
   border-radius: 999px;
-  color: var(--hs-muted);
+  color: var(--hs-ink-3);
 }
 .hs-button {
   display: inline-flex;
   flex: none;
   align-items: center;
+  justify-content: center;
   gap: calc(6 * var(--u));
   height: calc(30 * var(--u));
   padding: 0 calc(14 * var(--u));
   border-radius: 999px;
   background: var(--hs-control);
   color: var(--hs-ink);
+  line-height: calc(18 * var(--u));
   white-space: nowrap;
 }
 .hs-button-sm {
   gap: calc(4 * var(--u));
   height: calc(28 * var(--u));
   padding: 0 calc(12 * var(--u));
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  font-size: calc(15 * var(--u));
+  letter-spacing: 0;
 }
 .hs-button-lg {
   height: calc(32 * var(--u));
   padding: 0 calc(14 * var(--u)) 0 calc(10 * var(--u));
 }
-.hs-button-plane {
-  background: var(--hs-plane);
-}
 .hs-button-ink {
   background: var(--hs-accent);
+  box-shadow: var(--hs-lit-strong);
   color: var(--hs-on-accent);
 }
 .hs-button .hs-icon {
@@ -204,8 +286,10 @@
   align-items: center;
   height: calc(28 * var(--u));
   padding: 0 calc(12 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
+  color: var(--hs-ink-4);
+  font-size: calc(15 * var(--u));
+  line-height: calc(18 * var(--u));
+  letter-spacing: 0;
 }
 .hs-track {
   display: inline-flex;
@@ -221,20 +305,22 @@
   height: calc(28 * var(--u));
   padding: 0 calc(14 * var(--u));
   border-radius: 999px;
-  color: var(--hs-muted);
-  line-height: calc(16 * var(--u));
+  color: var(--hs-ink-2);
+  line-height: calc(18 * var(--u));
 }
 .hs-track > [data-selected] {
   background: var(--hs-plane);
   color: var(--hs-ink);
 }
+/* Line counts in the code face (Counts.tsx): additions and removals, each in its own colour. */
 .hs-counts {
   display: inline-flex;
   flex: none;
   gap: calc(8 * var(--u));
   font-family: var(--hs-mono);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  font-size: calc(14 * var(--u));
+  line-height: calc(18 * var(--u));
+  letter-spacing: 0;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -245,14 +331,14 @@
   color: var(--hs-bad);
 }
 
-/* Sidebar (Sidebar.tsx, sidebar.css): 246 units wide, parted from the work column by a hairline seam from the window's
-   top to its foot. Like the app's, hairlines stay one device pixel at any scale. */
+/* Sidebar (Sidebar.tsx, sidebar.css): 247 units wide, parted from the work column by a seam from the window's top to
+   its foot. Like the app's, seams and hairlines keep their own width at any scale. */
 .hs-sidebar {
   position: relative;
   display: flex;
   flex: none;
   flex-direction: column;
-  width: calc(246 * var(--u));
+  width: calc(247 * var(--u));
   overflow: hidden;
 }
 .hs-sidebar::after {
@@ -261,49 +347,46 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: var(--hairline);
-  background: var(--hs-line);
+  width: 1px;
+  background: var(--hs-seam);
   pointer-events: none;
 }
-/* The window's corner: the wordmark after the traffic lights, then Back and Forward (off, with nothing to go forward to). */
+/* The window's corner: the sidebar toggle after the traffic lights, then Back and Forward at the far end (Forward off,
+   with nothing to go forward to). */
 .hs-sidebar-head {
   display: flex;
   flex: none;
   align-items: center;
+  justify-content: space-between;
   height: calc(44 * var(--u));
-  padding: 0 calc(19 * var(--u)) 0 calc(90 * var(--u));
+  padding: 0 calc(12 * var(--u)) 0 calc(86 * var(--u));
 }
-.hs-sidebar .hs-round {
+.hs-sidebar-toggle {
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+}
+/* The sidebar's own tools are drawn at 18, the size of the glyphs its rows lead with. */
+.hs-sidebar :is(.hs-sidebar-head, .hs-list-tools, .hs-sidebar-foot) .hs-icon {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+}
+.hs-history {
+  display: flex;
+}
+.hs-history .hs-round {
   width: calc(24 * var(--u));
   height: calc(24 * var(--u));
 }
-.hs-wordmark {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: calc(7 * var(--u));
-  min-width: 0;
-  font-size: calc(15 * var(--u));
-  line-height: calc(16 * var(--u));
-  letter-spacing: -0.02em;
-  white-space: nowrap;
+.hs-history .hs-round[data-off] {
+  color: var(--hs-ink-4);
 }
-.hs-wordmark svg {
-  flex: none;
-  width: calc(16 * var(--u));
-  height: calc(16 * var(--u));
-}
-.hs-sidebar-head .hs-round[data-off] {
-  color: var(--hs-faint);
-}
-/* The screens as 32-unit rows (SidebarNav.tsx): the icon and name, Tasks with its count in amber at the line's end.
-   Rows and thread rows share the same inset, and the open one sits on the current-row fill. */
+/* The screens as 32-unit rows (SidebarNav.tsx): an 18-unit glyph and the name, New thread in ink, Tasks with its count
+   in amber at the line's end. Rows and thread rows share the same inset, and the open one sits on the current-row fill. */
 .hs-nav {
-  display: flex;
+  display: grid;
   flex: none;
-  flex-direction: column;
   gap: calc(2 * var(--u));
-  padding-top: calc(2 * var(--u));
+  padding: calc(2 * var(--u)) calc(8 * var(--u)) 0;
 }
 .hs-nav-row,
 .hs-project-head,
@@ -313,26 +396,33 @@
   align-items: center;
   gap: calc(8 * var(--u));
   height: calc(32 * var(--u));
-  margin: 0 calc(16 * var(--u)) 0 calc(8 * var(--u));
   padding: 0 calc(8 * var(--u));
   border-radius: calc(10 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(14 * var(--u));
-  line-height: calc(16 * var(--u));
+  color: var(--hs-ink-3);
+  line-height: calc(18 * var(--u));
   white-space: nowrap;
 }
-.hs-nav-row > span:not(.hs-nav-count),
-.hs-project-head > span {
+.hs-nav-row[data-screen="newthread"] {
+  color: var(--hs-ink);
+}
+.hs-nav-row > .hs-icon {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+}
+.hs-nav-label,
+.hs-project-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.hs-nav-label {
+  flex: 1;
+}
 .hs-nav-count {
   flex: none;
   min-width: calc(16 * var(--u));
-  margin-left: auto;
-  color: var(--hs-attention);
-  font-size: calc(13 * var(--u));
+  color: var(--hs-warn);
+  font-size: calc(15 * var(--u));
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -342,29 +432,44 @@
   box-shadow: var(--hs-lit);
   color: var(--hs-ink);
 }
-/* Workspaces (SidebarListHead.tsx): a quiet heading, then search, a new folder and the filter. */
+/* The list's name (ListSwitcher.tsx), which switches what the list holds, then search, a new folder and the filter. */
 .hs-list-head {
   display: flex;
   flex: none;
   align-items: center;
+  justify-content: space-between;
   height: calc(32 * var(--u));
-  margin: calc(12 * var(--u)) calc(8 * var(--u)) 0;
-  padding: 0 calc(10 * var(--u)) 0 calc(8 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(13 * var(--u));
+  margin: calc(12 * var(--u)) calc(8 * var(--u)) calc(2 * var(--u));
 }
 .hs-list-name {
-  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  height: calc(28 * var(--u));
+  padding: 0 calc(8 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
+  white-space: nowrap;
+}
+.hs-list-name .hs-icon {
+  width: calc(10 * var(--u));
+  height: calc(10 * var(--u));
+  color: var(--hs-ink-4);
 }
 .hs-list-tools {
   display: flex;
-  gap: calc(12 * var(--u));
-  color: var(--hs-muted);
+  gap: calc(4 * var(--u));
+  margin-right: calc(4 * var(--u));
 }
-/* Each project's threads under its folder (SidebarProjectGroup.tsx); a folded project shows its chevron. */
+.hs-list-tools .hs-round {
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
+}
+/* Each project's threads under its cube (SidebarProjectGroup.tsx); a folded project shows its chevron. */
 .hs-threads {
   flex: 1;
   min-height: 0;
+  padding: 0 calc(8 * var(--u)) calc(12 * var(--u));
   overflow: hidden;
 }
 .hs-project {
@@ -373,52 +478,47 @@
   gap: calc(2 * var(--u));
 }
 .hs-project + .hs-project {
-  margin-top: calc(7 * var(--u));
+  margin-top: calc(16 * var(--u));
 }
 .hs-project-head {
+  gap: calc(4 * var(--u));
   height: calc(28 * var(--u));
-  margin-right: 0;
+  margin-bottom: calc(-2 * var(--u));
+  font-size: calc(15 * var(--u));
+  line-height: calc(23 * var(--u));
 }
-.hs-project-head .hs-icon:last-child:not(:first-child) {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
-  margin-left: calc(-4 * var(--u));
+.hs-project-head > .hs-project-cube {
+  margin-right: calc(4 * var(--u));
 }
-/* A thread row (ThreadLibraryRow.tsx): its title, and the mark of what it needs in a 16-unit slot at the line's end. */
+.hs-project-chevron {
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
+}
+/* A thread row (ThreadLibraryRow.tsx): the cube of its state in a 16-unit slot that every row keeps, then its title. */
+.hs-row {
+  color: var(--hs-ink-2);
+}
+.hs-row-lead {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+}
+.hs-row-lead > * {
+  display: none;
+  grid-area: 1 / 1;
+}
 .hs-row-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.hs-row-cube,
-.hs-row-question {
-  display: none;
-  flex: none;
-  width: calc(16 * var(--u));
-  height: calc(16 * var(--u));
-}
-.hs-row-cube {
-  color: var(--hs-ink);
-}
-.hs-row-question {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
-  margin: 0 calc(1 * var(--u));
-  color: var(--hs-attention);
-}
-.hs-row-dot {
-  display: none;
-  flex: none;
-  width: calc(7 * var(--u));
-  height: calc(7 * var(--u));
-  margin: 0 calc(4.5 * var(--u));
-  border-radius: 999px;
-  background: var(--hs-ink);
-}
-.hs-row[data-busy]:not([data-waiting]) .hs-row-cube,
-.hs-row[data-waiting] .hs-row-question,
-.hs-row[data-done]:not([data-busy], [data-waiting]) .hs-row-dot {
+/* Waiting outranks working, which outranks an unread result. */
+.hs-row[data-waiting] .hs-row-waiting,
+.hs-row[data-busy]:not([data-waiting]) .hs-row-busy,
+.hs-row[data-done]:not([data-busy], [data-waiting]) .hs-row-done {
   display: block;
 }
 /* The open thread takes the current-row fill, and so does every thread open in a split pane. */
@@ -430,71 +530,68 @@
   box-shadow: var(--hs-lit);
   color: var(--hs-ink);
 }
-/* Resolved at the list's foot, quiet, its chevron after the word; then the foot: the week's usage and Settings. */
+/* A later day's label over its rows, and the project's own Resolved at its foot (resolved.css): quiet words that run
+   into a hairline. */
+.hs-day,
 .hs-resolved {
   display: flex;
   flex: none;
+  padding: 0 calc(8 * var(--u));
+  color: var(--hs-ink-4);
+  font-size: calc(14 * var(--u));
+  line-height: calc(18 * var(--u));
+  white-space: nowrap;
+}
+.hs-day::after,
+.hs-resolved::after {
+  content: "";
+  flex: 1;
+  align-self: center;
+  border-top: var(--hairline) solid var(--hs-line);
+}
+.hs-day {
+  align-items: flex-end;
+  gap: calc(8 * var(--u));
+  height: calc(22 * var(--u));
+  margin-top: calc(10 * var(--u));
+  padding-bottom: calc(2 * var(--u));
+}
+.hs-project-head + .hs-day {
+  margin-top: calc(4 * var(--u));
+}
+.hs-resolved {
   align-items: center;
   gap: calc(4 * var(--u));
-  height: calc(32 * var(--u));
-  margin: calc(4 * var(--u)) calc(8 * var(--u));
-  padding: 0 calc(8 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(13 * var(--u));
+  height: calc(24 * var(--u));
+  margin: calc(8 * var(--u)) 0 calc(2 * var(--u));
 }
 .hs-resolved .hs-icon {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
+  margin-right: calc(6 * var(--u));
 }
+/* The foot: Settings, under a seam that meets the one beside the work column. */
 .hs-sidebar-foot {
   display: flex;
   flex: none;
   align-items: center;
   justify-content: flex-end;
-  gap: calc(10 * var(--u));
-  height: calc(44 * var(--u));
-  padding: 0 calc(17 * var(--u));
+  height: calc(52 * var(--u));
+  padding: 0 calc(8 * var(--u));
+  box-shadow: inset 0 1px 0 var(--hs-seam);
 }
-.hs-usage {
-  display: flex;
-  align-items: center;
-  gap: calc(5 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(13 * var(--u));
-  font-variant-numeric: tabular-nums;
+.hs-sidebar-foot .hs-round {
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
 }
-.hs-usage[hidden] {
-  display: none;
-}
+/* An amount as a share (AmountShare.tsx): a faint disc under a wedge from twelve o'clock. */
 .hs-pie {
   flex: none;
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
 }
-.hs-sidebar-foot .hs-round {
-  width: calc(28 * var(--u));
-  height: calc(28 * var(--u));
-}
-/* The working cube: its light moves around it one face at a time. */
-.hs-cube-face:not([data-face="top"]) {
-  opacity: 0;
-}
-.hs-cube-face {
-  animation: hs-mark-face 2400ms ease-in-out infinite;
-}
-.hs-cube-face[data-face="right"] {
-  animation-delay: -1600ms;
-}
-.hs-cube-face[data-face="left"] {
-  animation-delay: -800ms;
-}
-@media (prefers-reduced-motion: reduce) {
-  .hs-cube-face {
-    animation: none;
-  }
-}
 
-/* Panes: the conversation on the tile under its header on the window's top line, closed off by a hairline. */
+/* Panes: the conversation on the ground under its header on the window's top line. */
 .hs-panes {
   display: flex;
   flex: 1;
@@ -518,54 +615,25 @@
   display: flex;
 }
 /* A thread header (TopBar.tsx): tabs start 8 in, a pane split beside the first names its thread 20 in, and the round
-   tools end 8 from the window's edge or 12 from the pane or panel beside them. Page headers keep 12 on both sides. */
+   tools end 12 from the window's edge or the pane or panel beside them. */
 .hs-header {
   display: flex;
   flex: none;
   align-items: center;
   gap: calc(8 * var(--u));
   height: calc(44 * var(--u));
-  padding: 0 calc(8 * var(--u));
-  line-height: calc(16 * var(--u));
+  padding: 0 calc(12 * var(--u)) 0 calc(8 * var(--u));
+  line-height: calc(18 * var(--u));
 }
 .hs-header[data-kind="title"] {
   padding-left: calc(20 * var(--u));
 }
-.hs-panes[data-split] > .hs-pane:first-child .hs-header,
-.hs-app-thread .hs-header {
-  padding-right: calc(12 * var(--u));
-}
 .hs-title {
   min-width: 0;
-  margin-left: calc(-8 * var(--u));
-  padding: 0 calc(8 * var(--u));
   overflow: hidden;
+  font-size: calc(15 * var(--u));
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.hs-facts {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: calc(10 * var(--u));
-  min-width: 0;
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  white-space: nowrap;
-}
-.hs-fact-working {
-  display: none;
-  align-items: center;
-  gap: calc(5 * var(--u));
-}
-.hs-fact-working i {
-  width: calc(7 * var(--u));
-  height: calc(7 * var(--u));
-  border-radius: 999px;
-  background: var(--hs-ink);
-}
-:is(.hs-pane, .hs-header)[data-busy] .hs-fact-working {
-  display: inline-flex;
 }
 .hs-header-actions {
   display: flex;
@@ -574,10 +642,15 @@
   gap: calc(4 * var(--u));
   margin-left: auto;
 }
-.hs-header-actions .hs-facts {
-  flex: none;
+/* The person's Orcling, a face to talk to from any thread (HeaderOrcling.tsx), a step apart from the thread's own tools. */
+.hs-header-orcling {
+  margin-right: calc(4 * var(--u));
 }
-/* The thread's actions sit on a narrow pill: the vertical dots need no more width than themselves. */
+.hs-orcling {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+}
+/* The thread's actions sit on a narrow pill: the dots need no more width than themselves. */
 .hs-more {
   width: calc(20 * var(--u));
 }
@@ -591,21 +664,23 @@
   display: grid;
 }
 
-/* Tabs on the top line (work-tabs.css), the work column's and the panel's alike: 30-unit tabs up to 220 wide that share
-   their row down to 136, the panel's as wide as their names. The current tab is raised on the fill with its close;
-   the rest are bare until the pointer fills them. */
+/* Tabs on the top line (work-tabs.css), the work column's and the panel's alike. A tab stands the header's full
+   height: its mark and name as plain words in the third ink, the current one in ink over a 2-unit line with round ends
+   on the header's foot. Each takes its name's width up to 220 and keeps the room for its close, which shows on the
+   current one. */
 .hs-tabs-row {
   display: flex;
   flex: 0 1 auto;
   align-items: center;
+  align-self: stretch;
   gap: calc(2 * var(--u));
   min-width: 0;
 }
 .hs-tabs,
 .hs-panel-tabs {
   display: flex;
-  align-items: center;
-  gap: calc(2 * var(--u));
+  align-items: stretch;
+  align-self: stretch;
   min-width: 0;
 }
 .hs-tabs {
@@ -614,29 +689,31 @@
 .hs-tab {
   position: relative;
   display: flex;
-  flex: 0 1 calc(220 * var(--u));
+  flex: 0 1 auto;
   align-items: center;
-  min-width: calc(136 * var(--u));
-  height: calc(30 * var(--u));
-  border-radius: calc(6 * var(--u));
-  color: var(--hs-muted);
-  line-height: calc(20 * var(--u));
-  transition:
-    background-color 120ms ease-out,
-    color 120ms ease-out;
-}
-.hs-panel-tabs .hs-tab {
-  flex: 0 0 auto;
   min-width: 0;
   max-width: calc(220 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
+  line-height: calc(23 * var(--u));
+  transition: color 120ms ease-out;
+}
+.hs-panel-tabs .hs-tab {
+  flex: none;
 }
 .hs-tab[data-current] {
-  background: var(--hs-fill-strong);
   color: var(--hs-ink);
 }
 .hs-tab:not([data-current]):has(> button:hover) {
-  background: var(--hs-fill);
-  color: var(--hs-ink);
+  color: var(--hs-ink-2);
+}
+.hs-tab[data-current]::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: calc(2 * var(--u));
+  border-radius: 999px;
+  background: currentColor;
 }
 .hs-tab-face {
   display: flex;
@@ -644,18 +721,15 @@
   align-items: center;
   gap: calc(8 * var(--u));
   min-width: 0;
-  height: 100%;
-  padding: 0 calc(10 * var(--u));
+  height: calc(28 * var(--u));
+  padding: 0 calc(26 * var(--u)) 0 calc(8 * var(--u));
   border: 0;
-  border-radius: inherit;
+  border-radius: calc(10 * var(--u));
   background: none;
   color: inherit;
   font: inherit;
   letter-spacing: inherit;
   text-align: left;
-}
-.hs-tab[data-current] .hs-tab-face {
-  padding-right: calc(28 * var(--u));
 }
 .hs-tab-face:focus-visible {
   outline: 2px solid var(--hs-ink);
@@ -666,14 +740,14 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
 }
 .hs-tab-icon > * {
   display: none;
   grid-area: 1 / 1;
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
 }
 .hs-tab:not([data-busy], [data-waiting], [data-unread]) .hs-tab-icon > :first-child,
 .hs-tab[data-waiting] .hs-tab-waiting,
@@ -681,23 +755,11 @@
 .hs-tab[data-unread]:not([data-busy], [data-waiting]) .hs-tab-unread {
   display: block;
 }
-.hs-tab-busy {
-  color: var(--hs-faint);
-}
-.hs-tab[data-current] .hs-tab-busy {
-  color: var(--hs-ink);
-}
-.hs-tab-waiting {
-  color: var(--hs-attention);
-}
-.hs-tab-icon > :is(.hs-tab-unread, .hs-tab-dot) {
+.hs-tab-icon > .hs-tab-dot {
   width: calc(7 * var(--u));
   height: calc(7 * var(--u));
   border-radius: 999px;
   background: currentColor;
-}
-.hs-tab-icon > .hs-tab-unread {
-  background: var(--hs-ink);
 }
 .hs-tab-title {
   min-width: 0;
@@ -707,12 +769,12 @@
 }
 .hs-tab-close {
   position: absolute;
-  right: calc(6 * var(--u));
+  right: calc(4 * var(--u));
   display: none;
   place-items: center;
   width: calc(18 * var(--u));
   height: calc(18 * var(--u));
-  color: var(--hs-muted);
+  color: var(--hs-ink-3);
   pointer-events: none;
 }
 .hs-tab[data-current] .hs-tab-close {
@@ -721,44 +783,6 @@
 .hs-tab-close .hs-icon {
   width: calc(12 * var(--u));
   height: calc(12 * var(--u));
-}
-/* The work column's tabs (work-tabs.css .thread-tabs) stand the header's full height: plain words, the current one in
-   ink over a 2-unit underline, a face that fills under the pointer. */
-.hs-header > .hs-tabs-row,
-.hs-tabs {
-  align-self: stretch;
-}
-.hs-tabs {
-  align-items: stretch;
-}
-.hs-tabs .hs-tab {
-  flex: 0 1 auto;
-  max-width: calc(220 * var(--u));
-  height: auto;
-  border-radius: 0;
-}
-.hs-tabs .hs-tab[data-current],
-.hs-tabs .hs-tab:not([data-current]):has(> button:hover) {
-  background: none;
-}
-.hs-tabs .hs-tab[data-current]::after {
-  content: "";
-  position: absolute;
-  inset: auto 0 0;
-  height: calc(2 * var(--u));
-  background: currentColor;
-}
-.hs-tabs .hs-tab-face {
-  align-self: center;
-  height: calc(28 * var(--u));
-  padding: 0 calc(26 * var(--u)) 0 calc(8 * var(--u));
-  border-radius: calc(6 * var(--u));
-}
-.hs-tabs .hs-tab:not([data-current]):has(> button:hover) .hs-tab-face {
-  background: var(--hs-fill);
-}
-.hs-tabs .hs-tab-close {
-  right: calc(4 * var(--u));
 }
 
 /* Transcript: pinned to its newest line, like a conversation scrolled to the end (Transcript.tsx). */
@@ -794,22 +818,23 @@
   justify-content: flex-end;
 }
 .hs-bubble {
-  max-width: min(88%, 72ch);
-  padding: calc(12 * var(--u)) calc(16 * var(--u));
-  border-radius: calc(18 * var(--u));
+  max-width: 88%;
+  padding: calc(10 * var(--u)) calc(14 * var(--u));
+  border-radius: calc(16 * var(--u));
   background: var(--hs-bubble);
-  font-size: calc(14 * var(--u));
-  line-height: calc(22 * var(--u));
-  letter-spacing: -0.01em;
+  font-size: calc(17 * var(--u));
+  line-height: calc(27 * var(--u));
   white-space: pre-wrap;
 }
+/* What a turn's work came to (TurnReceipt.tsx): quiet facts on one line, then the chevron that opens the work. */
 .hs-receipt {
   display: flex;
   align-items: center;
   gap: calc(16 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  color: var(--hs-ink-4);
+  font-size: calc(14 * var(--u));
+  line-height: calc(18 * var(--u));
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .hs-receipt-item {
@@ -818,21 +843,22 @@
   gap: calc(6 * var(--u));
 }
 .hs-receipt .hs-icon {
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
+}
+.hs-receipt .hs-receipt-chevron {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
-}
-.hs-receipt-chevron {
   transition: rotate 220ms var(--hs-ease);
 }
-/* The receipt is the work's disclosure: its chevron turns while the steps are open. */
-.hs-turn:has(> .hs-steps:not([hidden])) .hs-receipt-chevron {
+/* The receipt is the work's disclosure: its chevron turns while the work is open. */
+.hs-turn:has(> .hs-work:not([hidden])) .hs-receipt-chevron {
   rotate: 180deg;
 }
 .hs-prose {
   color: var(--hs-prose);
-  font-size: calc(14 * var(--u));
-  line-height: calc(22 * var(--u));
-  letter-spacing: -0.01em;
+  font-size: calc(17 * var(--u));
+  line-height: calc(27 * var(--u));
 }
 :is(.hs-prose, .hs-table, .hs-spec) code {
   padding: calc(2 * var(--u)) calc(5 * var(--u));
@@ -844,150 +870,165 @@
   letter-spacing: 0;
   box-decoration-break: clone;
 }
+/* A file a reply names is a link to it: its code keeps a quiet underline. */
+.hs-prose code[data-link] {
+  text-decoration: underline color-mix(in srgb, var(--hs-ink) 35%, transparent);
+  text-underline-offset: calc(3 * var(--u));
+}
 .hs-strong {
-  font-weight: 700;
+  color: var(--hs-ink);
+  font-weight: 600;
+}
+/* Proof beside a claim (ReplyProof.css): a small pill at the sentence's end that names the edit or the run behind it. */
+.hs-proof {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(5 * var(--u));
+  padding: var(--u) calc(9 * var(--u)) var(--u) calc(7 * var(--u));
+  border-radius: 999px;
+  background: var(--hs-control);
+  color: var(--hs-ink-2);
+  font-size: calc(14 * var(--u));
+  line-height: calc(21 * var(--u));
+  letter-spacing: normal;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hs-proof .hs-icon {
+  width: calc(13 * var(--u));
+  height: calc(13 * var(--u));
+  color: var(--hs-ok);
 }
 
-/* The steps card (WorkSteps.tsx): a row per step with a loader or an ink check, opening to what it touched. */
-.hs-steps {
-  margin-bottom: 0;
-  padding: calc(16 * var(--u)) calc(18 * var(--u)) calc(14 * var(--u));
-  border-radius: calc(20 * var(--u));
-  background: var(--hs-plane);
+/* A turn's work as writing on the conversation's own ground (WorkSteps.tsx, WorkActs.tsx). Each step is its name,
+   what the agent said of it, and a line for each thing it did: a mark, a quiet verb, the thing, and how it came out.
+   The step under way is in ink, and the thing under way opens on a piece of its own. */
+.hs-work {
+  display: flex;
+  flex-direction: column;
+  gap: calc(12 * var(--u));
+  min-width: 0;
+}
+.hs-work-lines {
+  display: grid;
+  gap: calc(14 * var(--u));
+  min-width: 0;
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
-.hs-step {
+.hs-work-line {
   display: grid;
-  grid-template-columns: calc(16 * var(--u)) minmax(0, 1fr);
-  column-gap: calc(10 * var(--u));
+  min-width: 0;
 }
-.hs-step-mark {
+.hs-work-name {
+  display: flex;
+  align-items: center;
+  min-height: calc(24 * var(--u));
+  color: var(--hs-ink-2);
+  transition: color 220ms ease-out;
+}
+.hs-work-line[data-running] > .hs-work-name {
+  color: var(--hs-ink);
+}
+.hs-work-opened {
+  min-width: 0;
+  padding: calc(2 * var(--u)) 0 calc(4 * var(--u));
+}
+.hs-work-detail {
+  margin: 0;
+  color: var(--hs-ink-3);
+  font-size: calc(16 * var(--u));
+  line-height: calc(23 * var(--u));
+}
+/* What the agent wrote at a step's head reads in full, a step quieter than a reply. The newest thing a live turn has
+   said reads as its reply until the work goes on past it. */
+:is(.hs-work-said, .hs-work-reply[data-said]) .hs-prose {
+  color: var(--hs-ink-2);
+  font-size: calc(16 * var(--u));
+  line-height: calc(25 * var(--u));
+}
+.hs-work-reply .hs-prose {
+  transition:
+    color 220ms ease-out,
+    font-size 220ms ease-out;
+}
+.hs-work-acts {
   display: grid;
-  place-items: center;
-  height: calc(30 * var(--u));
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.hs-live {
-  display: inline-grid;
-  color: var(--hs-faint);
+.hs-work-act {
+  min-width: 0;
+  border-radius: calc(18 * var(--u));
 }
-.hs-live .hs-icon {
-  animation: hs-spin 1s linear infinite;
+.hs-work-act-head {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  min-width: 0;
+  min-height: calc(30 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
+  line-height: calc(21 * var(--u));
 }
-.hs-done {
-  display: grid;
-  place-items: center;
+/* A line's mark takes the ink of the thing the line names. */
+.hs-work-act-head > .hs-icon {
+  color: var(--hs-ink-2);
+}
+.hs-work-act-head > .hs-file-glyph {
   width: calc(16 * var(--u));
   height: calc(16 * var(--u));
-  border-radius: 999px;
-  background: var(--hs-ink);
-  color: var(--hs-bg);
 }
-.hs-done .hs-icon {
-  width: calc(11 * var(--u));
-  height: calc(11 * var(--u));
-  stroke-width: 2.25;
-}
-.hs-step-title {
-  display: flex;
-  align-items: center;
-  gap: calc(8 * var(--u));
-  min-width: 0;
-  height: calc(30 * var(--u));
-  color: var(--hs-muted);
-  line-height: calc(16 * var(--u));
-}
-.hs-step:has(> .hs-step-mark > .hs-live:not([hidden])) > .hs-step-title {
-  color: var(--hs-ink);
-}
-.hs-step-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hs-step-meta {
-  flex: none;
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-}
-.hs-step-chevron {
-  display: none;
-  width: calc(12 * var(--u));
-  height: calc(12 * var(--u));
-  margin-left: auto;
-  rotate: 90deg;
-}
-.hs-step:has(> .hs-step-body:not([hidden])) .hs-step-chevron {
-  display: block;
-}
-.hs-step-body {
-  display: grid;
-  grid-column: 2;
-  gap: calc(10 * var(--u));
-  padding: calc(2 * var(--u)) 0 calc(12 * var(--u));
-}
-.hs-step-narration .hs-prose {
-  color: var(--hs-muted);
-  font-size: calc(13 * var(--u));
-  line-height: calc(20 * var(--u));
-  letter-spacing: -0.005em;
-}
-.hs-step-note {
-  display: flex;
-  align-items: center;
-  gap: calc(8 * var(--u));
-  height: calc(30 * var(--u));
-  color: var(--hs-faint);
-  line-height: calc(16 * var(--u));
-}
-.hs-group {
-  display: grid;
-  grid-template-columns: calc(72 * var(--u)) minmax(0, 1fr);
-  column-gap: calc(12 * var(--u));
-}
-.hs-group-label {
-  display: flex;
-  align-items: center;
-  height: calc(28 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-}
-.hs-chips {
-  display: grid;
-  gap: var(--u);
-  margin-left: calc(-8 * var(--u));
-}
-.hs-chip {
-  display: flex;
-  align-items: center;
-  gap: calc(8 * var(--u));
-  min-width: 0;
-  height: calc(28 * var(--u));
-  padding: 0 calc(8 * var(--u));
-  border-radius: calc(10 * var(--u));
-  color: var(--hs-muted);
-  line-height: calc(16 * var(--u));
-  white-space: nowrap;
-}
-.hs-chip[data-live] {
-  color: var(--hs-ink);
-}
-.hs-file-glyph {
-  flex: none;
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
-}
-.hs-chip-label {
-  color: var(--hs-ink);
-}
-.hs-chip-detail {
+.hs-work-act-words {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.hs-work-act-verb {
+  color: var(--hs-ink-4);
+}
+.hs-work-act-name {
+  color: var(--hs-ink-2);
+}
+.hs-work-act:is([data-running], [data-open]) .hs-work-act-name {
+  color: var(--hs-ink);
+}
+.hs-work-act-words[data-mono] > .hs-work-act-name {
+  font-family: var(--hs-mono);
+  font-size: calc(14 * var(--u));
+  letter-spacing: 0;
+}
+.hs-work-act-result {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  color: var(--hs-ink-4);
+  font-size: calc(14 * var(--u));
+  font-variant-numeric: tabular-nums;
+}
+.hs-work-act-end {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+}
+.hs-work-act-end[hidden] {
+  display: none;
+}
+.hs-work-act-result .hs-state-mark {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+}
+.hs-work-act-result .hs-counts {
+  gap: calc(6 * var(--u));
+  line-height: calc(21 * var(--u));
+}
+/* Five blocks that weigh an edit (WorkMarks.tsx): the added share in green, the removed in red, the rest empty. */
 .hs-size-blocks {
   display: inline-flex;
   flex: none;
@@ -1005,19 +1046,100 @@
 .hs-size-blocks [data-tone="bad"] {
   background: var(--hs-bad);
 }
+/* The thing under way, or one the reader pressed, on a piece of its own: its line as the head, the thing under it. */
+.hs-work-act[data-open] {
+  --hs-control: var(--hs-fill);
+  margin-block: calc(4 * var(--u)) calc(6 * var(--u));
+  background: var(--hs-plane);
+}
+.hs-work-act[data-open] > .hs-work-act-head {
+  padding: calc(10 * var(--u)) calc(14 * var(--u)) calc(4 * var(--u)) calc(12 * var(--u));
+}
+.hs-work-act-body {
+  display: grid;
+  min-width: 0;
+  padding: calc(4 * var(--u)) calc(14 * var(--u)) calc(14 * var(--u)) calc(12 * var(--u));
+}
+/* A test run under way names itself beside the cube at work, in line with the head's words. */
+.hs-work-tests {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  height: calc(24 * var(--u));
+  padding-left: calc(24 * var(--u));
+  color: var(--hs-ink);
+  line-height: calc(18 * var(--u));
+}
+.hs-work-tests .hs-state-mark {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+}
+/* The command a run is for, in plain words beside the command itself, on a soft field. */
+.hs-work-command {
+  display: flex;
+  align-items: baseline;
+  gap: calc(16 * var(--u));
+  min-width: 0;
+  padding: calc(10 * var(--u)) calc(12 * var(--u));
+  border-radius: calc(12 * var(--u));
+  background: var(--hs-control);
+  color: var(--hs-ink);
+  font-size: calc(14 * var(--u));
+  line-height: calc(21 * var(--u));
+  white-space: nowrap;
+}
+.hs-work-command code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hs-ink-3);
+  font-family: var(--hs-mono);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+}
+/* What the turn is doing between its calls: a line whose words shimmer and whose seconds count. */
+.hs-work-live-words {
+  background: linear-gradient(90deg, var(--hs-ink-3) 0%, var(--hs-ink-3) 40%, var(--hs-ink) 50%, var(--hs-ink-3) 60%, var(--hs-ink-3) 100%) 100% 0 / 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: hs-shimmer 2.2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hs-work-live-words {
+    animation: none;
+  }
+}
+/* The same work drawn in time is one press away (WorkSteps.tsx ViewSwap). */
+.hs-work-swap {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: calc(6 * var(--u));
+  height: calc(26 * var(--u));
+  padding: 0 calc(10 * var(--u)) 0 calc(8 * var(--u));
+  border-radius: 999px;
+  background: var(--hs-control);
+  color: var(--hs-ink-3);
+  font-size: calc(14 * var(--u));
+}
+.hs-file-glyph {
+  flex: none;
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+}
 
-/* OpenOrc talking in the thread, such as a message from another thread: a quiet fill row. */
+/* A message from another thread reads as a message (SystemNotice.tsx): who it is from, then what it said, on a fill. */
 .hs-notice {
   display: flex;
   align-items: flex-start;
   gap: calc(10 * var(--u));
   padding: calc(12 * var(--u)) calc(14 * var(--u));
-  border-radius: calc(16 * var(--u));
+  border-radius: calc(14 * var(--u));
   background: var(--hs-fill);
 }
 .hs-notice > .hs-icon {
   margin-top: calc(2 * var(--u));
-  color: var(--hs-faint);
+  color: var(--hs-ink-4);
 }
 .hs-notice-body {
   display: flex;
@@ -1025,10 +1147,10 @@
   flex-direction: column;
   align-items: flex-start;
   min-width: 0;
-  color: var(--hs-muted);
+  color: var(--hs-ink-2);
 }
 .hs-notice-from {
-  color: var(--hs-faint);
+  color: var(--hs-ink-3);
 }
 .hs-notice-name {
   color: var(--hs-ink);
@@ -1037,10 +1159,11 @@
   margin-top: calc(4 * var(--u));
 }
 
-/* A turn's edits closed to one line (ChangeCard.tsx). */
+/* A turn's edits closed to one line (ChangeCard.tsx): a plane inside a hairline ring. */
 .hs-change {
-  border-radius: calc(18 * var(--u));
+  border-radius: calc(16 * var(--u));
   background: var(--hs-plane);
+  box-shadow: 0 0 0 1px var(--hs-line);
 }
 .hs-change-head {
   display: flex;
@@ -1048,7 +1171,7 @@
   gap: calc(8 * var(--u));
   min-height: calc(48 * var(--u));
   padding: 0 calc(10 * var(--u)) 0 calc(16 * var(--u));
-  line-height: calc(16 * var(--u));
+  line-height: calc(18 * var(--u));
 }
 .hs-change-actions {
   display: flex;
@@ -1061,7 +1184,7 @@
   place-items: center;
   width: calc(24 * var(--u));
   height: calc(24 * var(--u));
-  color: var(--hs-muted);
+  color: var(--hs-ink-3);
 }
 .hs-change-chevron .hs-icon {
   width: calc(14 * var(--u));
@@ -1069,9 +1192,9 @@
 }
 .hs-change-note {
   padding: 0 calc(16 * var(--u)) calc(12 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  color: var(--hs-ink-2);
+  font-size: calc(14 * var(--u));
+  line-height: calc(18 * var(--u));
 }
 
 /* A turn's end (MessageActions.tsx TurnEnd): where it stands, then copy and fork once it is done. It rests under the
@@ -1079,23 +1202,31 @@
 .hs-turn > .hs-turn-actions {
   display: flex;
   align-items: center;
-  gap: calc(6 * var(--u));
-  height: calc(32 * var(--u));
-  margin-top: calc(10 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(13 * var(--u));
-  line-height: calc(16 * var(--u));
+  gap: calc(2 * var(--u));
+  height: calc(30 * var(--u));
+  margin: calc(10 * var(--u)) 0 0 calc(-7 * var(--u));
+  color: var(--hs-ink-4);
+  font-size: calc(14 * var(--u));
+  line-height: calc(18 * var(--u));
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.hs-turn-status {
+  padding: 0 calc(7 * var(--u));
 }
 .hs-turn-tools {
   display: flex;
+  gap: calc(2 * var(--u));
 }
 .hs-turn-tools[hidden] {
   display: none;
 }
 .hs-turn-tools .hs-icon {
   box-sizing: content-box;
-  padding: calc(8 * var(--u));
+  padding: calc(7 * var(--u));
+}
+.hs-turn-tools .hs-icon:last-child {
+  color: var(--hs-ink-3);
 }
 .hs-turn > .hs-reply + .hs-turn-actions {
   margin-top: calc(24 * var(--u));
@@ -1104,7 +1235,7 @@
   visibility: hidden;
 }
 
-/* The end of a conversation: the cube in a 36-unit box, its light moving around the faces while the pane works. */
+/* The end of a conversation (AgentPresence.tsx): the OpenOrc cube in a 36-unit box, in ink while the pane works. */
 .hs-column > .hs-presence {
   margin-top: calc(14 * var(--u));
 }
@@ -1118,11 +1249,11 @@
   place-items: center;
   width: calc(36 * var(--u));
   height: calc(36 * var(--u));
-  color: var(--hs-muted);
+  color: var(--hs-ink-4);
 }
 .hs-orb svg {
-  width: calc(22 * var(--u));
-  height: calc(22 * var(--u));
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
 }
 :is(.hs-pane, .hs-page)[data-busy] .hs-orb {
   color: var(--hs-ink);
@@ -1140,7 +1271,8 @@
   animation-delay: -800ms;
 }
 
-/* Composer (Composer.tsx): one plane, a bar of pills under the prompt, then the folder, branch and Commit. */
+/* Composer (Composer.tsx): one plane, the prompt over a bar of attach, the model with its week's usage, the mode,
+   and at the bar's end the uncommitted lines, the context share and send. */
 .hs-composer-area {
   flex: none;
   padding: calc(12 * var(--u)) calc(24 * var(--u)) calc(14 * var(--u));
@@ -1155,14 +1287,14 @@
   display: grid;
   gap: calc(14 * var(--u));
   padding: calc(14 * var(--u)) calc(12 * var(--u)) calc(12 * var(--u)) calc(16 * var(--u));
-  border-radius: calc(20 * var(--u));
+  border-radius: calc(16 * var(--u));
   background: var(--hs-plane);
 }
 .hs-prompt {
   position: relative;
-  min-height: calc(20 * var(--u));
-  font-size: calc(14 * var(--u));
-  line-height: calc(20 * var(--u));
+  min-height: calc(23 * var(--u));
+  font-size: calc(17 * var(--u));
+  line-height: calc(23 * var(--u));
   letter-spacing: -0.01em;
   white-space: pre-wrap;
 }
@@ -1170,7 +1302,7 @@
   position: absolute;
   top: 0;
   left: 0;
-  color: var(--hs-faint);
+  color: var(--hs-ink-4);
 }
 .hs-placeholder-busy,
 :is(.hs-pane, .hs-page)[data-busy] .hs-placeholder-idle,
@@ -1198,60 +1330,53 @@
 .hs-bar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: calc(8 * var(--u));
   min-width: 0;
   height: calc(32 * var(--u));
-  margin-left: calc(-4 * var(--u));
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  font-size: calc(15 * var(--u));
+  line-height: calc(18 * var(--u));
 }
-/* As the app's composer-tools: a row that never wraps or squeezes its chips. A composer too narrow for every chip
-   scrolls it sideways and fades the edge that has more, so the context ring and send keep their place. */
+/* The chips never wrap or squeeze. A bar too narrow for them gives up words a step at a time, as the app's does
+   (scripts/composer-fit.ts picks the step): the effort, the mode's name, the context's number with the Commit chip's
+   totals, the model's name; under that the send cluster takes a row of its own. */
 .hs-bar-tools {
   display: flex;
   flex: 1 1 auto;
   align-items: center;
   gap: calc(6 * var(--u));
   min-width: 0;
-  margin: calc(-4 * var(--u)) 0 calc(-4 * var(--u)) calc(-4 * var(--u));
-  padding: calc(4 * var(--u));
-  overflow-x: auto;
-  scrollbar-width: none;
+  margin-left: calc(-4 * var(--u));
+  overflow: hidden;
 }
 .hs-bar-tools > * {
   flex-shrink: 0;
 }
-@property --hs-tools-fade-start {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 0px;
+.hs-bar:not([data-fit="whole"]) .hs-model-effort {
+  display: none;
 }
-@property --hs-tools-fade-end {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 0px;
+.hs-bar:is([data-fit="marks"], [data-fit="no-context"], [data-fit="logos"], [data-fit="least"]) .hs-mode {
+  padding-inline: calc(8 * var(--u));
 }
-@supports (animation-timeline: scroll()) {
-  .hs-bar-tools {
-    mask-image: linear-gradient(to right, transparent, #000 var(--hs-tools-fade-start), #000 calc(100% - var(--hs-tools-fade-end)), transparent);
-    animation: hs-tools-fade linear both;
-    animation-timeline: scroll(self inline);
-  }
+.hs-bar:is([data-fit="marks"], [data-fit="no-context"], [data-fit="logos"], [data-fit="least"]) .hs-mode > span {
+  display: none;
 }
-@keyframes hs-tools-fade {
-  0% {
-    --hs-tools-fade-start: 0px;
-    --hs-tools-fade-end: calc(24 * var(--u));
-  }
-  8%,
-  92% {
-    --hs-tools-fade-start: calc(24 * var(--u));
-    --hs-tools-fade-end: calc(24 * var(--u));
-  }
-  100% {
-    --hs-tools-fade-start: calc(24 * var(--u));
-    --hs-tools-fade-end: 0px;
-  }
+.hs-bar:is([data-fit="no-context"], [data-fit="logos"], [data-fit="least"]) :is(.hs-context > span, .hs-commit .hs-counts) {
+  display: none;
+}
+.hs-bar:is([data-fit="no-context"], [data-fit="logos"], [data-fit="least"]) .hs-commit-label {
+  padding-inline: calc(12 * var(--u));
+}
+.hs-bar:is([data-fit="logos"], [data-fit="least"]) .hs-model-name {
+  display: none;
+}
+.hs-bar[data-fit="least"] {
+  flex-wrap: wrap;
+  row-gap: calc(8 * var(--u));
+  height: auto;
+}
+.hs-bar[data-fit="least"] .hs-bar-end {
+  margin-left: auto;
 }
 .hs-attach {
   display: grid;
@@ -1259,7 +1384,7 @@
   place-items: center;
   width: calc(28 * var(--u));
   height: calc(28 * var(--u));
-  color: var(--hs-faint);
+  color: var(--hs-ink-4);
 }
 .hs-pill {
   display: inline-flex;
@@ -1270,18 +1395,21 @@
   padding: 0 calc(10 * var(--u)) 0 calc(8 * var(--u));
   border-radius: 999px;
   background: var(--hs-control);
-  color: var(--hs-muted);
+  color: var(--hs-ink);
   white-space: nowrap;
 }
 .hs-pill > .hs-icon {
   width: calc(13 * var(--u));
   height: calc(13 * var(--u));
-  color: var(--hs-faint);
+  color: var(--hs-ink-2);
 }
-.hs-model > .hs-icon {
+/* The model's pill ends in the week's usage of the account it runs on, as a share in a 24-unit button. */
+.hs-model {
+  padding-right: calc(2 * var(--u));
+}
+.hs-model > .hs-logo {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
-  color: var(--hs-muted);
 }
 .hs-model-name {
   min-width: 0;
@@ -1289,14 +1417,21 @@
   text-overflow: ellipsis;
 }
 .hs-model-effort {
-  color: var(--hs-faint);
+  color: var(--hs-ink-3);
+}
+.hs-model-usage {
+  display: grid;
+  place-items: center;
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
+  margin-left: calc(-3 * var(--u));
+  color: var(--hs-ink-3);
 }
 .hs-bar-end {
   display: flex;
   flex: none;
   align-items: center;
   gap: calc(10 * var(--u));
-  margin-left: auto;
 }
 .hs-context {
   display: inline-flex;
@@ -1305,8 +1440,11 @@
   height: calc(28 * var(--u));
   margin-right: calc(-4 * var(--u));
   padding: 0 calc(6 * var(--u));
-  color: var(--hs-faint);
+  color: var(--hs-ink-3);
   font-variant-numeric: tabular-nums;
+}
+.hs-context > span {
+  color: var(--hs-ink-4);
 }
 .hs-send {
   display: grid;
@@ -1315,8 +1453,8 @@
   width: calc(32 * var(--u));
   height: calc(32 * var(--u));
   border-radius: 999px;
-  background: var(--hs-fill-strong);
-  color: var(--hs-muted);
+  background: var(--hs-control);
+  color: var(--hs-ink-4);
   transition:
     background-color 160ms ease-out,
     color 160ms ease-out;
@@ -1334,37 +1472,37 @@
 :is(.hs-pane, .hs-page)[data-busy] .hs-composer:not([data-typed]) .hs-send-stop {
   display: block;
 }
-.hs-composer[data-typed] .hs-send,
-:is(.hs-pane, .hs-page)[data-busy] .hs-send {
+/* A message ready to send turns send ink; while a turn runs with nothing typed, it is Stop, in ink on the key. */
+.hs-composer[data-typed] .hs-send {
   background: var(--hs-accent);
+  box-shadow: var(--hs-lit-strong);
   color: var(--hs-on-accent);
 }
-/* Uncommitted changes sit right over the composer, on its left edge (composer.css). */
-.hs-changes-bar {
-  display: flex;
-  min-width: 0;
-  margin-bottom: calc(10 * var(--u));
+:is(.hs-pane, .hs-page)[data-busy] .hs-composer:not([data-typed]) .hs-send {
+  color: var(--hs-ink);
 }
+/* Uncommitted lines in the bar, before the context share (ComposerCommitChip.tsx): Commit, then the counts. */
 .hs-commit {
   display: inline-flex;
   flex: none;
   align-items: center;
   height: calc(28 * var(--u));
   border-radius: 999px;
-  background: var(--hs-plane);
+  background: var(--hs-control);
 }
 .hs-commit-label {
   padding: 0 calc(6 * var(--u)) 0 calc(12 * var(--u));
-  color: var(--hs-ink);
+  color: var(--hs-ink-4);
 }
 .hs-commit .hs-counts {
   gap: calc(6 * var(--u));
   padding: 0 calc(12 * var(--u)) 0 calc(6 * var(--u));
+  font-size: calc(15 * var(--u));
 }
 
-/* The new-thread page (NewThread.tsx, new-thread.css): the question, the large composer and where it works, centred
-   as if the project's year of activity along the bottom were not there. The activity is 134 units tall and sits 36
-   over the pane's bottom; the column's top takes the same room back. */
+/* The new-thread page (NewThread.tsx, new-thread.css): the mark, the question, the large composer and where it works,
+   centred as if the project's year of activity along the bottom were not there. The activity is 134 units tall and
+   sits 36 over the pane's bottom; the column's top takes the same room back. */
 .hs-new-body {
   display: flex;
   flex: 1;
@@ -1396,9 +1534,9 @@
 }
 .hs-new-activity-line {
   margin: 0;
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  color: var(--hs-ink-4);
+  font-size: calc(15 * var(--u));
+  line-height: calc(18 * var(--u));
   white-space: nowrap;
 }
 /* One dot a day, a week to a column; a dot grows and darkens with the day's rank. */
@@ -1445,8 +1583,8 @@
   justify-self: center;
   width: calc(44 * var(--u));
   height: calc(44 * var(--u));
-  margin-bottom: calc(-4 * var(--u));
-  color: var(--hs-faint);
+  margin-bottom: calc(14 * var(--u));
+  color: var(--hs-ink-4);
 }
 .hs-new-mark svg {
   width: 100%;
@@ -1454,8 +1592,8 @@
 }
 .hs-new-question {
   text-align: center;
-  font-size: calc(28 * var(--u));
-  line-height: calc(34 * var(--u));
+  font-size: calc(32 * var(--u));
+  line-height: calc(39 * var(--u));
   letter-spacing: -0.02em;
 }
 /* The project is the heading's own picker, underlined (new-thread.css). */
@@ -1468,15 +1606,16 @@
 .hs-composer[data-layout="new"] .hs-shell {
   gap: calc(18 * var(--u));
   padding: calc(18 * var(--u)) calc(14 * var(--u)) calc(14 * var(--u)) calc(20 * var(--u));
-  border-radius: calc(24 * var(--u));
+  border-radius: calc(18 * var(--u));
 }
 .hs-composer[data-layout="new"] .hs-prompt {
-  min-height: calc(24 * var(--u));
-  font-size: calc(15 * var(--u));
-  line-height: calc(24 * var(--u));
+  min-height: calc(27 * var(--u));
+  line-height: calc(27 * var(--u));
 }
 .hs-composer[data-layout="new"] .hs-bar {
   height: calc(34 * var(--u));
+}
+.hs-composer[data-layout="new"] .hs-bar-tools {
   margin-left: calc(-6 * var(--u));
 }
 .hs-composer[data-layout="new"] :is(.hs-attach, .hs-pill) {
@@ -1492,63 +1631,127 @@
   width: calc(34 * var(--u));
   height: calc(34 * var(--u));
 }
-/* A Markdown table in a reply, as Streamdown renders it with the app's overrides. */
+/* A Markdown table in a reply (rich-text.css): no piece of its own, hairlines under quiet heads on the reply's ground. */
 .hs-table-wrap {
   margin: calc(16 * var(--u)) 0;
-  overflow: hidden;
-  border-radius: calc(16 * var(--u));
-  background: var(--hs-fill);
-}
-.hs-table-tools {
-  display: flex;
-  justify-content: flex-end;
-  padding: calc(5 * var(--u)) calc(10 * var(--u));
-  color: var(--hs-muted);
-}
-.hs-table-tools > span {
-  display: grid;
-  place-items: center;
-  width: calc(30 * var(--u));
-  height: calc(30 * var(--u));
-}
-.hs-table-tools .hs-icon {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
 }
 .hs-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: calc(13 * var(--u));
   line-height: 1.6;
 }
 .hs-table :is(th, td) {
   min-width: calc(100 * var(--u));
-  padding: calc(10 * var(--u)) calc(14 * var(--u));
-  border-top: var(--hairline) solid var(--hs-line);
+  padding: calc(10 * var(--u)) calc(14 * var(--u)) calc(10 * var(--u)) 0;
+  border-bottom: var(--hairline) solid var(--hs-line);
   font-weight: inherit;
   text-align: left;
   vertical-align: top;
 }
 .hs-table th {
-  border-top: 0;
-  color: var(--hs-muted);
+  padding-block: calc(6 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(14 * var(--u));
   white-space: nowrap;
 }
 
-/* A question card: the agent asks, the user picks, and the answer goes back. */
-.hs-question {
+/* A question waits docked onto the composer (QuestionCard.tsx QuestionAsk, composer.css): the asking agent's mark and
+   the question, Decline at the line's end, then each choice as a key that answers on one press. */
+.hs-ask {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8 * var(--u));
+  min-width: 0;
+  margin-left: calc(-4 * var(--u));
+  padding-bottom: calc(12 * var(--u));
+  border-bottom: var(--hairline) solid var(--hs-line);
+}
+.hs-ask-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: calc(12 * var(--u));
+  padding-left: calc(4 * var(--u));
+}
+.hs-ask-head {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(8 * var(--u));
+  min-width: 0;
+  padding: calc(4 * var(--u)) 0;
+  font-size: calc(17 * var(--u));
+  line-height: calc(23 * var(--u));
+  letter-spacing: -0.01em;
+}
+.hs-ask-head > .hs-logo {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  margin-top: calc(4.5 * var(--u));
+}
+.hs-ask-way {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: calc(28 * var(--u));
+  padding: 0 calc(12 * var(--u));
+  color: var(--hs-ink-2);
+  font-size: calc(15 * var(--u));
+  line-height: calc(18 * var(--u));
+  letter-spacing: 0;
+}
+.hs-ask-choices {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8 * var(--u));
+}
+.hs-ask-choice,
+.hs-ask-line {
+  min-height: calc(36 * var(--u));
+  border-radius: calc(14 * var(--u));
+  background: var(--hs-control);
+}
+.hs-ask-choice {
   display: grid;
+  padding: calc(6 * var(--u)) calc(8 * var(--u));
+  transition: box-shadow 160ms ease-out;
+}
+.hs-ask-choice-description {
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
+  line-height: calc(18 * var(--u));
+}
+/* The choice under the press: a key in the piece's own fill with an ink edge. */
+.hs-ask-choice[data-picked] {
+  background: var(--hs-plane);
+  box-shadow: inset 0 0 0 calc(1.5 * var(--u)) var(--hs-ink);
+}
+.hs-ask-line {
+  display: flex;
+  align-items: center;
+  padding: 0 calc(8 * var(--u));
+  color: var(--hs-ink-3);
+}
+/* Once answered, the question stays in the conversation as its record (conversation.css): an r16 plane, its options as
+   44-unit fills, the chosen one a key with an ink edge and a check, the rest stepped back, then where the answer went. */
+.hs-question {
+  display: flex;
+  flex-direction: column;
   gap: calc(12 * var(--u));
   padding: calc(16 * var(--u));
-  border-radius: calc(20 * var(--u));
+  border-radius: calc(16 * var(--u));
   background: var(--hs-plane);
 }
 .hs-question-ask {
   display: flex;
   align-items: center;
   gap: calc(8 * var(--u));
-  font-size: calc(14 * var(--u));
+  font-size: calc(17 * var(--u));
+  line-height: calc(23 * var(--u));
   letter-spacing: -0.01em;
+}
+.hs-question-ask > .hs-logo {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
 }
 .hs-question-options {
   display: grid;
@@ -1562,11 +1765,8 @@
   padding: calc(12 * var(--u));
   border-radius: calc(12 * var(--u));
   background: var(--hs-fill);
-  line-height: calc(16 * var(--u));
-  transition:
-    background-color 220ms ease-out,
-    color 220ms ease-out,
-    opacity 220ms ease-out;
+  line-height: calc(18 * var(--u));
+  opacity: 0.4;
 }
 .hs-question-option-label {
   display: grid;
@@ -1575,67 +1775,40 @@
   min-width: 0;
 }
 .hs-question-option-description {
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(14 * var(--u));
 }
 .hs-question-check {
-  width: calc(12 * var(--u));
-  height: calc(12 * var(--u));
   opacity: 0;
 }
-.hs-question-option[data-picked] {
-  background: var(--hs-fill-strong);
-}
-.hs-question-option[data-picked] .hs-question-check {
+.hs-question-option[data-chosen] {
+  background: var(--hs-plane);
+  box-shadow: inset 0 0 0 calc(1.5 * var(--u)) var(--hs-ink);
   opacity: 1;
 }
-.hs-question-option[data-chosen] {
-  background: var(--hs-accent);
-  color: var(--hs-on-accent);
-}
-.hs-question-option[data-chosen] .hs-question-option-description {
-  color: inherit;
-}
-.hs-question-option[data-dropped] {
-  opacity: 0.4;
+.hs-question-option[data-chosen] .hs-question-check {
+  opacity: 1;
 }
 .hs-question-foot {
-  display: flex;
-  align-items: center;
-  gap: calc(6 * var(--u));
   min-height: calc(16 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-}
-.hs-question-foot > span:first-child {
-  flex: 1;
-}
-.hs-question-foot .hs-text-button {
-  height: calc(30 * var(--u));
-  padding: 0 calc(14 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(13 * var(--u));
-}
-.hs-question-foot .hs-button[data-disabled] {
-  background: var(--hs-fill-strong);
-  color: var(--hs-muted);
+  color: var(--hs-ink-4);
+  font-size: calc(14 * var(--u));
+  line-height: calc(18 * var(--u));
 }
 
-/* Task cards an agent leaves in the thread (TaskCard.tsx). */
+/* Task cards an agent leaves in the thread (TaskCard.tsx): the task's mark and title, then where it stands. */
 .hs-task-card {
   padding: calc(12 * var(--u)) calc(16 * var(--u));
-  border-radius: calc(18 * var(--u));
+  border-radius: calc(16 * var(--u));
   background: var(--hs-plane);
 }
 .hs-task-card-row {
   display: flex;
   align-items: center;
   gap: calc(8 * var(--u));
-  line-height: calc(16 * var(--u));
 }
 .hs-task-card-row > .hs-icon:first-child {
-  color: var(--hs-muted);
+  color: var(--hs-ink-3);
 }
 .hs-task-card-title {
   flex: 1;
@@ -1647,16 +1820,17 @@
 .hs-task-card-open {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
-  color: var(--hs-faint);
+  color: var(--hs-ink-4);
 }
 .hs-task-card-meta {
   display: flex;
   align-items: center;
   gap: calc(8 * var(--u));
   margin-top: calc(4 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(14 * var(--u));
+  line-height: calc(18 * var(--u));
+  letter-spacing: 0;
 }
 .hs-task-card-branch {
   display: inline-flex;
@@ -1664,29 +1838,49 @@
   align-items: center;
   gap: calc(4 * var(--u));
   font-family: var(--hs-mono);
-  font-size: calc(11 * var(--u));
 }
 .hs-task-card-branch .hs-icon {
   width: calc(11 * var(--u));
   height: calc(11 * var(--u));
 }
 
-/* The task view (TaskView.tsx, TaskDocument.tsx): breadcrumb, tab track, a reading column, and the footer. */
+/* The task view (TaskView.tsx, TaskDocument.tsx): the crumbs on the top line with the task's status mark, the tab
+   track, a reading column, and the footer. */
 .hs-task-header {
   padding: 0 calc(12 * var(--u));
-  line-height: calc(20 * var(--u));
+  line-height: calc(23 * var(--u));
 }
-.hs-task-header .hs-title {
-  flex: 0 1 auto;
-  margin-left: 0;
-  padding: 0;
+.hs-crumbs-row {
+  display: flex;
+  align-items: center;
+  gap: calc(4 * var(--u));
+  min-width: 0;
 }
 .hs-crumb {
-  color: var(--hs-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  height: calc(28 * var(--u));
+  margin-left: calc(-2 * var(--u));
+  padding: 0 calc(6 * var(--u));
+  color: var(--hs-ink-2);
+}
+.hs-crumb .hs-icon {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
 }
 .hs-crumb-sep {
-  color: var(--hs-faint);
+  color: var(--hs-ink-4);
 }
+.hs-crumb-current {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  min-width: 0;
+  margin-left: calc(6 * var(--u));
+  white-space: nowrap;
+}
+/* A task's status mark (status.tsx): an empty ring in the backlog, a turning arc in progress, an amber disc in review. */
 .hs-status-mark {
   flex: none;
   width: calc(16 * var(--u));
@@ -1702,6 +1896,8 @@
   stroke: var(--hs-fill-strong);
 }
 .hs-status-mark[data-status="review"] {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
   color: var(--hs-attention);
 }
 /* The tab track opens the document's own column. */
@@ -1710,11 +1906,16 @@
   width: 100%;
   max-width: calc(800 * var(--u));
   margin: 0 auto;
-  padding: calc(24 * var(--u)) calc(48 * var(--u)) calc(6 * var(--u));
+  padding: calc(24 * var(--u)) calc(48 * var(--u)) 0;
 }
 .hs-task-tabs .hs-track > span {
   padding: 0 calc(16 * var(--u));
-  font-size: calc(12 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
+  letter-spacing: 0;
+}
+.hs-task-tabs .hs-track > [data-selected] {
+  color: var(--hs-ink);
 }
 .hs-doc {
   flex: none;
@@ -1722,19 +1923,19 @@
   max-width: calc(800 * var(--u));
   min-height: 100%;
   margin: 0 auto;
-  padding: calc(26 * var(--u)) calc(48 * var(--u)) calc(64 * var(--u));
+  padding: calc(32 * var(--u)) calc(48 * var(--u)) calc(64 * var(--u));
   transition: opacity 450ms ease;
 }
 .hs-doc-title {
-  font-size: calc(22 * var(--u));
-  line-height: calc(28 * var(--u));
+  font-size: calc(25 * var(--u));
+  line-height: calc(32 * var(--u));
   letter-spacing: -0.015em;
 }
 .hs-props {
   display: flex;
   flex-wrap: wrap;
   gap: calc(6 * var(--u));
-  margin-top: calc(16 * var(--u));
+  margin: calc(16 * var(--u)) 0 calc(28 * var(--u));
 }
 .hs-prop {
   display: inline-flex;
@@ -1744,18 +1945,23 @@
   padding: 0 calc(12 * var(--u)) 0 calc(10 * var(--u));
   border-radius: 999px;
   background: var(--hs-plane);
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
+  white-space: nowrap;
 }
 .hs-prop-select {
-  min-width: calc(113 * var(--u));
+  min-width: calc(129 * var(--u));
   padding-right: calc(10 * var(--u));
   color: var(--hs-ink);
 }
 .hs-prop .hs-icon {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
-  color: var(--hs-muted);
+  color: var(--hs-ink-3);
+}
+.hs-prop .hs-status-mark {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
 }
 .hs-prop .hs-prop-chevron {
   width: calc(12 * var(--u));
@@ -1769,25 +1975,36 @@
   align-items: center;
   gap: calc(4 * var(--u));
   height: calc(32 * var(--u));
-  margin-top: calc(28 * var(--u));
+  margin-bottom: calc(12 * var(--u));
+}
+.hs-editor-controls .hs-round .hs-icon {
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
 }
 .hs-editor-mode {
-  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  height: calc(28 * var(--u));
   padding: 0 calc(12 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
+}
+.hs-editor-end {
+  display: flex;
+  gap: calc(4 * var(--u));
+  margin-left: auto;
 }
 .hs-spec {
-  margin-top: calc(12 * var(--u));
-  font-size: calc(14 * var(--u));
-  line-height: calc(22 * var(--u));
+  font-size: calc(17 * var(--u));
+  line-height: calc(27 * var(--u));
   letter-spacing: -0.01em;
 }
 .hs-spec h3,
 .hs-comments h3 {
-  font-size: calc(16 * var(--u));
+  font-size: calc(18 * var(--u));
   font-weight: inherit;
-  line-height: calc(22 * var(--u));
+  line-height: calc(25 * var(--u));
+  letter-spacing: -0.01em;
 }
 .hs-spec h3 {
   margin: calc(28 * var(--u)) 0 calc(10 * var(--u));
@@ -1796,12 +2013,13 @@
   margin-top: 0;
 }
 .hs-spec p {
+  margin: calc(10 * var(--u)) 0;
   color: inherit;
   font-size: inherit;
   line-height: inherit;
 }
 .hs-spec ul {
-  margin: 0;
+  margin: calc(10 * var(--u)) 0;
   padding-left: calc(24 * var(--u));
   list-style: disc;
 }
@@ -1810,13 +2028,14 @@
   padding-left: calc(3 * var(--u));
 }
 .hs-spec li::marker {
-  color: var(--hs-muted);
+  color: var(--hs-ink-2);
 }
 .hs-check {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: calc(12 * var(--u));
-  min-height: calc(34 * var(--u));
+  min-height: calc(39 * var(--u));
+  padding: calc(6 * var(--u)) 0;
 }
 .hs-check i {
   display: grid;
@@ -1824,6 +2043,7 @@
   place-items: center;
   width: calc(16 * var(--u));
   height: calc(16 * var(--u));
+  margin-top: calc(3 * var(--u));
   border-radius: calc(5 * var(--u));
   background: var(--hs-plane);
   box-shadow: inset 0 0 0 calc(1.5 * var(--u)) var(--hs-fill-strong);
@@ -1839,18 +2059,19 @@
   stroke-width: 2.25;
 }
 .hs-check[data-done] span {
-  color: var(--hs-muted);
+  color: var(--hs-ink-3);
 }
 .hs-labels {
   display: flex;
   align-items: center;
-  gap: calc(12 * var(--u));
+  gap: calc(8 * var(--u));
   margin-top: calc(24 * var(--u));
-  font-size: calc(12 * var(--u));
-  line-height: calc(24 * var(--u));
+  color: var(--hs-ink-2);
+  font-size: calc(15 * var(--u));
+  line-height: calc(26 * var(--u));
 }
 .hs-labels span:first-child {
-  color: var(--hs-muted);
+  color: var(--hs-ink-3);
 }
 
 /* Task comments (TaskComments.css): authors in ink, replies hanging off one line elbow, the composer a plane. */
@@ -1861,10 +2082,10 @@
   margin-bottom: calc(4 * var(--u));
 }
 .hs-comments-help {
-  margin-bottom: calc(20 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  margin: 0 0 calc(20 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
+  line-height: calc(18 * var(--u));
 }
 .hs-comment {
   padding-block: calc(20 * var(--u));
@@ -1876,26 +2097,27 @@
   align-items: baseline;
   gap: calc(8 * var(--u));
   margin-bottom: calc(6 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
+  color: var(--hs-ink-4);
+  font-size: calc(15 * var(--u));
 }
 .hs-comment-meta strong {
   color: var(--hs-ink);
-  font-size: calc(13 * var(--u));
+  font-size: calc(16 * var(--u));
   font-weight: inherit;
 }
 .hs-comment-body,
 .hs-comment-body .hs-prose {
-  font-size: calc(14 * var(--u));
-  line-height: calc(22 * var(--u));
+  color: var(--hs-ink);
+  font-size: calc(17 * var(--u));
+  line-height: calc(27 * var(--u));
   letter-spacing: -0.01em;
 }
 .hs-comment-reply {
   display: block;
   margin-top: calc(8 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
+  line-height: calc(18 * var(--u));
 }
 .hs-replies {
   margin-top: calc(4 * var(--u));
@@ -1925,30 +2147,29 @@
   bottom: 0;
 }
 .hs-comment-status {
-  margin-top: calc(8 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  margin: calc(8 * var(--u)) 0 0;
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
+  line-height: calc(18 * var(--u));
 }
 .hs-comment-actions {
   display: flex;
   gap: calc(16 * var(--u));
   margin-top: calc(8 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
 }
 .hs-comment-composer {
   margin-top: calc(24 * var(--u));
-  border-radius: calc(20 * var(--u));
+  border-radius: calc(16 * var(--u));
   background: var(--hs-plane);
 }
 .hs-comment-input {
   position: relative;
   min-height: calc(84 * var(--u));
   padding: calc(14 * var(--u)) calc(16 * var(--u)) calc(8 * var(--u));
-  font-size: calc(14 * var(--u));
-  line-height: calc(22 * var(--u));
-  letter-spacing: -0.01em;
+  font-size: calc(17 * var(--u));
+  line-height: calc(27 * var(--u));
   white-space: pre-wrap;
 }
 .hs-comment-input .hs-placeholder {
@@ -1968,16 +2189,16 @@
   justify-content: space-between;
   gap: calc(12 * var(--u));
   min-height: calc(36 * var(--u));
-  padding: calc(10 * var(--u));
+  padding: calc(9 * var(--u)) calc(10 * var(--u));
   border-radius: calc(10 * var(--u));
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  font-size: calc(15 * var(--u));
+  line-height: calc(18 * var(--u));
 }
 .hs-option[data-selected] {
   background: var(--hs-fill);
 }
 .hs-option span:last-child {
-  color: var(--hs-muted);
+  color: var(--hs-ink-3);
 }
 .hs-comment-composer-foot {
   display: flex;
@@ -1986,7 +2207,7 @@
 }
 .hs-comment-submit {
   background: var(--hs-fill-strong);
-  color: var(--hs-muted);
+  color: var(--hs-ink-3);
   transition:
     background-color 160ms ease-out,
     color 160ms ease-out;
@@ -1995,6 +2216,8 @@
   background: var(--hs-fill);
   color: var(--hs-ink);
 }
+/* The document's foot (TaskDocument.tsx, TaskFooterActions.tsx): Saved, where the task works, then the task's buttons,
+   Open thread and the model a new thread starts on. */
 .hs-doc-footer {
   display: flex;
   flex: none;
@@ -2003,22 +2226,34 @@
   gap: calc(12 * var(--u));
   height: calc(50 * var(--u));
   padding: 0 calc(12 * var(--u)) 0 calc(24 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
+  line-height: calc(18 * var(--u));
 }
-.hs-doc-footer > span:not(.hs-button) {
+.hs-doc-footer > span:not(.hs-doc-actions) {
   display: inline-flex;
   align-items: center;
   gap: calc(6 * var(--u));
 }
-.hs-doc-footer .hs-icon {
+.hs-doc-footer > span > .hs-icon {
   width: calc(12 * var(--u));
   height: calc(12 * var(--u));
 }
+.hs-doc-branch {
+  font-size: calc(14 * var(--u));
+}
+.hs-doc-actions {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+}
+.hs-doc-actions .hs-round .hs-icon {
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
+}
 .hs-open-thread {
   background: var(--hs-plane);
-  font-size: calc(13 * var(--u));
+  font-size: calc(16 * var(--u));
 }
 .hs-open-thread .hs-icon {
   width: calc(13 * var(--u));
@@ -2027,64 +2262,64 @@
 
 /* The Tasks page, still (TaskList.tsx): quiet group headings over 44-unit rows. */
 .hs-mock-tasks {
-  --hs-canvas: 760;
+  --hs-canvas: 860;
   display: flex;
   flex-direction: column;
-  min-height: calc(560 * var(--u));
+  min-height: calc(630 * var(--u));
 }
 .hs-mock-tasks .hs-header {
   padding: 0 calc(12 * var(--u));
+  line-height: calc(23 * var(--u));
 }
-.hs-mock-tasks .hs-header .hs-title {
-  flex: 0 1 auto;
-  margin-left: 0;
-  padding: 0;
+.hs-mock-tasks .hs-header-actions .hs-round .hs-icon {
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
 }
-.hs-crumb-scope {
-  display: flex;
-  align-items: center;
-  gap: calc(6 * var(--u));
+.hs-mock-tasks .hs-header-actions .hs-button {
+  margin-left: calc(4 * var(--u));
 }
-.hs-crumb-scope .hs-icon {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
-  color: var(--hs-faint);
+.hs-mock-tasks .hs-button-lg .hs-icon {
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
 }
-.hs-mock-tasks .hs-header-actions {
-  gap: calc(4 * var(--u));
-}
-/* Groups under quiet headings, Ready for review with its count in amber; 44-unit rows. */
+/* Groups under quiet headings, Ready for review with its count in amber; 44-unit rows 2 apart. */
 .hs-task-list {
-  padding: calc(18 * var(--u)) calc(24 * var(--u)) calc(24 * var(--u));
+  padding: calc(16 * var(--u)) calc(28 * var(--u)) calc(24 * var(--u));
 }
 .hs-task-group + .hs-task-group {
-  margin-top: calc(22 * var(--u));
+  margin-top: calc(24 * var(--u));
 }
 .hs-task-group-head {
   display: flex;
   align-items: center;
   gap: calc(10 * var(--u));
   height: calc(28 * var(--u));
-  margin-bottom: calc(4 * var(--u));
-  line-height: calc(16 * var(--u));
+  margin-bottom: calc(6 * var(--u));
+  padding: 0 calc(12 * var(--u));
+  line-height: calc(18 * var(--u));
 }
 .hs-task-group-count {
   color: var(--hs-attention);
-  font-size: calc(13 * var(--u));
+  font-size: calc(15 * var(--u));
 }
 .hs-task-row {
   display: flex;
   align-items: center;
-  gap: calc(10 * var(--u));
+  gap: calc(12 * var(--u));
   height: calc(44 * var(--u));
-  line-height: calc(16 * var(--u));
+  padding: 0 calc(12 * var(--u)) 0 calc(9 * var(--u));
+  line-height: calc(18 * var(--u));
+}
+.hs-task-row + .hs-task-row {
+  margin-top: calc(2 * var(--u));
 }
 .hs-task-row-status {
   display: grid;
   flex: none;
   place-items: center;
-  width: calc(16 * var(--u));
-  height: calc(16 * var(--u));
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
+  margin-right: calc(-5 * var(--u));
 }
 .hs-task-row-title {
   flex: 1;
@@ -2094,23 +2329,29 @@
   white-space: nowrap;
 }
 .hs-task-row[data-status="backlog"] .hs-task-row-title {
-  color: var(--hs-muted);
+  color: var(--hs-ink-2);
 }
 .hs-task-row-label,
 .hs-task-row-meta {
   display: flex;
   flex: none;
   align-items: center;
+  gap: calc(8 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
+}
+.hs-task-row-label {
   gap: calc(6 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(13 * var(--u));
 }
 .hs-task-row-label::before {
   content: "";
-  width: calc(6 * var(--u));
-  height: calc(6 * var(--u));
+  width: calc(7 * var(--u));
+  height: calc(7 * var(--u));
   border-radius: 999px;
-  background: var(--hs-muted);
+  background: var(--hs-ink-4);
+}
+.hs-task-row-project {
+  width: calc(148 * var(--u));
 }
 .hs-task-row-meta .hs-icon {
   width: calc(14 * var(--u));
@@ -2118,45 +2359,40 @@
 }
 .hs-task-row-time {
   justify-content: flex-end;
-  width: calc(72 * var(--u));
-  color: var(--hs-faint);
+  width: calc(48 * var(--u));
+  white-space: nowrap;
 }
 .hs-task-row-end {
   display: flex;
   flex: none;
   justify-content: flex-end;
-  width: calc(64 * var(--u));
-  color: var(--hs-muted);
+  width: calc(84 * var(--u));
+  margin-left: calc(-5 * var(--u));
+  color: var(--hs-ink-3);
 }
 .hs-task-review {
   background: var(--hs-plane);
 }
 
 /* The work panel (Panel.tsx, panel-browser.css) stands on the same ground as the conversation beside it, parted by a
-   hairline seam that starts as a short stroke on the top line. Its header holds its pages as tabs, the add button
-   after them, and expand at the far end. */
+   seam from the window's top to its foot. Its header holds its pages as tabs drawn like the work column's, the add
+   button after them, and expand at the far end. */
 .hs-app-panel {
   position: relative;
   flex: none;
-  width: calc(504 * var(--u));
+  width: calc(460 * var(--u));
   overflow: hidden;
 }
-.hs-app-panel::before,
-.hs-app-panel .hs-panel-header::before {
+.hs-app-panel::before {
   content: "";
   position: absolute;
-  left: 0;
-  width: var(--hairline);
-  background: var(--hs-line);
-  pointer-events: none;
-}
-.hs-app-panel::before {
-  top: calc(44 * var(--u) - var(--hairline));
+  z-index: 1;
+  top: 0;
   bottom: 0;
-}
-.hs-app-panel .hs-panel-header::before {
-  top: calc(8.6 * var(--u));
-  bottom: calc(8.6 * var(--u));
+  left: 0;
+  width: 1px;
+  background: var(--hs-seam);
+  pointer-events: none;
 }
 .hs-panel-header {
   position: relative;
@@ -2166,18 +2402,21 @@
   gap: calc(2 * var(--u));
   height: calc(44 * var(--u));
   padding: 0 calc(10 * var(--u));
-  border-bottom: var(--hairline) solid var(--hs-line);
+}
+.hs-panel-header > .hs-round .hs-icon {
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
 }
 .hs-panel-expand {
   margin-left: auto;
 }
 /* The Changes page alone, still: the panel's header over its page. */
 .hs-mock-changes {
-  --hs-canvas: 632;
+  --hs-canvas: 700;
   padding-bottom: calc(10 * var(--u));
 }
 .hs-panel-bar .hs-round {
-  color: var(--hs-faint);
+  color: var(--hs-ink-4);
 }
 .hs-panel-bar .hs-icon {
   width: calc(15 * var(--u));
@@ -2185,23 +2424,26 @@
 }
 .hs-panel-bar {
   display: flex;
+  flex: none;
   align-items: center;
   gap: calc(8 * var(--u));
   height: calc(48 * var(--u));
   padding: 0 calc(10 * var(--u)) 0 calc(20 * var(--u));
-  line-height: calc(16 * var(--u));
+  line-height: calc(18 * var(--u));
 }
 .hs-panel-meta {
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
+  color: var(--hs-ink-4);
+  font-size: calc(15 * var(--u));
 }
 .hs-panel-bar .hs-counts {
   gap: calc(6 * var(--u));
+  font-size: calc(15 * var(--u));
 }
 .hs-panel-refresh {
   margin-left: auto;
 }
-/* A file's head on the ground, then its diff on the plane from edge to edge (DiffView.tsx). */
+/* A file's head on the ground, then its diff on the plane from edge to edge (DiffView.tsx). Long lines wrap under
+   their own start, as the app's do. */
 .hs-diff-file {
   padding: 0;
 }
@@ -2212,18 +2454,19 @@
   height: calc(36 * var(--u));
   padding: 0 calc(16 * var(--u));
   font-family: var(--hs-mono);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  font-size: calc(15 * var(--u));
+  line-height: calc(18 * var(--u));
   letter-spacing: 0;
 }
 .hs-diff-head > .hs-icon {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
-  color: var(--hs-faint);
+  color: var(--hs-ink-4);
 }
 .hs-diff-letter {
   width: calc(12 * var(--u));
-  color: var(--hs-muted);
+  color: var(--hs-ink-3);
+  font-size: calc(14 * var(--u));
   text-align: center;
 }
 .hs-diff-path {
@@ -2234,25 +2477,29 @@
   white-space: nowrap;
 }
 .hs-diff-path span {
-  color: var(--hs-faint);
+  color: var(--hs-ink-4);
+}
+.hs-diff-head .hs-counts {
+  gap: calc(9 * var(--u));
+  font-size: calc(15 * var(--u));
 }
 .hs-diff {
-  padding: calc(2 * var(--u)) 0;
   background: var(--hs-plane);
   color: var(--hs-ink);
   font-family: var(--hs-mono);
-  font-size: calc(12 * var(--u));
+  font-size: calc(14 * var(--u));
   line-height: calc(20 * var(--u));
   letter-spacing: 0;
+  font-variant-ligatures: none;
 }
 .hs-diff-row {
   display: flex;
-  height: calc(20 * var(--u));
+  min-height: calc(20 * var(--u));
 }
 .hs-diff-num {
   flex: none;
   width: calc(36 * var(--u));
-  padding-right: calc(7.2 * var(--u));
+  padding-right: calc(2 * var(--u));
   color: var(--hs-line-number);
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -2261,9 +2508,9 @@
   position: relative;
   flex: 1;
   min-width: 0;
-  padding: 0 calc(7.2 * var(--u)) 0 calc(14.4 * var(--u));
-  overflow: hidden;
-  white-space: pre;
+  padding: 0 calc(8 * var(--u)) 0 calc(22 * var(--u));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .hs-diff-row[data-type="add"] {
   background: var(--hs-ok-soft);
@@ -2275,7 +2522,7 @@
 .hs-diff-row[data-type="del"] .hs-diff-code::before {
   content: "+";
   position: absolute;
-  left: calc(2 * var(--u));
+  left: calc(6 * var(--u));
 }
 .hs-diff-row[data-type="del"] .hs-diff-code::before {
   content: "-";
@@ -2299,9 +2546,9 @@
   gap: calc(2 * var(--u));
   height: calc(44 * var(--u));
   padding: calc(4 * var(--u)) calc(8 * var(--u)) calc(4 * var(--u)) calc(16 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(14 * var(--u));
+  line-height: calc(18 * var(--u));
 }
 .hs-explorer-bar > span:first-child {
   flex: 1;
@@ -2314,7 +2561,11 @@
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
 }
-/* The filter reads like the list head's Search: no field, the glyph and its words in the muted ink. */
+.hs-explorer-bar .hs-round:first-of-type .hs-icon {
+  width: calc(13 * var(--u));
+  height: calc(13 * var(--u));
+}
+/* The filter reads like the list head's Search: no field at rest, the glyph and its words in the third ink. */
 .hs-explorer-filter {
   display: flex;
   flex: none;
@@ -2324,12 +2575,8 @@
   margin: calc(8 * var(--u));
   padding: 0 calc(12 * var(--u)) 0 calc(8 * var(--u));
   border-radius: 999px;
-  color: var(--hs-muted);
-  line-height: calc(16 * var(--u));
-}
-.hs-explorer-filter .hs-icon {
-  width: calc(16 * var(--u));
-  height: calc(16 * var(--u));
+  color: var(--hs-ink-3);
+  line-height: calc(18 * var(--u));
 }
 .hs-tree {
   padding: 0 calc(5 * var(--u)) calc(12 * var(--u));
@@ -2344,25 +2591,25 @@
   height: calc(28 * var(--u));
   padding: 0 calc(8 * var(--u)) 0 calc((8 + var(--level) * 14) * var(--u));
   border-radius: calc(10 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
-  line-height: calc(20 * var(--u));
+  color: var(--hs-ink-2);
+  font-size: calc(15 * var(--u));
   white-space: nowrap;
 }
 .hs-tree-row[data-selected] {
-  background: var(--hs-plane);
+  background: var(--hs-current);
   color: var(--hs-ink);
 }
 .hs-tree-row :is(.hs-icon, .hs-file-glyph) {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
+  color: var(--hs-ink-3);
 }
 .hs-tree-row .hs-tree-chevron {
   flex: none;
   width: calc(12 * var(--u));
   height: calc(12 * var(--u));
 }
-.hs-tree-folder {
+.hs-tree-row .hs-tree-folder {
   opacity: 0.65;
 }
 .hs-tree-guide {
@@ -2373,25 +2620,33 @@
   border-left: var(--hairline) solid color-mix(in srgb, var(--hs-line) 55%, transparent);
 }
 
-/* The panel's Terminal page: the shell's folder in the bar, and the shell's lines in the code font. */
+/* The panel's Terminal page (TerminalPanel.tsx): the shell's folder in the bar with End and Restart, and the shell's
+   lines in the code font on 24-unit rows. */
 .hs-panel-path {
   font-family: var(--hs-mono);
   letter-spacing: 0;
+}
+.hs-panel-bar .hs-panel-tool {
+  color: var(--hs-ink-3);
+}
+.hs-panel-bar .hs-panel-tool .hs-icon {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
 }
 .hs-terminal {
   padding: 0 calc(10 * var(--u)) calc(10 * var(--u)) calc(20 * var(--u));
   color: var(--hs-ink);
   font-family: var(--hs-mono);
-  font-size: calc(12 * var(--u));
-  line-height: calc(21 * var(--u));
+  font-size: calc(14 * var(--u));
+  line-height: calc(24 * var(--u));
   letter-spacing: 0;
   white-space: pre;
 }
 .hs-terminal > div {
-  min-height: calc(21 * var(--u));
+  min-height: calc(24 * var(--u));
 }
 .hs-terminal-dim {
-  color: var(--hs-faint);
+  color: var(--hs-ink-4);
 }
 
 /* The panel's browser (panel-browser.css): Back and Forward, the address pill with Reload, Home, then the page on a
@@ -2405,7 +2660,7 @@
   padding: 0 calc(10 * var(--u));
 }
 .hs-browser-forward {
-  color: var(--hs-faint);
+  color: var(--hs-ink-4);
 }
 .hs-address {
   display: flex;
@@ -2417,8 +2672,8 @@
   padding: 0 calc(4 * var(--u)) 0 calc(14 * var(--u));
   border-radius: 999px;
   background: var(--hs-control);
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(15 * var(--u));
   white-space: nowrap;
 }
 .hs-address .hs-round {
@@ -2429,6 +2684,10 @@
 .hs-address .hs-icon {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
+}
+.hs-browser-bar > .hs-round:last-child .hs-icon {
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
 }
 .hs-viewport {
   display: flex;
@@ -2496,21 +2755,21 @@
 
 /* Worktrees, still: a whole window on the tile. */
 .hs-mock-worktree {
-  --hs-canvas: 1360;
+  --hs-canvas: 1512;
   display: flex;
   height: clamp(440px, 44vw, 620px);
 }
 
-/* The app, live: one 1456 × 910 window with three threads open in tabs and the panel dragged to 504, so every tab keeps
-   the 136 it needs. Each thread has its own panel pages. Picking a tab swaps the thread, or the panel's page, in
-   place: the old one blurs out as the new one blurs in. */
+/* The app, live: one 1512 × 982 window with three threads open in tabs and the panel at 460. Each thread has its own
+   panel pages. Picking a tab swaps the thread, or the panel's page, in place: the old one blurs out as the new one
+   blurs in. */
 .hs-mock-app {
-  --hs-canvas: 1456;
+  --hs-canvas: 1512;
   display: flex;
-  height: calc(910 * var(--u));
+  height: calc(982 * var(--u));
 }
 /* The Commit chip steps aside while the panel shows the open thread's changes (composer-changes.ts). */
-.hs-mock-app:has(.hs-panel-session:not([hidden]) [data-value="changes"][aria-selected="true"]) .hs-app-thread .hs-page:not([hidden]) .hs-changes-bar {
+.hs-mock-app:has(.hs-panel-session:not([hidden]) [data-value="changes"][aria-selected="true"]) .hs-app-thread .hs-page:not([hidden]) .hs-commit {
   display: none;
 }
 .hs-app-panel,
@@ -2543,8 +2802,8 @@
   background: var(--hs-fill);
   color: var(--hs-ink);
 }
-/* A thread's menu (floating.css): 8 under the header's line, its right edge 8 in from the thread's, r16 on the
-   floating fill with 36 rows of r10, muted glyphs and hairlines between groups. */
+/* A thread's menu (floating.css): 8 under the header's line, its right edge 8 in from the thread's, r14 on the
+   floating fill with 34 rows of r10, 18-unit glyphs and hairlines between groups. */
 .hs-menu {
   position: absolute;
   z-index: 3;
@@ -2552,70 +2811,76 @@
   right: calc(8 * var(--u));
   display: flex;
   flex-direction: column;
-  gap: calc(2 * var(--u));
-  min-width: calc(192 * var(--u));
+  min-width: calc(211 * var(--u));
   padding: calc(6 * var(--u));
-  border-radius: calc(16 * var(--u));
+  border-radius: calc(14 * var(--u));
   background: var(--hs-plane);
-  font-size: calc(13 * var(--u));
-  line-height: calc(16 * var(--u));
+  box-shadow:
+    0 0 0 var(--u) rgb(23 23 23 / 0.06),
+    0 calc(8 * var(--u)) calc(24 * var(--u)) rgb(0 0 0 / 0.1),
+    0 calc(2 * var(--u)) calc(6 * var(--u)) rgb(0 0 0 / 0.06);
+  line-height: calc(18 * var(--u));
   white-space: nowrap;
+}
+:root[data-theme="dark"] .hs-menu {
+  box-shadow:
+    0 0 0 calc(0.5 * var(--u)) var(--hs-line-strong),
+    0 calc(12 * var(--u)) calc(32 * var(--u)) calc(-12 * var(--u)) rgb(0 0 0 / 0.6);
 }
 .hs-menu-item {
   display: flex;
   align-items: center;
   gap: calc(10 * var(--u));
-  min-height: calc(36 * var(--u));
+  min-height: calc(34 * var(--u));
   padding: 0 calc(10 * var(--u));
   border-radius: calc(10 * var(--u));
   color: var(--hs-ink);
 }
 .hs-menu-item > .hs-icon {
   flex: none;
-  width: calc(15 * var(--u));
-  height: calc(15 * var(--u));
-  color: var(--hs-muted);
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
 }
 .hs-menu-item > .hs-menu-more {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
   margin-left: auto;
+  color: var(--hs-ink-3);
 }
 .hs-menu-tag {
   margin-left: auto;
   padding-left: calc(16 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
+  color: var(--hs-ink-4);
+  font-size: calc(15 * var(--u));
 }
 .hs-menu-tag + .hs-menu-more {
   margin-left: 0;
 }
-.hs-menu-item[data-danger],
-.hs-menu-item[data-danger] > .hs-icon {
+.hs-menu-item[data-danger] {
   color: var(--hs-bad);
 }
 .hs-menu-separator {
   height: 0;
-  margin: calc(4 * var(--u)) calc(10 * var(--u));
+  margin: calc(6 * var(--u)) calc(10 * var(--u));
   border-top: var(--hairline) solid var(--hs-line);
 }
 /* Threads that talk, still: one thread whose transcript reads from the top, so the message that reached it leads. */
 .hs-mock-message {
-  --hs-canvas: 640;
+  --hs-canvas: 720;
   display: flex;
-  height: calc(620 * var(--u));
+  height: calc(700 * var(--u));
 }
 .hs-mock-message .hs-transcript {
   justify-content: flex-start;
 }
 /* A file open in the work panel, still: the code in the editor's GitHub colors, the line being typed on highlighted. */
 .hs-mock-editor {
-  --hs-canvas: 600;
+  --hs-canvas: 680;
   --hs-syntax-kw: #d73a49;
   --hs-syntax-str: #032f62;
   --hs-syntax-fn: #6f42c1;
   --hs-syntax-tag: #22863a;
-  height: calc(560 * var(--u));
+  height: calc(630 * var(--u));
   background: var(--hs-bg);
 }
 :root[data-theme="dark"] .hs-mock-editor {
@@ -2627,18 +2892,22 @@
 .hs-file-toolbar {
   display: flex;
   align-items: center;
-  gap: calc(6 * var(--u));
-  height: calc(44 * var(--u));
-  padding: 0 calc(10 * var(--u)) 0 calc(20 * var(--u));
+  gap: calc(5 * var(--u));
+  min-height: calc(44 * var(--u));
+  padding: calc(4 * var(--u)) calc(10 * var(--u)) calc(4 * var(--u)) calc(20 * var(--u));
 }
 .hs-crumbs {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: calc(4 * var(--u));
+  gap: calc(5 * var(--u));
   min-width: 0;
-  color: var(--hs-faint);
-  font-size: calc(13 * var(--u));
+  margin-right: calc(7 * var(--u));
+  color: var(--hs-ink-4);
+  font-size: calc(15 * var(--u));
+}
+.hs-crumbs > span {
+  padding: calc(3 * var(--u)) calc(4 * var(--u));
 }
 .hs-crumbs .hs-icon {
   width: calc(12 * var(--u));
@@ -2647,36 +2916,44 @@
 .hs-crumbs [data-current] {
   color: var(--hs-ink);
 }
-.hs-file-toolbar .hs-button {
-  background: var(--hs-fill);
+.hs-file-toolbar .hs-round {
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
 }
+.hs-file-toolbar .hs-round .hs-icon {
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
+}
+/* The editor (code-editor/theme.ts): the code face at 15 on 25-unit lines, line numbers in the fourth ink, and the
+   line the caret is on over the fill. */
 .hs-code {
   padding-top: calc(8 * var(--u));
   color: var(--hs-ink);
   font-family: var(--hs-mono);
-  font-size: calc(12.5 * var(--u));
-  line-height: calc(22 * var(--u));
+  font-size: calc(15 * var(--u));
+  line-height: calc(25 * var(--u));
   letter-spacing: 0;
 }
 .hs-code-row {
   display: flex;
-  height: calc(22 * var(--u));
+  height: calc(25 * var(--u));
 }
 .hs-code-row[data-active] {
   background: var(--hs-fill);
 }
 .hs-code-num {
   flex: none;
-  width: calc(48 * var(--u));
-  padding-right: calc(14 * var(--u));
-  color: var(--hs-line-number);
+  min-width: calc(42 * var(--u));
+  padding: 0 calc(10 * var(--u)) 0 calc(14 * var(--u));
+  color: var(--hs-ink-4);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 .hs-code-row[data-active] .hs-code-num {
-  color: var(--hs-muted);
+  color: var(--hs-ink-3);
 }
 .hs-code-line {
+  padding-left: calc(6 * var(--u));
   white-space: pre;
 }
 .hs-tok-kw {
@@ -2693,23 +2970,15 @@
   color: var(--hs-syntax-tag);
 }
 
-/* A reply with more than one block: paragraphs, a small heading, and bullets that lead with their point. */
+/* A reply with more than one block: paragraphs, and bullets that lead with their point. */
 .hs-reply > * + * {
   margin-top: calc(14 * var(--u));
-}
-.hs-reply > .hs-prose-heading {
-  margin-top: calc(20 * var(--u));
-  color: var(--hs-ink);
-  font-size: calc(16 * var(--u));
-  line-height: calc(24 * var(--u));
-  letter-spacing: -0.01em;
 }
 .hs-prose-list {
   display: grid;
   gap: calc(8 * var(--u));
   margin-bottom: 0;
   padding: 0;
-  color: var(--hs-muted);
   list-style: none;
 }
 .hs-prose-list li {
@@ -2719,15 +2988,12 @@
 .hs-prose-list li::before {
   content: "";
   position: absolute;
-  top: calc(9 * var(--u));
+  top: calc(8.5 * var(--u));
   left: 0;
   width: calc(4 * var(--u));
   height: calc(4 * var(--u));
   border-radius: 999px;
-  background: var(--hs-faint);
-}
-.hs-prose-list .hs-strong {
-  color: var(--hs-ink);
+  background: var(--hs-ink-4);
 }
 
 /* Scenes with data-motion: scripts/hero-motion.ts opens and closes [data-grow]
@@ -2774,18 +3040,22 @@
   animation-play-state: paused !important;
 }
 
-/* Without a player the page shows the last moment through data-end-hidden, so the states read from hidden blocks
-   follow those attributes instead. */
-.hero-scene:not([data-engine]) .hs-turn:has(> .hs-steps[data-end-hidden]) .hs-receipt-chevron {
+/* Without a player the page shows the last moment through data-end-hidden, so the receipt's chevron follows that
+   attribute on the work it opens. */
+.hero-scene:not([data-engine]) .hs-turn:has(> .hs-work[data-end-hidden]) .hs-receipt-chevron {
   rotate: none;
 }
-.hero-scene:not([data-engine]) .hs-step:has(> .hs-step-mark > .hs-live[data-end-hidden]) > .hs-step-title {
-  color: var(--hs-muted);
-}
-.hero-scene:not([data-engine]) .hs-step:has(> .hs-step-body[data-end-hidden]) .hs-step-chevron {
-  display: none;
-}
 
+@keyframes hs-cube-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes hs-shimmer {
+  to {
+    background-position: -66% 0;
+  }
+}
 @keyframes hs-arrive {
   from {
     opacity: 0;
@@ -2810,28 +3080,9 @@
     opacity: 0;
   }
 }
-@keyframes hs-title-sweep {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: 0 0;
-  }
-}
-@keyframes hs-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 @keyframes hs-blink {
   50% {
     opacity: 0;
-  }
-}
-@keyframes hs-reply-pulse {
-  from {
-    opacity: 0.35;
-    scale: 0.75;
   }
 }
 @keyframes hs-mark-face {

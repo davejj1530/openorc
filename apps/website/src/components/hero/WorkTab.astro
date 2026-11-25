@@ -1,16 +1,15 @@
 ---
 /**
- * One tab on the window's top line, drawn as work-tabs.css draws them: the work column's are plain words, the current
- * one in ink over an underline; the panel's are pills, the current one raised on the fill. The close shows only on
- * the current tab. A thread's tab shows the mark of the agent it runs on, and its state in place of that mark: the
- * working cube while its agent works, an amber question while it waits on you, an ink dot while a finished turn is
- * unread. A file page with unsaved
- * edits shows a dot instead of its glyph. Scenes pass windows for those states and stills pass `true`. A tab given an `id` is one the visitor can pick.
+ * One tab on the window's top line, drawn as work-tabs.css draws them, the work column's and the panel's alike: its
+ * mark and name as plain words, the current one in ink over an underline. The close shows only on the current tab.
+ * A thread's tab shows the mark of the agent it runs on, and the cube of its state in place of that mark: at work
+ * while its agent works, in the attention colour while it waits on you, whole while a finished turn is unread. A file
+ * page with unsaved edits shows a dot instead of its glyph. Scenes pass windows for those states and stills pass
+ * `true`. A tab given an `id` is one the visitor can pick.
  */
 import FileGlyph from "./FileGlyph.astro";
-import AskMark from "./AskMark.astro";
 import ProductIcon, { type IconName } from "./ProductIcon.astro";
-import WorkingCube from "./WorkingCube.astro";
+import StateMark from "./StateMark.astro";
 import { flagged, type Journey } from "../../data/hero/timeline";
 
 export interface Tab {
@@ -64,11 +63,11 @@ const pickable = id
       ) : (
         <ProductIcon name={icon ?? "messageSquare"} />
       )}
-      {busy ? <WorkingCube class="hs-tab-busy" /> : null}
-      {waiting ? <AskMark class="hs-tab-waiting" /> : null}
-      {unread ? <i class="hs-tab-unread" /> : null}
+      {busy ? <StateMark class="hs-tab-busy" /> : null}
+      {waiting ? <StateMark kind="question" class="hs-tab-waiting" /> : null}
+      {unread ? <StateMark kind="done" class="hs-tab-unread" /> : null}
     </span>
     <span class="hs-tab-title">{label}</span>
   </Face>
-  <span class="hs-tab-close" aria-hidden="true"><ProductIcon name="close" /></span>
+  <span class="hs-tab-close" aria-hidden="true"><ProductIcon name="x" /></span>
 </div>

@@ -555,7 +555,7 @@ h3 {
   container-type: inline-size;
 }
 .demo-window {
-  aspect-ratio: 1360 / 850;
+  aspect-ratio: 1512 / 945;
 }
 
 /* Switchers: a fill track at natural width, with a raised knob that slides to the choice (scripts/segmented.ts). */

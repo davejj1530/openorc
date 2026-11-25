@@ -5,21 +5,23 @@
  * needs and asks it with thread_send; the question joins that thread's running
  * turn as a message notice, Codex answers the same way from its unmerged work
  * and goes back to the migration, and the answer starts a new turn that builds
- * the page against the new shape. Each turn shows its work as the app's steps
- * card while it runs, then folds behind its receipt. Content and timing:
- * data/hero/handoff.ts. With motion, blocks open with springs and each message
- * flies to the thread it reaches, opening into that thread's notice.
+ * the page against the new shape. Each turn shows its work as the app writes it
+ * while it runs, a step a line and a line for each thing the step did, then
+ * folds behind its receipt. Content and timing: data/hero/handoff.ts. With
+ * motion, blocks open with springs and each message flies to the thread it
+ * reaches, opening into that thread's notice.
  */
 import ChangeLine from "./ChangeLine.astro";
-import FileChips from "./FileChips.astro";
 import Notice from "./Notice.astro";
 import ProductIcon from "./ProductIcon.astro";
 import Prose from "./Prose.astro";
 import Receipt from "./Receipt.astro";
 import SceneFrame from "./SceneFrame.astro";
-import Step from "./Step.astro";
 import ThreadPane from "./ThreadPane.astro";
 import TurnEnd from "./TurnEnd.astro";
+import Work from "./Work.astro";
+import WorkAct from "./WorkAct.astro";
+import WorkLine from "./WorkLine.astro";
 import { busy, handoff, threads } from "../../data/hero/handoff";
 import { timed } from "../../data/hero/timeline";
 import { branches } from "../../data/hero/workspace";
@@ -35,6 +37,13 @@ const rows = [
 ];
 const at = (windows: string) => timed(handoff, windows);
 const head = { journey: handoff };
+const name = (path: string) => path.slice(path.lastIndexOf("/") + 1);
+/** A line's verb while its thing is under way, then once it is done. */
+const verbs = (during: string, after: string, done: string) => [
+  { text: during, show: `<${done}` },
+  { text: after, show: `>${done}` },
+];
+const [migrating] = b.edits.slice(-1);
 ---
 
 <SceneFrame id="handoff" journey={handoff} label={label} rows={rows} motion>
@@ -44,6 +53,7 @@ const head = { journey: handoff };
       journey={handoff}
       title={a.title}
       busy={busy.a}
+      more
       model={{ harness: a.harness, label: a.label, effort: a.effort }}
       permission={a.permission}
       placeholder={`Message ${a.agent}…`}
@@ -72,26 +82,15 @@ const head = { journey: handoff };
             { text: "2 steps", show: ">aSending" },
           ]}
         />
-        <ol class="hs-steps" data-grow {...at("aSend~aDone")}>
-          <Step
-            {...head}
-            title={[
-              { text: "Thinking", show: "<aThought" },
-              { text: a.phases.read, show: ">aThought" },
-            ]}
-            live="<aRead"
-            done=">aRead"
-            meta={{ text: "4 files", show: ">aRead" }}
-          />
-          <Step {...head} grow data-anchor="a-sending" {...at(">aSending")} title={a.phases.ask} live="<aAskedStart" done=">aAskedStart" open="<aAskedStart">
-            <span class="hs-step-note">
-              <ProductIcon name="workMessage" />
-              <span {...at("<aSent")}>Sending message</span>
-              <span {...at(">aSent")}>Sent message</span>
-              <span class="hs-live" {...at("<aSent")}><ProductIcon name="loader" /></span>
-            </span>
-          </Step>
-        </ol>
+        <Work grow {...at("aSend~aDone")}>
+          <WorkLine {...head} title={[{ text: a.phases.read, show: ">aThought" }]} running="<aRead">
+            <WorkAct {...head} grow {...at("<aThought")} live icon="lightbulb" name="Thinking" />
+            <WorkAct {...head} grow {...at(">aThought")} file="src/settings/Settings.tsx" verb={verbs("Reading", "Read", "aRead")} name="Settings.tsx, Members.tsx and 2 more" running="<aRead" />
+          </WorkLine>
+          <WorkLine {...head} grow data-anchor="a-sending" {...at(">aSending")} title={a.phases.ask} running="<aAskedStart">
+            <WorkAct {...head} icon="workMessage" verb={verbs("Sending message", "Sent message", "aSent")} name={a.flight} running="<aSent" />
+          </WorkLine>
+        </Work>
         <div class="hs-reply" data-grow {...at(">aAskedStart")}><Prose text={a.asked} stream="aAskedStart~aAskedEnd" /></div>
         <TurnEnd {...head} clock={{ from: "aSend", writing: "aAskedStart", to: "aDone" }} />
       </div>
@@ -106,19 +105,21 @@ const head = { journey: handoff };
           steps={[{ text: "1 step", show: "<aEdited" }]}
           changes={[{ text: `+${a.change.added} in 1 file`, show: ">aEdited" }]}
         />
-        <ol class="hs-steps" data-grow {...at("aWork~aFinish")}>
-          <Step {...head} title={a.phases.build} live="<aEdited" done=">aEdited" meta={{ text: "1 file", show: ">aEdited" }} open="<aEdited">
-            <FileChips label="Editing" files={[a.change]} live={a.change.path} />
-          </Step>
-        </ol>
-        <div class="hs-reply" data-grow {...at(">aResultStart")}><Prose text={a.result} stream="aResultStart~aResultEnd" /></div>
+        <Work grow {...at("aWork~aFinish")} journey={handoff} timeline=">aEdited">
+          <WorkLine {...head} title={a.phases.build} running="<aEdited">
+            <WorkAct {...head} file={a.change.path} verb={verbs("Writing", "Wrote", "aEdited")} name={name(a.change.path)} added={a.change.added} removed={a.change.removed} created settled=">aEdited" running="<aEdited" />
+          </WorkLine>
+        </Work>
+        <div class="hs-reply" data-grow {...at(">aResultStart")}>
+          <Prose text={a.result} stream="aResultStart~aResultEnd" proof={{ text: `${name(a.change.path)} +${a.change.added}`, show: at(">aFinish") }} />
+        </div>
         <ChangeLine grow {...at(">aFinish")} files={1} added={a.change.added} removed={a.change.removed} undo />
         <TurnEnd {...head} data-grow="" {...at(">aWork")} clock={{ from: "aWork", writing: "aResultStart", to: "aFinish" }} />
       </div>
     </ThreadPane>
 
     <ThreadPane id="b" split journey={handoff} title={b.title} busy={busy.b} model={{ harness: b.harness, label: b.label, effort: b.effort }} permission={b.permission} placeholder={`Message ${b.agent}…`} changes changeStat={b.change}>
-      <!-- Mid-migration when the scene opens: the message joins this turn, so its steps keep going. -->
+      <!-- Mid-migration when the scene opens: the message joins this turn, so its work keeps going. -->
       <div class="hs-turn">
         <div class="hs-user"><div class="hs-bubble">{b.request}</div></div>
         <Receipt
@@ -129,22 +130,28 @@ const head = { journey: handoff };
             { text: `+${b.change.added} −${b.change.removed} in 3 files`, show: ">aSent" },
           ]}
         />
-        <ol class="hs-steps">
-          <Step title={b.phases.read} meta={{ text: "6 files · 2 searches" }} />
-          <Step {...head} title={b.phases.migrate} live="<aSent" done=">aSent" meta={{ text: "3 files", show: ">aSent" }} open="<aSent">
-            <FileChips label="Editing" files={b.edits} live={b.edits.at(-1)?.path} />
-          </Step>
-          <Step {...head} grow data-anchor="b-sending" {...at(">bWork")} title={b.phases.answer} live="<bDone" done=">bDone" open="<bDone">
-            <div class="hs-step-narration" data-grow {...at(">bAnswerStart")}><Prose text={b.answer} stream="bAnswerStart~bAnswerEnd" /></div>
-            <span class="hs-step-note" data-grow {...at(">bSending")}>
-              <ProductIcon name="workMessage" />
-              <span {...at("<bSent")}>Sending message</span>
-              <span {...at(">bSent")}>Sent message</span>
-              <span class="hs-live" {...at("<bSent")}><ProductIcon name="loader" /></span>
-            </span>
-          </Step>
-          <Step {...head} grow {...at(">bDone")} title={b.phases.resume} live=">bDone" />
-        </ol>
+        <Work timeline>
+          <WorkLine title={b.phases.read}>
+            <WorkAct file="src/db/plans.ts" verb="Read" name="plans.ts, users.ts and 4 more" />
+            <WorkAct icon="search" verb="Searched" name="“user.plan”, “planId”" result="2 searches" />
+          </WorkLine>
+          <WorkLine {...head} title={b.phases.migrate} running="<aSent">
+            {b.edits.slice(0, -1).map((edit, index) => (
+              <WorkAct file={edit.path} verb={index ? "Edited" : "Wrote"} name={name(edit.path)} added={edit.added} removed={edit.removed} created={!index} />
+            ))}
+            {migrating ? <WorkAct {...head} file={migrating.path} verb={verbs("Writing", "Wrote", "aSent")} name={name(migrating.path)} added={migrating.added} created settled=">aSent" running="<aSent" /> : null}
+          </WorkLine>
+          <WorkLine {...head} grow data-anchor="b-sending" {...at(">bWork")} title={b.phases.answer} running="<bAnswerStart">
+            <WorkAct {...head} grow {...at("<bSending")} live icon="lightbulb" name="Thinking" />
+            <WorkAct {...head} grow {...at(">bSending")} icon="workMessage" verb={verbs("Sending message", "Sent message", "bSent")} name={b.flight} running="<bSent" />
+          </WorkLine>
+          <WorkLine {...head} grow {...at(">bAnswerStart")}>
+            <div slot="head" class="hs-work-said"><Prose text={b.answer} stream="bAnswerStart~bAnswerEnd" /></div>
+          </WorkLine>
+          <WorkLine {...head} grow {...at(">bDone")} title={b.phases.resume} running=">bDone">
+            <WorkAct {...head} file="src/billing/queries.ts" verb="Editing" name="queries.ts" running=">bDone" />
+          </WorkLine>
+        </Work>
         <Notice grow data-anchor="b-notice" {...at(">aSent")} from={b.notice.from} text={b.notice.text} />
         <TurnEnd {...head} clock={{ from: "bStart" }} />
       </div>

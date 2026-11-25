@@ -1,8 +1,8 @@
 ---
 /**
  * Worktrees, still: threads on their own branches beside threads on the checkout, and one of them open with its
- * uncommitted changes in the Commit chip over the composer. With `menu`, the thread's menu is open, its branch marked
- * Worktree on top. The sidebar is the scenes' own.
+ * uncommitted changes in the Commit chip in the composer's bar. With `menu`, the thread's menu is open, its branch
+ * marked Worktree on top. The sidebar is the scenes' own.
  */
 import "../../styles/hero-scene.css";
 import ChangeLine from "../hero/ChangeLine.astro";
@@ -42,7 +42,9 @@ const change = { added: 12, removed: 4 };
     <div class="hs-turn">
       <div class="hs-user"><div class="hs-bubble">Move every color, radius, and spacing value into one tokens file.</div></div>
       <Receipt thought="Thought 8s" changes={`+${change.added} −${change.removed} in 3 files`} check="tests passed" />
-      <div class="hs-reply"><Prose text="Every color, radius, and spacing step now comes from one `tokens.css`. The old per-component values are gone, and nothing outside this worktree has changed." /></div>
+      <div class="hs-reply">
+        <Prose text="Every color, radius, and spacing step now comes from one `tokens.css`. The old per-component values are gone, and nothing outside this worktree has changed." proof={`3 files +${change.added} −${change.removed}`} />
+      </div>
       <ChangeLine files={3} added={change.added} removed={change.removed} undo />
       <TurnEnd took="2m 4s" />
     </div>

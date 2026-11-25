@@ -412,30 +412,69 @@
   margin-left: auto;
 }
 
-/* Chips: the model, the mode, a destination. A pill on the control fill; hover steps the fill. */
+/* Chips: the model, the mode, a destination. A pill on the control fill; hover steps the fill. The model's pill holds
+   two controls on its one fill: the model, opening its picker, and at its end the usage meter of the account that
+   model spends, opening every account's limits. */
 .composer-chip,
-.composer-model-trigger {
+.composer-model {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 260px;
   height: var(--control-sm);
-  padding: 0 10px 0 8px;
   border-radius: var(--radius-pill);
   background-color: var(--control-fill);
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.composer-chip,
+.composer-model-trigger {
+  gap: 6px;
+  max-width: 260px;
+  padding: 0 10px 0 8px;
   color: var(--ink);
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
   white-space: nowrap;
-  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.composer-model-trigger {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 100%;
+  border-radius: inherit;
 }
 .composer-chip:hover:not(:disabled),
 .composer-chip[data-popup-open],
-.composer-model-trigger:hover:not(:disabled),
-.composer-model-trigger[data-popup-open] {
+.composer-model:has(> .composer-model-trigger:hover:not(:disabled)),
+.composer-model:has(> .composer-model-trigger[data-popup-open]) {
   background-image: linear-gradient(var(--surface-2), var(--surface-2));
+}
+/* The meter: the week's share left on a disc, 24px round inside the pill, with its own fill under the pointer so it
+   reads as a second control. A low week turns it amber. Its number is its hover words. */
+.composer-model:has(.composer-model-usage) > .composer-model-trigger {
+  padding-right: 3px;
+}
+.composer-model-usage {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 2px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.composer-model-usage:hover,
+.composer-model-usage[data-popup-open] {
+  background-color: var(--surface-3);
+  color: var(--ink);
+}
+.composer-model-usage[data-low] {
+  color: var(--warn);
 }
 .composer-chip:disabled,
 .composer-model-trigger:disabled {

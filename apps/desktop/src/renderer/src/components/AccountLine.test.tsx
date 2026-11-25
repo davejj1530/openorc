@@ -1,6 +1,7 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { AccountGraceLine } from "./AccountGraceLine";
+import { formatUsageTime, graceDeadlineWords } from "@openorc/client";
+import { AccountLine } from "./AccountLine";
 
 const until = new Date(2026, 10, 15, 14, 5).getTime();
 const now = new Date(2026, 10, 14, 14, 5).getTime();
@@ -28,10 +29,11 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
-const shown = (container: HTMLElement) => [container.querySelector(".sidebar-account-grace")!.textContent];
+const shown = (container: HTMLElement) => [container.querySelector(".sidebar-account-plan")!.textContent];
+const line = <AccountLine words={graceDeadlineWords(until, now)} tip={formatUsageTime(until)} />;
 
 it("says today or tomorrow with the time where the words fit, and keeps the full deadline on demand", () => {
-  const { container } = render(<AccountGraceLine until={until} now={now} />);
+  const { container } = render(line);
   expect(shown(container)[0]).toMatch(/^Pro ends tomorrow at /);
   expect(container.querySelector("[data-tip]")?.getAttribute("data-tip")).toContain("2026");
   expect(container.querySelector("[title]")).toBeNull();
@@ -39,7 +41,7 @@ it("says today or tomorrow with the time where the words fit, and keeps the full
 
 it("names the weekday and the time where the longer words would not fit, and takes them back when there is room", () => {
   layout.room = 150;
-  const { container } = render(<AccountGraceLine until={until} now={now} />);
+  const { container } = render(line);
   expect(shown(container)[0]).toMatch(/^Pro ends Sun /);
   layout.room = 170;
   act(() => resized.forEach((changed) => changed()));

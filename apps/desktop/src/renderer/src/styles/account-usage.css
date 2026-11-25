@@ -1,0 +1,156 @@
+/* The usage meter's popover, opened from the model chip: every account's limits and balances in one table, two
+   amounts to a row. Hairlines sit between rows; the open thread's account sits on the current-row fill instead. */
+.account-usage-popup {
+  width: min(504px, calc(100vw - 24px));
+  max-height: min(calc(100dvh - 24px), var(--available-height, 100dvh));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+}
+.usage-table-wrap {
+  display: grid;
+  gap: 4px;
+}
+.usage-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.usage-table :is(th, td) {
+  padding: 0 10px;
+  font-weight: 400;
+  text-align: left;
+}
+.usage-table thead th {
+  height: 30px;
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-4);
+}
+.usage-table-amount {
+  width: 148px;
+}
+.usage-table tbody :is(th, td) {
+  height: 52px;
+}
+.usage-table tbody tr + tr > * {
+  border-top: var(--hairline) solid var(--line);
+}
+.usage-table tbody tr[data-current] > *,
+.usage-table tbody tr[data-current] + tr > * {
+  border-top-color: transparent;
+}
+.usage-table tbody tr[data-current] > * {
+  background: var(--current-row-fill);
+}
+.usage-table tbody tr[data-current] > :first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+.usage-table tbody tr[data-current] > :last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+/* A row that carries on the one above it, with the amounts that did not fit there: no line between the two. */
+.usage-table tbody tr[data-more] > * {
+  border-top-color: transparent;
+}
+.usage-table-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.usage-table-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--text-base);
+  line-height: 18px;
+  color: var(--ink);
+}
+.usage-table-plan {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-4);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.usage-table-limit {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+}
+.usage-table-limit .amount-share {
+  grid-row: span 2;
+  color: var(--ink-2);
+}
+/* A balance has no disc: its figure keeps the column the shares left stand in. */
+.usage-table-limit > :not(.amount-share) {
+  grid-column: 2;
+}
+.usage-table-cell[data-tone] .amount-share {
+  color: var(--warn);
+}
+.usage-table-value {
+  font-size: var(--text-base);
+  line-height: 18px;
+  color: var(--ink);
+}
+.usage-table-reset {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-4);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.usage-table-cell[data-tone] .usage-table-value {
+  color: var(--warn);
+}
+.usage-table-cell[data-empty] {
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-4);
+}
+.usage-table-note {
+  padding: 12px 10px;
+  font-size: var(--text-base);
+  line-height: 18px;
+  color: var(--ink-4);
+}
+/* Under the table: the way to Usage in Settings and, at the row's end, what the open conversation has cost. */
+.usage-table-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.usage-table-more {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-3);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.usage-table-more:hover {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+.usage-cost {
+  display: flex;
+  gap: 8px;
+  padding: 0 10px;
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+.usage-cost-value {
+  color: var(--ink);
+}

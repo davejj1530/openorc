@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cloudTime, hoursDetail, initials, periodLabel, planDate, planLine, priceText } from "./account-words.js";
+import { cloudTime, hoursDetail, initials, periodLabel, planDate, planWords, priceText } from "./account-words.js";
 
 const DEC_3 = Date.parse("2026-12-03T12:00:00Z");
 
@@ -20,8 +20,11 @@ describe("account words", () => {
   });
 
   it("puts the plan and the hours left in one line", () => {
-    expect(planLine({ plan: { pro: false }, hours: null })).toBe("Free");
-    expect(planLine({ plan: { pro: true, standing: "live", at: DEC_3 }, hours: { leftSeconds: 41 * 3600, monthly: null, packsLeftSeconds: 41 * 3600 } })).toBe("Pro · 41 h left");
+    expect(planWords({ plan: { pro: false }, hours: null })).toEqual({ long: "Free", short: "Free" });
+    expect(planWords({ plan: { pro: true, standing: "live", at: DEC_3 }, hours: { leftSeconds: 41 * 3600, monthly: null, packsLeftSeconds: 41 * 3600 } })).toEqual({
+      long: "Pro · 41 h left",
+      short: "41 h left",
+    });
   });
 
   it("dates Pro by its standing", () => {

@@ -16,6 +16,7 @@ import {
   type Orcling,
 } from "@openorc/protocol";
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { AccountUsage } from "./AccountUsage";
 import { useComposerControl } from "./composer-read-only";
 import { CoversPreview } from "../lib/browser-preview";
 import { useClaudeAccountId } from "../lib/claude-account";
@@ -473,7 +474,7 @@ function composerModelName(orclings: OrclingPickerChoices | undefined, current: 
   return chosenOrcling(orclings)?.name ?? current?.label ?? value?.model ?? "Choose model";
 }
 
-/** A compact trigger with one model browser. */
+/** A compact trigger with one model browser, and beside it in the same pill the usage meter of the account it would spend. */
 interface ComposerModelPickerProps {
   value: ModelChoice | null;
   onChange: (choice: ModelChoice) => void;
@@ -511,66 +512,71 @@ export function ComposerModelPicker({ value, onChange, onSelectModel, orclings, 
   const title = `${modelTitle(current, value?.model) ?? "Choose a model"} · ${label}`;
   const control = useComposerControl(disabled, fast && fastBlocked ? `${title} · ${fastStatus(fast, fastBlocked)}${fastHint}` : title);
   return (
-    <Popover.Root
-      open={popup.open && !control.disabled}
-      onOpenChange={(next) => {
-        popup.onOpenChange(next);
-        if (next) void models.refetch();
-      }}
-    >
-      <Popover.Trigger ref={popup.trigger} disabled={control.disabled} className="composer-model-trigger" aria-label="Model and effort" {...warmAccountUsage(accounts)} data-tip={control.reason}>
-        <ComposerTriggerIcon orcling={chosenOrcling(orclings)} value={value} />
-        {fast ? <Zap size={13} aria-label={fastBlocked ? "Fast mode can't run" : "Fast mode requested"} className="composer-fast-indicator shrink-0" data-blocked={fastBlocked || undefined} /> : null}
-        <span className="composer-model-name">{composerModelName(orclings, current, value)}</span>
-        {value ? <TriggerEffort label={label} /> : null}
-      </Popover.Trigger>
-      <Popover.Portal>
-        <CoversPreview />
-        <Popover.Positioner side="top" align="start" sideOffset={6} collisionPadding={12} collisionBoundary={popup.boundary}>
-          <Popover.Popup
-            ref={floatingGround}
-            className={cn(modelSelector ? "composer-effort-popup" : "model-picker-popup", "composer-float")}
-            initialFocus={modelSelector ? undefined : false}
-            style={popup.maxWidth ? { maxWidth: popup.maxWidth } : undefined}
-          >
-            {modelSelector ? (
-              <ComposerEffortPanel
-                value={value}
-                current={current}
-                onChange={onChange}
-                disabled={settingsDisabled}
-                efforts={efforts}
-                index={index}
-                label={label}
-                defaultEffort={defaultEffort}
-                fast={fast}
-                fastAvailable={fastAvailable}
-                fastBlocked={fastBlocked}
-                fastHint={fastHint}
-                hint={hint}
-                failed={models.isError}
-              >
-                {modelSelector}
-              </ComposerEffortPanel>
-            ) : (
-              <ModelBrowser
-                value={value}
-                onChange={onChange}
-                onSelectModel={onSelectModel}
-                orclings={orclings}
-                accounts={accounts}
-                showEffort
-                showFast={Boolean(fastReason) || (limits?.fast ?? true)}
-                harnesses={limits?.harnesses}
-                cloud={limits?.cloud}
-                disabled={settingsDisabled}
-                closeOnSelect={false}
-                close={() => popup.setOpen(false)}
-              />
-            )}
-          </Popover.Popup>
-        </Popover.Positioner>
-      </Popover.Portal>
-    </Popover.Root>
+    <span className="composer-model">
+      <Popover.Root
+        open={popup.open && !control.disabled}
+        onOpenChange={(next) => {
+          popup.onOpenChange(next);
+          if (next) void models.refetch();
+        }}
+      >
+        <Popover.Trigger ref={popup.trigger} disabled={control.disabled} className="composer-model-trigger" aria-label="Model and effort" {...warmAccountUsage(accounts)} data-tip={control.reason}>
+          <ComposerTriggerIcon orcling={chosenOrcling(orclings)} value={value} />
+          {fast ? (
+            <Zap size={13} aria-label={fastBlocked ? "Fast mode can't run" : "Fast mode requested"} className="composer-fast-indicator shrink-0" data-blocked={fastBlocked || undefined} />
+          ) : null}
+          <span className="composer-model-name">{composerModelName(orclings, current, value)}</span>
+          {value ? <TriggerEffort label={label} /> : null}
+        </Popover.Trigger>
+        <Popover.Portal>
+          <CoversPreview />
+          <Popover.Positioner side="top" align="start" sideOffset={6} collisionPadding={12} collisionBoundary={popup.boundary}>
+            <Popover.Popup
+              ref={floatingGround}
+              className={cn(modelSelector ? "composer-effort-popup" : "model-picker-popup", "composer-float")}
+              initialFocus={modelSelector ? undefined : false}
+              style={popup.maxWidth ? { maxWidth: popup.maxWidth } : undefined}
+            >
+              {modelSelector ? (
+                <ComposerEffortPanel
+                  value={value}
+                  current={current}
+                  onChange={onChange}
+                  disabled={settingsDisabled}
+                  efforts={efforts}
+                  index={index}
+                  label={label}
+                  defaultEffort={defaultEffort}
+                  fast={fast}
+                  fastAvailable={fastAvailable}
+                  fastBlocked={fastBlocked}
+                  fastHint={fastHint}
+                  hint={hint}
+                  failed={models.isError}
+                >
+                  {modelSelector}
+                </ComposerEffortPanel>
+              ) : (
+                <ModelBrowser
+                  value={value}
+                  onChange={onChange}
+                  onSelectModel={onSelectModel}
+                  orclings={orclings}
+                  accounts={accounts}
+                  showEffort
+                  showFast={Boolean(fastReason) || (limits?.fast ?? true)}
+                  harnesses={limits?.harnesses}
+                  cloud={limits?.cloud}
+                  disabled={settingsDisabled}
+                  closeOnSelect={false}
+                  close={() => popup.setOpen(false)}
+                />
+              )}
+            </Popover.Popup>
+          </Popover.Positioner>
+        </Popover.Portal>
+      </Popover.Root>
+      <AccountUsage choice={value} />
+    </span>
   );
 }

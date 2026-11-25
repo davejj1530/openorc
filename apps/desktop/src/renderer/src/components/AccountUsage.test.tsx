@@ -90,9 +90,13 @@ vi.mock("../lib/client", async (original) => {
 });
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
 
-import { publishComposerAccount, useComposerAccount } from "../lib/composer-account";
+import type { ModelChoice } from "@openorc/client";
+import { ClaudeAccountScope } from "../lib/claude-account";
 import { useRouter } from "../lib/router";
 import { AccountUsage } from "./AccountUsage";
+
+/** What a model chip has chosen. */
+const pick = (agent: string, model = ""): ModelChoice => ({ agent: agent as ModelChoice["agent"], model, effort: null });
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -102,7 +106,6 @@ beforeEach(() => {
       disconnect() {}
     },
   );
-  useComposerAccount.setState({ chosen: null });
   thread = claudeThread;
   fxReads.length = 0;
   fxInstalled = false;
@@ -113,18 +116,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("opens every account's 5-hour and weekly limits from the footer's share left, the thread's account first", async () => {
+it("opens every account's 5-hour and weekly limits from the model chip's share left, the thread's account first", async () => {
   useRouter.setState({ route: { view: "thread", threadId: "notes" } });
-  render(<AccountUsage />);
+  render(<AccountUsage choice={null} />);
   const button = screen.getByRole("button", { name: "Claude · Work: 59% left this week" });
-  // The share is filled on its disc, never drawn as an arc, and its number stands beside it.
-  expect(button.textContent).toBe("59%");
+  // The share is filled on its disc, never drawn as an arc; its number is the meter's name, not its text.
+  expect(button.textContent).toBe("");
   expect(button.querySelector(".amount-share path")).not.toBeNull();
   expect(button.querySelector("[stroke-dasharray]")).toBeNull();
   fireEvent.click(button);
   const table = await screen.findByRole("table");
   const rows = within(table).getAllByRole("row").slice(1);
-  expect(rows.map((row) => within(row).getByRole("rowheader").textContent)).toEqual(["Claude · WorkTeam", "CodexPro", "Claude · Client"]);
+  expect(rows.map((row) => within(row).getByRole("rowheader").textContent)).toEqual(["WorkTeam", "CodexPro", "Client"]);
   expect(rows[0]!.getAttribute("aria-current")).toBe("true");
   expect(
     rows.map((row) =>
@@ -135,29 +138,29 @@ it("opens every account's 5-hour and weekly limits from the footer's share left,
   ).toEqual([["4% left", "59% left"], ["82% left", "64% left"], ["Not signed in"]]);
   expect(rows[0]!.querySelector('[data-tone="low"]')?.textContent).toContain("in 21m");
   // Claude Code prices turns even on a plan, so a Claude conversation never shows a cost.
-  expect(screen.queryByRole("region", { name: "This conversation" })).toBeNull();
+  expect(screen.queryByText(/This conversation/)).toBeNull();
 });
 
 it("on an OpenCode thread, which has no weekly limit, shows the usage glyph plain and opens with what the conversation has cost", async () => {
   thread = { id: "notes", agent: "opencode", claudeAccountId: null, teamInstanceId: null };
   useRouter.setState({ route: { view: "thread", threadId: "notes" } });
-  render(<AccountUsage />);
+  render(<AccountUsage choice={null} />);
   const button = screen.getByRole("button", { name: "OpenCode: no weekly limit" });
-  // The footer shows no figure and measures nothing until the popup opens.
+  // The meter shows no figure and measures nothing until the popup opens.
   expect(button.textContent).toBe("");
   expect(button.querySelector(".amount-share")).toBeNull();
   expect(button.querySelector("svg")?.getAttribute("data-icon")).toBe("Signal");
   fireEvent.click(button);
-  const cost = await screen.findByRole("region", { name: "This conversation" });
+  const cost = await screen.findByText(/This conversation/);
   expect(within(cost).getByText("$1.97")).toBeTruthy();
-  expect(within(cost).getByText("As OpenCode reports it after each turn.")).toBeTruthy();
+  expect(cost.getAttribute("data-tip")).toBe("As OpenCode reports it after each turn.");
   expect(within(screen.getByRole("table")).getAllByRole("row").slice(1)).toHaveLength(3);
 });
 
 it("measures Gemini for Antigravity and shows both model pools without implying a missing five-hour quota", async () => {
   thread = { id: "notes", agent: "antigravity", claudeAccountId: null, teamInstanceId: null };
   useRouter.setState({ route: { view: "thread", threadId: "notes" } });
-  render(<AccountUsage />);
+  render(<AccountUsage choice={null} />);
   fireEvent.click(screen.getByRole("button", { name: "Antigravity: 97% left this week" }));
   const table = await screen.findByRole("table");
   const gemini = within(table).getByRole("row", { name: /Antigravity Gemini Models/ });
@@ -169,17 +172,19 @@ it("measures Gemini for Antigravity and shows both model pools without implying 
 
 it("off a thread, an agent with no weekly limit shows nothing, since there is no conversation to price", () => {
   useRouter.setState({ route: { view: "newthread" } });
-  act(() => publishComposerAccount({ agent: "opencode" }));
-  const { container } = render(<AccountUsage />);
+  const { container } = render(<AccountUsage choice={pick("opencode")} />);
   expect(container.innerHTML).toBe("");
 });
 
-it("off a thread, reports on the agent and account the new-thread composer has chosen", () => {
+it("off a thread, reports on the agent its model chip has chosen, on the Claude account its composer works on", () => {
   useRouter.setState({ route: { view: "newthread" } });
-  act(() => publishComposerAccount({ agent: "codex" }));
-  render(<AccountUsage />);
+  const { rerender } = render(<AccountUsage choice={pick("codex")} />);
   expect(screen.getByRole("button", { name: "Codex: 64% left this week" })).toBeTruthy();
-  act(() => publishComposerAccount({ agent: "claude", claudeAccountId: "work" }));
+  rerender(
+    <ClaudeAccountScope id="work">
+      <AccountUsage choice={pick("claude")} />
+    </ClaudeAccountScope>,
+  );
   expect(screen.getByRole("button", { name: "Claude · Work: 59% left this week" })).toBeTruthy();
 });
 
@@ -187,15 +192,14 @@ it("shows an fx balance before a first turn, without a percentage meter or inven
   fxInstalled = true;
   fx = { ...fx, windows: [], credits: [{ label: "AI Gateway balance", balance: "12.50", unlimited: false, currency: "USD" }] };
   useRouter.setState({ route: { view: "newthread" } });
-  publishComposerAccount({ agent: "fx", model: "gateway/anthropic/example" });
-  render(<AccountUsage />);
+  render(<AccountUsage choice={pick("fx", "gateway/anthropic/example")} />);
   const button = screen.getByRole("button", { name: "fx: AI Gateway balance: $12.50" });
   expect(button.querySelector(".amount-share")).toBeNull();
   fireEvent.click(button);
-  const details = await screen.findByRole("region", { name: "fx account usage" });
+  const details = await screen.findByRole("row", { name: /^fx/ });
   expect(within(details).getByText("$12.50")).toBeTruthy();
   expect(within(details).queryByText("No limits reported")).toBeNull();
-  expect(screen.queryByRole("region", { name: "This conversation" })).toBeNull();
+  expect(screen.queryByText(/This conversation/)).toBeNull();
   expect(fxReads.every((provider) => provider === "gateway/anthropic/example")).toBe(true);
 });
 
@@ -203,15 +207,14 @@ it("labels fx budgets by their actual period and switches the usage connection w
   fxInstalled = true;
   fx = { ...fx, windows: [limit("gateway:budget", "Monthly budget", 25, 10000)], credits: [] };
   useRouter.setState({ route: { view: "newthread" } });
-  publishComposerAccount({ agent: "fx", model: "gateway/example" });
-  render(<AccountUsage />);
+  const { rerender } = render(<AccountUsage choice={pick("fx", "gateway/example")} />);
   fireEvent.click(screen.getByRole("button", { name: "fx: 75% left · Monthly budget" }));
-  const details = await screen.findByRole("region", { name: "fx account usage" });
+  const details = await screen.findByRole("row", { name: /^fx/ });
   expect(within(details).getByText("Monthly budget")).toBeTruthy();
   expect(within(details).getByText("75% left")).toBeTruthy();
-  await act(async () => publishComposerAccount({ agent: "fx", model: "codex/example" }));
+  await act(async () => rerender(<AccountUsage choice={pick("fx", "codex/example")} />));
   expect(fxReads.at(-1)).toBe("codex/example");
-  expect(within(screen.getByRole("region", { name: "fx account usage" })).getByText("Codex subscription via fx")).toBeTruthy();
+  expect(within(screen.getByRole("row", { name: /^fx/ })).getByText("Codex subscription via fx")).toBeTruthy();
 });
 
 it("reads an fx thread's connection instead of the saved CLI default", () => {
@@ -219,7 +222,7 @@ it("reads an fx thread's connection instead of the saved CLI default", () => {
   fx = { ...fx, windows: [limit("codex:primary", "Codex · 5-hour window", 20, 100)], credits: [] };
   thread = { id: "notes", agent: "fx", model: "codex/example", claudeAccountId: null, teamInstanceId: null };
   useRouter.setState({ route: { view: "thread", threadId: "notes" } });
-  render(<AccountUsage />);
+  render(<AccountUsage choice={null} />);
   expect(screen.getByRole("button", { name: "fx: 80% left · Codex · 5-hour window" })).toBeTruthy();
   expect(fxReads).toEqual(["codex/example"]);
 });

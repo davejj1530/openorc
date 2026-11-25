@@ -1,19 +1,19 @@
-import { planLine } from "@openorc/client";
+import { formatUsageTime, graceDeadlineWords, planWords } from "@openorc/client";
 import type { AccountStatus } from "@openorc/protocol";
 import { cloneElement } from "react";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { useAccountSeatState } from "../lib/account-seat-state";
-import { AccountGraceLine } from "./AccountGraceLine";
+import { AccountLine } from "./AccountLine";
 import { AccountFace } from "./AccountFace";
 import { CircleUser, LoaderCircle, X } from "./icons";
 import { Tooltip } from "./ui";
 
 /**
  * The person at the foot's start. Signed in: their face, name and plan, opening Settings > Account; in a narrow sidebar
- * the name gives way a whole word at a time from its end, and the plan line always fits. Signed out: Sign in. Nothing
- * in a build with no account server to sign in to.
+ * the name gives way a whole word at a time from its end, and the plan line says its shorter words. In the day of
+ * grace that line says when Pro ends. Signed out: Sign in. Nothing in a build with no account server to sign in to.
  */
 export function SidebarAccount() {
   const { account, now } = useAccountSeatState(useRpc("account.status", {}).data);
@@ -21,11 +21,11 @@ export function SidebarAccount() {
   if (account?.state === "signed-out") return <SidebarSignIn account={account} />;
   if (account?.state !== "signed-in") return null;
   const name = account.name ?? account.email;
+  const grace = account.organizationAccess?.state === "grace" ? account.organizationAccess : null;
   return (
     <button
       type="button"
       className="sidebar-account no-drag"
-      data-grace={account.organizationAccess?.state === "grace" || undefined}
       aria-current={open ? "page" : undefined}
       onClick={() => {
         useRouter.getState().navigate({ view: "settings", section: "account" });
@@ -39,7 +39,7 @@ export function SidebarAccount() {
             <span key={index}>{index ? ` ${word}` : word}</span>
           ))}
         </span>
-        <span className="sidebar-account-plan">{account.organizationAccess?.state === "grace" ? <AccountGraceLine until={account.organizationAccess.until} now={now} /> : planLine(account)}</span>
+        <AccountLine words={grace ? graceDeadlineWords(grace.until, now) : planWords(account)} tip={grace ? formatUsageTime(grace.until) : undefined} />
       </span>
     </button>
   );

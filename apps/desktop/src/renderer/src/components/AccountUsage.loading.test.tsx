@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ProviderUsage } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { publishComposerAccount, useComposerAccount } from "../lib/composer-account";
+import type { ModelChoice } from "@openorc/client";
+import { ClaudeAccountScope } from "../lib/claude-account";
 import { useRouter } from "../lib/router";
 import { AccountUsage } from "./AccountUsage";
 
@@ -38,8 +39,6 @@ beforeEach(() => {
   );
   client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } });
   useRouter.setState({ route: { view: "newthread" } });
-  useComposerAccount.setState({ chosen: null });
-  publishComposerAccount({ agent: "codex" });
   readUsage = async () => codex;
   mocks.call.mockImplementation(async (method, params) => {
     if (method === "providers.usage") return readUsage(params.provider, params.claudeAccountId);
@@ -63,12 +62,19 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function mount() {
-  return render(
+/** The meter in a composer whose model chip has chosen `agent`, working on a Claude account when one is named. */
+function meter(agent: ModelChoice["agent"], claudeAccountId?: string) {
+  return (
     <QueryClientProvider client={client}>
-      <AccountUsage />
-    </QueryClientProvider>,
+      <ClaudeAccountScope id={claudeAccountId}>
+        <AccountUsage choice={{ agent, model: "", effort: null }} />
+      </ClaudeAccountScope>
+    </QueryClientProvider>
   );
+}
+
+function mount() {
+  return render(meter("codex"));
 }
 
 it("shows the known current account immediately and fills each other account without waiting for the slowest", async () => {
@@ -85,10 +91,10 @@ it("shows the known current account immediately and fills each other account wit
   fireEvent.click(await screen.findByRole("button", { name: "Codex: 64% left this week" }));
   const row = await screen.findByRole("row", { name: /Codex/ }, { timeout: 200 });
   expect(within(row).getByText("64% left")).toBeTruthy();
-  expect(within(await screen.findByRole("row", { name: /Claude · Work/ })).getByText("Reading usage")).toBeTruthy();
+  expect(within(await screen.findByRole("row", { name: /Work/ })).getByText("Reading usage")).toBeTruthy();
   await act(async () => finishWork({ ...codex, provider: "claude", claudeAccountId: "work", windows: [{ ...codex.windows[0]!, remainingPercent: 41, usedPercent: 59 }] }));
-  expect(within(await screen.findByRole("row", { name: /Claude · Work/ })).getByText("41% left")).toBeTruthy();
-  expect(within(screen.getByRole("row", { name: /Claude · Client/ })).getByText("Reading usage")).toBeTruthy();
+  expect(within(await screen.findByRole("row", { name: /Work/ })).getByText("41% left")).toBeTruthy();
+  expect(within(screen.getByRole("row", { name: /Client/ })).getByText("Reading usage")).toBeTruthy();
   expect(mocks.call.mock.calls.filter(([method, params]) => method === "providers.usage" && params.provider === "codex")).toHaveLength(1);
 });
 
@@ -103,14 +109,14 @@ it("shows the current account before discovery finishes", async () => {
 it("reopens from the shared cache without another provider read", async () => {
   const rendered = mount();
   fireEvent.click(await screen.findByRole("button", { name: "Codex: 64% left this week" }));
-  await screen.findByRole("row", { name: /Claude · Client.*64%/ });
+  await screen.findByRole("row", { name: /Client.*64%/ });
   const calls = mocks.call.mock.calls.filter(([method]) => method === "providers.usage");
   expect(calls).toHaveLength(3);
   expect(calls.every(([, params]) => params.maxAgeMs === 60_000)).toBe(true);
   rendered.unmount();
   mount();
   fireEvent.click(screen.getByRole("button", { name: "Codex: 64% left this week" }));
-  expect(within(await screen.findByRole("row", { name: /Claude · Client/ }, { timeout: 200 })).getByText("64% left")).toBeTruthy();
+  expect(within(await screen.findByRole("row", { name: /Client/ }, { timeout: 200 })).getByText("64% left")).toBeTruthy();
   expect(mocks.call.mock.calls.filter(([method]) => method === "providers.usage")).toHaveLength(3);
 });
 
@@ -121,16 +127,16 @@ it("keeps successful rows visible when one account fails", async () => {
   };
   mount();
   fireEvent.click(await screen.findByRole("button", { name: "Codex: 64% left this week" }));
-  await waitFor(() => expect(within(screen.getByRole("row", { name: /Claude · Work/ })).getByText("Couldn’t read usage")).toBeTruthy());
+  await waitFor(() => expect(within(screen.getByRole("row", { name: /Work/ })).getByText("Couldn’t read usage")).toBeTruthy());
   expect(within(screen.getByRole("row", { name: /Codex/ })).getByText("64% left")).toBeTruthy();
 });
 
 it("does not carry the previous account's allowance into a new selection", async () => {
   const pending = new Promise<ProviderUsage>(() => {});
   readUsage = async (provider) => (provider === "codex" ? codex : pending);
-  mount();
+  const { rerender } = mount();
   await screen.findByRole("button", { name: "Codex: 64% left this week" });
-  act(() => publishComposerAccount({ agent: "claude", claudeAccountId: "work" }));
+  rerender(meter("claude", "work"));
   expect(screen.queryByRole("button", { name: /64% left this week/ })).toBeNull();
 });
 

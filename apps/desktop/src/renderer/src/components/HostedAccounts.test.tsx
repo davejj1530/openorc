@@ -84,25 +84,24 @@ it.each(["claude", "codex"] as const)("shows the cloud %s sign-in's last reading
     plan: "Max",
     context: "OpenOrc Cloud",
   };
-  render(<AccountUsage />, { wrapper });
-  expect(await screen.findByText("19%")).toBeTruthy();
-  expect(screen.getByRole("button", { name: "OpenOrc Cloud: 19% left this week" })).toBeTruthy();
+  render(<AccountUsage choice={null} />, { wrapper });
+  expect(await screen.findByRole("button", { name: "OpenOrc Cloud: 19% left this week" })).toBeTruthy();
   expect(host.asked).toEqual([{ provider: agent, cloud: true }]);
   expect(host.reads).not.toContain("claude.accounts.list");
-  expect(screen.queryByText("64%")).toBeNull();
+  expect(screen.queryByRole("button", { name: /64% left/ })).toBeNull();
 });
 
 it("shows nothing for a cloud thread whose sign-in has no reading yet, rather than a guess", async () => {
-  render(<AccountUsage />, { wrapper });
+  render(<AccountUsage choice={null} />, { wrapper });
   await settled();
   expect(host.asked).toEqual([{ provider: "claude", cloud: true }]);
   expect(screen.queryByRole("button")).toBeNull();
 });
 
-it("keeps the local account's reported allowance in the footer", async () => {
+it("keeps the local account's reported allowance in the meter", async () => {
   host.thread = { ...localReviewThread, id: cloudReviewThread.id, agent: "claude" };
-  render(<AccountUsage />, { wrapper });
-  expect(await screen.findByText("64%")).toBeTruthy();
+  render(<AccountUsage choice={null} />, { wrapper });
+  expect(await screen.findByRole("button", { name: /64% left this week/ })).toBeTruthy();
   expect(host.reads).toContain("claude.accounts.list");
   expect(host.reads).toContain("providers.usage");
 });
@@ -175,7 +174,7 @@ it("reads the usage of the account a cloud thread runs on, by its name", async (
     plan: "Pro",
     context: "OpenOrc Cloud",
   };
-  render(<AccountUsage />, { wrapper });
+  render(<AccountUsage choice={null} />, { wrapper });
   expect(await screen.findByRole("button", { name: "OpenOrc Cloud · ChatGPT Pro: 70% left this week" })).toBeTruthy();
   expect(host.asked).toContainEqual({ provider: "codex", cloud: true, cloudAccountId: "pro" });
 });
@@ -193,7 +192,7 @@ it("says when an old cloud reading was taken, in plain colours, since a cloud ac
     context: "OpenOrc Cloud",
     refreshedAt: observedAt,
   };
-  render(<AccountUsage />, { wrapper });
+  render(<AccountUsage choice={null} />, { wrapper });
   fireEvent.click(await screen.findByRole("button", { name: "OpenOrc Cloud: 19% left this week" }));
   const reported = `Reported ${new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(observedAt)}`;
   // Said once, under the account, as the reading is one.

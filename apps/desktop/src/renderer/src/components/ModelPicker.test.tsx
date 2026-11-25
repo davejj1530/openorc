@@ -8,6 +8,8 @@ import { ComposerModelPicker, defaultChoice, ModelPicker, type ModelChoice } fro
 const mocks = vi.hoisted(() => ({ call: vi.fn(), navigate: vi.fn() }));
 vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onReady: () => {}, onPush: () => () => {} } }));
 vi.mock("../lib/router", () => ({ useRouter: { getState: () => ({ navigate: mocks.navigate }) } }));
+// The chip's usage meter has its own tests; here the chip is its picker alone.
+vi.mock("./AccountUsage", () => ({ AccountUsage: () => null }));
 vi.mock("./EffortGalaxy", () => ({ EffortGalaxy: () => <span data-testid="effort-galaxy" /> }));
 vi.mock("./FastModeRocket", () => ({ FastModeRocket: () => <span data-testid="fast-mode-rocket" /> }));
 afterEach(() => {

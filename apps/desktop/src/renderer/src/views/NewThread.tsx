@@ -25,7 +25,6 @@ import { useCloudStartReady } from "../lib/use-cloud-start-ready";
 import { useMounted } from "../lib/use-mounted";
 import { cloudPicker } from "../lib/use-thread-accounts";
 import { NewThreadStage, useCloudStart } from "./new-thread-starting";
-import { usePublishComposerAccount } from "../lib/composer-account";
 import { useDefaultHarness } from "../lib/default-harness";
 import { focusedProject, useLayout } from "../lib/layout";
 import { swapInPlace } from "../lib/motion";
@@ -202,7 +201,6 @@ function NewThreadProject({
   const files = useNewThreadFiles(projectId, onCloud);
   const chooseModel = (model: ModelChoice) => changeDraft({ target: { kind: "model", choice: model } });
   const { choice, runDraft } = useStartChoice({ draft, onCloud, models: models.data, info: info.data, defaultHarness, choose: chooseModel });
-  usePublishComposerAccount(choice?.agent, claudeAccountId, choice?.model);
 
   const {
     selectedProject: selected,

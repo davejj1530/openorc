@@ -1,17 +1,27 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { AccountStatus } from "@openorc/protocol";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SidebarAccount } from "./SidebarAccount";
 import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 import { useRouter } from "../lib/router";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
+beforeEach(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+});
 afterEach(() => {
   cleanup();
   queryClient.clear();
   vi.resetAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function show(status: AccountStatus) {

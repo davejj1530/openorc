@@ -26,10 +26,15 @@ export function periodLabel(period: ProPeriod, price: Price | null, locale?: str
   return price ? `${priceText(price, locale)} ${PER[period].per}` : PER[period].name;
 }
 
-/** The plan in one short line, as the sidebar's foot shows it: "Free", or "Pro · 41 h left", which fits its narrowest width. */
-export function planLine(account: Pick<SignedIn, "plan" | "hours">): string {
-  if (!account.plan.pro) return "Free";
-  return account.hours ? `Pro · ${cloudTime(account.hours.leftSeconds)} left` : "Pro";
+/**
+ * The plan in one line, as the sidebar's foot shows it, in two lengths: "Pro · 41 h left" where there is room, the
+ * hours alone where not. "Free" and a Pro with no hours say the same in both.
+ */
+export function planWords(account: Pick<SignedIn, "plan" | "hours">): { long: string; short: string } {
+  if (!account.plan.pro) return { long: "Free", short: "Free" };
+  if (!account.hours) return { long: "Pro", short: "Pro" };
+  const left = `${cloudTime(account.hours.leftSeconds)} left`;
+  return { long: `Pro · ${left}`, short: left };
 }
 
 /** When Pro renews, ends, or stops after a failed payment; null for Free. */

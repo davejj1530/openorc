@@ -777,33 +777,28 @@ button.browser-empty:hover,
 }
 .sidebar-account-words {
   display: flex;
+  flex: 1;
   flex-direction: column;
   min-width: 0;
 }
+/* The plan in one quiet line that never leaves its box: its longer words are measured, unseen, against the room the
+   row really has, and the shorter take their place where they would not fit. */
 .sidebar-account-plan {
-  white-space: nowrap;
-}
-/* In the day of grace the plan line says when Pro ends, and the usage chip leaves the row to it. The words take the
-   row's whole width, so the longer words are measured against the room there really is. */
-.sidebar-account[data-grace="true"] {
-  /* The words may run to the row's end; Settings keeps its own 8px around its glyph. */
-  padding-right: 0;
-}
-.sidebar-account[data-grace="true"] .sidebar-account-words {
-  flex: 1;
-}
-.sidebar-account-grace {
   position: relative;
   display: block;
   overflow: hidden;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-3);
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.sidebar-grace-measure {
+.sidebar-account-plan-measure {
   position: absolute;
   visibility: hidden;
   pointer-events: none;
 }
-.sidebar-grace-measure::before {
+.sidebar-account-plan-measure::before {
   content: attr(data-words);
 }
 /* Words that don't fit wrap onto a second line that never shows, so the name loses whole words, never letters. */
@@ -822,11 +817,6 @@ button.browser-empty:hover,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.sidebar-account-plan {
-  font-size: var(--text-xs);
-  line-height: 16px;
-  color: var(--ink-3);
 }
 /* Signed out, the person's place holds Sign in, drawn as a navigation row: the glyph 16px in, the label in quiet ink.
    While the page waits the glyph turns, and a cross takes its place under the pointer to call the sign-in off. A
@@ -978,174 +968,6 @@ button.browser-empty:hover,
   stroke: var(--ink-2);
   stroke-linecap: round;
   transition: stroke-dasharray var(--duration-quick) var(--ease-out);
-}
-/* The week's usage is a footer button: the share left filled on its disc, then the number, in a 28px pill; a
-   low week turns both amber. An account with no weekly limit shows its glyph plain. */
-.sidebar-tool.account-usage-button {
-  grid-auto-flow: column;
-  gap: 6px;
-  width: auto;
-  height: 28px;
-  padding: 0 8px 0 6px;
-  font-size: var(--text-xs);
-  line-height: 18px;
-  color: var(--ink-2);
-}
-.account-usage-button[data-low] {
-  color: var(--warn);
-}
-/* The usage button's popover: every account's 5-hour and weekly limits in one table. Hairlines sit between
-   rows; the open thread's account sits on the current-row fill instead. */
-.account-usage-popup {
-  width: min(440px, calc(100vw - 24px));
-  max-height: min(calc(100dvh - 24px), var(--available-height, 100dvh));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 6px;
-}
-.usage-table-wrap {
-  display: grid;
-  gap: 4px;
-}
-.usage-table {
-  width: 100%;
-  table-layout: fixed;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-.usage-table :is(th, td) {
-  padding: 0 10px;
-  font-weight: 400;
-  text-align: left;
-}
-.usage-table thead th {
-  height: 30px;
-  font-size: var(--text-xs);
-  line-height: 18px;
-  color: var(--ink-4);
-}
-.usage-table thead th:not(:first-child) {
-  width: 124px;
-}
-.usage-table tbody :is(th, td) {
-  height: 52px;
-}
-.usage-table tbody tr + tr > * {
-  border-top: var(--hairline) solid var(--line);
-}
-.usage-table tbody tr[data-current] > *,
-.usage-table tbody tr[data-current] + tr > * {
-  border-top-color: transparent;
-}
-.usage-table tbody tr[data-current] > * {
-  background: var(--current-row-fill);
-}
-.usage-table tbody tr[data-current] > :first-child {
-  border-radius: var(--radius-md) 0 0 var(--radius-md);
-}
-.usage-table tbody tr[data-current] > :last-child {
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-}
-.usage-table-account {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-.usage-table-name {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  font-size: var(--text-base);
-  line-height: 18px;
-  color: var(--ink);
-}
-.usage-table-plan {
-  font-size: var(--text-xs);
-  line-height: 18px;
-  color: var(--ink-4);
-}
-.usage-table-limit {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  align-items: center;
-  column-gap: 8px;
-}
-.usage-table-limit .amount-share {
-  grid-row: span 2;
-  color: var(--ink-2);
-}
-.usage-table-cell[data-tone] .amount-share,
-.usage-table-limit[data-tone] .amount-share {
-  color: var(--warn);
-}
-.usage-table-value {
-  font-size: var(--text-base);
-  line-height: 18px;
-  color: var(--ink);
-}
-.usage-table-reset {
-  overflow: hidden;
-  font-size: var(--text-xs);
-  line-height: 18px;
-  color: var(--ink-4);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.usage-table-cell[data-tone] .usage-table-value,
-.usage-table-limit[data-tone] .usage-cost-value {
-  color: var(--warn);
-}
-.usage-table-cell[data-empty] {
-  font-size: var(--text-xs);
-  line-height: 18px;
-  color: var(--ink-4);
-}
-.usage-table-note {
-  padding: 12px 10px;
-  font-size: var(--text-base);
-  line-height: 18px;
-  color: var(--ink-4);
-}
-.usage-table-more {
-  justify-self: start;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: var(--radius-md);
-  font-size: var(--text-xs);
-  line-height: 18px;
-  color: var(--ink-3);
-  transition:
-    background-color var(--duration-quick) var(--ease-out),
-    color var(--duration-quick) var(--ease-out);
-}
-.usage-table-more:hover {
-  background-color: var(--surface-2);
-  color: var(--ink);
-}
-/* The open conversation's cost leads the table, on the current row's fill as the thread's account does
-   in it, with where the figure comes from under it. */
-.usage-cost-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  height: 52px;
-  padding: 0 10px;
-  border-radius: var(--radius-md);
-  background: var(--current-row-fill);
-}
-.usage-cost-value {
-  flex-shrink: 0;
-  font-size: var(--text-base);
-  line-height: 18px;
-  color: var(--ink);
-}
-.usage-cost-note {
-  padding: 6px 10px 8px;
-  font-size: var(--text-xs);
-  line-height: 18px;
-  color: var(--ink-4);
 }
 /* The resize grip rides the seam between the sidebar and the work column. */
 .app-shell .resize-handle[data-edge="sidebar"] {

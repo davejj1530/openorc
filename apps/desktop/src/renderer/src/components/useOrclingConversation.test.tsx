@@ -21,6 +21,7 @@ const answers = (): Record<string, unknown> => ({
   "orclings.groups.list": [{ threadId: "group", title: "Pip and Bo", memberIds: ["pip", "bo"], createdAt: 1 }],
   "agents.modelCatalog": { models, providers: [] },
   "system.info": info,
+  "claude.accounts.list": { defaultId: "work", accounts: [] },
 });
 const calls = (method: string) => host.call.mock.calls.filter(([name]) => name === method).map(([, params]) => params);
 

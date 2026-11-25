@@ -27,12 +27,13 @@ export function usageParams(account: Pick<UsageAccount, "provider" | "claudeAcco
   };
 }
 
+/** The accounts the usage table lists. Each row's logo says its agent, so several Claude accounts go by their own names. */
 function listedAccounts(installed: HarnessAvailability[], claude: ClaudeAccounts | undefined): UsageAccount[] {
   const enabled = claude?.accounts.filter((account) => account.enabled) ?? [];
   return installed.flatMap<UsageAccount>(({ id, state }) => {
     if (state === "not_found" || !quotaProviders.has(id)) return [];
     if (id !== "claude") return [{ provider: id, name: harnessCatalog[id].name }];
-    return enabled.map((account) => ({ provider: id, claudeAccountId: account.id, name: enabled.length > 1 ? `Claude · ${account.name}` : "Claude" }));
+    return enabled.map((account) => ({ provider: id, claudeAccountId: account.id, name: enabled.length > 1 ? account.name : "Claude" }));
   });
 }
 

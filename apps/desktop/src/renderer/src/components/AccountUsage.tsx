@@ -11,21 +11,24 @@ import {
   type ProviderUsage,
   type ThreadSummary,
 } from "@openorc/protocol";
-import { allowanceState, cloudAccountChoices, conversationCost, creditBalanceLabel, formatCost, formatUsageTime, usageResetLabel } from "@openorc/client";
+import { allowanceState, cloudAccountChoices, conversationCost, creditBalanceLabel, formatCost, formatUsageTime, usageResetLabel, type ModelChoice } from "@openorc/client";
 import { useEffect, useState, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/client";
 import { useUsageAccounts, usageAccountId, usageParams, USAGE_MAX_AGE_MS, type UsageAccount, type UsageAccountReport } from "../lib/account-usage-data";
-import { savedComposerAccount, useComposerAccount, type ComposerAccount } from "../lib/composer-account";
+import { useClaudeAccountId } from "../lib/claude-account";
 import { useRouter } from "../lib/router";
+import { usageRows, type UsageAmount } from "../lib/usage-rows";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { HarnessLogo } from "./HarnessLogo";
 import { AmountShare } from "./ContextUsage";
 import { Signal } from "./icons";
 import { Tooltip } from "./ui";
 
-/** The footer's glyph size, the same as the sidebar's other tools. */
+/** A limit's disc in the table. */
 const USAGE_ICON = 16;
+/** The meter's disc in the model chip, the size of the chip's own marks. */
+const MARK = 14;
 
 /** An agent and Claude account as the chip names them, or null for an agent OpenOrc does not run. */
 function usageAccount(agent: string, claudeAccountId: string | undefined, accountName: (id: string) => string | undefined, model?: string | null): UsageAccount | null {
@@ -37,18 +40,18 @@ function usageAccount(agent: string, claudeAccountId: string | undefined, accoun
 }
 
 /**
- * The account the chip reports on: on a thread, the one it runs on; anywhere else, the one the new-thread composer
- * has chosen, so the chip always shows the setup the next message would spend. None for a team conversation, whose
- * members can each run on their own account.
+ * The account the meter reports on: on a thread, the one it runs on; anywhere else, the one its model chip has chosen,
+ * on the Claude account its composer works on, so the meter always shows the setup the next message would spend. None
+ * for a team conversation, whose members can each run on their own account.
  */
-function useUsageAccount(): UsageAccount | null {
+function useUsageAccount(choice: ModelChoice | null): UsageAccount | null {
   const threadId = useRouter((s) => (s.route.view === "thread" ? s.route.threadId : null));
   const thread = useRpc("threads.get", { id: threadId ?? "" }, { enabled: Boolean(threadId) }).data;
-  const composer: ComposerAccount | null = useComposerAccount((s) => s.chosen) ?? (threadId ? null : savedComposerAccount());
-  const agent = threadId ? thread?.agent : composer?.agent;
+  const scoped = useClaudeAccountId();
+  const agent = threadId ? thread?.agent : choice?.agent;
   const accounts = useRpc("claude.accounts.list", {}, { enabled: agent === "claude" }).data;
   const accountName = (id: string) => accounts?.accounts.find((account) => account.id === id)?.name;
-  if (!threadId) return composer ? usageAccount(composer.agent, composer.claudeAccountId, accountName, composer.model) : null;
+  if (!threadId) return choice ? usageAccount(choice.agent, scoped, accountName, choice.model) : null;
   if (!thread || thread.id !== threadId || thread.teamInstanceId) return null;
   return usageAccount(thread.agent, thread.claudeAccountId ?? undefined, accountName, thread.model);
 }
@@ -108,25 +111,40 @@ function resetWords(window: AllowanceWindow, now: number, stale: boolean, turnRe
   return usageResetLabel(window.resetsAt, now).replace(/^Resets /, "");
 }
 
-/** One limit in the table: a ring and the share left, with when it resets under them. */
-function LimitCell({ window, now, turnRead }: { window: AllowanceWindow | null; now: number; turnRead: TurnRead }) {
-  const left = window ? percentLeft(window) : null;
-  if (!window || left === null)
+/**
+ * One amount in the table. A limit is its disc and the share left, over when it resets, or over its own name where the
+ * column's head does not name it; a balance is its figure. A limit the account does not report says so, and a cell
+ * past a row's amounts stays empty.
+ */
+function AmountCell({ amount, now, turnRead }: { amount: UsageAmount | null | undefined; now: number; turnRead: TurnRead }) {
+  if (amount === undefined) return <td className="usage-table-cell" />;
+  if (amount && "credit" in amount)
+    return (
+      <td className="usage-table-cell" data-tip={amount.credit.label}>
+        <span className="usage-table-limit">
+          <span className="usage-table-value tabular">{creditBalanceLabel(amount.credit)}</span>
+          <span className="usage-table-reset">Balance</span>
+        </span>
+      </td>
+    );
+  const left = amount ? percentLeft(amount.limit) : null;
+  if (!amount || left === null)
     return (
       <td className="usage-table-cell" data-empty>
         Not reported
       </td>
     );
+  const window = amount.limit;
   const shown = Math.round(left);
   const stale = outOfDate(window, now, turnRead);
-  const reset = resetWords(window, now, stale, turnRead);
+  const under = amount.caption && !stale ? amount.caption : resetWords(window, now, stale, turnRead);
   const tone = limitTone(window, shown, stale);
   return (
-    <td className="usage-table-cell" data-tone={tone} data-tip={window.resetsAt === null ? undefined : formatUsageTime(window.resetsAt)}>
+    <td className="usage-table-cell" data-tone={tone} data-tip={[amount.caption, window.resetsAt === null ? null : formatUsageTime(window.resetsAt)].filter(Boolean).join(" · ") || undefined}>
       <span className="usage-table-limit">
         <AmountShare fraction={left / 100} size={USAGE_ICON} />
         <span className="usage-table-value tabular">{shown}% left</span>
-        {reset ? <span className="usage-table-reset">{reset}</span> : null}
+        {under ? <span className="usage-table-reset">{under}</span> : null}
       </span>
     </td>
   );
@@ -135,48 +153,37 @@ function LimitCell({ window, now, turnRead }: { window: AllowanceWindow | null; 
 /** A row's reading of OpenOrc Cloud's, failed when its last read did or found the account signed out; none for this Mac's. */
 const readOf = (account: Pick<UsageAccountReport, "status">, turnRead: boolean): TurnRead => (turnRead ? { failed: account.status === "error" || account.status === "disconnected" } : null);
 
-/** Separate model pools get their own row, so one pool never stands in for the others. */
-function usageRows(accounts: UsageAccountReport[]) {
-  return accounts.flatMap((account) => {
-    const groups = new Map<string, AllowanceWindow[]>();
-    for (const window of account.windows) {
-      const group = window.group ?? "";
-      const windows = groups.get(group) ?? [];
-      windows.push(window);
-      groups.set(group, windows);
-    }
-    if (!groups.size) groups.set("", []);
-    return [...groups].map(([group, windows]) => ({ ...account, windows, key: JSON.stringify([account.id, group]), detail: [account.plan, group].filter(Boolean).join(" · ") }));
-  });
-}
-
-/** Every account's 5-hour and weekly limits in one table, the open thread's account first and marked. */
-function UsageTable({ current }: { current: UsageAccount }) {
+/**
+ * Every account's limits and balances in one table, the open thread's account first and marked. Under it, the way to
+ * Usage in Settings and, once its agent reports one, what the open conversation has cost.
+ */
+function UsageTable({ current, cost }: { current: UsageAccount; cost: number | null }) {
   const read = useUsageAccounts(current);
   const now = useNow();
-  const accounts = read.accounts.filter((account) => account.provider !== "fx");
-  const currentId = usageAccountId(current);
   return (
     <div className="usage-table-wrap">
-      {read.accounts
-        .filter((account) => account.provider === "fx")
-        .map((account) => (
-          <FxAccountUsage key={account.id} account={account} now={now} />
-        ))}
-      {accounts.length > 0 && <LimitsTable accounts={accounts} currentId={currentId} now={now} />}
-      {read.accounts.length === 0 && (
+      {read.accounts.length > 0 ? (
+        <LimitsTable accounts={read.accounts} currentId={usageAccountId(current)} now={now} />
+      ) : (
         <p className="usage-table-note" role="status">
           {noteWords(read.failed, !read.pending)}
         </p>
       )}
-      {accounts.length > 0 && read.failed && (
+      {read.accounts.length > 0 && read.failed && (
         <p className="usage-table-note" role="status">
           Couldn’t load all accounts
         </p>
       )}
-      <button type="button" className="usage-table-more no-drag" onClick={() => useRouter.getState().navigate({ view: "settings", section: "usage" })}>
-        Usage in Settings
-      </button>
+      <div className="usage-table-foot">
+        <button type="button" className="usage-table-more no-drag" onClick={() => useRouter.getState().navigate({ view: "settings", section: "usage" })}>
+          Usage in Settings
+        </button>
+        {cost !== null ? (
+          <p className="usage-cost" data-tip={`As ${current.name} reports it after each turn.`}>
+            This conversation <span className="usage-cost-value tabular">{formatCost(cost)}</span>
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -191,104 +198,68 @@ export function useNow(): number {
   return now;
 }
 
-/** Accounts' 5-hour and weekly limits, a row for each pool, with the current account's marked. `turnRead`: OpenOrc Cloud's readings. */
+/**
+ * Accounts' limits and balances, a row for each account or pool of its models, with the current account's marked. The
+ * heads name the 5-hour and weekly limits while some row holds them. `turnRead`: OpenOrc Cloud's readings.
+ */
 function LimitsTable({ accounts, currentId, now, turnRead = false }: { accounts: UsageAccountReport[]; currentId: string; now: number; turnRead?: boolean }) {
+  const rows = usageRows(accounts);
   return (
     <table className="usage-table">
+      <colgroup>
+        <col />
+        <col className="usage-table-amount" />
+        <col className="usage-table-amount" />
+      </colgroup>
       <thead>
         <tr>
           <th scope="col">Account</th>
-          <th scope="col">5 hours</th>
-          <th scope="col">Week</th>
+          {rows.some((row) => row.headed) ? (
+            <>
+              <th scope="col">5 hours</th>
+              <th scope="col">Week</th>
+            </>
+          ) : (
+            <td colSpan={2} />
+          )}
         </tr>
       </thead>
       <tbody>
-        {usageRows(accounts).map((account) => (
-          <tr key={account.key} data-current={account.id === currentId || undefined} aria-current={account.id === currentId || undefined} aria-busy={account.status === "loading"}>
-            <th scope="row">
-              <span className="usage-table-account">
-                <HarnessLogo id={account.provider} size={16} className="shrink-0" />
-                <span className="usage-table-name">
-                  <span className="truncate">{account.name}</span>
-                  {account.detail ? <span className="usage-table-plan">{account.detail}</span> : null}
-                </span>
-              </span>
-            </th>
-            {account.windows.length ? (
-              <>
-                <LimitCell window={sessionWindow(account.windows)} now={now} turnRead={readOf(account, turnRead)} />
-                <LimitCell window={weeklyWindow(account.windows)} now={now} turnRead={readOf(account, turnRead)} />
-              </>
-            ) : (
-              <td className="usage-table-cell" data-empty colSpan={2}>
-                {emptyWords[account.status]}
-              </td>
-            )}
-          </tr>
-        ))}
+        {rows.map(({ account, key, detail, cells, more }) => {
+          const current = account.id === currentId || undefined;
+          const read = readOf(account, turnRead);
+          return (
+            <tr key={key} data-current={current} aria-current={current} aria-busy={account.status === "loading"} data-more={more || undefined}>
+              <th scope="row">
+                {more ? null : (
+                  <span className="usage-table-account">
+                    <HarnessLogo id={account.provider} size={16} className="shrink-0" />
+                    <span className="usage-table-name">
+                      <span className="truncate">{account.name}</span>
+                      {detail ? <span className="usage-table-plan">{detail}</span> : null}
+                    </span>
+                  </span>
+                )}
+              </th>
+              {cells.length ? (
+                <>
+                  <AmountCell amount={cells[0]} now={now} turnRead={read} />
+                  <AmountCell amount={cells[1]} now={now} turnRead={read} />
+                </>
+              ) : (
+                <td className="usage-table-cell" data-empty colSpan={2}>
+                  {emptyWords[account.status]}
+                </td>
+              )}
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );
 }
 
-/** fx connections report budgets and balances as well as rolling plan limits. */
-function FxAccountUsage({ account, now }: { account: UsageAccountReport; now: number }) {
-  return (
-    <section className="usage-cost" aria-label="fx account usage" aria-busy={account.status === "loading"}>
-      <div className="usage-table-account">
-        <HarnessLogo id="fx" size={16} className="shrink-0" />
-        <span className="usage-table-name">
-          <span>fx</span>
-          <span className="usage-table-plan">{[account.context, account.plan].filter(Boolean).join(" · ")}</span>
-        </span>
-      </div>
-      {account.windows.map((window) => {
-        const left = percentLeft(window);
-        const stale = outOfDate(window, now, null);
-        return (
-          <div className="usage-cost-row" key={window.id}>
-            <span className="usage-table-name">
-              <span>{window.label}</span>
-              <span className="usage-table-plan">{resetWords(window, now, stale, null)}</span>
-            </span>
-            <span className="usage-table-limit" data-tone={left === null ? undefined : limitTone(window, left, stale)}>
-              <AmountShare fraction={(left ?? 0) / 100} size={USAGE_ICON} />
-              <span className="usage-cost-value tabular">{left === null ? "Not reported" : `${Math.round(left)}% left`}</span>
-            </span>
-          </div>
-        );
-      })}
-      {account.credits.map((credit, index) => (
-        <div className="usage-cost-row" key={`${credit.label}:${index}`}>
-          <span>{credit.label}</span>
-          <span className="usage-cost-value tabular">{creditBalanceLabel(credit)}</span>
-        </div>
-      ))}
-      {((!account.windows.length && !account.credits.length) || account.status === "error" || account.status === "disconnected") && <p className="usage-cost-note">{emptyWords[account.status]}</p>}
-    </section>
-  );
-}
-
-/** The open conversation's cost, on the current row's fill above the table, with where the figure comes from. */
-function ConversationCost({ account, cost }: { account: UsageAccount; cost: number }) {
-  return (
-    <section className="usage-cost" aria-label="This conversation">
-      <div className="usage-cost-row">
-        <span className="usage-table-account">
-          <HarnessLogo id={account.provider} size={16} className="shrink-0" />
-          <span className="usage-table-name">
-            <span className="truncate">{account.name}</span>
-            <span className="usage-table-plan">This conversation</span>
-          </span>
-        </span>
-        <span className="usage-cost-value tabular">{formatCost(cost)}</span>
-      </div>
-      <p className="usage-cost-note">As {account.name} reports it after each turn.</p>
-    </section>
-  );
-}
-
-/** What the footer's usage button shows and says. */
+/** What the model chip's meter shows and says. */
 interface UsageMark {
   tooltip: string;
   label: string;
@@ -296,14 +267,9 @@ interface UsageMark {
   mark: ReactNode;
 }
 
-/** A share left as the foot shows it: filled on its disc, then the number. */
+/** A share left as the chip shows it: filled on its disc. Its number is the meter's hover words. */
 function ShareLeft({ left }: { left: number }) {
-  return (
-    <>
-      <AmountShare fraction={left / 100} size={USAGE_ICON} />
-      <span className="tabular">{Math.round(left)}%</span>
-    </>
-  );
+  return <AmountShare fraction={left / 100} size={MARK} />;
 }
 
 /** The week's share left. */
@@ -312,9 +278,9 @@ function weekMark(account: UsageAccount, left: number): UsageMark {
   return { tooltip: `${shown}% left this week`, label: `${account.name}: ${shown}% left this week`, low: shown <= 10, mark: <ShareLeft left={left} /> };
 }
 
-/** An account with no weekly limit has nothing to measure: the plain glyph, like the footer's other buttons, opening on what the conversation has cost. */
+/** An account with no weekly limit has nothing to measure: a plain glyph, opening on what the conversation has cost. */
 function noLimitMark(account: UsageAccount): UsageMark {
-  return { tooltip: "No weekly limit", label: `${account.name}: no weekly limit`, low: false, mark: <Signal size={USAGE_ICON} /> };
+  return { tooltip: "No weekly limit", label: `${account.name}: no weekly limit`, low: false, mark: <Signal size={MARK} /> };
 }
 
 function fxMark(account: UsageAccount, windows: AllowanceWindow[], credits: UsageAccountReport["credits"]): UsageMark | null {
@@ -328,20 +294,21 @@ function fxMark(account: UsageAccount, windows: AllowanceWindow[], credits: Usag
   const credit = credits.find((credit) => credit.unlimited || credit.balance !== null);
   if (!credit) return null;
   const tooltip = `${credit.label}: ${creditBalanceLabel(credit)}`;
-  return { tooltip, label: `fx: ${tooltip}`, low: !credit.unlimited && Number(credit.balance) <= 0, mark: <Signal size={USAGE_ICON} /> };
+  return { tooltip, label: `fx: ${tooltip}`, low: !credit.unlimited && Number(credit.balance) <= 0, mark: <Signal size={MARK} /> };
 }
 
-/** Where the table opens: over the sidebar's footer. */
-const PLACE = { side: "top", align: "start", sideOffset: 8 } as const;
+/** Where the table opens: over the model chip, as the chip's own picker does. */
+const PLACE = { side: "top", align: "start", sideOffset: 6 } as const;
 
 /**
- * Allowances and balances for the selected account, alongside reported conversation costs. On a cloud thread the
- * account is the agent sign-in its turns run on there; nothing is shown while the thread's place is still read.
+ * The model chip's meter: the week's share left on the account the chip's choice runs on, opening on every account's
+ * allowances and balances alongside reported conversation costs. On a cloud thread the account is the agent sign-in
+ * its turns run on there; nothing is shown while the thread's place is still read.
  */
-export function AccountUsage() {
+export function AccountUsage({ choice }: { choice: ModelChoice | null }) {
   const place = useOpenThreadPlace();
   if (place === "reading") return null;
-  return place === "mac" ? <LocalAccountUsage /> : <CloudAccountUsage agent={place.cloud} thread={place.thread} />;
+  return place === "mac" ? <LocalAccountUsage choice={choice} /> : <CloudAccountUsage agent={place.cloud} thread={place.thread} />;
 }
 
 /** Where the open thread runs: this Mac, off a thread too, or OpenOrc Cloud with the agent its turns run. */
@@ -383,7 +350,7 @@ function CloudAccountUsage({ agent, thread }: { agent: HarnessId; thread: Thread
   return (
     <Popover.Root>
       <Tooltip label={mark.tooltip} side="top">
-        <Popover.Trigger className="sidebar-tool account-usage-button no-drag" data-low={mark.low || undefined} aria-label={mark.label}>
+        <Popover.Trigger className="composer-model-usage" data-low={mark.low || undefined} aria-label={mark.label}>
           {mark.mark}
         </Popover.Trigger>
       </Tooltip>
@@ -401,8 +368,8 @@ function CloudAccountUsage({ agent, thread }: { agent: HarnessId; thread: Thread
   );
 }
 
-function LocalAccountUsage() {
-  const account = useUsageAccount();
+function LocalAccountUsage({ choice }: { choice: ModelChoice | null }) {
+  const account = useUsageAccount(choice);
   const usage = useRpc("providers.usage", usageParams(account ?? { provider: "claude" }), { enabled: Boolean(account), staleTime: USAGE_MAX_AGE_MS });
   const cost = useConversationCost(account);
   if (!account) return null;
@@ -411,7 +378,7 @@ function LocalAccountUsage() {
   return (
     <Popover.Root>
       <Tooltip label={mark.tooltip} side="top">
-        <Popover.Trigger className="sidebar-tool account-usage-button no-drag" data-low={mark.low || undefined} aria-label={mark.label}>
+        <Popover.Trigger className="composer-model-usage" data-low={mark.low || undefined} aria-label={mark.label}>
           {mark.mark}
         </Popover.Trigger>
       </Tooltip>
@@ -419,8 +386,7 @@ function LocalAccountUsage() {
         <CoversPreview />
         <Popover.Positioner {...PLACE} collisionPadding={8} className="z-50">
           <Popover.Popup ref={floatingGround} className="floating-popover account-usage-popup" aria-label="Usage">
-            {cost !== null ? <ConversationCost account={account} cost={cost} /> : null}
-            <UsageTable current={account} />
+            <UsageTable current={account} cost={cost} />
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>

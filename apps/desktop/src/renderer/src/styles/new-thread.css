@@ -137,8 +137,10 @@
   width: var(--control-md);
   height: var(--control-md);
 }
-.composer-new-thread :is(.composer-chip, .composer-model-trigger) {
+.composer-new-thread :is(.composer-chip, .composer-model) {
   height: var(--control-md);
+}
+.composer-new-thread :is(.composer-chip, .composer-model-trigger) {
   padding: 0 10px 0 9px;
 }
 .composer-new-thread .composer-send {

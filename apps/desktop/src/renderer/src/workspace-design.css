@@ -182,8 +182,8 @@
   content: "";
   position: absolute;
   left: 0;
-  width: var(--hairline);
-  background: var(--line);
+  width: var(--seam);
+  background: var(--seam-line);
   pointer-events: none;
 }
 /* Above the pane's content: the code view pins an opaque line-number gutter to this same edge, and a diff's sticky

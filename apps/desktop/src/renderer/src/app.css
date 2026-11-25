@@ -43,6 +43,10 @@
 :root {
   /* Every structural line's width; one physical pixel on high-density screens, below. */
   --hairline: 1px;
+  /* The two full-height partitions beside the conversation and the line over the sidebar's footer that meets
+     one, the same width on every screen and halfway from the line to the strong line. */
+  --seam: 1px;
+  --seam-line: color-mix(in srgb, var(--line), var(--line-strong));
   --bg: #ffffff;
   --surface: #ffffff;
   --surface-2: #f7f7f7;

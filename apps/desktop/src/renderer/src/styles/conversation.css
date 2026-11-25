@@ -59,7 +59,7 @@
   min-width: 0;
   min-height: 16px;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink);
 }
 .turn-head-mark {
@@ -80,7 +80,7 @@
   min-height: 16px;
   border-radius: var(--radius-sm);
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
   text-align: left;
 }
@@ -271,7 +271,7 @@
 .turn-status {
   padding-inline: 7px;
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -352,7 +352,7 @@
 }
 .copy-action-word {
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   white-space: nowrap;
 }
 
@@ -364,7 +364,7 @@
   height: 32px;
   max-width: 100%;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
   text-align: left;
 }
@@ -398,7 +398,7 @@
 }
 .thinking-lines > p {
   font-size: var(--text-base);
-  line-height: 22px;
+  line-height: 25px;
   color: var(--ink-4);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -413,7 +413,7 @@
   min-width: 0;
   min-height: 30px;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
   text-align: left;
 }
@@ -462,14 +462,14 @@
 .tool-row-text {
   margin-left: 24px;
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-4);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .tool-row-text {
   font-size: var(--text-base);
-  line-height: 20px;
+  line-height: 23px;
   color: var(--ink-3);
 }
 .tool-row-detail {
@@ -484,7 +484,7 @@
   background: var(--surface-2);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-3);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -512,7 +512,7 @@
   min-height: 30px;
   text-align: left;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
 }
 .work-step-toggle > span {
@@ -555,7 +555,7 @@
   border-radius: 22px;
   background: var(--surface);
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink);
   text-align: left;
 }
@@ -572,7 +572,7 @@
   margin: 8px 16px 0;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-3);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -604,7 +604,7 @@
   margin-bottom: 12px;
   padding: 0;
   font-size: var(--text-md);
-  line-height: 20px;
+  line-height: 23px;
   letter-spacing: var(--text-md--letter-spacing);
   color: var(--ink);
   overflow-wrap: anywhere;
@@ -627,7 +627,7 @@
   border-radius: var(--radius-lg);
   background: var(--surface-2);
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink);
   transition:
     background-color var(--duration-arrive) var(--ease-out),
@@ -673,7 +673,7 @@
   background: var(--surface);
   box-shadow: inset 0 0 0 1.5px var(--ink);
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink);
 }
 .question-foot {
@@ -682,7 +682,7 @@
   gap: 6px;
   min-height: 16px;
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
 }
 
@@ -700,7 +700,7 @@
   border-radius: var(--radius-xl);
   background: var(--surface-2);
   font-size: var(--text-base);
-  line-height: 20px;
+  line-height: 23px;
 }
 .system-notice-icon {
   flex-shrink: 0;
@@ -737,7 +737,7 @@ button.system-notice-name:focus-visible {
 .app-shell .system-notice-words {
   margin-top: 4px;
   font-size: var(--text-base);
-  line-height: 20px;
+  line-height: 23px;
   color: var(--ink-2);
 }
 .app-shell .system-notice-words :where(p):not(:last-child) {
@@ -762,7 +762,7 @@ button.system-notice-name:focus-visible {
 .app-shell .system-notice-words :not(pre) > code {
   padding: 1px 4px;
   font-size: var(--text-sm);
-  line-height: 16px;
+  line-height: 18px;
   color: inherit;
 }
 /* A long message shows its first lines and fades into the button that shows the rest. */
@@ -809,7 +809,7 @@ button.system-notice-name:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink);
 }
 .change-counts {
@@ -818,7 +818,7 @@ button.system-notice-name:focus-visible {
   white-space: nowrap;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
   font-variant-numeric: tabular-nums;
 }
@@ -876,7 +876,7 @@ button.system-notice-name:focus-visible {
   padding: 0 8px;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
 }
 .change-file {
   flex: 1;
@@ -963,7 +963,7 @@ button.system-notice-name:focus-visible {
   box-shadow: 0 0 0 var(--hairline) var(--line-strong);
   color: var(--ink);
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
 }
 .agent-update-notice .agent-update-notice-detail {
   margin-top: 2px;

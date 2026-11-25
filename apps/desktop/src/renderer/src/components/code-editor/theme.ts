@@ -43,7 +43,7 @@ const theme = EditorView.theme({
   "&": { height: "100%", color: "var(--ink)", backgroundColor: "var(--bg)", fontSize: "var(--text-sm)", ...syntaxVariables(syntaxColors.light) },
   ".dark &": syntaxVariables(syntaxColors.dark),
   "&.cm-focused": { outline: "none" },
-  ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "22px" },
+  ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "25px" },
   ".cm-content": { caretColor: "var(--ink)", padding: "8px 0" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--ink)" },
   ".cm-selectionBackground": { background: "color-mix(in srgb, var(--selection) 60%, var(--bg))" },

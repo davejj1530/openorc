@@ -239,7 +239,7 @@
 .accent-note {
   color: var(--ink-4);
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 21px;
 }
 .accent-role p {
   padding-left: calc(var(--control-sm) + 8px);
@@ -268,7 +268,7 @@
 }
 .accent-example p {
   margin: 16px 0;
-  line-height: 20px;
+  line-height: 23px;
   color: var(--ink-2);
 }
 .accent-example-link {

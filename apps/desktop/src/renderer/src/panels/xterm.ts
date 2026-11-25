@@ -24,7 +24,7 @@ export function openXterm(element: HTMLElement): { term: Xterm; fit: FitAddon } 
     cursorBlink: true,
     // The selected face is applied after loading, so xterm never caches its fallback's metrics.
     fontFamily: "monospace",
-    fontSize: 12,
+    fontSize: 14,
     lineHeight: 1.35,
     macOptionIsMeta: true,
     // The ring in main is the replay after a re-attach; this is only what the

@@ -66,13 +66,13 @@
 }
 .commit-sheet-title {
   font-size: var(--text-md);
-  line-height: 20px;
+  line-height: 23px;
   letter-spacing: var(--text-md--letter-spacing);
   color: var(--ink);
 }
 .commit-sheet-summary {
   font-size: var(--text-sm);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
 }
 /* One line to start, like the drawn field; a longer message grows it up to five lines. */

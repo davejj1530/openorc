@@ -43,7 +43,7 @@
   padding: 8px 10px 6px;
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 20px;
+  line-height: 23px;
   letter-spacing: var(--text-md--letter-spacing);
 }
 
@@ -214,7 +214,7 @@
   border-radius: var(--radius-md);
   color: var(--ink);
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   letter-spacing: var(--text-base--letter-spacing);
   text-align: left;
   outline: none;
@@ -408,7 +408,7 @@
   padding: 5px 9px;
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
-  line-height: 16px;
+  line-height: 18px;
   transform-origin: var(--transform-origin);
   transition:
     opacity var(--duration-leave) var(--ease-out),
@@ -492,7 +492,7 @@
 .dialog-sheet-title {
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 20px;
+  line-height: 23px;
   letter-spacing: var(--text-md--letter-spacing);
 }
 .dialog-sheet-body {
@@ -596,7 +596,7 @@
   background: transparent;
   color: var(--ink);
   font-size: var(--text-lg);
-  line-height: 22px;
+  line-height: 25px;
   letter-spacing: -0.01em;
   outline: none;
 }
@@ -683,7 +683,7 @@
   overflow: hidden;
   color: var(--ink);
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: 21px;
   letter-spacing: var(--text-base--letter-spacing);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -693,7 +693,7 @@
   color: var(--mention-ink);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -701,7 +701,7 @@
   display: -webkit-box;
   overflow: hidden;
   color: var(--ink-3);
-  line-height: 18px;
+  line-height: 21px;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
 }

@@ -54,7 +54,7 @@
 .schedule-row-name {
   color: var(--ink);
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   letter-spacing: var(--text-base--letter-spacing);
 }
 

@@ -19,7 +19,7 @@
   padding: 7px 10px 8px 8px;
   border-radius: var(--radius-lg);
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 21px;
   text-align: left;
   transition: background-color var(--duration-quick) var(--ease-out);
 }
@@ -87,7 +87,7 @@ button.own-row:focus-visible,
 .own-quiet {
   margin: 0;
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-3);
 }
 .own-quiet[data-tone="bad"] {
@@ -109,7 +109,7 @@ button.own-row:focus-visible,
   gap: 3px;
   min-width: 0;
   font-size: var(--text-sm);
-  line-height: 20px;
+  line-height: 23px;
   color: var(--ink-2);
 }
 .own-fold,
@@ -118,7 +118,7 @@ button.own-row:focus-visible,
   margin: 0;
   min-width: 0;
   font-size: var(--text-sm);
-  line-height: 20px;
+  line-height: 23px;
   color: var(--ink-2);
   overflow-wrap: anywhere;
 }
@@ -140,7 +140,7 @@ button.own-row:focus-visible,
   border-radius: var(--radius-2xl);
   background: var(--control-fill);
   font-size: var(--text-sm);
-  line-height: 20px;
+  line-height: 23px;
   color: var(--ink);
   overflow-wrap: anywhere;
 }
@@ -163,7 +163,7 @@ button.own-row:focus-visible,
 }
 .own-from-name {
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-2);
   text-align: left;
   transition: color var(--duration-quick) var(--ease-out);
@@ -174,7 +174,7 @@ button.own-from-name:hover {
 .own-from .own-fold,
 .own-from .own-plain {
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-3);
 }
 
@@ -185,7 +185,7 @@ button.own-from-name:hover {
   gap: 8px;
   min-width: 0;
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-3);
 }
 .own-page-head > svg {

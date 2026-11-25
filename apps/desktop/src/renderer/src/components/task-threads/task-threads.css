@@ -23,7 +23,7 @@
 }
 .task-sheet-title {
   font-size: var(--text-md);
-  line-height: 20px;
+  line-height: 23px;
   letter-spacing: var(--text-md--letter-spacing);
 }
 .task-sheet-actions {

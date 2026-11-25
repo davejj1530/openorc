@@ -55,13 +55,13 @@
 }
 .usage-dashboard-total[data-unreported] {
   color: var(--ink-3);
-  font-size: 22px;
+  font-size: var(--text-title-sm);
 }
 .usage-dashboard-context,
 .usage-dashboard-coverage {
   color: var(--ink-3);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--text-xs);
+  line-height: 21px;
   margin-top: 6px;
 }
 .usage-dashboard-coverage {
@@ -107,32 +107,32 @@
   align-items: center;
   gap: 7px;
   flex-wrap: wrap;
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--text-sm);
+  line-height: 23px;
 }
 .usage-agent-name img {
   flex: none;
 }
 .usage-agent-sessions {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--ink-3);
 }
 .usage-agent-description p {
   margin-top: 4px;
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .usage-agent-value {
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--text-sm);
+  line-height: 23px;
   white-space: nowrap;
 }
 .usage-dashboard :is(h2, th) {
   font-weight: 400;
 }
 .usage-dashboard h2 {
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--text-base);
+  line-height: 23px;
 }
 .usage-chart {
   min-width: 0;
@@ -193,8 +193,8 @@
   padding: 12px 14px;
   border-radius: var(--radius-2xl);
   background: var(--bg);
-  font-size: 12px;
-  line-height: 20px;
+  font-size: var(--text-xs);
+  line-height: 23px;
 }
 .usage-chart-tooltip p {
   color: var(--ink-3);
@@ -226,13 +226,13 @@
 }
 .usage-token-totals dt {
   color: var(--ink-3);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--text-xs);
+  line-height: 21px;
 }
 .usage-token-totals dd {
   color: var(--ink);
-  font-size: 22px;
-  line-height: 28px;
+  font-size: var(--text-title-sm);
+  line-height: 32px;
   margin-top: 4px;
 }
 .usage-token-composition {
@@ -254,7 +254,7 @@
   flex-wrap: wrap;
   gap: 8px 20px;
   margin-top: 10px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--ink-3);
 }
 .usage-token-legend > span {
@@ -281,7 +281,7 @@
 .usage-breakdown table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .usage-breakdown th,
 .usage-breakdown td {
@@ -299,7 +299,7 @@
 }
 .usage-breakdown thead {
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .usage-breakdown tbody tr {
   border-top: var(--hairline) solid var(--line);
@@ -320,15 +320,15 @@
 .usage-dashboard-message {
   padding: 32px 0;
   color: var(--ink-3);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .usage-dashboard-message[role="alert"] {
   color: var(--bad);
 }
 .usage-dashboard-footnote {
   margin-top: 28px;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--text-xs);
+  line-height: 21px;
   color: var(--ink-3);
 }
 @container (max-width: 760px) {

@@ -25,13 +25,13 @@
   flex: 1;
   min-width: 0;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink);
 }
 .steps-count {
   justify-items: end;
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -144,7 +144,7 @@
 
 .work-phase-detail {
   font-size: var(--text-base);
-  line-height: 20px;
+  line-height: 23px;
   color: var(--ink-3);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -160,7 +160,7 @@
 .work-lines .journal-response .prose-chat,
 .work-phase-narration .text-prose {
   font-size: var(--text-base);
-  line-height: 22px;
+  line-height: 25px;
   color: var(--ink-2);
 }
 .work-rail-blocks {
@@ -180,7 +180,7 @@
   gap: 8px;
   padding: 2px 0;
   font-size: var(--text-sm);
-  line-height: 20px;
+  line-height: 23px;
   color: var(--ink-3);
 }
 .work-thoughts > p {
@@ -210,7 +210,7 @@
   border-radius: var(--radius-md);
   color: var(--ink-2);
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   text-align: left;
 }
 .work-chip > a {
@@ -343,7 +343,7 @@ button.work-chip:focus-visible {
 }
 .tool-call-progress {
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-4);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -362,7 +362,7 @@ button.work-chip:focus-visible {
   gap: 10px;
   min-height: 30px;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-2);
   transition: color var(--duration-arrive) var(--ease-out);
 }
@@ -385,7 +385,7 @@ button.work-chip:focus-visible {
   gap: 10px;
   min-height: 30px;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink);
 }
 
@@ -437,7 +437,7 @@ button.work-chip:focus-visible {
   min-height: 24px;
   text-align: left;
   font-size: var(--text-base);
-  line-height: 20px;
+  line-height: 23px;
   color: var(--ink-2);
   transition: color var(--duration-arrive) var(--ease-out);
 }
@@ -467,7 +467,7 @@ button.work-name:focus-visible {
   min-width: 0;
   margin: 0;
   font-size: var(--text-xs);
-  line-height: 22px;
+  line-height: 25px;
   color: var(--ink-4);
 }
 

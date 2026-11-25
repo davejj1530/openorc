@@ -50,7 +50,7 @@
 }
 .seat-person-held {
   flex: none;
-  font-size: 13px;
-  line-height: 19px;
+  font-size: var(--text-sm);
+  line-height: 22px;
   color: var(--ink-3);
 }

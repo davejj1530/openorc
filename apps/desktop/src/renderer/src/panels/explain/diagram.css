@@ -81,7 +81,7 @@
 .explain-diagram-edge-label {
   position: absolute;
   box-sizing: border-box;
-  height: 20px;
+  height: 23px;
   padding: 0 8px;
   overflow: hidden;
   translate: -50% -50%;
@@ -89,7 +89,7 @@
   background: var(--surface);
   color: var(--ink-3);
   font-size: var(--text-sm);
-  line-height: 20px;
+  line-height: 23px;
   white-space: nowrap;
   text-overflow: ellipsis;
   pointer-events: none;

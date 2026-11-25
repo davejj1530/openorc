@@ -14,7 +14,7 @@
   min-width: 0;
   flex-shrink: 0;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   letter-spacing: var(--text-base--letter-spacing);
   color: var(--ink);
   white-space: nowrap;
@@ -29,7 +29,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--text-sm);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
 }
 .panel-bar-stat {
@@ -38,13 +38,13 @@
   flex-shrink: 0;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  line-height: 16px;
+  line-height: 18px;
 }
 .panel-notice {
   flex-shrink: 0;
   padding: 0 20px 10px;
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-3);
   overflow-wrap: anywhere;
 }

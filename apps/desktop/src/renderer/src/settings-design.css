@@ -8,7 +8,7 @@
 .settings-profile-face {
   width: 44px;
   height: 44px;
-  font-size: 17px;
+  font-size: 19px;
 }
 .settings-profile-identity {
   flex: 1;
@@ -16,20 +16,20 @@
   overflow-wrap: anywhere;
 }
 .settings-profile-identity h2 {
-  font-size: 24px;
-  line-height: 30px;
+  font-size: 27px;
+  line-height: 34px;
   letter-spacing: -0.02em;
 }
 .settings-profile-identity p {
   margin-top: 3px;
   color: var(--ink-4);
-  font-size: 13px;
-  line-height: 19px;
+  font-size: var(--text-sm);
+  line-height: 22px;
 }
 .profile-dialog-face {
   width: 48px;
   height: 48px;
-  font-size: 18px;
+  font-size: var(--text-xl);
 }
 @media (max-width: 600px) {
   .settings-profile-heading {
@@ -64,7 +64,7 @@
   display: block;
   margin-bottom: 8px;
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .settings-data-note + .settings-data-note {
   border-top: var(--hairline) solid var(--line);
@@ -72,12 +72,12 @@
   padding-top: 16px;
 }
 .settings-data-note h3 {
-  font-size: 13px;
+  font-size: var(--text-sm);
   margin-bottom: 4px;
 }
 .settings-data-note p {
   color: var(--ink-2);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.6;
 }
 /* Each account is a tile card (r22) on the sheet, set apart by its fill alone. Every row of the
@@ -130,7 +130,7 @@
 .usage-account-identity h2 {
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 20px;
+  line-height: 23px;
   letter-spacing: var(--text-md--letter-spacing);
 }
 .usage-account-identity p {
@@ -173,7 +173,7 @@
   mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
   color: var(--ink-2);
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 21px;
 }
 .usage-account-details[hidden] {
   display: none;
@@ -253,7 +253,7 @@
 .usage-window-value[data-empty] {
   color: var(--ink-3);
   font-size: var(--text-base);
-  line-height: 22px;
+  line-height: 25px;
 }
 .usage-credit strong {
   color: var(--ink);
@@ -280,7 +280,7 @@
 }
 .usage-empty {
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .usage-report {
   display: grid;
@@ -378,7 +378,7 @@
   overflow: hidden;
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 20px;
+  line-height: 23px;
   letter-spacing: var(--text-md--letter-spacing);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -387,7 +387,7 @@
 @layer components {
   .settings-card-meta {
     color: var(--ink-3);
-    font-size: 12px;
+    font-size: var(--text-xs);
     line-height: 1.5;
   }
 }
@@ -395,7 +395,7 @@
   display: grid;
   gap: 6px;
   color: var(--ink-2);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .settings-card-actions {
   display: flex;
@@ -453,7 +453,7 @@
   gap: 6px;
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 20px;
+  line-height: 23px;
 }
 .settings-agent-chevron {
   flex-shrink: 0;
@@ -533,7 +533,7 @@
   border-color: transparent;
   background: transparent;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .settings-label-input:hover {
   border-color: var(--line);
@@ -564,7 +564,7 @@
   display: block;
   margin-top: 2px;
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.5;
 }
 .settings-toolbar {
@@ -575,13 +575,13 @@
   gap: 8px 16px;
   margin-bottom: 12px;
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .settings-note {
   max-width: 640px;
   margin-top: 10px;
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.6;
 }
 
@@ -670,7 +670,7 @@
   list-style: decimal;
   color: var(--ink);
   font-size: var(--text-base);
-  line-height: 20px;
+  line-height: 23px;
 }
 .slack-guide li::marker {
   color: var(--ink-4);
@@ -679,7 +679,7 @@
   margin-top: 4px;
   color: var(--ink-3);
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 21px;
 }
 
 /* Phone access. The addresses open under the switch as a row of the card; a note under the switch

@@ -68,7 +68,7 @@
      the facts sit close to the title. */
   margin: 0 -4px 0 -8px;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   letter-spacing: var(--text-base--letter-spacing);
 }
 .thread-rail-title :is(button, input) {
@@ -99,7 +99,7 @@
   min-width: 0;
   overflow: hidden;
   font-size: var(--text-sm);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
   white-space: nowrap;
 }
@@ -168,7 +168,7 @@
   margin-bottom: 0;
 }
 .app-shell .prose-chat h3 {
-  font-size: 18px;
+  font-size: var(--text-xl);
 }
 /* The panel sits on the window's ground with the sidebar and the conversation, apart from the
    conversation by the sidebar's seam: one hairline from the window's top to its foot. Floating over a narrow work row or covering it expanded,

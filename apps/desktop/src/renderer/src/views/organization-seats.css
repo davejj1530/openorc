@@ -11,8 +11,8 @@
   border-bottom: var(--hairline) solid var(--line);
 }
 .seats-tabs button {
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--text-base);
+  line-height: 23px;
   color: var(--ink-3);
   padding: 0 0 10px;
   position: relative;
@@ -37,13 +37,13 @@
   padding: 8px 12px 24px;
 }
 .seats-summary h2 {
-  font-size: 18px;
-  line-height: 24px;
+  font-size: var(--text-xl);
+  line-height: 27px;
   letter-spacing: -0.015em;
 }
 .seats-summary p {
-  font-size: 13px;
-  line-height: 19px;
+  font-size: var(--text-sm);
+  line-height: 22px;
   color: var(--ink-3);
   margin-top: 6px;
 }
@@ -64,13 +64,13 @@
   gap: 24px;
   align-items: center;
   padding: 0 12px;
-  font-size: 13px;
-  line-height: 19px;
+  font-size: var(--text-sm);
+  line-height: 22px;
 }
 .seats-head {
   height: 34px;
   color: var(--ink-4);
-  font-size: 12.5px;
+  font-size: var(--text-xs);
 }
 .seats-inventory-row {
   min-height: 60px;
@@ -84,7 +84,7 @@
   align-items: center;
   gap: 12px;
   min-width: 0;
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 .seats-holder .account-face {
   width: 32px;
@@ -107,8 +107,8 @@
   gap: 12px;
   padding: 12px;
   margin: 0 0 16px;
-  font-size: 13px;
-  line-height: 19px;
+  font-size: var(--text-sm);
+  line-height: 22px;
 }
 .seats-inline-state > span:first-child {
   flex: 1;
@@ -116,8 +116,8 @@
 .seats-dialog {
   display: grid;
   gap: 20px;
-  font-size: 14px;
-  line-height: 21px;
+  font-size: var(--text-base);
+  line-height: 24px;
 }
 .seats-dialog > p {
   margin: 0;
@@ -129,14 +129,14 @@
   margin: 0;
 }
 .seats-dialog input {
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 .seats-facts {
   margin: 0;
   display: grid;
   gap: 14px;
-  font-size: 13px;
-  line-height: 19px;
+  font-size: var(--text-sm);
+  line-height: 22px;
 }
 .seats-facts > div {
   display: flex;
@@ -154,8 +154,8 @@
 }
 .seats-error {
   color: var(--bad);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--text-sm);
+  line-height: 23px;
   overflow-wrap: anywhere;
 }
 @container (max-width: 700px) {

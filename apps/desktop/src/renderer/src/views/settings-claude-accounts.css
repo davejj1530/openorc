@@ -11,7 +11,7 @@
   gap: 4px 10px;
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 20px;
+  line-height: 23px;
 }
 .settings-account-default {
   color: var(--ink-3);
@@ -21,7 +21,7 @@
   margin-top: 3px;
   color: var(--ink-3);
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: 21px;
   overflow-wrap: anywhere;
 }
 .settings-account-actions {

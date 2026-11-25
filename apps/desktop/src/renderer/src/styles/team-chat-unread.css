@@ -24,7 +24,7 @@
   gap: 4px;
   margin-left: auto;
   font-size: var(--text-sm);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-2);
 }
 .sidebar-chat-marks > svg {

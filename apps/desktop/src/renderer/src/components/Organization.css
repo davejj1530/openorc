@@ -8,8 +8,8 @@
   flex-direction: column;
   gap: 8px;
   color: var(--ink-2);
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--text-sm);
+  line-height: 21px;
 }
 .organization-mark {
   display: inline-grid;
@@ -38,8 +38,8 @@
 }
 .organization-error {
   color: var(--bad);
-  font-size: 13px;
-  line-height: 19px;
+  font-size: var(--text-sm);
+  line-height: 22px;
   overflow-wrap: anywhere;
 }
 .organization-connect-row {
@@ -66,8 +66,8 @@
 .organization-small {
   display: block;
   color: var(--ink-4);
-  font-size: 12.5px;
-  line-height: 18px;
+  font-size: var(--text-xs);
+  line-height: 21px;
   margin-top: 2px;
 }
 .organization-person-identity {
@@ -81,13 +81,13 @@
 }
 .organization-person-identity p {
   color: var(--ink-4);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--text-sm);
+  line-height: 23px;
   margin-top: 3px;
 }
 .organization-membership-detail {
   color: var(--ink-2);
-  line-height: 21px;
+  line-height: 24px;
 }
 .organization-empty {
   display: flex;
@@ -124,12 +124,12 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--bad);
   margin-top: 14px;
 }
 .organization-access-project {
-  font-size: 15px;
+  font-size: var(--text-md);
 }
 .organization-access-people {
   max-height: 360px;
@@ -155,7 +155,7 @@
 }
 .organization-access-note {
   color: var(--ink-3);
-  font-size: 13px;
+  font-size: var(--text-sm);
   margin-top: -8px;
 }
 

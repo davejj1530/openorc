@@ -6,7 +6,7 @@
 .organization-received-identity p {
   margin-top: 3px;
   color: var(--ink-4);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .organization-received-person {
   display: flex;
@@ -16,7 +16,7 @@
 .organization-received-person .account-face {
   width: 24px;
   height: 24px;
-  font-size: 11px;
+  font-size: 12.5px;
 }
 .organization-received-email {
   padding: 12px 14px;
@@ -47,7 +47,7 @@
 }
 .organization-received-inviter {
   color: var(--ink-3);
-  font-size: 12.5px;
+  font-size: var(--text-xs);
 }
 .organization-received-actions {
   grid-column: 2;

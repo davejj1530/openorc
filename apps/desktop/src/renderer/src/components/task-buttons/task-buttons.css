@@ -68,7 +68,7 @@
 .task-button-empty {
   padding-block: 18px;
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-3);
 }
 .task-button-error {

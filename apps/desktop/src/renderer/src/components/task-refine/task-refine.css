@@ -34,7 +34,7 @@
 .task-refine-note {
   margin: -6px 0 16px;
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-3);
 }
 .task-refine-asked {
@@ -44,7 +44,7 @@
 .task-refine-sheet-hint {
   margin-top: -6px;
   font-size: var(--text-sm);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-3);
 }
 .task-refine-sheet-instruction {
@@ -107,7 +107,7 @@
 .refine-removed {
   margin: 6px 0 12px;
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-3);
 }
 .refine-removed-toggle {

@@ -16,7 +16,7 @@
   min-width: 0;
   color: var(--ink);
   font-family: "Immaculate Gothic", var(--font-sans);
-  font-size: 15px;
+  font-size: var(--text-md);
   letter-spacing: -0.02em;
   white-space: nowrap;
 }
@@ -28,8 +28,8 @@
   display: flex;
   flex-wrap: wrap;
   overflow: hidden;
-  height: 20px;
-  line-height: 20px;
+  height: 23px;
+  line-height: 23px;
   min-width: 0;
 }
 .space-switcher-name > span {
@@ -84,8 +84,8 @@
 }
 .space-menu-detail {
   color: var(--ink-4);
-  font-size: 12.5px;
-  line-height: 16px;
+  font-size: var(--text-xs);
+  line-height: 18px;
   margin-top: 1px;
 }
 .space-menu-read {
@@ -94,7 +94,7 @@
   gap: 6px;
   padding: 10px;
   color: var(--ink-3);
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .space-menu-read > span {
   flex: 1;

@@ -237,54 +237,54 @@
 @theme static {
   /* Keep font-mono utilities linked to the runtime code-font preference. */
   --font-mono: "JetBrains Mono Variable", "SF Mono", Menlo, Consolas, monospace;
-  /* Type. Quiet lines (times, second lines, meta) and code are 12.5px; section labels, counts and
-     small controls 13; rows and labels 14; writing, reading text and a column's title in its header 15,
-     writing and reading on a 24px line. Headings are 16, 22 and 28px. Hierarchy comes from size and gray, never weight. Single-line rows
-     set their own 16px leading. */
-  --text-xs: 12.5px;
-  --text-xs--line-height: 16px;
+  /* Type. Quiet lines (times, second lines, meta) and code are 14px; section labels, counts and
+     small controls 15; rows and labels 16; writing, reading text and a column's title in its header 17,
+     writing and reading on a 27px line. Headings are 18, 25 and 32px. Hierarchy comes from size and gray, never weight. Single-line rows
+     set their own 18px leading. */
+  --text-xs: 14px;
+  --text-xs--line-height: 18px;
   --text-xs--letter-spacing: 0em;
-  --text-sm: 13px;
-  --text-sm--line-height: 16px;
+  --text-sm: 15px;
+  --text-sm--line-height: 18px;
   --text-sm--letter-spacing: 0em;
-  --text-base: 14px;
-  --text-base--line-height: 20px;
+  --text-base: 16px;
+  --text-base--line-height: 23px;
   --text-base--letter-spacing: -0.005em;
-  --text-md: 15px;
-  --text-md--line-height: 24px;
+  --text-md: 17px;
+  --text-md--line-height: 27px;
   --text-md--letter-spacing: -0.01em;
-  --text-header: 15px;
-  --text-header--line-height: 20px;
+  --text-header: 17px;
+  --text-header--line-height: 23px;
   --text-header--letter-spacing: -0.01em;
   /* Reading size for replies and documents. */
-  --text-prose: 15px;
-  --text-prose--line-height: 24px;
+  --text-prose: 17px;
+  --text-prose--line-height: 27px;
   --text-prose--letter-spacing: -0.005em;
-  --text-lg: 16px;
-  --text-lg--line-height: 22px;
+  --text-lg: 18px;
+  --text-lg--line-height: 25px;
   --text-lg--letter-spacing: -0.01em;
   /* Second heading level inside content (replies, documents) only. */
-  --text-xl: 18px;
-  --text-xl--line-height: 24px;
+  --text-xl: 21px;
+  --text-xl--line-height: 27px;
   --text-xl--letter-spacing: -0.01em;
-  --text-title-sm: 22px;
-  --text-title-sm--line-height: 28px;
+  --text-title-sm: 25px;
+  --text-title-sm--line-height: 32px;
   --text-title-sm--letter-spacing: -0.015em;
-  --text-title: 28px;
-  --text-title--line-height: 34px;
+  --text-title: 32px;
+  --text-title--line-height: 39px;
   --text-title--letter-spacing: -0.02em;
   /* Numerals for usage and meters. Pair with .tabular. */
-  --text-stat: 18px;
-  --text-stat--line-height: 22px;
-  --text-stat-sm: 16px;
-  --text-stat-sm--line-height: 20px;
+  --text-stat: 21px;
+  --text-stat--line-height: 25px;
+  --text-stat-sm: 18px;
+  --text-stat-sm--line-height: 23px;
   /* streamdown's markdown headings reach for Tailwind's text-2xl and text-3xl, whose
      defaults are 24px and 30px. Pinned to the title steps so a dependency cannot
      introduce a size the scale does not have. */
-  --text-2xl: 22px;
-  --text-2xl--line-height: 28px;
-  --text-3xl: 28px;
-  --text-3xl--line-height: 34px;
+  --text-2xl: 25px;
+  --text-2xl--line-height: 32px;
+  --text-3xl: 32px;
+  --text-3xl--line-height: 39px;
 
   /* One weight for the interface, in every font. medium and semibold stay as names so a
      stray utility (Streamdown ships some) cannot reintroduce a heavier face. Bold is for
@@ -1009,7 +1009,7 @@ span.property-chip {
   background: transparent;
   padding: 8px 0;
   font-size: var(--text-prose);
-  line-height: 26px;
+  line-height: 30px;
   overflow-wrap: anywhere;
 }
 .document-description::placeholder {
@@ -1149,7 +1149,7 @@ span.property-chip {
   margin-bottom: 28px;
   color: var(--ink-4);
   font-size: var(--text-md);
-  line-height: 20px;
+  line-height: 23px;
   letter-spacing: var(--text-md--letter-spacing);
 }
 /* The section's name in the top bar, set like every screen's title there. */
@@ -1217,7 +1217,7 @@ span.property-chip {
 .settings-section-intro h2 {
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 20px;
+  line-height: 23px;
   letter-spacing: var(--text-md--letter-spacing);
 }
 .settings-section-intro p {
@@ -1225,7 +1225,7 @@ span.property-chip {
   margin-top: 2px;
   color: var(--ink-4);
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 21px;
 }
 .settings-section-body {
   min-width: 0;

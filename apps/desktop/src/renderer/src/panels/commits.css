@@ -45,7 +45,7 @@
 .commit-subject {
   overflow: hidden;
   font-size: var(--text-base);
-  line-height: 20px;
+  line-height: 23px;
   color: var(--ink-1);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -55,7 +55,7 @@
   gap: 8px;
   min-width: 0;
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-3);
 }
 .commit-meta > * {
@@ -89,6 +89,6 @@
 /* How many older commits a cloud thread's list leaves out: the lane runs on to it, with no dot. */
 .commit-more {
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-3);
 }

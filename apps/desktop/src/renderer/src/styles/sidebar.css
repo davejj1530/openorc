@@ -207,7 +207,7 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   padding: 0 8px;
   border-radius: var(--radius-md);
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-3);
   text-align: left;
   transition:
@@ -272,7 +272,7 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   min-width: 16px;
   margin-left: auto;
   font-size: var(--text-sm);
-  line-height: 16px;
+  line-height: 18px;
   text-align: center;
   color: var(--warn);
 }
@@ -287,15 +287,15 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   flex-wrap: wrap;
   align-content: flex-start;
   align-items: center;
-  gap: 16px 7px;
+  gap: 18px 7px;
   min-width: 0;
-  height: 16px;
+  height: 18px;
   overflow: hidden;
   color: var(--ink);
   font-family: "Immaculate Gothic", var(--font-sans);
-  font-size: 15px;
+  font-size: var(--text-md);
   letter-spacing: -0.02em;
-  line-height: 16px;
+  line-height: 18px;
   white-space: nowrap;
 }
 .workspace-navigation:not([data-traffic-lights="true"]) .sidebar-wordmark {
@@ -505,7 +505,7 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   height: 20px;
   padding: 0 8px 2px;
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
 }
 .sidebar-day-label::after {
@@ -641,7 +641,7 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   flex: 1;
   min-width: 0;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -737,7 +737,7 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   padding: 0 8px 0 32px;
   border-radius: var(--radius-md);
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
   text-align: left;
 }
@@ -765,7 +765,7 @@ button.browser-empty:hover,
   border-radius: var(--radius-md);
   text-align: left;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   transition: background-color var(--duration-leave) var(--ease-out);
 }
 .orcling-contact:hover {
@@ -819,7 +819,7 @@ button.browser-empty:hover,
 .sidebar-account-face {
   width: 26px;
   height: 26px;
-  font-size: 11px;
+  font-size: 12.5px;
 }
 .sidebar-account-words {
   display: flex;
@@ -857,10 +857,10 @@ button.browser-empty:hover,
   display: flex;
   flex-wrap: wrap;
   column-gap: 0.25em;
-  height: 16px;
+  height: 18px;
   overflow: hidden;
-  font-size: 14px;
-  line-height: 16px;
+  font-size: var(--text-base);
+  line-height: 18px;
   color: var(--ink);
 }
 .sidebar-account-name > :first-child {
@@ -870,8 +870,8 @@ button.browser-empty:hover,
   white-space: nowrap;
 }
 .sidebar-account-plan {
-  font-size: 12px;
-  line-height: 14px;
+  font-size: var(--text-xs);
+  line-height: 16px;
   color: var(--ink-3);
 }
 /* Signed out, the person's place holds Sign in, drawn as a navigation row: the glyph 16px in, the label in quiet ink.
@@ -888,7 +888,7 @@ button.browser-empty:hover,
 .sidebar-account.sidebar-sign-in {
   gap: 8px;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-3);
 }
 .sidebar-account.sidebar-sign-in:hover {
@@ -909,7 +909,7 @@ button.browser-empty:hover,
   white-space: nowrap;
 }
 .sidebar-sign-in-failed {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--bad);
 }
 /* Over the glyph's place: 24px round, centred on the glyph 24px in. */
@@ -1034,7 +1034,7 @@ button.browser-empty:hover,
   height: 28px;
   padding: 0 8px 0 6px;
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-2);
 }
 .account-usage-button[data-low] {
@@ -1067,7 +1067,7 @@ button.browser-empty:hover,
 .usage-table thead th {
   height: 30px;
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
 }
 .usage-table thead th:not(:first-child) {
@@ -1103,12 +1103,12 @@ button.browser-empty:hover,
   flex-direction: column;
   min-width: 0;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink);
 }
 .usage-table-plan {
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
 }
 .usage-table-limit {
@@ -1127,13 +1127,13 @@ button.browser-empty:hover,
 }
 .usage-table-value {
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink);
 }
 .usage-table-reset {
   overflow: hidden;
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -1144,13 +1144,13 @@ button.browser-empty:hover,
 }
 .usage-table-cell[data-empty] {
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
 }
 .usage-table-note {
   padding: 12px 10px;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
 }
 .usage-table-more {
@@ -1159,7 +1159,7 @@ button.browser-empty:hover,
   padding: 0 10px;
   border-radius: var(--radius-md);
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-3);
   transition:
     background-color var(--duration-quick) var(--ease-out),
@@ -1184,13 +1184,13 @@ button.browser-empty:hover,
 .usage-cost-value {
   flex-shrink: 0;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink);
 }
 .usage-cost-note {
   padding: 6px 10px 8px;
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink-4);
 }
 /* The resize grip rides the seam between the sidebar and the work column. */

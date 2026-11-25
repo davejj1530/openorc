@@ -45,7 +45,7 @@
   min-height: 30px;
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: 21px;
   color: var(--ink-3);
   text-align: left;
   transition:
@@ -145,8 +145,8 @@ button.work-act-head:hover .work-act-name,
   border-radius: var(--radius-lg);
   background: var(--screen);
   font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 19px;
+  font-size: var(--text-xs);
+  line-height: 22px;
   color: var(--screen-ink);
 }
 /* On the dark theme the screen is black outright, so it stands apart from the piece and the command's field. */
@@ -225,11 +225,11 @@ button.work-act-head:hover .work-act-name,
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  max-height: 104px;
+  max-height: 120px;
   margin: 2px 0 6px 24px;
   overflow: hidden;
   font-size: var(--text-sm);
-  line-height: 20px;
+  line-height: 23px;
   color: var(--ink-3);
 }
 /* Older lines have run off the top: they fade out there. A thought that fits is whole. */

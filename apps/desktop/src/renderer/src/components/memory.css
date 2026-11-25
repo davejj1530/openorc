@@ -32,7 +32,7 @@
 .memory-panel-heading {
   padding: 16px 20px 2px;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   color: var(--ink);
 }
 .memory-off-notice {

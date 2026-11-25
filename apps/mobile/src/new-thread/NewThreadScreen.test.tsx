@@ -2,7 +2,6 @@
 import type { ProjectGit, RpcMethod, RpcParams } from "@openorc/protocol";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { router } from "expo-router";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { attachImage, pickImages } from "../composer/attachments";
 import type { DraftImage } from "../composer/drafts";
@@ -41,7 +40,7 @@ vi.mock("../client", async () => {
   // `asleep`: the Mac does not answer, as when it sleeps.
   return { ...mac.phone.module, useLinkState: () => (mac.asleep ? { kind: "waiting", mac: { id: "mac-1", name: "Studio" }, why: "timeout", retryAt: null } : connected()) };
 });
-vi.mock("react-native-keyboard-controller", () => ({ KeyboardStickyView: ({ children }: { children: ReactNode }) => <>{children}</> }));
+vi.mock("react-native-keyboard-controller", () => ({ useReanimatedKeyboardAnimation: () => ({ height: { value: 0 }, progress: { value: 0 } }) }));
 vi.mock("expo-router", () => ({
   router: { replace: vi.fn(), push: vi.fn(), back: vi.fn() },
   useLocalSearchParams: () => ({ projectId: "openorc", composerId: "new-thread" }),
@@ -133,9 +132,10 @@ it("holds the project while an image is on its way to the Mac", async () => {
   vi.mocked(pickImages).mockResolvedValue([{ uri: "file:///a.heic" }] as Awaited<ReturnType<typeof pickImages>>);
   vi.mocked(attachImage).mockReturnValue(new Promise((resolve) => (upload = resolve)));
   await act(async () => fireEvent.click(button("Attach image")));
-  expect(button("Project, openorc").disabled).toBe(true);
+  // The project is a word of the question, so it says it is held as a word can.
+  expect(button("Project, openorc").getAttribute("aria-disabled")).toBe("true");
   await act(async () => upload({ path: "/attachments/a.jpg", preview: "file:///cache/a.jpg" }));
-  expect(button("Project, openorc").disabled).toBe(false);
+  expect(button("Project, openorc").getAttribute("aria-disabled")).toBe("false");
   expect(screen.getByLabelText("Attached image")).toBeTruthy();
 });
 
@@ -159,7 +159,7 @@ it("opens a searchable project list and restores the draft when switching back",
   expect(screen.getByLabelText("Message").textContent).toBe("Fix the build");
   await chooseProject("Workspace");
   expect(button("Project, Workspace")).toBeTruthy();
-  expect(screen.getByRole("header").textContent).toBe("What should we work on?");
+  expect(screen.getByRole("header").textContent).toBe("What should we work on outside a project?");
 });
 
 it("keeps the project and draft when an empty search is dismissed", async () => {

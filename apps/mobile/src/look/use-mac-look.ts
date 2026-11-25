@@ -11,3 +11,8 @@ export function useMacLook(): ThemePreset {
   useRpc("app.settings.get", {}, { enabled: useLinkState().kind !== "unpaired" });
   return useSyncExternalStore(subscribeLook, currentLook).preset;
 }
+
+/** Whether the shown Mac draws its painting behind New thread. */
+export function useMacPainting(): boolean {
+  return useSyncExternalStore(subscribeLook, currentLook).painting;
+}

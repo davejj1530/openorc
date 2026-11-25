@@ -76,6 +76,7 @@
     "@types/wawoff2": "^1.0.2",
     "jsdom": "^26.1.0",
     "postcss": "^8.5.0",
+    "sharp": "^0.35.4",
     "svg-path-bbox": "^2.1.0",
     "svgpath": "2.6.0",
     "tailwindcss": "^4.3.3",

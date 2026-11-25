@@ -80,6 +80,7 @@ vi.mock("./lib/client", async (original) => {
 
 import { App } from "./App";
 import { useRouter } from "./lib/router";
+import { useBackdrop } from "./lib/backdrop";
 import { useTheme } from "./lib/theme";
 import { useOnboardingAgents } from "./lib/default-harness";
 import { writeOnboardingState } from "./lib/onboarding";
@@ -109,7 +110,7 @@ beforeEach(() => {
 });
 
 describe("the look", () => {
-  it("hands the palette on screen to the core once its settings show none, for phones to follow", () => {
+  it("hands the palette and the backdrop on screen to the core once its settings show none, for phones to follow", () => {
     vi.useFakeTimers();
     try {
       harnesses = bothReady();
@@ -117,7 +118,7 @@ describe("the look", () => {
       coreLook = null;
       render(<App />);
       act(() => void vi.advanceTimersByTime(1_000));
-      expect(saveSettings).toHaveBeenCalledWith({ look: { palette: "claude", colors: {} } });
+      expect(saveSettings).toHaveBeenCalledWith({ look: { palette: "claude", colors: {}, backdrop: useBackdrop.getState().style } });
     } finally {
       vi.useRealTimers();
     }

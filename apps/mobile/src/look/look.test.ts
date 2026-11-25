@@ -22,13 +22,23 @@ it("paints a Mac's palette and colors in both modes, through every class and use
   expect(variables["light"]).toMatchObject({ "--color-bg": linear.light.bg, "--color-accent": linear.light.accent });
   expect(variables["dark"]).toMatchObject({ "--color-accent": accent });
   applyLook(null);
-  expect(currentLook()).toEqual({ preset: "openorc", colors });
+  expect(currentLook()).toEqual({ preset: "openorc", colors, painting: false });
   expect(variables["light"]).toMatchObject({ "--color-bg": colors.light.bg, "--color-accent": colors.light.accent });
+});
+
+it("shows the painting when the Mac draws it behind New thread, and nothing for a backdrop this phone cannot draw or an older Mac", () => {
+  const look = (backdrop?: string) => ({ palette: "openorc", colors: {}, ...(backdrop ? { backdrop } : {}) });
+  applyLook(look("painting"));
+  expect(currentLook().painting).toBe(true);
+  for (const backdrop of ["off", "swirl", "image", undefined]) {
+    applyLook(look(backdrop));
+    expect(currentLook().painting).toBe(false);
+  }
 });
 
 it("paints the default for a palette this phone does not have", () => {
   applyLook({ palette: "aurora", colors: { light: { "--accent": colors.light.ok } } });
-  expect(currentLook()).toEqual({ preset: "openorc", colors });
+  expect(currentLook()).toEqual({ preset: "openorc", colors, painting: false });
 });
 
 it("follows the shown Mac's settings in the query cache: kept, answered, and gone when the phone shows another Mac", () => {

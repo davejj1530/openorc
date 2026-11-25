@@ -1,4 +1,4 @@
-import { readLook, type Mode, type ThemePreset } from "@openorc/client/theme";
+import { PAINTING_BACKDROP, readLook, type Mode, type ThemePreset } from "@openorc/client/theme";
 import type { AppLook, AppSettings } from "@openorc/protocol";
 import type { QueryCache } from "@tanstack/react-query";
 import { Uniwind } from "uniwind";
@@ -9,21 +9,23 @@ import { paintPalette } from "./paint";
 /** One mode's colors by token, for places classes cannot reach: native screen options, SVG paints, Reanimated. */
 export type Palette = Record<ColorToken, string>;
 
-/** The palette the phone paints with, and its colors in each mode. */
+/** The palette the phone paints with, its colors in each mode, and whether New thread shows the painting. */
 export interface Look {
   preset: ThemePreset;
   colors: Record<Mode, Palette>;
+  /** The Mac draws its painting behind New thread, so the phone does. Its patterns and the person's own image stay on the Mac. */
+  painting: boolean;
 }
 
 const modes: readonly Mode[] = ["light", "dark"];
-let current: Look = { preset: "openorc", colors };
+let current: Look = { preset: "openorc", colors, painting: false };
 const listeners = new Set<() => void>();
 
 /** A Mac's look as this phone paints it; the default palette for none, or for a palette this phone does not have. */
 function lookFor(look: AppLook | null): Look {
   const { preset, overrides } = readLook(look);
   const paint = (mode: Mode) => paintPalette(palettes[preset][mode], stylesheet[mode], overrides[mode]) as Palette;
-  return { preset, colors: { light: paint("light"), dark: paint("dark") } };
+  return { preset, colors: { light: paint("light"), dark: paint("dark") }, painting: look?.backdrop === PAINTING_BACKDROP };
 }
 
 /** Paints the phone with a Mac's look, or the default for none: every class through Uniwind's variables, and `useColors`. */

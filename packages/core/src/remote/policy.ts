@@ -5,6 +5,7 @@ import {
   phoneEvents,
   REMOTE_ATTACHMENT_BYTES,
   rpcParams,
+  supportsLookBackdrop,
   supportsSubagents,
   type OrclingDraft,
   type RemoteMethod,
@@ -335,7 +336,12 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "files.read": phoneFileRead,
   // When the copy was saved, never where it lies on the Mac.
   "threads.cloudCopy": (copy) => ({ ...copy, folder: "" }),
-  "app.settings.get": same,
+  // An installed phone's look is the palette and its colors, as that phone was built to read it.
+  "app.settings.get": (settings, { capabilities }) => {
+    if (!settings.look || supportsLookBackdrop(capabilities)) return settings;
+    const { backdrop: _backdrop, ...look } = settings.look;
+    return { ...settings, look };
+  },
   "cloud.offer": same,
   "threads.movePreview": same,
   "threads.start": same,

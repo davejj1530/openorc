@@ -451,6 +451,8 @@ export type ScheduleRunResult = { status: "started"; firingId: string; thread: T
 export const AppLook = z.object({
   palette: z.string().min(1).max(40),
   colors: z.object({ light: z.record(z.string().max(40), z.string().max(16)).optional(), dark: z.record(z.string().max(40), z.string().max(16)).optional() }),
+  /** What the desktop draws behind New thread, by the clients' own name for it; absent until a desktop hands one over. A phone shows the ones it has. */
+  backdrop: z.string().min(1).max(40).optional(),
 });
 export type AppLook = z.infer<typeof AppLook>;
 

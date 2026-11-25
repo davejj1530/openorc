@@ -10,6 +10,12 @@ describe("the look a Mac hands its phones", () => {
     expect(lookOf("github", custom)).toEqual({ palette: "github", colors: {} });
   });
 
+  it("carries what New thread draws behind itself, and tells two looks apart by it", () => {
+    expect(lookOf("github", custom, "painting")).toEqual({ palette: "github", colors: {}, backdrop: "painting" });
+    expect(sameLook(lookOf("github", custom, "painting"), lookOf("github", custom, "off"))).toBe(false);
+    expect(sameLook(lookOf("github", custom), lookOf("github", custom, "off"))).toBe(false);
+  });
+
   it("reads back as the palette and each mode's overrides", () => {
     expect(readLook(lookOf("linear", custom))).toEqual({ preset: "linear", overrides: { light: {}, dark: { "--accent": "#5e6ad2" } } });
     expect(readLook(null)).toEqual({ preset: "openorc", overrides: { light: {}, dark: {} } });

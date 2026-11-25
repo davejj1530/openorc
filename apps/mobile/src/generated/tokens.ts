@@ -142,6 +142,12 @@ export const motion = {
   stagger: 40,
   arrive: { blur: 4, rise: 4 },
 } as const;
+/** New thread's paintings (new-thread/pictures) by the card's shape, in points; the first that covers the card is shown. */
+export const paintings = [
+  { name: "phone", width: 440, height: 860 },
+  { name: "wide", width: 1000, height: 940 },
+  { name: "tall", width: 760, height: 1280 },
+] as const;
 export const fonts = { text: "ImmaculateGothic-Text", bold: "ImmaculateGothic-Bold", mono: "JetBrainsMono-Regular" } as const;
 export const syntax = {
   light: {

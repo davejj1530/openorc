@@ -5,7 +5,8 @@ import { DictationKey, DictationNotice, DictationPill } from "../dictation/Dicta
 import { useComposerDictation } from "../dictation/use-composer-dictation";
 import { Plus } from "../generated/icons";
 import { cn } from "../ui/cn";
-import { fonts } from "../generated/tokens";
+import { GlassPane } from "../ui/Glass";
+import { fonts, radius } from "../generated/tokens";
 import { ComposerChips } from "./ComposerChips";
 import { ComposerImages } from "./ComposerImages";
 import { ComposerQuotes, type QuoteWriters } from "./ComposerQuotes";
@@ -43,6 +44,11 @@ export interface ComposerPlaneProps {
   tagging?: Tagging | null;
   /** In a thread: how the passages the draft quotes are noted and removed. */
   quoting?: QuoteWriters | undefined;
+  /**
+   * What the composer is made of: a thread's solid plane; New thread's, the one thing on its screen, with the
+   * desktop's wider corner (`hero`); or that as a pane of glass where New thread stands over its picture.
+   */
+  surface?: "plane" | "hero" | "glass";
 }
 
 /** Tagging people in a draft: the thread whose people `@` offers, the reader it leaves out, and a pick's tag. */
@@ -76,6 +82,52 @@ function promptRuns(segments: readonly { text: string; skill?: unknown }[], tags
   );
 }
 
+type SkillPicking = ReturnType<typeof useSkillPicker>;
+type Dictating = ReturnType<typeof useComposerDictation>;
+
+/** What opens above the plane while the prompt has the keyboard: the thread's people at an `@` word, else the skills a `/` word finds. */
+function PromptPicker({ picker, tagging, word }: { picker: SkillPicking; tagging: Tagging | null; word: ReturnType<typeof tagWordAt> }) {
+  if (tagging && word)
+    return (
+      <PeoplePicker
+        threadId={tagging.threadId}
+        viewerId={tagging.viewerId}
+        query={word.query}
+        onPick={(person) => picker.place(tagging.onPick({ id: person.id, name: person.name }, word, picker.caret))}
+      />
+    );
+  return word ? null : <SkillPicker matches={picker.matches} notice={picker.notice} onPick={picker.pick} />;
+}
+
+/** The plane's bar: attach, then the model and mode, on the left; the dictation key and the actions on the right. A recording takes the left side. */
+function ComposerBar({ dictation, attachDimmed, onAttach, chips, children }: { dictation: Dictating; attachDimmed: boolean; onAttach: () => void; chips: ReactNode; children: ReactNode }) {
+  return (
+    <View className="flex-row items-center justify-between gap-2">
+      {dictation.phase ? <DictationPill phase={dictation.phase} since={dictation.since} onFinish={dictation.toggle} onCancel={dictation.cancel} /> : null}
+      <View className={cn("min-w-0 flex-1 flex-row items-center gap-1.5", dictation.phase && "hidden")}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Attach image"
+          onPress={() => {
+            // The photo picker and the camera come up over the composer, so the keyboard goes first.
+            Keyboard.dismiss();
+            onAttach();
+          }}
+          hitSlop={8}
+          className="h-control-sm w-7 items-center justify-center rounded-full active:bg-surface-2"
+        >
+          <Plus size={16} className={cn("text-ink-4", attachDimmed && "opacity-40")} />
+        </Pressable>
+        {chips}
+      </View>
+      <View className="flex-row items-center gap-2.5">
+        {dictation.phase ? null : <DictationKey onPress={dictation.toggle} />}
+        {children}
+      </View>
+    </View>
+  );
+}
+
 /**
  * The composer's one r20 plane, for a thread and for a new one: the draft's quotes and images, the prompt, and a bar with attach,
  * model and mode on the left and the actions on the right. While the prompt has the keyboard, a `/` word opens the
@@ -98,6 +150,7 @@ export function ComposerPlane({
   children,
   tagging = null,
   quoting,
+  surface = "plane",
 }: ComposerPlaneProps) {
   const [focused, setFocused] = useState(Boolean(autoFocus));
   const picker = useSkillPicker({ scope: skillScope, agent: settings.choice?.agent, claudeAccountId: settings.claudeAccount?.chosen ?? settings.claudeAccountId, text: draft.text, onText });
@@ -105,16 +158,9 @@ export function ComposerPlane({
   const dictation = useComposerDictation({ owner: composerId, text: draft.text, onText, onCaret: picker.place });
   return (
     <>
-      {focused && tagging && word ? (
-        <PeoplePicker
-          threadId={tagging.threadId}
-          viewerId={tagging.viewerId}
-          query={word.query}
-          onPick={(person) => picker.place(tagging.onPick({ id: person.id, name: person.name }, word, picker.caret))}
-        />
-      ) : null}
-      {focused && !word ? <SkillPicker matches={picker.matches} notice={picker.notice} onPick={picker.pick} /> : null}
-      <View className="gap-3.5 rounded-3xl bg-composer-input pb-3 pl-4 pr-3 pt-3.5">
+      {focused ? <PromptPicker picker={picker} tagging={tagging} word={word} /> : null}
+      <View className={cn("gap-3.5 rounded-3xl pb-3 pl-4 pr-3 pt-3.5", surface !== "plane" && "rounded-5xl", surface !== "glass" && "bg-composer-input")}>
+        {surface === "glass" ? <GlassPane radius={radius["5xl"]} /> : null}
         {quoting ? <ComposerQuotes quotes={draft.quotes ?? []} {...quoting} /> : null}
         <ComposerImages images={draft.images} uploading={uploading} onRemove={onRemoveImage} />
         <TextInput
@@ -146,29 +192,9 @@ export function ComposerPlane({
           {promptRuns(picker.segments, draft.tags ?? [])}
         </TextInput>
         {dictation.notice ? <DictationNotice kind={dictation.notice} /> : null}
-        <View className="flex-row items-center justify-between gap-2">
-          {dictation.phase ? <DictationPill phase={dictation.phase} since={dictation.since} onFinish={dictation.toggle} onCancel={dictation.cancel} /> : null}
-          <View className={cn("min-w-0 flex-1 flex-row items-center gap-1.5", dictation.phase && "hidden")}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Attach image"
-              onPress={() => {
-                // The photo picker and the camera come up over the composer, so the keyboard goes first.
-                Keyboard.dismiss();
-                onAttach();
-              }}
-              hitSlop={8}
-              className="h-control-sm w-7 items-center justify-center rounded-full active:bg-surface-2"
-            >
-              <Plus size={16} className={cn("text-ink-4", attachDimmed && "opacity-40")} />
-            </Pressable>
-            {chips ? <ComposerChips composerId={composerId} settings={settings} /> : null}
-          </View>
-          <View className="flex-row items-center gap-2.5">
-            {dictation.phase ? null : <DictationKey onPress={dictation.toggle} />}
-            {children}
-          </View>
-        </View>
+        <ComposerBar dictation={dictation} attachDimmed={attachDimmed} onAttach={onAttach} chips={chips ? <ComposerChips composerId={composerId} settings={settings} /> : null}>
+          {children}
+        </ComposerBar>
       </View>
     </>
   );

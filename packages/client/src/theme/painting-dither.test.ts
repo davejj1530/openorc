@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { darkGrade, daylightInks, ditherDaylight, ditherPainting, leanOf, toneAt, type Pixels } from "./painting-dither";
+import { darkGrade, daylightInks, ditherDaylight, ditherPainting, leanOf, toneAt, type Pixels } from "./painting-dither.js";
 
 /** A painting of the given size, each pixel coloured by its place. */
 function painting(width: number, height: number, color: (x: number, y: number) => [number, number, number]): Pixels {

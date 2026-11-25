@@ -10,9 +10,9 @@ export interface PaletteLook {
 
 const modes: readonly Mode[] = ["light", "dark"];
 
-/** What app settings carry of the desktop's theme: the palette on screen and the colors changed on it. */
-export function lookOf(preset: ThemePreset, custom: CustomColors): AppLook {
-  return { palette: preset, colors: custom[preset] ?? {} };
+/** What app settings carry of the desktop's theme: the palette on screen, the colors changed on it, and what New thread draws behind itself. */
+export function lookOf(preset: ThemePreset, custom: CustomColors, backdrop?: string): AppLook {
+  return { palette: preset, colors: custom[preset] ?? {}, ...(backdrop ? { backdrop } : {}) };
 }
 
 /** The default palette when there is no look, or its palette is one this client does not have, with its colors dropped. */
@@ -26,5 +26,5 @@ export function readLook(look: AppLook | null): PaletteLook {
 export function sameLook(a: AppLook | null, b: AppLook | null): boolean {
   if (!a || !b) return a === b;
   const entries = (colors: TokenOverrides | undefined) => JSON.stringify(Object.entries(colors ?? {}).sort(([x], [y]) => (x < y ? -1 : 1)));
-  return a.palette === b.palette && modes.every((mode) => entries(a.colors[mode]) === entries(b.colors[mode]));
+  return a.palette === b.palette && a.backdrop === b.backdrop && modes.every((mode) => entries(a.colors[mode]) === entries(b.colors[mode]));
 }

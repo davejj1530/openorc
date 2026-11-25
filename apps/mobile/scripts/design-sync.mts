@@ -25,6 +25,7 @@ import { renderIcons } from "./design-sync/icons.mts";
 import { renderOpenOrcMark } from "./design-sync/openorc-mark.mts";
 import { renderOrclingArt } from "./design-sync/orcling-art.mts";
 import { readSyntax } from "./design-sync/syntax.mts";
+import { PAINTING_SHAPES, renderPaintings } from "./design-sync/painting.mts";
 import { readStylesheet, type Scales } from "./design-sync/stylesheet.mts";
 
 const app = resolve(import.meta.dirname, "..");
@@ -83,6 +84,8 @@ function tokensTs(colors: Colors, scales: Scales, fonts: Fonts, syntax: Syntax):
     constant("height", scales.height),
     constant("container", scales.container),
     constant("motion", scales.motion),
+    "/** New thread's paintings (new-thread/pictures) by the card's shape, in points; the first that covers the card is shown. */",
+    constant("paintings", PAINTING_SHAPES),
     constant("fonts", fonts),
     constant("syntax", syntax),
   ].join("\n");
@@ -155,6 +158,7 @@ async function outputs(): Promise<Output[]> {
     // The notification extension draws an Orcling's face in a text from the same art the app's faces use.
     { path: resolve(app, "targets/notification-service/OrclingArt.swift"), contents: renderOrclingArt(header) },
     ...faces,
+    ...(await renderPaintings(desktop, resolve(app, "src/new-thread/pictures"))),
   ];
 }
 

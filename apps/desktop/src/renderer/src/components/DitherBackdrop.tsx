@@ -7,7 +7,7 @@ import { toHex } from "../lib/color";
 import { backdropPatterns, isPicture, useBackdrop, type Backdrop, type BackdropPattern } from "../lib/backdrop";
 import { observeOnScreen, useReducedMotion } from "../lib/motion";
 import { useTheme } from "../lib/theme";
-import { darkGrade, ditherDaylight, ditherPainting, type Pixels } from "./painting-dither";
+import { paintingCrop, paintingScenes, type PaintingScene, type Pixels } from "@openorc/client/theme";
 
 /** The sphere fills the corner it fades from; the other shapes read at the shader's own scale. */
 const SCALE: Partial<Record<BackdropPattern, number>> = { sphere: 2.2 };
@@ -116,39 +116,27 @@ const DOT = 2;
 /** The least time between two redraws while the window is resized. */
 const REDRAW_MS = 150;
 
-/**
- * A picture the screen shows: its source, how far down from its top the card may show (its sky and far ground, never
- * the near ground), where its centre of interest sits across and down within that, and how its cells are drawn.
- */
-interface Scene {
-  source: string;
-  reach: number;
-  focus: { x: number; y: number };
-  draw: (painting: Pixels) => Uint8ClampedArray<ArrayBuffer>;
-}
+/** A picture the screen shows: its source, and the scene the phone draws from the same picture. */
+type Scene = PaintingScene & { source: string };
 
-/** Dark shows a storm over mountains in greens; light shows a green hill under a clear sky in its own colours. */
 const scenes: Record<"dark" | "light", Scene> = {
-  dark: { source: storm, reach: 0.6, focus: { x: 0.3, y: 0.5 }, draw: (painting) => ditherPainting(painting, darkGrade) },
-  light: { source: day, reach: 0.9, focus: { x: 0.5, y: 0.25 }, draw: ditherDaylight },
+  dark: { source: storm, ...paintingScenes.dark },
+  light: { source: day, ...paintingScenes.light },
 };
 
 /**
  * The picture at one pixel a cell, cropped to the cells' shape around its centre of interest within its reach, as the
  * window draws it smaller. Null where the window gives no 2D canvas.
  */
-function fittedPainting(image: HTMLImageElement, { reach, focus }: Scene, width: number, height: number): Pixels | null {
-  const shown = image.naturalHeight * reach;
-  const scale = Math.max(width / image.naturalWidth, height / shown);
-  const cropWidth = width / scale;
-  const cropHeight = height / scale;
+function fittedPainting(image: HTMLImageElement, scene: Scene, width: number, height: number): Pixels | null {
+  const crop = paintingCrop({ width: image.naturalWidth, height: image.naturalHeight }, scene, { width, height });
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) return null;
   context.imageSmoothingQuality = "high";
-  context.drawImage(image, (image.naturalWidth - cropWidth) * focus.x, (shown - cropHeight) * focus.y, cropWidth, cropHeight, 0, 0, width, height);
+  context.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, width, height);
   return { data: context.getImageData(0, 0, width, height).data, width, height };
 }
 

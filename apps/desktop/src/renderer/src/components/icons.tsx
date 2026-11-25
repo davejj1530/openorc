@@ -1,6 +1,11 @@
 import { forwardRef, type ReactNode, type SVGProps } from "react";
 
-/** Codex-generated Precision Outline family. Geometry is original, on a 24px grid. */
+/**
+ * OpenOrc's outline family, original geometry on a 24px grid in a 2px line with round ends, which is 1.5px at the
+ * sidebar's 18px and the weight of the letters beside it. One idea a glyph, in as few strokes as say it: no inner
+ * detail lines and nothing smaller than 3 units, so a glyph holds at 13px. Faces reach the 3 to 21 box, and frames
+ * turn their corners at 3.5 or more.
+ */
 export type IconProps = SVGProps<SVGSVGElement> & { size?: number | string };
 
 function icon(name: string, geometry: ReactNode) {
@@ -14,7 +19,7 @@ function icon(name: string, geometry: ReactNode) {
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth={1.75}
+        strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
@@ -32,25 +37,27 @@ function icon(name: string, geometry: ReactNode) {
   return Icon;
 }
 
-const frame = <rect x="3.5" y="3.5" width="17" height="17" rx="2.5" />;
+const frame = <rect x="3.5" y="3.5" width="17" height="17" rx="4" />;
+/** A pane's outline, wider than tall as a window is. */
+const pane = <rect x="3" y="4.5" width="18" height="15" rx="3.5" />;
 const windowFrame = (
   <>
-    <rect x="3" y="4" width="18" height="16" rx="2.5" />
-    <path d="M3 9h18" />
+    {pane}
+    <path d="M3 9.5h18" />
   </>
 );
 const paper = <path d="M14 3.5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9Z M14 3.5v6h6" />;
-const folder = <path d="M3 8V5.5a2 2 0 0 1 2-2h4.5L13 7h6a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8h7l2-2" />;
+const folder = <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2a2 2 0 0 1 1.5.7l1.5 1.8h6.8A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5Z" />;
 const clockFace = (
   <>
     <circle cx="12" cy="13" r="7.5" />
-    <path d="M12 9v4l3 2" />
+    <path d="M12 9.5V13l2.5 1.5" />
   </>
 );
 const lens = (
   <>
-    <circle cx="10.5" cy="10.5" r="6.5" />
-    <path d="m15.3 15.3 5.2 5.2" />
+    <circle cx="11" cy="11" r="7.5" />
+    <path d="m16.5 16.5 4 4" />
   </>
 );
 const shield = <path d="m12 3 8 3v6c0 4-4 7.2-8 9-4-1.8-8-5-8-9V6Z" />;
@@ -76,10 +83,9 @@ const branch = (
 );
 const slider = (
   <>
-    <path d="M4 6h3m4 0h9 M4 12h9m4 0h3 M4 18h3m4 0h9" />
-    <circle cx="9" cy="6" r="2" />
-    <circle cx="15" cy="12" r="2" />
-    <circle cx="9" cy="18" r="2" />
+    <path d="M4 8h8 M18 8h2 M4 16h2 M12 16h8" />
+    <circle cx="15" cy="8" r="3" />
+    <circle cx="9" cy="16" r="3" />
   </>
 );
 const sun = (
@@ -90,7 +96,7 @@ const sun = (
 );
 const pin = <path d="M9 3.5h6 M10 3.5v6l-3 4v2h10v-2l-3-4v-6 M12 15.5v5" />;
 
-export const Plus = icon("Plus", <path d="M12 5v14 M5 12h14" />);
+export const Plus = icon("Plus", <path d="M12 4.5v15 M4.5 12h15" />);
 export const Minus = icon("Minus", <path d="M5 12h14" />);
 export const Mic = icon(
   "Mic",
@@ -107,8 +113,8 @@ export const Hash = icon("Hash", <path d="m10 3-3 18m10-18-3 18M4 8h16M3 16h16" 
 export const Lock = icon(
   "Lock",
   <>
-    <rect x="5" y="10" width="14" height="11" rx="3" />
-    <path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2" />
+    <rect x="5" y="10.5" width="14" height="10.5" rx="3" />
+    <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
   </>,
 );
 export const ChevronLeft = icon("ChevronLeft", <path d="m15 6-6 6 6 6" />);
@@ -140,14 +146,14 @@ export const ZoomIn = icon(
   "ZoomIn",
   <>
     {lens}
-    <path d="M7.5 10.5h6 M10.5 7.5v6" />
+    <path d="M8 11h6 M11 8v6" />
   </>,
 );
 export const ZoomOut = icon(
   "ZoomOut",
   <>
     {lens}
-    <path d="M7.5 10.5h6" />
+    <path d="M8 11h6" />
   </>,
 );
 export const MoreHorizontal = icon(
@@ -200,8 +206,8 @@ export const SquareSlash = icon(
 export const Copy = icon(
   "Copy",
   <>
-    <rect x="8" y="8" width="12" height="12" rx="2" />
-    <path d="M15 4H6a2 2 0 0 0-2 2v9" />
+    <rect x="8.5" y="8.5" width="12" height="12" rx="3" />
+    <path d="M5.5 15.5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2" />
   </>,
 );
 export const Upload = icon("Upload", <path d="M4 15v4a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19v-4 M12 15V3.5m-5 5 5-5 5 5" />);
@@ -216,20 +222,27 @@ export const Send = icon("Send", <path d="m3 4 18 8-18 8 3-8Z M6 12h15" />);
 export const Trash2 = icon(
   "Trash2",
   <>
-    <path d="M3.5 6.5h17 M9 6.5v-3h6v3 M5.5 6.5l1 13a1.5 1.5 0 0 0 1.5 1h8a1.5 1.5 0 0 0 1.5-1l1-13 M10 10v7 M14 10v7" />
+    <path d="M4 6.5h16 M9.5 6.5v-2a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2 M6 6.5l.8 11.6a2 2 0 0 0 2 1.9h6.4a2 2 0 0 0 2-1.9L18 6.5" />
   </>,
 );
-export const Pencil = icon("Pencil", <path d="m5 15 11-11a1.4 1.4 0 0 1 2 0l2 2a1.4 1.4 0 0 1 0 2L9 19l-5 1Z M14 6l4 4" />);
-export const PenSquare = icon("PenSquare", <path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5 M10 11l8-8 3 3-8 8-4 1Z M16 5l3 3" />);
-export const Home = icon("Home", <path d="m3 10 9-7 9 7 M5 8.5v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-10 M9.5 20.5v-7h5v7" />);
+export const Pencil = icon("Pencil", <path d="M16.2 4.6a2.26 2.26 0 0 1 3.2 3.2L8.5 18.7 4 20l1.3-4.5Z" />);
+/** Compose: a sheet with its corner left open for the pen. */
+export const PenSquare = icon("PenSquare", <path d="M12 4H7.5A3.5 3.5 0 0 0 4 7.5v9A3.5 3.5 0 0 0 7.5 20h9a3.5 3.5 0 0 0 3.5-3.5V12 M17.9 3.6a1.77 1.77 0 0 1 2.5 2.5L12.5 14 9 15l1-3.5Z" />);
+export const Home = icon("Home", <path d="m3.5 10.5 8.5-7 8.5 7 M5.5 9v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V9" />);
 export const Orclings = icon("Orclings", <path d="M12 3.5c7 0 8.5 1.5 8.5 8.5s-1.5 8.5-8.5 8.5-8.5-1.5-8.5-8.5S5 3.5 12 3.5Z M9 10v4 M15 10v4" />);
 export const FolderGit2 = icon("FolderGit2", folder);
 export const Folder = icon("Folder", folder);
-export const FolderPlus = icon("FolderPlus", <path d="M3 8V5.5a2 2 0 0 1 2-2h4.5L13 7h6a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z M12 10.5v6 M9 13.5h6" />);
+export const FolderPlus = icon(
+  "FolderPlus",
+  <>
+    {folder}
+    <path d="M12 11v5.5 M9.25 13.75h5.5" />
+  </>,
+);
 export const Zap = icon("Zap", <path d="m14 2-11 12h8l-1 8 11-12h-8Z" />);
 export const FolderOpen = icon("FolderOpen", <path d="M3 18V5.5a2 2 0 0 1 2-2h4l3.5 3.5H18a2 2 0 0 1 2 2v1 M3 19l3-8h15l-3 9H5a2 2 0 0 1-2-1Z" />);
 export const MessageSquare = icon("MessageSquare", <path d="M5.5 4h13A2.5 2.5 0 0 1 21 6.5v10a2.5 2.5 0 0 1-2.5 2.5H9l-6 3V6.5A2.5 2.5 0 0 1 5.5 4Z" />);
-export const MailOpen = icon("MailOpen", <path d="m3 10 9-7 9 7v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z M3 10l9 6 9-6 M3.5 20l5.5-6 M20.5 20 15 14" />);
+export const MailOpen = icon("MailOpen", <path d="m3 10 9-6.5 9 6.5v8.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z M3.5 10.5 12 16l8.5-5.5" />);
 export const Brain = icon("Brain", layers);
 /** Projects: a folder with another behind it. */
 export const Folders = icon(
@@ -260,28 +273,28 @@ export const GitFork = icon(
 export const GitPullRequest = icon(
   "GitPullRequest",
   <>
-    <circle cx="6" cy="5.5" r="2.5" />
-    <circle cx="6" cy="18.5" r="2.5" />
-    <circle cx="18" cy="18.5" r="2.5" />
-    <path d="M6 8v8 M18 16V9a3 3 0 0 0-3-3h-2 M16 3l-3 3 3 3" />
+    <circle cx="6" cy="6" r="2.75" />
+    <circle cx="6" cy="18" r="2.75" />
+    <circle cx="18" cy="18" r="2.75" />
+    <path d="M6 8.75v6.5 M18 15.25V10a4 4 0 0 0-4-4h-1.5 M15 3.5 12.5 6 15 8.5" />
   </>,
 );
 export const GitMerge = icon(
   "GitMerge",
   <>
-    <circle cx="6" cy="5.5" r="2.5" />
-    <circle cx="6" cy="18.5" r="2.5" />
-    <circle cx="18" cy="12" r="2.5" />
-    <path d="M6 8v8 M6 8c0 2.5 2.5 4 5 4h4.5" />
+    <circle cx="6" cy="6" r="2.75" />
+    <circle cx="6" cy="18" r="2.75" />
+    <circle cx="18" cy="12" r="2.75" />
+    <path d="M6 8.75v6.5 M6 8.75c0 2 2 3.25 4.5 3.25h4.75" />
   </>,
 );
 export const GitPullRequestClosed = icon(
   "GitPullRequestClosed",
   <>
-    <circle cx="6" cy="5.5" r="2.5" />
-    <circle cx="6" cy="18.5" r="2.5" />
-    <circle cx="18" cy="18.5" r="2.5" />
-    <path d="M6 8v8 M18 16v-4.5 M15.5 3.5l5 5 M20.5 3.5l-5 5" />
+    <circle cx="6" cy="6" r="2.75" />
+    <circle cx="6" cy="18" r="2.75" />
+    <circle cx="18" cy="18" r="2.75" />
+    <path d="M6 8.75v6.5 M18 15.25V12 M15.5 3.5l5 5 M20.5 3.5l-5 5" />
   </>,
 );
 export const GitCommitHorizontal = icon(
@@ -300,18 +313,19 @@ export const LayoutGrid = icon(
     <rect x="14.5" y="14.5" width="6" height="6" rx="1.5" />
   </>,
 );
+/** A pane with a short bar on the side its column opens: the sidebar's toggle, and the panel's. */
 export const PanelLeft = icon(
   "PanelLeft",
   <>
-    {frame}
-    <path d="M9 3.5v17" />
+    {pane}
+    <path d="M8 9v6" />
   </>,
 );
 export const PanelRight = icon(
   "PanelRight",
   <>
-    {frame}
-    <path d="M15 3.5v17" />
+    {pane}
+    <path d="M16 9v6" />
   </>,
 );
 /** The panel toggle's mark, drawn on the side the panel docks. */
@@ -321,15 +335,15 @@ export function PanelIcon({ side, ...props }: IconProps & { side: "left" | "righ
 export const PanelRightClose = icon(
   "PanelRightClose",
   <>
-    {frame}
-    <path d="M15 3.5v17 M7 9l3 3-3 3" />
+    {pane}
+    <path d="M15.5 4.5v15 M8 9.5l2.5 2.5L8 14.5" />
   </>,
 );
 export const Columns2 = icon(
   "Columns2",
   <>
-    {frame}
-    <path d="M12 3.5v17" />
+    {pane}
+    <path d="M12 4.5v15" />
   </>,
 );
 export const AppWindow = icon("AppWindow", windowFrame);
@@ -385,23 +399,22 @@ export const SmilePlus = icon(
 export const Clock = icon(
   "Clock",
   <>
-    <circle cx="12" cy="12" r="8.5" />
-    <path d="M12 7v5l3.5 2.5" />
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
   </>,
 );
 export const AlarmClock = icon(
   "AlarmClock",
   <>
     {clockFace}
-    <path d="m3 5 3-2 M18 3l3 2 M7 19l-2 2 M17 19l2 2" />
+    <path d="m3.5 5.5 3-2.5 M17.5 3l3 2.5" />
   </>,
 );
 export const CalendarClock = icon(
   "CalendarClock",
   <>
-    <path d="M9 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v3 M7 2v4 M16 2v4 M3 9h17" />
-    <circle cx="16" cy="16" r="5.5" />
-    <path d="M16 13v3h2.5" />
+    <rect x="3.5" y="4.5" width="17" height="16" rx="3.5" />
+    <path d="M3.5 10h17 M8 2.5v4 M16 2.5v4" />
   </>,
 );
 export const History = icon("History", <path d="M3 10a9 9 0 1 1 1 7 M3 4v6h6 M12 7v5l4 2" />);
@@ -512,10 +525,11 @@ export const ListChecks = icon("ListChecks", <path d="m3 6 1.5 1.5L7 5 M11 6h9 M
 export const ListTodo = icon(
   "ListTodo",
   <>
-    <path d="M14 3.5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9Z M7 9l1 1 2-2 M13 9h3 M7 14h2 M13 14h3 M7 17h2 M13 17h3" />
+    {frame}
+    <path d="m8 12.25 2.75 2.75L16 9.5" />
   </>,
 );
-export const Funnel = icon("Funnel", <path d="M4 5.5A1 1 0 0 1 5 4.5h14a1 1 0 0 1 .8 1.6L14.5 13v5.4a1 1 0 0 1-.55.9l-2.5 1.25a1 1 0 0 1-1.45-.9V13L4.2 6.1a1 1 0 0 1-.2-.6Z" />);
+export const Funnel = icon("Funnel", <path d="M4 5h16l-6 7.5V18l-4 2v-7.5Z" />);
 export const ListFilter = icon("ListFilter", <path d="M3.5 6h17 M7 12h10 M10 18h4" />);
 export const FilePlain = icon("FilePlain", paper);
 export const FileText = icon(
@@ -525,13 +539,8 @@ export const FileText = icon(
     <path d="M8 13h8 M8 17h6" />
   </>,
 );
-export const FileDiff = icon(
-  "FileDiff",
-  <>
-    {paper}
-    <path d="M7 13h5 M9.5 10.5v5 M13 17h4" />
-  </>,
-);
+/** Changes: what was added over what was taken away, with no page drawn around them. */
+export const FileDiff = icon("FileDiff", <path d="M12 2.5v11.5 M6.25 8.25h11.5 M6.25 20h11.5" />);
 export const FileCode2 = icon(
   "FileCode2",
   <>
@@ -542,7 +551,7 @@ export const FileCode2 = icon(
 export const BookText = icon(
   "BookText",
   <>
-    <path d="M6 20.5h14V3.5H6a2.5 2.5 0 0 0-2.5 2.5v12A2.5 2.5 0 0 1 6 15.5h14 M3.5 18a2.5 2.5 0 0 0 2.5 2.5 M8 7.5h8 M8 11h6" />
+    <path d="M5 18.5A2.5 2.5 0 0 1 7.5 16H19V3H7.5A2.5 2.5 0 0 0 5 5.5Z M5 18.5A2.5 2.5 0 0 0 7.5 21H19" />
   </>,
 );
 export const Bold = icon("Bold", <path strokeWidth="2.25" d="M6 4h7a4 4 0 0 1 0 8H6V4Z M6 12h8a4 4 0 0 1 0 8H6Z" />);
@@ -558,8 +567,8 @@ export const Code2 = icon("Code2", <path d="m7 7-5 5 5 5 M17 7l5 5-5 5 M14 4l-4 
 export const Terminal = icon(
   "Terminal",
   <>
-    {windowFrame}
-    <path d="m7 12 3 2.5L7 17 M13 17h4" />
+    {pane}
+    <path d="m7.5 9.5 3 2.5-3 2.5 M13 14.5h3.5" />
   </>,
 );
 export const Slash = icon("Slash", <path d="M16 3 8 21" />);
@@ -574,8 +583,8 @@ export const Image = icon(
   "Image",
   <>
     {frame}
-    <circle cx="8" cy="8" r="1.5" />
-    <path d="m3.5 17 5-5 4 4 3-3 5 5" />
+    <circle cx="8.75" cy="8.75" r="1.75" />
+    <path d="m4 17 5-5 4 4 2.5-2.5 4.5 4.5" />
   </>,
 );
 export const Globe = icon(
@@ -586,13 +595,14 @@ export const Globe = icon(
     <path d="M3 12h18" />
   </>,
 );
-export const Lightbulb = icon("Lightbulb", <path d="M9 17c0-3-3.5-3.5-3.5-7.5a6.5 6.5 0 0 1 13 0c0 4-3.5 4.5-3.5 7.5Z M9 20.5h6 M12 17v-6m-2-1 2 1 2-1" />);
+export const Lightbulb = icon("Lightbulb", <path d="M9 17c0-3-3.5-3.5-3.5-7.5a6.5 6.5 0 0 1 13 0c0 4-3.5 4.5-3.5 7.5Z M9.5 20.5h5" />);
 export const Hammer = icon("Hammer", <path d="m3 19 9-9 3 3-9 9Z M9 6l4-4 8 8-4 4-3-3 1-1-3-3-1 1Z" />);
 export const Wand = icon("Wand", <path d="M4 20 14 10 M17.5 3.5v6 M14.5 6.5h6" />);
+/** A cog of eight shallow teeth, its outline drawn from arcs so it stays round at any size. */
 export const Settings = icon(
   "Settings",
   <>
-    <path d="m9 3-.5 3-2 1-3-.5-1.5 3 2.5 2v2L2 15l1.5 3 3-.5 2 1 .5 3h6l.5-3 2-1 3 .5 1.5-3-2.5-2.5v-2l2.5-2-1.5-3-3 .5-2-1L15 3Z" />
+    <path d="M10.11 4.95 L10.60 2.60 A9.5 9.5 0 0 1 13.40 2.60 L13.89 4.95 A7.3 7.3 0 0 1 15.65 5.68 L17.65 4.36 A9.5 9.5 0 0 1 19.64 6.35 L18.32 8.35 A7.3 7.3 0 0 1 19.05 10.11 L21.40 10.60 A9.5 9.5 0 0 1 21.40 13.40 L19.05 13.89 A7.3 7.3 0 0 1 18.32 15.65 L19.64 17.65 A9.5 9.5 0 0 1 17.65 19.64 L15.65 18.32 A7.3 7.3 0 0 1 13.89 19.05 L13.40 21.40 A9.5 9.5 0 0 1 10.60 21.40 L10.11 19.05 A7.3 7.3 0 0 1 8.35 18.32 L6.35 19.64 A9.5 9.5 0 0 1 4.36 17.65 L5.68 15.65 A7.3 7.3 0 0 1 4.95 13.89 L2.60 13.40 A9.5 9.5 0 0 1 2.60 10.60 L4.95 10.11 A7.3 7.3 0 0 1 5.68 8.35 L4.36 6.35 A9.5 9.5 0 0 1 6.35 4.36 L8.35 5.68 A7.3 7.3 0 0 1 10.11 4.95Z" />
     <circle cx="12" cy="12" r="3" />
   </>,
 );

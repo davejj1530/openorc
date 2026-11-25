@@ -6,7 +6,7 @@ import { call, useLinkRead } from "../client";
 import type { LinkRead } from "../connection/link-hooks";
 import { ChevronDown, ChevronRight } from "../generated/icons";
 import { Mono } from "../ui/Mono";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { ImageTile } from "./images";
 import { matchLines } from "./mono-lines";
@@ -33,7 +33,7 @@ export function usePrinted(block: ToolBlock | undefined): { text: string; state:
 
 /** Where an output the page left out stands while it is read from the Mac. */
 export function Reading({ state }: { state: LinkRead<unknown>["state"] }) {
-  if (state === "loading") return <Spinner />;
+  if (state === "loading") return <WorkingMark />;
   return state === "failed" ? <Text className="text-ink-4">Could not load the output</Text> : null;
 }
 

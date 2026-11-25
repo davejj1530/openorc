@@ -20,7 +20,7 @@ import {
   type WorkObject,
 } from "@openorc/client";
 import { FileText, GitBranch, Lightbulb, Terminal } from "./icons";
-import { Spinner } from "./Spinner";
+import { WorkingMark } from "./StateMark";
 import { ThreadLink } from "./ThreadImages";
 import { toolIcons } from "./tool-icons";
 import { CommandSteps } from "./ToolCommand";
@@ -130,7 +130,7 @@ function ActMark({ object }: { object: WorkObject }) {
   const mark = lineMark(object);
   if (mark.kind === "chip") return <ChipIcon chip={mark.chip} />;
   const Icon = mark.kind === "tool" ? toolIcons[mark.icon] : MARKS[mark.kind];
-  return <Icon size={14} className="work-chip-icon" />;
+  return <Icon size={16} className="work-chip-icon" />;
 }
 
 const MARKS = { git: GitBranch, run: Terminal, unnamed: FileText };
@@ -163,7 +163,7 @@ function ActResult({ result }: { result: LineResult }) {
     return (
       <>
         <span>{result.since}</span>
-        <Spinner size={14} className="tool-row-live" />
+        <WorkingMark size={14} />
       </>
     );
   if (result.kind === "words") return <span data-tone={result.bad ? "bad" : undefined}>{result.text}</span>;
@@ -244,7 +244,7 @@ export function ThoughtRow({ said, took, open, onToggle, children }: { said: str
   return (
     <li className="work-act" data-state="done" data-open={open || undefined} data-plane={open ? "" : undefined}>
       <button type="button" className="work-act-head" aria-expanded={open} onClick={onToggle}>
-        <Lightbulb size={14} className="work-chip-icon" />
+        <Lightbulb size={16} className="work-chip-icon" />
         <span className="work-act-words">
           <span className="work-act-verb">Thought </span>
           <span className="work-act-name">{said}</span>

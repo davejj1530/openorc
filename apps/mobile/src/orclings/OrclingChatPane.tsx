@@ -5,7 +5,7 @@ import { useEffect, type RefObject } from "react";
 import { View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
 import { client } from "../client";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { OrclingChatList } from "./OrclingChatList";
 import { OrclingFace } from "./OrclingFace";
@@ -43,7 +43,7 @@ export function OrclingChatPane({
     return (
       <View className="flex-1 items-center justify-center gap-3">
         {loading ? (
-          <Spinner />
+          <WorkingMark />
         ) : (
           <>
             <OrclingFace look={chat.look} size={96} />

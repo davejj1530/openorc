@@ -7,7 +7,7 @@ import { failureMessage } from "../failure";
 import { Download, FileText } from "../generated/icons";
 import { ChatImageTile } from "../thread/images";
 import { cn } from "../ui/cn";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 
 /** Where the open conversation's files are read: the phone's own session, the organization and the conversation. */
@@ -50,7 +50,7 @@ function FileRow({ scope, file }: { scope: HostedFileScope | null; file: TeamCha
           </Text>
           <Text className="text-sm tabular-nums text-ink-3">{formatBytes(file.bytes)}</Text>
         </View>
-        {pending ? <Spinner /> : <Download size={16} className="text-ink-3" />}
+        {pending ? <WorkingMark /> : <Download size={16} className="text-ink-3" />}
       </Pressable>
       {error ? (
         <Text accessibilityRole="alert" className="px-1 text-sm text-bad">

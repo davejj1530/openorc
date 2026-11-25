@@ -2,7 +2,7 @@ import { hostedFilePatch } from "@openorc/client";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpc } from "../client";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { fileName } from "./change-words";
 import { FailedBlock } from "./ChangeRows";
@@ -22,7 +22,7 @@ export function CloudDiffScreen() {
       {read.error ? <FailedBlock message={read.error.message} onRetry={() => void read.refetch()} /> : null}
       {!diff && !read.error ? (
         <View className="items-center py-10">
-          <Spinner />
+          <WorkingMark />
         </View>
       ) : null}
       {diff ? (

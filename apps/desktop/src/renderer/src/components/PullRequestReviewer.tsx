@@ -13,7 +13,8 @@ import {
   type PullRequestReview,
   type ThreadSummary,
 } from "@openorc/protocol";
-import { LoaderCircle, Wand } from "./icons";
+import { Wand } from "./icons";
+import { WorkingMark } from "./StateMark";
 import { defaultChoice, ModelPicker, type ModelChoice } from "./ModelPicker";
 import type { PickerAccounts } from "./ModelPickerAccounts";
 import { Button, Segmented, TextButton } from "./ui";
@@ -108,7 +109,7 @@ function ReviewConversationLink({ conversation, models }: { conversation: Thread
   const author = orcling?.name ?? draftAuthor({ agent: conversation.agent, model: conversation.model }, models);
   return (
     <TextButton underline className="inline-flex items-center gap-1.5 text-sm" onClick={() => openThread(conversation.id)} data-tip={conversation.title}>
-      {reviewing ? <LoaderCircle size={13} className="animate-spin" aria-hidden="true" /> : null}
+      {reviewing ? <WorkingMark size={14} /> : null}
       {reviewing ? `${author} is reviewing` : "Review conversation"}
     </TextButton>
   );

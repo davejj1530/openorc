@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowDown } from "../generated/icons";
 import { arrive } from "../ui/motion";
 import { useMeasuredSides, usePaneWidth } from "../ui/pane";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { AgentPresence } from "./AgentPresence";
 import { newArrivals, useArrival } from "./arrivals";
@@ -429,7 +429,7 @@ const RowList = memo(function RowList({ rows, arrivals, hasOlder, filled, follow
       keyboardOffset={insets.bottom}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
-      ListHeaderComponent={hasOlder ? <View className="h-12 items-center justify-center">{filled ? <Spinner /> : null}</View> : null}
+      ListHeaderComponent={hasOlder ? <View className="h-12 items-center justify-center">{filled ? <WorkingMark /> : null}</View> : null}
       ListFooterComponent={footer}
       contentContainerStyle={contentStyle}
     />

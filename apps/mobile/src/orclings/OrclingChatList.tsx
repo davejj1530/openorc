@@ -15,7 +15,7 @@ import { replySegments } from "../thread/reply-images";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { useMode } from "../ui/mode";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { bubbleTint, chatItems, type ChatItem } from "./chat-items";
 import { OrclingFace } from "./OrclingFace";
@@ -288,7 +288,7 @@ export function OrclingChatList({ chat, blocks, typing, runId, hasOlder, loadOld
       keyboardOffset={insets.bottom}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
-      ListHeaderComponent={hasOlder ? <View className="h-12 items-center justify-center">{<Spinner />}</View> : null}
+      ListHeaderComponent={hasOlder ? <View className="h-12 items-center justify-center">{<WorkingMark />}</View> : null}
       ListFooterComponent={footer}
       contentContainerStyle={contentStyle}
     />

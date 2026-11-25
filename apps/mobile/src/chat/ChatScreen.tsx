@@ -7,7 +7,7 @@ import { KeyboardChatScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { teamChat } from "../client";
 import { Pin } from "../generated/icons";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { cn } from "../ui/cn";
 import { useMeasuredSides } from "../ui/pane";
 import { Text } from "../ui/Text";
@@ -271,7 +271,7 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
               <Text className="text-sm text-ink-3">Earlier messages</Text>
             </Pressable>
           ) : null}
-          {!timeline.data && !timeline.error ? <Spinner /> : null}
+          {!timeline.data && !timeline.error ? <WorkingMark /> : null}
           {timeline.error ? <Text className="px-5 py-10 text-center text-ink-4">{timeline.error.message}</Text> : null}
           {timeline.data && !messages.length && !draft.pending.length ? <Text className="py-10 text-center text-ink-4">No messages yet</Text> : null}
           {items.map((item) => (

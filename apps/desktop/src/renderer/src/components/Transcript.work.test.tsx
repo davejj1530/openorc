@@ -461,7 +461,7 @@ it("shows a manual compaction between turns as finished work, not a turn under w
   // Core reports the thread busy while it compacts: the turn's end and the live row say so.
   const { rerender } = render(<Transcript run={runs.get(runId)!} working />);
   expect(ends()).toEqual(["done", "working"]);
-  expect(document.querySelector(".tool-row-live")).toBeTruthy();
+  expect(document.querySelector(".state-mark")).toBeTruthy();
   expect(document.body.textContent).toContain("Compacting context");
   frame(2, [
     {
@@ -488,7 +488,7 @@ it("shows a manual compaction between turns as finished work, not a turn under w
   expect(runs.get(runId)!.live).toBe(true);
   // The compaction ends with nothing to copy, so only the reply's turn keeps an end.
   expect(ends()).toEqual(["done"]);
-  expect(document.querySelector(".tool-row-live")).toBeNull();
+  expect(document.querySelector(".state-mark")).toBeNull();
   expect(document.querySelector(".work-now")).toBeNull();
   expect(receipt().textContent).toMatch(/1 step/);
   expect(document.body.textContent).toContain("Context compacted.");

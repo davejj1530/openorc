@@ -8,7 +8,7 @@ import { failureMessage } from "../failure";
 import { UsageRing } from "../settings/UsageRing";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { continueChoices, type ContinueChoice } from "./continue-choices";
 
@@ -47,7 +47,7 @@ function AccountChoice({ choice, now, going, disabled, onPress }: { choice: Cont
       onPress={onPress}
       className="min-h-touch flex-row items-center gap-3 rounded-2xl bg-key px-3 active:bg-surface-3"
     >
-      {going ? <Spinner size={16} /> : <UsageRing left={choice.limited ? 0 : choice.left} stale={false} />}
+      {going ? <WorkingMark size={16} /> : <UsageRing left={choice.limited ? 0 : choice.left} stale={false} />}
       <Text numberOfLines={1} className={cn("min-w-0 flex-1 text-md", off && "text-ink-4")}>
         {choice.account.name}
       </Text>
@@ -142,7 +142,7 @@ function Stopped({ thread, request, disabled, onSent }: RecoveryProps) {
           onPress={() => start("restart", { restart: true }, RESTART_PROMPT)}
           className="h-control-md flex-row items-center justify-center gap-2 self-start rounded-full bg-key px-4 active:bg-surface-3"
         >
-          {going === "restart" ? <Spinner size={14} /> : null}
+          {going === "restart" ? <WorkingMark size={14} /> : null}
           <Text className={cn("text-sm text-ink-2", off && "text-ink-4")}>{words.restart}</Text>
         </Pressable>
       ) : null}

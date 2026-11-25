@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ThreadRichText } from "./ThreadImages";
-import { WorkAgent, WorkDelegate, AlertCircle, ArrowUpRight, Check, ChevronRight, GitBranch, LoaderCircle, Play } from "./icons";
+import { WorkAgent, WorkDelegate, AlertCircle, ArrowUpRight, Check, ChevronRight, GitBranch, Play } from "./icons";
+import { WorkingMark } from "./StateMark";
 import { statusLabel } from "./status";
 import { WorkingCube } from "./OpenOrcMark";
 import { Button, TextButton } from "./ui";
@@ -25,7 +26,7 @@ export function taskCardClass(compact: boolean): string {
 function taskStepIcon({ failed, done, working }: { failed: boolean; done: boolean; working: boolean }) {
   if (failed) return <AlertCircle size={12} className="shrink-0 text-bad" />;
   if (done) return <Check size={12} className="shrink-0" />;
-  return <LoaderCircle size={12} className={cn("shrink-0", working && "animate-spin")} />;
+  return <WorkingMark kind={working ? "working" : "waiting"} size={12} />;
 }
 
 /** Loads the run's newest turn again after a failed load, and clears the error once it is here. */

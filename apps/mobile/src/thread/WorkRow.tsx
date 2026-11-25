@@ -11,6 +11,7 @@ import {
   useTicking,
   workDuration,
   workEntries,
+  workMarkKind,
   workObjects,
   type ActLine,
   type Block,
@@ -29,7 +30,7 @@ import { ChevronDown, ChevronRight, CircleCheck, FileDiff, GitPullRequest, Globe
 import { cn } from "../ui/cn";
 import type { IconProps } from "../ui/icon";
 import { arrive } from "../ui/motion";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { SweepText } from "../ui/SweepText";
 import { Text } from "../ui/Text";
 import { client } from "../client";
@@ -119,7 +120,7 @@ function LiveLine({ headline }: { headline: LiveHeadline }) {
   return (
     <View accessibilityRole="text">
       <View className="min-h-control-row flex-row items-center gap-2.5">
-        {thinking ? <Lightbulb size={16} className="text-ink-4" /> : <Spinner size={14} />}
+        {thinking ? <Lightbulb size={16} className="text-ink-4" /> : <WorkingMark size={14} />}
         <SweepText text={thinking ? "Thinking" : headline.label} className="flex-1 text-ink" sweeping />
         {headline.since === undefined ? null : (
           <Text className="text-xs text-ink-4 tabular-nums" accessibilityElementsHidden>
@@ -360,7 +361,7 @@ export const WorkRow = memo(function WorkRow({ row }: { row: WorkRowProps }) {
         <View className="pb-3.5">
           {!open && headline ? (
             <View accessibilityRole="text" className="min-h-control-md flex-row items-center gap-2">
-              <Spinner />
+              <WorkingMark kind={workMarkKind(now[0])} />
               <LiveWords headline={headline} elapsed />
             </View>
           ) : null}

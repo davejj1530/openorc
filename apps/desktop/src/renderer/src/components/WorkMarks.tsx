@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Block, ObjectState, WorkChip } from "@openorc/client";
 import { Brain, Check, Folder, Globe, Hammer, Search, Terminal, WorkDelegate, X } from "./icons";
-import { Spinner } from "./Spinner";
+import { WorkingMark } from "./StateMark";
 import { FileGlyph } from "./FileGlyph";
 
 /** How raw blocks render: the transcript's own rows. `details` draws a call as its details alone, under its chip. */
@@ -23,7 +23,7 @@ export function OpenedCall({ open, calls, renderBlocks, children }: { open: bool
 
 /** Running, done or failed, as a mark. A row says only what is unusual: `quiet` leaves a finished one unmarked. */
 export function StateMark({ state, size = 14, quiet = false }: { state: ObjectState; size?: number; quiet?: boolean }) {
-  if (state === "running") return <Spinner size={size} className="tool-row-live work-object-mark" />;
+  if (state === "running") return <WorkingMark size={size} />;
   if (state === "failed") return <X size={size} className="work-object-mark" data-tone="bad" />;
   return state === "done" && !quiet ? <Check size={size} className="work-object-mark" /> : null;
 }
@@ -59,9 +59,10 @@ export function SizeStat({ added, removed }: { added: number; removed: number })
 
 const kindIcons = { folder: Folder, query: Search, command: Terminal, intent: Terminal, web: Globe, tool: Hammer, agent: WorkDelegate, memory: Brain } as const;
 
-/** A file shows its language's mark; anything else shows what kind of thing it is. */
+/** A file shows its language's mark; anything else shows what kind of thing it is. The mark is 16px, a step over the
+ * line's 15px words. */
 export function ChipIcon({ chip }: { chip: WorkChip }) {
-  if (chip.kind === "file" || chip.kind === "edit") return <FileGlyph path={chip.label} size={14} className="work-chip-icon" />;
+  if (chip.kind === "file" || chip.kind === "edit") return <FileGlyph path={chip.label} size={16} className="work-chip-icon" />;
   const Icon = kindIcons[chip.kind];
-  return <Icon size={14} className="work-chip-icon" />;
+  return <Icon size={16} className="work-chip-icon" />;
 }

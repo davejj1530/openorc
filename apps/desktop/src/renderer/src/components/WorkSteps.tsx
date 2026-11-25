@@ -2,6 +2,7 @@ import { memo, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   type Block,
   workDuration,
+  isLive,
   isSignal,
   liveHeadline,
   workEntries,
@@ -21,10 +22,11 @@ import {
   stepWaiting,
   type ActLine,
   type StepThoughts,
+  workMarkKind,
 } from "@openorc/client";
 import { cn } from "../lib/cn";
 import { Check, ChevronRight, Lightbulb, List, Workflow, X } from "./icons";
-import { Spinner } from "./Spinner";
+import { WorkingMark } from "./StateMark";
 import type { RenderBlocks } from "./WorkMarks";
 import { ActRow, ThoughtRow } from "./WorkActs";
 import { WorkTimeline } from "./WorkTimeline";
@@ -92,7 +94,7 @@ function ViewSwap({ timeline, onSwap }: { timeline: boolean; onSwap: () => void 
   const Icon = timeline ? List : Workflow;
   return (
     <button type="button" className="work-view-swap" onClick={onSwap}>
-      <Icon size={14} />
+      <Icon size={16} />
       {timeline ? "Summary" : "Timeline"}
     </button>
   );
@@ -138,7 +140,7 @@ export function WorkNow({ blocks, turn, taskCards = true, lead }: { blocks: Bloc
   const headline = liveHeadline(entries, turn);
   return headline ? (
     <div className="work-now motion-arrive" role="status">
-      <Spinner size={16} className="tool-row-live" />
+      <WorkingMark kind={workMarkKind(turn.findLast(isLive))} />
       {lead ? <span className="work-now-lead">{lead}</span> : null}
       <LiveWords headline={headline} elapsed />
     </div>
@@ -224,7 +226,7 @@ function LiveLine({ headline }: { headline: LiveHeadline }) {
   return (
     <div className="work-act work-live" data-state="running">
       <div className="work-act-head">
-        {thinking ? <Lightbulb size={14} className="work-chip-icon" /> : <Spinner size={14} className="tool-row-live" />}
+        {thinking ? <Lightbulb size={16} className="work-chip-icon" /> : <WorkingMark size={16} />}
         <span className="work-act-words">
           <span className="work-live-words">{thinking ? "Thinking" : headline.label}</span>
         </span>
@@ -259,13 +261,13 @@ function LiveThought({ text }: { text: string }) {
 export type StepState = "pending" | "running" | "done" | "failed";
 
 /**
- * A step's mark: an empty ring, a loader while it runs, an ink check once done, a cross once it failed. Checks and
+ * A step's mark: an empty ring, the cube at work while it runs, an ink check once done, a cross once it failed. Checks and
  * crosses land with one overshoot.
  */
 export function StepMark({ state }: { state: StepState }) {
   return (
     <span className="step-mark" data-state={state} aria-hidden="true">
-      {state === "running" ? <Spinner size={16} className="tool-row-live" /> : null}
+      {state === "running" ? <WorkingMark /> : null}
       {state === "done" ? (
         <span className="step-check">
           <Check size={11} strokeWidth={2.25} />

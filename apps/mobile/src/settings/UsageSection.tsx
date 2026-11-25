@@ -6,7 +6,7 @@ import { RefreshCw } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { HarnessLogo } from "../ui/HarnessLogo";
 import { ListPressable } from "../ui/ListPressable";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { Card, Divider, RowLines, rowClass, Section } from "./parts";
 import { useCloudLimits, useUsage, type Usage } from "./use-usage";
@@ -103,7 +103,7 @@ function NoCards({ words, reading }: { words: string; reading: boolean }) {
   return (
     <Card>
       <View className={rowClass}>
-        <RowLines lead={reading ? <Spinner size={16} /> : null} label={words} labelClassName="text-ink-4" />
+        <RowLines lead={reading ? <WorkingMark size={16} /> : null} label={words} labelClassName="text-ink-4" />
       </View>
     </Card>
   );

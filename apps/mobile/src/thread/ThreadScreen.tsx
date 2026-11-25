@@ -18,7 +18,7 @@ import { useThreadOnScreen } from "../notifications/on-screen";
 import { chatFor, useOrclingChats } from "../orclings/orcling-chats";
 import { OrclingChatPane } from "../orclings/OrclingChatPane";
 import { OrclingHeader } from "../orclings/OrclingHeader";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { CloudFileScopeContext, useThreadFiles } from "../cloud/cloud-files";
 import { threadTogetherOf, TogetherContext, turnSeen } from "./cloud-together";
@@ -98,7 +98,7 @@ function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActi
     if (blocks?.length) reportThreadOpened(threadId, blocks.length);
   }, [threadId, blocks?.length]);
   if (failed && !blocks?.length) return <LoadFailed retry={retry} />;
-  if (!merged || !blocks?.length) return <View className="flex-1 items-center justify-center">{loading || runs.length ? <Spinner /> : <Text className="text-ink-4">Nothing yet</Text>}</View>;
+  if (!merged || !blocks?.length) return <View className="flex-1 items-center justify-center">{loading || runs.length ? <WorkingMark /> : <Text className="text-ink-4">Nothing yet</Text>}</View>;
   return (
     <Transcript
       blocks={blocks}
@@ -251,7 +251,7 @@ export function ThreadScreen() {
                       followKey={room.sends}
                     />
                   ) : (
-                    <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <Spinner /> : <Text className="text-ink-4">Thread not found</Text>}</View>
+                    <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <WorkingMark /> : <Text className="text-ink-4">Thread not found</Text>}</View>
                   )}
                 </NoteReplyContext.Provider>
               </CloudFileScopeContext.Provider>

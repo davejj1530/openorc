@@ -24,7 +24,7 @@ import {
 import { cn } from "../ui/cn";
 import type { IconProps } from "../ui/icon";
 import { confirm } from "../ui/motion";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { ImageTile } from "./images";
 import { useOpen } from "./disclosure";
@@ -52,7 +52,7 @@ export function toolState(block: ToolBlock): string {
 }
 
 function ToolStatus({ block }: { block: ToolBlock }) {
-  if (!block.done) return <Spinner size={14} />;
+  if (!block.done) return <WorkingMark size={14} />;
   if (block.isError || (block.status && block.status !== "success")) return <Text className="text-xs text-ink-4">{stateLabel(block.status ?? "error")}</Text>;
   return null;
 }
@@ -112,7 +112,7 @@ export const ThinkingRow = memo(function ThinkingRow({ block }: { block: Extract
         onPress={() => setOpen(!open)}
         className="min-h-touch flex-row items-center gap-2 active:opacity-60"
       >
-        {live ? <Spinner /> : <Lightbulb size={16} className="text-ink-4" />}
+        {live ? <WorkingMark kind="thinking" /> : <Lightbulb size={16} className="text-ink-4" />}
         <Text className="text-ink-4">{thoughtWords(block)}</Text>
         {text ? (
           <View style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }}>
@@ -164,7 +164,7 @@ function ImageViewRow({ block, runId }: { block: Extract<Block, { kind: "activit
             {name}
           </Text>
         ) : null}
-        {block.status === "running" ? <Spinner size={14} /> : null}
+        {block.status === "running" ? <WorkingMark size={14} /> : null}
         <View style={{ transform: [{ rotate: open ? "90deg" : "0deg" }] }}>
           <ChevronRight size={12} className="text-ink-4" />
         </View>
@@ -201,7 +201,7 @@ function Activity({ block }: { block: Extract<Block, { kind: "activity" }> }) {
       >
         {finishedAgent ? <WorkAgent size={16} className="text-ink-4" /> : <WorkMessage size={16} className={block.status === "error" ? "text-bad" : "text-ink-4"} />}
         <Text className={cn("text-ink-4", block.status === "error" && "text-bad")}>{block.label}</Text>
-        {live ? <Spinner size={14} /> : null}
+        {live ? <WorkingMark size={14} /> : null}
         {!live && block.status !== "success" ? <Text className="text-xs text-ink-4">{stateLabel(block.status)}</Text> : null}
         {expandable ? (
           <View style={{ transform: [{ rotate: open ? "90deg" : "0deg" }] }}>
@@ -223,7 +223,7 @@ export function StepMark({ state, arrived }: { state: "pending" | "running" | "d
   const still = useReducedMotion();
   return (
     <View className="h-control-md w-4 items-center justify-center">
-      {state === "running" ? <Spinner /> : null}
+      {state === "running" ? <WorkingMark /> : null}
       {state === "done" ? (
         <Animated.View className="size-4 items-center justify-center rounded-full bg-ink" style={arrived && !still ? confirm : undefined}>
           <Check size={11} className="text-surface" />

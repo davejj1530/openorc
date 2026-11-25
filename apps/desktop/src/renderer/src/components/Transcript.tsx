@@ -2,11 +2,12 @@ import { lazy, memo, Suspense, useContext, useEffect, useId, useLayoutEffect, us
 import { useVisited } from "../lib/use-visited";
 import { harnessCatalog, type ActivityRecovery } from "@openorc/protocol";
 import { WorkMessage, WorkAgent, ChevronDown, ChevronRight, Lightbulb } from "./icons";
-import { Spinner } from "./Spinner";
+import { WorkingMark } from "./StateMark";
 import {
   workTurns,
   type Block,
   type RunTranscript,
+  isLive,
   liveVerb,
   stateLabel,
   toolCallPresentation,
@@ -20,6 +21,7 @@ import {
   isUnifiedDiff,
   useTurnModel,
   subagentGroups,
+  workMarkKind,
 } from "@openorc/client";
 import { cn } from "../lib/cn";
 import { QuestionCard } from "./QuestionCard";
@@ -363,7 +365,7 @@ const GroupRow = memo(function GroupRow({ id, blocks, runId, taskCards }: GroupR
         }}
         className="work-step-toggle"
       >
-        {live ? <Spinner size={16} className="tool-row-live shrink-0" /> : <Icon size={16} className="tool-icon shrink-0" data-tone={tone} />}
+        {live ? <WorkingMark kind={workMarkKind(blocks.findLast(isLive))} /> : <Icon size={16} className="tool-icon shrink-0" data-tone={tone} />}
         <span className="truncate">{label}</span>
         <ChevronRight size={12} className={cn("work-chevron shrink-0", open && "rotate-90")} />
       </button>
@@ -708,7 +710,7 @@ function ToolBlock({ block, cards, details = false }: { block: Extract<Block, { 
 }
 
 function activityStatus(block: Extract<Block, { kind: "activity" }>, live: boolean): ReactNode {
-  if (live) return <Spinner size={14} className="tool-row-live" />;
+  if (live) return <WorkingMark size={14} />;
   if (block.status !== "success") return <span className="text-xs">{stateLabel(block.status)}</span>;
   return null;
 }
@@ -797,7 +799,7 @@ function ThinkingRow({ block }: { block: Extract<Block, { kind: "thinking" }> })
         disabled={!text}
         className="thinking-head"
       >
-        {live ? <Spinner size={16} className="tool-row-live" /> : <Lightbulb size={16} />}
+        {live ? <WorkingMark kind="thinking" /> : <Lightbulb size={16} />}
         <span>{thoughtWords(block)}</span>
         {text ? <ChevronDown size={14} className={cn("thinking-chevron", open && "rotate-180")} /> : null}
       </button>

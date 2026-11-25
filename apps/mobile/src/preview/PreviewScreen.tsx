@@ -7,7 +7,7 @@ import { useLinkState, useRpc } from "../client";
 import { perfEnabled } from "../thread/perf-probe";
 import { PanelHeader, usePanelParams, type PanelTool } from "../panel/host";
 import { haptic } from "../ui/haptics";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { useLate } from "../ui/use-late";
 import { openInApp } from "../ui/web";
@@ -32,7 +32,7 @@ function Words({ title, detail }: { title: string; detail?: string }) {
 
 function Opening({ connected }: { connected: boolean }) {
   const late = useLate(SPINNER_DELAY_MS);
-  return <View className="flex-1 items-center justify-center">{late && connected ? <Spinner /> : null}</View>;
+  return <View className="flex-1 items-center justify-center">{late && connected ? <WorkingMark /> : null}</View>;
 }
 
 interface BodyProps {

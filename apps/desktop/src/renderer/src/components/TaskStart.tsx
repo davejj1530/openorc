@@ -1,5 +1,5 @@
 import type { Task } from "@openorc/protocol";
-import { Spinner } from "./Spinner";
+import { WorkingMark } from "./StateMark";
 import { MessageSquare } from "./icons";
 import { IconButton, Tooltip } from "./ui";
 import { useRpcMutation } from "../lib/client";
@@ -25,7 +25,7 @@ export function TaskStart({ task }: { task: Task }) {
             }
           }}
         >
-          {conversation.isPending ? <Spinner size={14} /> : <MessageSquare size={14} />}
+          {conversation.isPending ? <WorkingMark size={14} /> : <MessageSquare size={14} />}
         </IconButton>
       </Tooltip>
       {conversation.error ? (

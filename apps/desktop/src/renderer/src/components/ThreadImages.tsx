@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { defaultRehypePlugins, defaultUrlTransform, type Components, type ExtraProps, type StreamdownProps, type UrlTransform } from "streamdown";
 import { ChevronRight, Image, FolderOpen, X, ZoomIn, ZoomOut } from "./icons";
-import { Spinner } from "./Spinner";
+import { WorkingMark } from "./StateMark";
 import { cn } from "../lib/cn";
 import { imageSource, isImagePath, localPath } from "../../../shared/image-paths";
 import { fileReference } from "../../../shared/file-reference";
@@ -445,7 +445,7 @@ export function ImageViewRow({ block }: { block: Extract<Block, { kind: "activit
             {filename}
           </span>
         ) : null}
-        {block.status === "running" ? <Spinner size={14} className="tool-row-live" /> : null}
+        {block.status === "running" ? <WorkingMark size={14} /> : null}
         <ChevronRight size={12} className={cn("tool-row-chevron", open && "rotate-90")} />
       </button>
       {open ? (
@@ -469,7 +469,7 @@ export function ImageGenerationRow({ block }: { block: Extract<Block, { kind: "a
       <div data-state={block.status} role="status" className="flex min-h-7.5 items-center gap-2 text-base text-ink-4">
         <Image size={14} />
         <span>{label}</span>
-        {running ? <Spinner size={14} className="tool-row-live" /> : null}
+        {running ? <WorkingMark size={14} /> : null}
       </div>
       {running ? (
         <div className="mt-2 grid h-40 w-64 max-w-full place-content-center gap-2 rounded-xl bg-surface-2 text-center text-xs text-ink-3">

@@ -878,27 +878,14 @@ button.browser-empty:hover,
   background-color: var(--navigation-hover);
   color: var(--ink);
 }
-.sidebar-sign-in-turning {
-  animation: sidebar-sign-in-turn 900ms linear infinite;
-}
 .sidebar-sign-in-cross,
-.sidebar-sign-in-cancel:hover .sidebar-sign-in-turning,
-.sidebar-sign-in-cancel:focus-visible .sidebar-sign-in-turning {
+.sidebar-sign-in-cancel:hover .sidebar-sign-in-waiting,
+.sidebar-sign-in-cancel:focus-visible .sidebar-sign-in-waiting {
   visibility: hidden;
 }
 .sidebar-sign-in-cancel:hover .sidebar-sign-in-cross,
 .sidebar-sign-in-cancel:focus-visible .sidebar-sign-in-cross {
   visibility: visible;
-}
-@keyframes sidebar-sign-in-turn {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .sidebar-sign-in-turning {
-    animation: none;
-  }
 }
 /* A face with no picture: the initials on the control fill. */
 .account-face {

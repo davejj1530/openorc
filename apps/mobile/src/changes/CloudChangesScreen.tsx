@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { newId, useRpc } from "../client";
 import { startCloudReview, useCloudReview } from "../cloud/cloud-review";
 import { haptic } from "../ui/haptics";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { openInApp } from "../ui/web";
 import { changesLine } from "./change-words";
@@ -138,7 +138,7 @@ function useChangesOff(threadId: string): string | null | undefined {
 function Files({ threadId, changes, error, retry }: { threadId: string; changes: HostedThreadChanges | undefined; error: Error | null; retry: () => void }) {
   const nav = usePanelNav();
   if (error) return <FailedBlock message={error.message} onRetry={retry} />;
-  if (!changes) return <View className="items-center py-10">{<Spinner />}</View>;
+  if (!changes) return <View className="items-center py-10">{<WorkingMark />}</View>;
   if (changes.state !== "recorded") return <Text className="px-5 py-10 text-center text-ink-4">{changes.line}</Text>;
   if (!changes.files.length && !changes.unlisted) return <NoFilesBlock />;
   const open = (path: string) => nav.open({ name: "cloud-diff", params: { threadId, path } });

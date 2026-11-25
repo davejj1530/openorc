@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Spinner } from "../components/Spinner";
+import { WorkingMark } from "../components/StateMark";
 import type { TeamChatRoute } from "../lib/team-chat-route";
 import { useTeamChatContext, type TeamChatContextValue } from "../lib/team-chat-context";
 import { chatTimelineKey, teamChatDrafts, useTeamChatState, useTeamChatWatch } from "../lib/team-chat-queries";
@@ -77,7 +77,7 @@ function ChatWaiting({ error, onRetry }: { error: string | null; onRetry(): void
         <ThreadTabs />
       </TopBar>
       <div className="team-chat-state" role="status">
-        {!error ? <Spinner size={16} /> : null}
+        {!error ? <WorkingMark /> : null}
         <p>{error ?? "Loading chat…"}</p>
         {error ? (
           <Button size="sm" onClick={onRetry}>

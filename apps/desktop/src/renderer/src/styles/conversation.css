@@ -451,14 +451,6 @@
 .tool-row:is(:hover, :focus-visible, [aria-expanded="true"]) .tool-row-chevron {
   opacity: 1;
 }
-.spinner {
-  display: inline-flex;
-  animation: work-spin 1.2s linear infinite;
-}
-.tool-row-live {
-  flex-shrink: 0;
-  color: var(--ink-4);
-}
 .tool-row-text {
   margin-left: 24px;
   font-size: var(--text-xs);
@@ -497,11 +489,6 @@
 }
 .tool-icon[data-tone="error"] {
   color: var(--bad);
-}
-@keyframes work-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 /* A folded run of steps, outside the steps card: one row like any tool row. */
 .work-step-toggle {

@@ -9,7 +9,7 @@ import { ACTION_RESERVE, MARGIN, ROW_INSET } from "../home/grid";
 import { ThreadStatusMark } from "../home/ThreadStatusMark";
 import { ListPressable } from "../ui/ListPressable";
 import { Measure } from "../ui/pane";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { useSubthreads } from "./subthreads";
 
@@ -57,7 +57,7 @@ export function SubthreadsScreen() {
           ))}
         </ScrollView>
       ) : (
-        <View className="flex-1 items-center justify-center">{loading || !parent ? <Spinner /> : <Text className="text-lg text-ink-3">No subthreads</Text>}</View>
+        <View className="flex-1 items-center justify-center">{loading || !parent ? <WorkingMark /> : <Text className="text-lg text-ink-3">No subthreads</Text>}</View>
       )}
     </Measure>
   );

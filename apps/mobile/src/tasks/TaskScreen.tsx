@@ -12,7 +12,7 @@ import { Markdown } from "../thread/Markdown";
 import { arrive } from "../ui/motion";
 import { Measure } from "../ui/pane";
 import { useReducedMotion } from "../ui/reduced-motion";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { boardStatus } from "./board";
 import { holdsSecret, SECRET_SPEC, typedTitle, useTaskEdit, type TaskPatch } from "./task-edit";
@@ -207,7 +207,7 @@ export function TaskScreen() {
         </ScrollView>
       ) : (
         <View className="flex-1 items-center justify-center gap-4 px-8">
-          {task.isLoading ? <Spinner /> : <Text className="text-center text-lg text-ink-3">{task.error?.message ?? "This task is no longer available."}</Text>}
+          {task.isLoading ? <WorkingMark /> : <Text className="text-center text-lg text-ink-3">{task.error?.message ?? "This task is no longer available."}</Text>}
           {!task.isLoading && thread ? (
             <View className="self-stretch">
               <ThreadLink threadId={thread} label="Its conversation" />

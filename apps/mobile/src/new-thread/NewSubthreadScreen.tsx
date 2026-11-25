@@ -11,7 +11,7 @@ import { useShareSettings } from "../composer/settings-bridge";
 import { useDictatedSend } from "../dictation/use-composer-dictation";
 import { Cloud, FolderOpen, Globe } from "../generated/icons";
 import { Measure } from "../ui/pane";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { useNewSubthread } from "./use-new-subthread";
 
@@ -105,7 +105,7 @@ export function NewSubthreadScreen() {
   if (parent.data) return <SubthreadForm key={parent.data.id} parent={parent.data} />;
   return (
     <View className="flex-1 items-center justify-center bg-bg px-8">
-      {parent.isLoading ? <Spinner /> : <Text className="text-center text-lg text-ink-3">{parent.error?.message ?? "This thread is no longer available."}</Text>}
+      {parent.isLoading ? <WorkingMark /> : <Text className="text-center text-lg text-ink-3">{parent.error?.message ?? "This thread is no longer available."}</Text>}
     </View>
   );
 }

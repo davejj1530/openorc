@@ -8,7 +8,7 @@ import { ChevronRight, FilePlain, Folder, Search } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { ListPressable } from "../ui/ListPressable";
 import { Measure } from "../ui/pane";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { FilesNotice, readAt } from "./FilesNotice";
 import { useFilesSource, useFolder, useNames, useSavedAt, type FilesSourceNow, type FolderView, type Read } from "./files-source";
@@ -41,7 +41,7 @@ function EntryRow({ entry, onOpen }: { entry: FileEntry; onOpen: (entry: FileEnt
 function NameHits({ threadId, query, source, onOpen }: { threadId: string; query: string; source: FilesSourceNow; onOpen: (path: string) => void }) {
   const names = useNames(threadId, query, NAME_LIMIT, source);
   if (names.error && !names.data) return <FilesNotice text={names.error.message} />;
-  if (!names.data) return <View className="items-center py-10">{<Spinner />}</View>;
+  if (!names.data) return <View className="items-center py-10">{<WorkingMark />}</View>;
   if (!names.data.length) return <FilesNotice text="No file names match." />;
   return names.data.map((path) => {
     const folder = parentPlace(path);
@@ -137,8 +137,8 @@ function Listing({ folder, reachable, deciding, host, onOpen }: { folder: Read<F
     if (!folder.data.entries.length) return <FilesNotice text="Empty folder" />;
     return folder.data.entries.map((entry) => <EntryRow key={entry.path} entry={entry} onOpen={onOpen} />);
   }
-  if (deciding) return <View className="items-center py-10">{<Spinner />}</View>;
+  if (deciding) return <View className="items-center py-10">{<WorkingMark />}</View>;
   if (!reachable) return <FilesNotice text={`Waiting for ${host}`} />;
   if (folder.error) return <FilesNotice text={folder.error.message} onRetry={folder.refetch} />;
-  return <View className="items-center py-10">{<Spinner />}</View>;
+  return <View className="items-center py-10">{<WorkingMark />}</View>;
 }

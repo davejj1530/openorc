@@ -1,5 +1,5 @@
 import type { TeamChatAnswered, TeamChatFile, TeamChatOrclingPick, TeamConversation } from "@openorc/protocol";
-import { Spinner } from "./Spinner";
+import { WorkingMark } from "./StateMark";
 import type { ReactNode } from "react";
 import { teamChatShortNames, teamConversationTitle } from "@openorc/client";
 import { TopBar } from "./TopBar";
@@ -107,7 +107,7 @@ function TeamChatBody(props: TeamChatProps) {
   if (props.loading)
     return (
       <div className="team-chat-state" role="status">
-        <Spinner size={16} />
+        <WorkingMark />
         <span>Loading chat…</span>
       </div>
     );

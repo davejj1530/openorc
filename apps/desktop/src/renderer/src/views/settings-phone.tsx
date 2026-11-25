@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { relativeTime } from "@openorc/client";
 import type { PairingOfferView, RemoteDevice, Route } from "@openorc/protocol";
 import { ChevronDown } from "../components/icons";
-import { Spinner } from "../components/Spinner";
+import { WorkingMark } from "../components/StateMark";
 import { QrCode } from "../components/QrCode";
 import { Button, Dialog, TextButton } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
@@ -219,7 +219,7 @@ export function PairingCode({ sheet, retry }: { sheet: PairingSheet<PairingCodeO
         <div className="pairing-code-plate" data-state={sheet.kind}>
           {sheet.kind === "starting" ? (
             <span className="pairing-code-loader" role="status" aria-label="Making the code">
-              <Spinner size={20} className="tool-row-live" />
+              <WorkingMark size={20} />
             </span>
           ) : (
             <QrCode value={sheet.offer.url} label="Pairing code" />

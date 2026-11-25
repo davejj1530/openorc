@@ -3,7 +3,7 @@ import type { ProjectActivity, ThreadMarkKind } from "./state-marks.js";
 import { mentionLeads } from "./thread-collaboration.js";
 import { MENTION_MARK, pullRequestMark, threadStatus, threadTreeStatus, type ThreadStatus } from "./thread-row.js";
 import { toolCallPresentation, type Tone } from "./tool-presentation.js";
-import type { RunTranscript } from "./transcript.js";
+import type { Block, RunTranscript } from "./transcript.js";
 import { isLive } from "./work-steps.js";
 
 type MarkFields = Pick<ThreadSummary, "activity" | "session" | "unread" | "backgroundCommands" | "owner"> & Partial<Pick<ThreadSummary, "prUrl" | "prState">>;
@@ -23,12 +23,11 @@ const WORK: Record<Tone, ThreadMarkKind> = {
   neutral: "working",
 };
 
-/** What a working thread is on right now, from the step of its run still under way. */
-function workKind(run: RunTranscript | undefined): ThreadMarkKind {
-  const current = run?.blocks.findLast(isLive);
-  if (current?.kind === "thinking") return "thinking";
-  if (current?.kind === "message") return "replying";
-  if (current?.kind === "tool") return current.subagent ? "delegating" : WORK[toolCallPresentation(current.name, current.input).tone];
+/** The kind of work a step under way is, as the cube moves for it. */
+export function workMarkKind(step: Block | undefined): ThreadMarkKind {
+  if (step?.kind === "thinking") return "thinking";
+  if (step?.kind === "message") return "replying";
+  if (step?.kind === "tool") return step.subagent ? "delegating" : WORK[toolCallPresentation(step.name, step.input).tone];
   return "working";
 }
 
@@ -55,7 +54,7 @@ export function threadStateMark(
   }
   const kinds: Record<ThreadStatus["kind"], () => ThreadMarkKind> = {
     // Its own turn names its work; a parent that only waits on its sub threads shows them at work.
-    running: () => (thread.activity === "running" ? workKind(run) : "delegating"),
+    running: () => (thread.activity === "running" ? workMarkKind(run?.blocks.findLast(isLive)) : "delegating"),
     waiting: () => askKind(run),
     "waiting-other": () => "waiting",
     failed: () => "failed",

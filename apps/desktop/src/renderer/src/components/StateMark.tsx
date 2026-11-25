@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type CSSProperties } from "react";
-import { restMoment, type DotFrame, type MarkMotion } from "@openorc/client";
+import { restMoment, threadMarkMotion, type DotFrame, type MarkMotion, type ThreadMarkKind } from "@openorc/client";
 import { cn } from "../lib/cn";
 import { prefersReducedMotion } from "../lib/motion";
 import "../styles/state-marks.css";
@@ -42,4 +42,12 @@ export function StateMark({ motion, size = 16, label, className }: { motion: Mar
       ))}
     </svg>
   );
+}
+
+/**
+ * Something under way, as the cube at work: the light goes round. A line that stands for the whole turn names its
+ * `kind` of work, so its mark moves as the thread's own does in the sidebar.
+ */
+export function WorkingMark({ kind = "working", size = 16, className }: { kind?: ThreadMarkKind; size?: number; className?: string }) {
+  return <StateMark motion={threadMarkMotion(kind)} size={size} className={className} />;
 }

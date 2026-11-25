@@ -51,11 +51,3 @@ export const confirm = {
   animationDuration: `${motion.duration.confirm}ms`,
   animationTimingFunction: ease.overshoot,
 } as const;
-
-/** The desktop's spinner turn. */
-export const spin = {
-  animationName: { to: { transform: [{ rotate: "360deg" }] } },
-  animationDuration: "1.2s",
-  animationIterationCount: "infinite",
-  animationTimingFunction: "linear",
-} as const;

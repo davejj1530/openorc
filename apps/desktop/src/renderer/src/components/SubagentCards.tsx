@@ -3,7 +3,7 @@ import { cn } from "../lib/cn";
 import { subagentStatusLabel, useTicking, workDuration, type Block, type SubagentCard } from "@openorc/client";
 import { openThread } from "../lib/router";
 import { ArrowUpRight, Check, ChevronRight, CircleDashed, X } from "./icons";
-import { Spinner } from "./Spinner";
+import { WorkingMark } from "./StateMark";
 import { IconButton, TextButton } from "./ui";
 import { ThreadRichText } from "./ThreadImages";
 import { useRpc, useRpcs } from "../lib/client";
@@ -74,7 +74,7 @@ export function SubagentCards({ blocks }: { blocks: Extract<Block, { kind: "tool
 }
 
 function SubagentMark({ status }: { status: SubagentCard["status"] }) {
-  if (status === "running") return <Spinner size={15} className="tool-row-live" />;
+  if (status === "running") return <WorkingMark size={15} />;
   if (status === "no_updates") return <CircleDashed size={15} />;
   if (status === "completed")
     return (

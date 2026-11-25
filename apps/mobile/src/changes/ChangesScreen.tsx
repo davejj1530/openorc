@@ -11,7 +11,7 @@ import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { useMode } from "../ui/mode";
 import { Measure } from "../ui/pane";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { useLate } from "../ui/use-late";
 import { changesLine } from "./change-words";
 import { changesItems, ITEM_HEIGHTS, type ChangesItem } from "./changes-items";
@@ -75,7 +75,7 @@ function ChangesList({ threadId, reads, comparison, onComparison, footer, dim, l
   const nav = usePanelNav();
   const open = useCallback((path: string) => nav.open({ name: "diff", params: { threadId, path, comparison } }), [nav, threadId, comparison]);
   if (!changes.data && changes.error) return <FailedBlock message={changes.error.message} onRetry={() => void changes.refetch()} />;
-  if (!changes.data) return <View className="flex-1 items-center justify-center">{late ? <Spinner /> : null}</View>;
+  if (!changes.data) return <View className="flex-1 items-center justify-center">{late ? <WorkingMark /> : null}</View>;
   const refresh = () => {
     setRefreshing(true);
     void reads.refresh().finally(() => setRefreshing(false));

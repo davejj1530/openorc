@@ -8,7 +8,7 @@ import { useRpc, useRpcMutation } from "../client";
 import { SheetPill } from "../changes/SheetParts";
 import { haptic } from "../ui/haptics";
 import { SheetHeader } from "../ui/SheetHeader";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { descriptionDrafts, taskKey } from "./task-edit";
 
@@ -92,7 +92,7 @@ export function TaskDescriptionSheet() {
         <DescriptionEditor id={id} spec={task.data.spec} />
       ) : (
         <View className="flex-1 items-center justify-center">
-          {task.isLoading ? <Spinner /> : <Text className="text-lg text-ink-3">{task.error?.message ?? "This task is no longer available."}</Text>}
+          {task.isLoading ? <WorkingMark /> : <Text className="text-lg text-ink-3">{task.error?.message ?? "This task is no longer available."}</Text>}
         </View>
       )}
     </View>

@@ -1,5 +1,5 @@
 import { Popover } from "@base-ui/react/popover";
-import { Spinner } from "./Spinner";
+import { WorkingMark } from "./StateMark";
 import type { TeamChatPerson, TeamMessage } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import type { TeamChatContextValue } from "../lib/team-chat-context";
@@ -52,7 +52,7 @@ function PinsBody({ pins, people, onOpen, onUnpin }: { pins: ReturnType<typeof u
   if (pins.isPending)
     return (
       <div className="team-chat-pins-state" role="status">
-        <Spinner size={14} />
+        <WorkingMark size={14} />
       </div>
     );
   if (pins.error)

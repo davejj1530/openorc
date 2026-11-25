@@ -10,7 +10,7 @@ import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { LinkDot } from "../ui/LinkDot";
 import { ListPressable } from "../ui/ListPressable";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { swipeAccessibility, type SwipeAction } from "../ui/swipe";
 import { SwipeRow } from "../ui/SwipeRow";
 import { Card, Divider, RowLines, rowClass, Section } from "./parts";
@@ -81,7 +81,7 @@ function TryAgain() {
   };
   return (
     <ListPressable accessibilityRole="button" accessibilityState={{ disabled: trying }} disabled={trying} onPress={tryNow} className={pressable}>
-      <RowLines lead={trying ? <Spinner size={16} /> : <RefreshCw size={16} className="text-ink-4" />} label="Try again" labelClassName="text-ink-3" />
+      <RowLines lead={trying ? <WorkingMark size={16} /> : <RefreshCw size={16} className="text-ink-4" />} label="Try again" labelClassName="text-ink-3" />
     </ListPressable>
   );
 }

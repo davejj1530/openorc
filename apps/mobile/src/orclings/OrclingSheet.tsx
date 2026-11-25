@@ -16,7 +16,7 @@ import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { ListPressable } from "../ui/ListPressable";
 import { SheetHeader } from "../ui/SheetHeader";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { CheckIns } from "./CheckIns";
 import { OrclingFace } from "./OrclingFace";
@@ -247,7 +247,7 @@ export function OrclingSheet() {
           <DeleteOrcling profile={shown} />
         </View>
       ) : (
-        <View className="items-center pt-16">{profile.error ? <Text className="px-8 text-center text-ink-3">{profile.error.message}</Text> : <Spinner />}</View>
+        <View className="items-center pt-16">{profile.error ? <Text className="px-8 text-center text-ink-3">{profile.error.message}</Text> : <WorkingMark />}</View>
       )}
     </Animated.ScrollView>
   );

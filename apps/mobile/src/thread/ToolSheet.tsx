@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRun } from "../client";
 import { cn } from "../ui/cn";
 import { Mono } from "../ui/Mono";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { End, Mark } from "./lines";
 import { Call, Calls, InputPart, Reading, usePrinted } from "./sheet-call";
@@ -81,7 +81,7 @@ function CallHead({ block }: { block: ToolBlock }) {
       <Text accessibilityRole="header" className="flex-1 text-lg">
         {block.done ? verb : liveVerb(verb)}
       </Text>
-      {state === "running" ? <Spinner /> : null}
+      {state === "running" ? <WorkingMark /> : null}
       {state !== "running" && state !== "success" ? <Text className="text-sm text-bad">{stateLabel(state)}</Text> : null}
     </View>
   );

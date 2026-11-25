@@ -80,7 +80,7 @@
   display: block;
 }
 
-/* A step's mark: ring, loader or ink check, all 16px. */
+/* A step's mark: ring, the cube at work or ink check, all 16px. */
 .step-mark {
   grid-column: 1;
   grid-row: 1;
@@ -270,9 +270,10 @@ button.work-chip:focus-visible {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* A line's mark takes the ink of the thing the line names, not a dimmer one. */
 .work-chip-icon {
   flex-shrink: 0;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 .work-chip[data-live] {
   color: var(--ink);
@@ -373,7 +374,7 @@ button.work-chip:focus-visible {
   flex-shrink: 0;
 }
 
-/* The folded work's line: a loader and what is happening now, under the receipt. */
+/* The folded work's line: the cube at work and what is happening now, under the receipt. */
 /* How the work under way stands to a newer message: said first, and quietly. */
 .work-now-lead {
   flex-shrink: 0;

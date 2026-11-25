@@ -4,7 +4,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { relativeTime, shortSha, type GitObject, type ObjectState } from "@openorc/client";
 import { useRpc } from "../lib/client";
 import { Cloud, GitBranch, GitPullRequest, X } from "./icons";
-import { Spinner } from "./Spinner";
+import { WorkingMark } from "./StateMark";
 import { ThreadLink, useThreadMedia } from "./ThreadImages";
 import { SizeBlocks, SizeStat } from "./WorkMarks";
 
@@ -78,12 +78,12 @@ function originWords(git: GitObject, count: number): string {
   return push.ref?.created ? `Published to ${push.remote}` : `Pushed${what} to ${push.remote}`;
 }
 
-/** A row's mark on the branch lane: a loader while it runs, a cross once it failed, its own icon otherwise. */
+/** A row's mark on the branch lane: the cube at work while it runs, a cross once it failed, its own icon otherwise. */
 function GitMark({ state, children }: { state: ObjectState; children: ReactNode }) {
   if (state === "running")
     return (
       <span className="work-git-mark">
-        <Spinner size={14} className="tool-row-live" />
+        <WorkingMark size={14} />
       </span>
     );
   if (state === "failed")

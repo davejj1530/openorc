@@ -8,7 +8,7 @@ import { motion } from "../generated/tokens";
 import { useColors } from "../ui/mode";
 import { arriveAt, leave, turn } from "../ui/motion";
 import { useReducedMotion } from "../ui/reduced-motion";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { useOpen } from "./disclosure";
 import { TranscriptPressable } from "./TranscriptPressable";
@@ -31,7 +31,7 @@ export function SubagentCards({ blocks }: { blocks: Extract<Block, { kind: "tool
 }
 
 function SubagentMark({ status }: { status: SubagentCard["status"] }) {
-  if (status === "running") return <Spinner size={16} />;
+  if (status === "running") return <WorkingMark size={16} />;
   if (status === "no_updates") return <CircleDashed size={16} className="text-ink-4" />;
   return status === "completed" ? <CircleCheck size={16} className="text-ink-4" /> : <X size={16} className={status === "failed" ? "text-bad" : "text-ink-4"} />;
 }

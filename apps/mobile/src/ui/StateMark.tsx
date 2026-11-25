@@ -1,4 +1,4 @@
-import { mixHex, restMoment, type DotFrame, type MarkMotion, type MarkTone } from "@openorc/client";
+import { mixHex, restMoment, threadMarkMotion, type DotFrame, type MarkMotion, type MarkTone, type ThreadMarkKind } from "@openorc/client";
 import { memo } from "react";
 import { View, type ViewStyle } from "react-native";
 import Animated from "react-native-reanimated";
@@ -55,3 +55,11 @@ export const StateMark = memo(function StateMark({ motion, size = 20 }: { motion
     </View>
   );
 });
+
+/**
+ * Something under way, as the cube at work: the light goes round. A line that stands for the whole turn names its
+ * `kind` of work, so its mark moves as the thread's own does on Home.
+ */
+export function WorkingMark({ kind = "working", size = 16 }: { kind?: ThreadMarkKind; size?: number }) {
+  return <StateMark motion={threadMarkMotion(kind)} size={size} />;
+}

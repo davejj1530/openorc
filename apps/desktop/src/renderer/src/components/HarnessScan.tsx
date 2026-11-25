@@ -1,6 +1,7 @@
 import { harnessCatalog, type HarnessId, type HarnessInfo } from "@openorc/protocol";
 import { harnessLogos } from "./HarnessLogo";
-import { Check, ChevronDown, ExternalLink, Loader2, RefreshCw } from "./icons";
+import { Check, ChevronDown, ExternalLink, RefreshCw } from "./icons";
+import { WorkingMark } from "./StateMark";
 import { Button, StatusDot, TextButton } from "./ui";
 import { cn } from "../lib/cn";
 
@@ -56,11 +57,11 @@ const dotTone: Record<Exclude<HarnessRowState, "checking">, "ok" | "attention" |
   not_found: "muted",
 };
 
-/** The state as a dot and a word; a check still running spins in the dot's place. */
+/** The state as a dot and a word; a check still running shows the cube at work in the dot's place. */
 function HarnessState({ state }: { state: HarnessRowState }) {
   return (
     <span className="harness-state">
-      {state === "checking" ? <Loader2 className="onboarding-spin" size={11} aria-hidden="true" /> : <StatusDot tone={dotTone[state]} />}
+      {state === "checking" ? <WorkingMark size={12} /> : <StatusDot tone={dotTone[state]} />}
       {stateLabels[state]}
     </span>
   );

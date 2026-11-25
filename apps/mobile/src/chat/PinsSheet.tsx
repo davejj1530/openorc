@@ -6,7 +6,7 @@ import { teamChat } from "../client";
 import { ListPressable } from "../ui/ListPressable";
 import { SheetHeader } from "../ui/SheetHeader";
 import { useSheetBottom } from "../ui/sheet-bottom";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { ActorFace, authorOf } from "./Author";
 import { useChatLease } from "./lease";
@@ -40,7 +40,7 @@ function Pins({ lease, conversationId }: { lease: TeamChatLease; conversationId:
   const read = teamChat.usePins(lease, conversationId);
   const now = useSidebarNow();
   if (read.error) return <Text className="px-5 py-10 text-center text-ink-4">{read.error.message}</Text>;
-  if (!read.data) return <View className="items-center py-10">{<Spinner />}</View>;
+  if (!read.data) return <View className="items-center py-10">{<WorkingMark />}</View>;
   if (!read.data.pins.length) return <Text className="px-5 py-10 text-center text-ink-4">No pinned messages</Text>;
   return read.data.pins.map((pin) => (
     <PinRow

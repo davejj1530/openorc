@@ -6,7 +6,7 @@ import { useRpc } from "../client";
 import { perfEnabled } from "../thread/perf-probe";
 import { createSheetWindow, SheetWindowContext } from "../thread/sheet-window";
 import { CopyText } from "../ui/Mono";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { cutText, diffLine, fileName, omittedText } from "./change-words";
 import { FailedBlock } from "./ChangeRows";
@@ -66,7 +66,7 @@ export function DiffScreen() {
   const laidOut = ({ nativeEvent }: LayoutChangeEvent) => sheet.scrolled(sheet.view().top, nativeEvent.layout.height);
   let body = (
     <View className="items-center py-24">
-      <Spinner />
+      <WorkingMark />
     </View>
   );
   if (diff.data) body = <DiffBody diff={diff.data} />;

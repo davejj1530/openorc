@@ -9,7 +9,7 @@ import { useRpc, useRpcMutation } from "../client";
 import { SheetPill } from "../changes/SheetParts";
 import { haptic } from "../ui/haptics";
 import { SheetHeader } from "../ui/SheetHeader";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { profileKey } from "./orcling-edit";
 
@@ -100,7 +100,7 @@ export function InstructionsSheet() {
   return (
     <View className="flex-1 bg-bg">
       <SheetHeader title="Instructions" onClose={back} />
-      <View className="flex-1 items-center justify-center px-8">{profile.error ? <Text className="text-center text-ink-3">{profile.error.message}</Text> : <Spinner />}</View>
+      <View className="flex-1 items-center justify-center px-8">{profile.error ? <Text className="text-center text-ink-3">{profile.error.message}</Text> : <WorkingMark />}</View>
     </View>
   );
 }

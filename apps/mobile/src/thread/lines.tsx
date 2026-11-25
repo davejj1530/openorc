@@ -4,7 +4,7 @@ import { View } from "react-native";
 import { Brain, FileText, Folder, GitBranch, Globe, Hammer, Search, Terminal, WorkDelegate } from "../generated/icons";
 import { cn } from "../ui/cn";
 import type { IconProps } from "../ui/icon";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { useOpen } from "./disclosure";
 import { openLine } from "./open-sheet";
@@ -43,7 +43,7 @@ export function End({ result }: { result: LineResult }) {
     return (
       <>
         {result.since ? <Text className="text-xs text-ink-4 tabular-nums">{result.since}</Text> : null}
-        <Spinner size={14} />
+        <WorkingMark size={14} />
       </>
     );
   if (result.kind === "words") return <Text className={cn("text-xs tabular-nums", result.bad ? "text-bad" : "text-ink-4")}>{result.text}</Text>;

@@ -7,7 +7,7 @@ import { FilePlain } from "../generated/icons";
 import { CloudThreadFileTile, ImageTile } from "../thread/images";
 import { createSheetWindow, SheetWindowContext, windowScroll } from "../thread/sheet-window";
 import { Mono } from "../ui/Mono";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { FilesNotice, readAt } from "./FilesNotice";
 import { useFile, useFilesSource, type FilesSourceNow, type FileView, type Read } from "./files-source";
@@ -71,9 +71,9 @@ export function FileScreen() {
 }
 
 function Body({ threadId, read, source, reachable, host }: { threadId: string; read: Read<FileView>; source: FilesSourceNow; reachable: boolean; host: string }) {
-  if (source === null) return <View className="items-center py-10">{<Spinner />}</View>;
+  if (source === null) return <View className="items-center py-10">{<WorkingMark />}</View>;
   if (read.data) return <ReadFile threadId={threadId} read={read.data} source={source} />;
   if (!reachable) return <FilesNotice text={`Waiting for ${host}`} />;
   if (read.error) return <FilesNotice text={read.error.message} onRetry={read.refetch} />;
-  return <View className="items-center py-10">{<Spinner />}</View>;
+  return <View className="items-center py-10">{<WorkingMark />}</View>;
 }

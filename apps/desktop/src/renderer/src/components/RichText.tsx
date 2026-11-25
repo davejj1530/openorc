@@ -2,14 +2,16 @@ import { Component, memo, useEffect, useMemo, useState, type ReactNode } from "r
 import { Streamdown, type DiagramPlugin, type IconMap, type StreamdownProps } from "streamdown";
 import { createCodePlugin } from "@streamdown/code";
 import { math } from "@streamdown/math";
-import { Check, Copy, Download, ExternalLink, Loader2, Maximize2, RotateCcw, X, ZoomIn, ZoomOut } from "./icons";
+import { Check, Copy, Download, ExternalLink, Maximize2, RotateCcw, X, ZoomIn, ZoomOut } from "./icons";
+import { WorkingMark } from "./StateMark";
 
 const icons = {
   CheckIcon: Check,
   CopyIcon: Copy,
   DownloadIcon: Download,
   ExternalLinkIcon: ExternalLink,
-  Loader2Icon: Loader2,
+  // Streamdown asks its loader to turn; the cube moves by itself.
+  Loader2Icon: () => <WorkingMark />,
   Maximize2Icon: Maximize2,
   RotateCcwIcon: RotateCcw,
   XIcon: X,

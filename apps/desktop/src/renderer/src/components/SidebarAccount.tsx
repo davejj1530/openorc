@@ -7,7 +7,8 @@ import { useRouter } from "../lib/router";
 import { useAccountSeatState } from "../lib/account-seat-state";
 import { AccountLine } from "./AccountLine";
 import { AccountFace } from "./AccountFace";
-import { CircleUser, LoaderCircle, X } from "./icons";
+import { CircleUser, X } from "./icons";
+import { WorkingMark } from "./StateMark";
 import { Tooltip } from "./ui";
 
 /**
@@ -77,7 +78,7 @@ function SidebarSignIn({ account }: { account: Extract<AccountStatus, { state: "
       )}
       {waiting ? (
         <Tooltip label="Cancel" side="top" render={<button type="button" aria-label="Cancel signing in" className="sidebar-sign-in-cancel no-drag" onClick={() => cancel.mutate({})} />}>
-          <LoaderCircle size={16} className="sidebar-sign-in-turning" />
+          <WorkingMark className="sidebar-sign-in-waiting" />
           <X size={14} className="sidebar-sign-in-cross" />
         </Tooltip>
       ) : null}

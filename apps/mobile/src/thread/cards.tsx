@@ -12,7 +12,7 @@ import { haptic } from "../ui/haptics";
 import { HarnessLogo } from "../ui/HarnessLogo";
 import { useColors } from "../ui/mode";
 import { arrive, confirm, ease } from "../ui/motion";
-import { Spinner } from "../ui/Spinner";
+import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { ImageTile } from "./images";
 import { ActivityRow } from "./tools";
@@ -401,7 +401,7 @@ function ImageGeneration({ block, runId }: { block: Extract<Block, { kind: "acti
       <View className="min-h-control-md flex-row items-center gap-2">
         <ImageIcon size={14} className="text-ink-4" />
         <Text className="text-ink-4">{imageWords(block.status)}</Text>
-        {running ? <Spinner size={14} /> : null}
+        {running ? <WorkingMark size={14} /> : null}
       </View>
       {block.status === "success" && block.imagePath ? <ImageTile asset={{ kind: "activity", runId: block.runId ?? runId, activityId: activityIdOf(block.id) }} label="Generated image" /> : null}
       {block.status === "error" && block.text ? <Text className="text-sm text-bad">{block.text}</Text> : null}

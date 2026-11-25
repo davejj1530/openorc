@@ -87,6 +87,28 @@ describe("a phone publishing a thread's work", () => {
     expect(await phone.call("system.gh", {})).toEqual({ installed: expect.any(Boolean) });
   });
 
+  it("finds the commit a short id names and reads that commit's changes alone, a planted token redacted", async () => {
+    const thread = await worktreeThread("Commits");
+    await writeFile(path.join(thread.worktreePath, "config.ts"), `export const token = "${TOKEN}";\n`);
+    const { sha } = await phone.call("review.commitThread", { threadId: thread.id, message: "Add the config" });
+    await writeFile(path.join(thread.worktreePath, "later.ts"), "export const later = true;\n");
+    await phone.call("review.commitThread", { threadId: thread.id, message: "Add what came later" });
+    await writeFile(path.join(thread.worktreePath, "config.ts"), "export const token = null;\n");
+
+    expect(await phone.call("git.threadCommit", { threadId: thread.id, sha: sha.slice(0, 8) })).toEqual({ commit: expect.objectContaining({ sha, subject: "Add the config" }), url: null });
+    expect(await phone.call("git.threadCommit", { threadId: thread.id, sha: "0123456789" })).toBeNull();
+    const changes = await phone.call("review.threadCommitChanges", { threadId: thread.id, sha: sha.slice(0, 8) });
+    expect(changes).toMatchObject({
+      commit: { sha, subject: "Add the config" },
+      totals: { files: 1, insertions: 1, deletions: 0 },
+      files: [{ path: "config.ts", status: "added", body: { kind: "text", insertions: 1, deletions: 0 } }],
+      unlisted: 0,
+    });
+    const diff = await phone.call("review.threadCommitFileDiff", { threadId: thread.id, sha, path: "config.ts" as never });
+    expect(diff.patch).toBe('@@ -0,0 +1 @@\n+export const token = "[redacted:github-token]";\n');
+    await expect(phone.call("review.threadCommitFileDiff", { threadId: thread.id, sha, path: "later.ts" as never })).rejects.toThrow("This commit does not change this file.");
+  });
+
   it("commits, pushes into the bare repo and opens a pull request, each audited as the user on this phone", async () => {
     const thread = await worktreeThread("Publish");
     await writeFile(path.join(thread.worktreePath, "feature.ts"), "export const on = true;\n");

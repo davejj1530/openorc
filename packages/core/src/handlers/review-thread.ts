@@ -16,6 +16,8 @@ type Dependencies = {
     | "commitRange"
     | "threadCommit"
     | "threadCommitDiff"
+    | "threadCommitChanges"
+    | "threadCommitFileDiff"
     | "threadPushState"
   >;
   db: Db;
@@ -39,6 +41,8 @@ export function createReviewThreadHandlers({
   | "git.commitRange"
   | "git.threadCommit"
   | "review.threadCommitDiff"
+  | "review.threadCommitChanges"
+  | "review.threadCommitFileDiff"
   | "git.threadPushState"
 > {
   /**
@@ -101,6 +105,14 @@ export function createReviewThreadHandlers({
     "review.threadCommitDiff": ({ threadId, sha }) => {
       const { thread, project } = threadAndProject(db, threadId);
       return review.threadCommitDiff(thread, project, sha);
+    },
+    "review.threadCommitChanges": ({ threadId, sha }) => {
+      const { thread, project } = threadAndProject(db, threadId);
+      return review.threadCommitChanges(thread, project, sha);
+    },
+    "review.threadCommitFileDiff": ({ threadId, sha, path }) => {
+      const { thread, project } = threadAndProject(db, threadId);
+      return review.threadCommitFileDiff(thread, project, sha, path);
     },
     "git.threadPushState": ({ threadId }) => {
       const { thread, project } = threadAndProject(db, threadId);

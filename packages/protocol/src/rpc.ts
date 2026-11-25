@@ -30,7 +30,7 @@ import {
   AgentSkill,
   AppSettings,
   Commit,
-  COMMIT_ID,
+  CommitId,
   type CommitRange,
   type NamedCommit,
   FileChange,
@@ -81,7 +81,7 @@ import { taskThreadRpcParams, type TaskThreadRpcResults } from "./task-threads.j
 import { ThreadListParams } from "./thread-list.js";
 import { ThreadStartParams } from "./thread-start.js";
 import { threadSendRpcParams } from "./thread-send.js";
-import { BranchLoss, type ChangePreview, type FileDiff, type RemovalImpact, workspaceChangeRpcParams, type WorkspaceChanges } from "./workspace-changes.js";
+import { BranchLoss, type ChangePreview, type CommitChanges, type FileDiff, type RemovalImpact, workspaceChangeRpcParams, type WorkspaceChanges } from "./workspace-changes.js";
 import { worktreeRpcParams, type WorktreeRpcResults } from "./worktrees.js";
 
 /**
@@ -92,8 +92,6 @@ import { worktreeRpcParams, type WorktreeRpcResults } from "./worktrees.js";
 const reviewCommentScope = { threadId: z.string().min(1).optional(), taskId: z.string().min(1).optional() };
 const hasReviewScope = (scope: { threadId?: string; taskId?: string }) => Boolean(scope.threadId || scope.taskId);
 const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
-
-const CommitId = z.string().regex(COMMIT_ID);
 
 export const rpcParams = {
   ...threadSendRpcParams,
@@ -654,6 +652,8 @@ export interface RpcResults
   "review.threadDiff": ReviewDiff;
   "review.threadChanges": WorkspaceChanges;
   "review.threadFileDiff": FileDiff;
+  "review.threadCommitChanges": CommitChanges;
+  "review.threadCommitFileDiff": FileDiff;
   "review.commitThread": { sha: string };
   "review.pushThread": { remote: string; branch: string };
   "review.createThreadPr": { url: string };

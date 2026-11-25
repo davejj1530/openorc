@@ -10,7 +10,7 @@ export type ChangesItem =
 export const ITEM_HEIGHTS: Record<ChangesItem["kind"], number> = { file: 44, unlisted: 44, commits: 44, commit: 60 };
 
 /** The files as the Mac listed them, a row for those past its cap, then the branch's newest commits. */
-export function changesItems(changes: WorkspaceChanges | undefined, log: Commit[] | undefined, push: PushState | undefined): ChangesItem[] {
+export function changesItems(changes: Pick<WorkspaceChanges, "files" | "unlisted"> | undefined, log: Commit[] | undefined, push: PushState | undefined): ChangesItem[] {
   const items: ChangesItem[] = (changes?.files ?? []).map((file) => ({ kind: "file", key: `file:${file.path}`, file }));
   if (changes?.unlisted) items.push({ kind: "unlisted", key: "unlisted", text: `${changes.unlisted.toLocaleString("en-US")} more ${changes.unlisted === 1 ? "file" : "files"}` });
   if (!log?.length) return items;

@@ -9,11 +9,11 @@ import { FailedBlock } from "./ChangeRows";
 import { DiffLines } from "./DiffLines";
 import { PanelHeader, usePanelParams } from "../panel/host";
 
-/** One file of a cloud thread's changes, as OpenOrc Cloud read it: its diff, or the server's words for why none shows. */
+/** One file of a cloud thread's changes, or of one of its commits, as OpenOrc Cloud read it: its diff, or the server's words for why none shows. */
 export function CloudDiffScreen() {
-  const { threadId, path } = usePanelParams<{ threadId: string; path: string }>();
+  const { threadId, path, commit } = usePanelParams<{ threadId: string; path: string; commit?: string }>();
   const insets = useSafeAreaInsets();
-  const read = useRpc("hosted.review.file", { threadId, path });
+  const read = useRpc("hosted.review.file", commit ? { threadId, path, commit } : { threadId, path });
   const diff = read.data;
   return (
     <View className="flex-1 bg-bg">

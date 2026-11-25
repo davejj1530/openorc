@@ -645,6 +645,7 @@ export type Commit = z.infer<typeof Commit>;
 
 /** A commit's id, short or whole: never a word git could read as an option. */
 export const COMMIT_ID = /^[0-9a-f]{7,40}$/;
+export const CommitId = z.string().regex(COMMIT_ID);
 
 /** A commit a reply names, as the thread's workspace holds it. */
 export interface NamedCommit {

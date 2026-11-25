@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { ChangesScreen } from "../changes/ChangesScreen";
 import { CloudChangesScreen } from "../changes/CloudChangesScreen";
 import { CloudDiffScreen } from "../changes/CloudDiffScreen";
+import { CommitChangesScreen } from "../changes/CommitChangesScreen";
 import { DiffScreen } from "../changes/DiffScreen";
 import { FileScreen } from "../files/FileScreen";
 import { FilesScreen } from "../files/FilesScreen";
@@ -17,6 +18,7 @@ import type { PanelName, PanelRoute } from "./pane";
 const screens: Record<PanelName, ComponentType> = {
   changes: ChangesScreen,
   "cloud-changes": CloudChangesScreen,
+  "commit-changes": CommitChangesScreen,
   diff: DiffScreen,
   "cloud-diff": CloudDiffScreen,
   files: FilesScreen,

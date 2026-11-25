@@ -2,7 +2,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 
 /** A thread's side panel screens, each by the name of the route it also has in the stack. */
-export const PANEL_NAMES = ["changes", "cloud-changes", "diff", "cloud-diff", "files", "file", "preview", "subthreads"] as const;
+export const PANEL_NAMES = ["changes", "cloud-changes", "commit-changes", "diff", "cloud-diff", "files", "file", "preview", "subthreads"] as const;
 export type PanelName = (typeof PANEL_NAMES)[number];
 
 /** One screen of a thread's panel: which, and what it shows. Its params always name the thread. */

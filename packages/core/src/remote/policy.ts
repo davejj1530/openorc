@@ -247,6 +247,10 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "review.threadChanges": allow,
   // The schema's FolderPath and the core's own check that the file is among the changes hold the path.
   "review.threadFileDiff": allow,
+  // The schema holds the id to hex and the path to a place in the folder; the core refuses a path the commit does not change.
+  "git.threadCommit": allow,
+  "review.threadCommitChanges": allow,
+  "review.threadCommitFileDiff": allow,
   "git.threadLog": allow,
   // Commit ids and a branch name; reads only.
   "git.commitRange": allow,
@@ -349,6 +353,9 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "attachments.save": same,
   "review.threadChanges": same,
   "review.threadFileDiff": (diff) => ({ ...diff, patch: redact(diff.patch).text }),
+  "git.threadCommit": (named) => redactValue(named).value,
+  "review.threadCommitChanges": (changes) => ({ ...changes, commit: redactValue(changes.commit).value }),
+  "review.threadCommitFileDiff": (diff) => ({ ...diff, patch: redact(diff.patch).text }),
   "git.threadLog": (log) => redactValue(log).value,
   "git.commitRange": (range) => redactValue(range).value,
   // Why Push is blocked can be Git's own error, which names the Mac's folders.

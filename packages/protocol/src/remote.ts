@@ -55,6 +55,10 @@ export const REMOTE_METHODS = [
   // desktop's own methods. Never the whole patch (`review.threadDiff`) or the Mac's paths (`system.info`).
   "review.threadChanges",
   "review.threadFileDiff",
+  // The commit an id in a reply names, and one commit's changes as that capped list and one capped file.
+  "git.threadCommit",
+  "review.threadCommitChanges",
+  "review.threadCommitFileDiff",
   "git.threadLog",
   "git.commitRange",
   "git.threadPushState",

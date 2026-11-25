@@ -156,6 +156,8 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "git.log": byTask,
   "review.threadChanges": byThreadId,
   "review.threadFileDiff": byThreadId,
+  "review.threadCommitChanges": byThreadId,
+  "review.threadCommitFileDiff": byThreadId,
   "review.threadDiff": byThreadId,
   "review.commitThread": byThreadId,
   "review.pushThread": byThreadId,

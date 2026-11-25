@@ -12,6 +12,7 @@ export const PHONE_CAPABILITIES = [
   "cloud-threads",
   "cloud-session",
   "thread-files",
+  "commit-reads",
 ] as const;
 export const supportsSubagents = (capabilities: readonly string[] = []): boolean => capabilities.includes("subagent-threads");
 /** The Mac answers `session.negotiate` with the capabilities it shares; an older Mac's link refuses a reply image. */
@@ -26,6 +27,8 @@ export const supportsTaskDetails = (capabilities: readonly string[] = []): boole
 export const supportsSubthreadStarts = (capabilities: readonly string[] = []): boolean => capabilities.includes("subthread-starts");
 /** A Mac that shares it makes, changes and deletes Orclings for a phone; an older Mac refuses `orclings.create`, `orclings.update`, `orclings.delete` and `orclings.instructions.save`. */
 export const supportsOrclingEdits = (capabilities: readonly string[] = []): boolean => capabilities.includes("orcling-edits");
+/** A Mac that shares it finds the commit an id names and reads one commit's changes for a phone; an older Mac refuses `git.threadCommit`, `review.threadCommitChanges` and `review.threadCommitFileDiff`. */
+export const COMMIT_READS = "commit-reads";
 
 /**
  * Frozen at the installed builds, App Store 1.0.0 (202610270002, 85bf1c5e) and TestFlight 202610270003, whose

@@ -61,10 +61,17 @@ export function CommitsHead({ text }: { text: string }) {
   );
 }
 
-/** A commit: its subject, then its short sha and when, with "Not pushed" while origin lacks it. */
-export const CommitRow = memo(function CommitRow({ commit, unpushed }: { commit: Commit; unpushed: boolean }) {
+/** A commit: its subject, then its short sha and when, with "Not pushed" while origin lacks it. With `onOpen` it opens its changes. */
+export const CommitRow = memo(function CommitRow({ commit, unpushed, onOpen }: { commit: Commit; unpushed: boolean; onOpen?: ((sha: string) => void) | undefined }) {
   return (
-    <View accessible accessibilityLabel={[commit.subject, unpushed ? "Not pushed" : null, relativeTime(commit.at)].filter(Boolean).join(", ")} className="h-15 justify-center gap-1 px-5">
+    <ListPressable
+      accessible
+      accessibilityRole={onOpen ? "button" : undefined}
+      accessibilityLabel={[commit.subject, unpushed ? "Not pushed" : null, relativeTime(commit.at)].filter(Boolean).join(", ")}
+      disabled={!onOpen}
+      onPress={() => onOpen?.(commit.sha)}
+      className="h-15 justify-center gap-1 px-5 active:bg-surface-2"
+    >
       <View className="flex-row items-center gap-2">
         <Text numberOfLines={1} className="min-w-0 flex-1">
           {commit.subject}
@@ -79,7 +86,7 @@ export const CommitRow = memo(function CommitRow({ commit, unpushed }: { commit:
         <Text className="font-mono text-xs text-ink-4">{shortSha(commit.sha)}</Text>
         <Text className="text-xs tabular-nums text-ink-4">{relativeTime(commit.at)}</Text>
       </View>
-    </View>
+    </ListPressable>
   );
 });
 

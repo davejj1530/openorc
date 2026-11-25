@@ -186,6 +186,8 @@ const idReadTags: MethodRules = {
   ...each(["git.threadLog", "git.threadPushState"], (p) => ["workspace-diff", `threadlog:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`]),
   // Whether origin has a commit a reply names changes with a push, not with every edit to the folder.
   "git.threadCommit": (p) => [`threadlog:${String(p["threadId"])}`],
+  // A commit never changes: these are read once and dropped with the thread.
+  ...each(["review.threadCommitChanges", "review.threadCommitFileDiff"], (p) => [`thread:${String(p["threadId"])}`]),
   ...each(["git.projectLog", "git.projectPushState"], (p) => ["workspace-diff", `projectlog:${String(p["projectId"])}`]),
   // Main invalidates preview:<id> when the Mac opens, closes or switches the thread's page; a deleted thread closes it.
   "preview.state": (p) => ["preview", `preview:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`],

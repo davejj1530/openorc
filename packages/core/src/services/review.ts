@@ -3,10 +3,12 @@ import {
   changedFiles,
   changeStats,
   commitAll,
+  commitFilePatch,
   commitNamed,
   commitPage,
   commitPatch,
   commitRange,
+  commitStats,
   createPr,
   filePatch,
   git,
@@ -23,7 +25,22 @@ import {
   unpushedCommits,
   workspaceTransfer,
 } from "@openorc/git";
-import type { ChangeComparison, Commit, CommitRange, FileDiff, NamedCommit, Project, PushState, ReviewComment, ReviewDiff, Snapshot, Task, Thread, WorkspaceChanges } from "@openorc/protocol";
+import type {
+  ChangeComparison,
+  Commit,
+  CommitChanges,
+  CommitRange,
+  FileDiff,
+  NamedCommit,
+  Project,
+  PushState,
+  ReviewComment,
+  ReviewDiff,
+  Snapshot,
+  Task,
+  Thread,
+  WorkspaceChanges,
+} from "@openorc/protocol";
 import { isDetachedCopy, reviewCommentPlace, WORKSPACE_ID } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { access, mkdir, writeFile } from "node:fs/promises";
@@ -105,6 +122,7 @@ function acceptedMessage(selected: ReviewComment[]): string | null {
   return messageId ?? null;
 }
 
+const COMMIT_NOT_HERE = "This commit is not in the thread's folder.";
 const DETACHED_COPY = "This conversation's copy is on no branch, so nothing in it is committed or pushed.";
 
 /** What a thread's changes are measured against: its worktree's base for "base", else HEAD (null). */
@@ -361,9 +379,27 @@ export class ReviewService {
   async threadCommitDiff(thread: Thread, project: Project, sha: string): Promise<ReviewDiff> {
     const cwd = await this.threadCwd(thread, project);
     const commit = await commitNamed(cwd, sha);
-    if (!commit) throw new Error("This commit is not in the thread's folder.");
+    if (!commit) throw new Error(COMMIT_NOT_HERE);
     const { parent, patch, files } = await commitPatch(cwd, commit.sha);
     return { baseSha: parent, patch, files, since: null };
+  }
+
+  /** The commit `sha` names with its changes as a capped list, for a reader that draws one file at a time. */
+  async threadCommitChanges(thread: Thread, project: Project, sha: string): Promise<CommitChanges> {
+    const cwd = await this.threadCwd(thread, project);
+    const commit = await commitNamed(cwd, sha);
+    if (!commit) throw new Error(COMMIT_NOT_HERE);
+    return { commit, ...(await commitStats(cwd, commit.sha)) };
+  }
+
+  /** One file of that commit's changes. A path it does not change is refused. */
+  async threadCommitFileDiff(thread: Thread, project: Project, sha: string, file: string): Promise<FileDiff> {
+    const cwd = await this.threadCwd(thread, project);
+    const commit = await commitNamed(cwd, sha);
+    if (!commit) throw new Error(COMMIT_NOT_HERE);
+    const diff = await commitFilePatch(cwd, commit.sha, file);
+    if (!diff) throw new Error("This commit does not change this file.");
+    return diff;
   }
 
   async commitRange(thread: Thread, project: Project, request: { from: string | null; to: string; base: string | null; limit?: number }): Promise<CommitRange | null> {

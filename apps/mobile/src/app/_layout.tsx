@@ -92,6 +92,7 @@ export default function RootLayout() {
                   <Stack.Screen name="file" options={pushed} />
                   <Stack.Screen name="chat/[id]" dangerouslySingular={onePerThread} options={opened} />
                   <Stack.Screen name="preview" dangerouslySingular={onePerPanel} options={pushed} />
+                  <Stack.Screen name="commit-changes" options={pushed} />
                   <Stack.Screen name="diff" options={pushed} />
                   <Stack.Screen name="cloud-diff" options={pushed} />
                   <Stack.Screen name="new" dangerouslySingular options={opened} />

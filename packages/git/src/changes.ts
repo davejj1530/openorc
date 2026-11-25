@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { CHANGES_LISTED, FILE_DIFF_BYTES, FILE_DIFF_LINES, type FileChange, type FileChangeStat, type FileDiff, type FileDiffBody, type WorkspaceChanges } from "@openorc/protocol";
 import { git, GitError } from "./exec.js";
-import { changedFileStatus, headOrEmptyTree, MAX_UNTRACKED_DIFF_BYTES, untrackedFiles } from "./repo.js";
+import { changedFileStatus, commitBase, headOrEmptyTree, MAX_UNTRACKED_DIFF_BYTES, untrackedFiles } from "./repo.js";
 
 /** Pathspecs name files exactly: `:(glob)*` or `*` in a file name is that name, never a pattern. */
 const LITERAL = { GIT_LITERAL_PATHSPECS: "1" };
@@ -25,8 +25,23 @@ export type ChangeList = Pick<WorkspaceChanges, "totals" | "files" | "unlisted">
  */
 export async function changeStats(cwd: string, baseSha: string | null): Promise<ChangeList> {
   const base = baseSha ?? (await headOrEmptyTree(cwd));
-  const [tracked, untracked] = await Promise.all([trackedStats(cwd, base), untrackedFiles(cwd).then((files) => untrackedStats(cwd, files))]);
-  const files = [...tracked, ...untracked];
+  const [tracked, untracked] = await Promise.all([trackedStats(cwd, [base]), untrackedFiles(cwd).then((files) => untrackedStats(cwd, files))]);
+  return listed([...tracked, ...untracked]);
+}
+
+/** One commit's changes against its first parent, as changeStats lists a workspace's. */
+export async function commitStats(cwd: string, sha: string): Promise<ChangeList & { parent: string | null }> {
+  const { parent, base } = await commitBase(cwd, sha);
+  return { parent, ...listed(await trackedStats(cwd, [base, sha])) };
+}
+
+/** One file of a commit's changes, cut to size. Null when the commit does not change the path. */
+export async function commitFilePatch(cwd: string, sha: string, file: string): Promise<FileDiff | null> {
+  const { base } = await commitBase(cwd, sha);
+  return trackedPatch(cwd, [base, sha], file);
+}
+
+function listed(files: FileChangeStat[]): ChangeList {
   const totals = { files: files.length, insertions: 0, deletions: 0 };
   for (const { body } of files) {
     if (body.kind !== "text") continue;
@@ -36,16 +51,21 @@ export async function changeStats(cwd: string, baseSha: string | null): Promise<
   return { totals, files: files.slice(0, CHANGES_LISTED), unlisted: Math.max(0, files.length - CHANGES_LISTED) };
 }
 
+/** A tracked file's hunks over `range`: against the folder as it stands from one commit, or between two. Null when it has no changes there. */
+async function trackedPatch(cwd: string, range: readonly string[], file: string): Promise<FileDiff | null> {
+  let tracked = (await trackedStats(cwd, range, file)).find((change) => change.path === file);
+  // Alone, either side of a rename reads as added or deleted; only the whole diff pairs them up.
+  if (tracked?.status === "added" || tracked?.status === "deleted") tracked = (await trackedStats(cwd, range)).find((change) => change.path === file);
+  if (!tracked) return null;
+  const paths = ["--", ...(tracked.oldPath ? [tracked.oldPath] : []), tracked.path];
+  return fileDiff(tracked, tracked.body, (await git(cwd, [...PATCH, "-M", ...range, ...paths], { env: LITERAL, okCodes: [0, 1] })).stdout);
+}
+
 /** One changed file's hunks against `baseSha` (HEAD when null), cut to size. Null when the path has no changes. */
 export async function filePatch(cwd: string, baseSha: string | null, file: string): Promise<FileDiff | null> {
   const base = baseSha ?? (await headOrEmptyTree(cwd));
-  let tracked = (await trackedStats(cwd, base, file)).find((change) => change.path === file);
-  // Alone, either side of a rename reads as added or deleted; only the whole diff pairs them up.
-  if (tracked?.status === "added" || tracked?.status === "deleted") tracked = (await trackedStats(cwd, base)).find((change) => change.path === file);
-  if (tracked) {
-    const paths = ["--", ...(tracked.oldPath ? [tracked.oldPath] : []), tracked.path];
-    return fileDiff(tracked, tracked.body, (await git(cwd, [...PATCH, "-M", base, ...paths], { env: LITERAL, okCodes: [0, 1] })).stdout);
-  }
+  const tracked = await trackedPatch(cwd, [base], file);
+  if (tracked) return tracked;
   if (!(await untrackedFiles(cwd, file)).includes(file)) return null;
   const stat = await lstat(path.join(cwd, file)).catch(() => null);
   if (!stat) return null;
@@ -64,11 +84,12 @@ export async function filePatch(cwd: string, baseSha: string | null, file: strin
 }
 
 /**
- * Tracked changes against `base`, staged or not, with their counts, in git's order: one `diff --raw --numstat` call
- * (the raw entries name the status, the numstat ones the counts), limited to `file` when given.
+ * Tracked changes over `range` with their counts, in git's order: against the folder as it stands, staged or not, from
+ * one commit, or between two. One `diff --raw --numstat` call (the raw entries name the status, the numstat ones the
+ * counts), limited to `file` when given.
  */
-async function trackedStats(cwd: string, base: string, file?: string): Promise<FileChangeStat[]> {
-  const args = ["diff", "--raw", "--numstat", "-z", "-M", base, ...(file === undefined ? [] : ["--", file])];
+async function trackedStats(cwd: string, range: readonly string[], file?: string): Promise<FileChangeStat[]> {
+  const args = ["diff", "--raw", "--numstat", "-z", "-M", ...range, ...(file === undefined ? [] : ["--", file])];
   const parts = (await git(cwd, args, { env: LITERAL, okCodes: [0, 1] })).stdout.split("\0");
   const changes: FileChange[] = [];
   let i = 0;

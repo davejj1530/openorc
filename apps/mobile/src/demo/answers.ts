@@ -217,6 +217,16 @@ const answers: Answers = {
     if (!workspace) throw new Error("This file has no changes.");
     return workspace.fileDiff(comparison ?? "base", path);
   },
+  // The demo Mac shares no commit reads (its negotiate leaves "commit-reads" out), so the phone never asks for them.
+  "git.threadCommit": () => {
+    throw new Error(NOT_IN_DEMO);
+  },
+  "review.threadCommitChanges": () => {
+    throw new Error(NOT_IN_DEMO);
+  },
+  "review.threadCommitFileDiff": () => {
+    throw new Error(NOT_IN_DEMO);
+  },
   "git.threadLog": (core, { threadId, limit }) => core.workspaces.get(threadId)?.commits(limit ?? 50) ?? [],
   "git.commitRange": () => null,
   "git.threadPushState": (core, { threadId }) =>

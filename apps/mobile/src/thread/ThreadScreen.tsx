@@ -25,6 +25,7 @@ import { threadTogetherOf, TogetherContext, turnSeen } from "./cloud-together";
 import { createDisclosure, DisclosureContext } from "./disclosure";
 import { useMarkSeen } from "./mark-seen";
 import { AuthorsContext, useThreadAuthors } from "./thread-authors";
+import { CommitScopeContext } from "./use-commit-links";
 import { holdTranscriptList, perfEnabled, reportThreadOpened } from "./perf-probe";
 import { PerfProbe } from "./PerfProbe";
 import { useSnoozeClock } from "./snooze-clock";
@@ -207,6 +208,7 @@ export function ThreadScreen() {
   useShareSettings(id, settings);
   // An OpenOrc Cloud thread: its files go to the cloud through the phone's own session.
   const cloud = thread !== null && placeOf(thread).elsewhere;
+  const commits = useMemo(() => ({ threadId: id, cloud }), [id, cloud]);
   const together = threadTogetherOf(thread);
   useMarkSeen(thread);
   useCoverHome();
@@ -236,23 +238,25 @@ export function ThreadScreen() {
             <VoicesContext.Provider value={voices}>
               <CloudFileScopeContext.Provider value={files.readable}>
                 <NoteReplyContext.Provider value={noteReply.value}>
-                  {thread ? (
-                    <ConversationPane
-                      chat={chat}
-                      threadId={id}
-                      thread={thread}
-                      runs={runs}
-                      loading={runsQuery.isLoading}
-                      failed={Boolean(runsQuery.error)}
-                      retry={() => void runsQuery.refetch()}
-                      onActivity={setActivity}
-                      composerInset={room.composerInset}
-                      listRef={room.listRef}
-                      followKey={room.sends}
-                    />
-                  ) : (
-                    <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <WorkingMark /> : <Text className="text-ink-4">Thread not found</Text>}</View>
-                  )}
+                  <CommitScopeContext.Provider value={commits}>
+                    {thread ? (
+                      <ConversationPane
+                        chat={chat}
+                        threadId={id}
+                        thread={thread}
+                        runs={runs}
+                        loading={runsQuery.isLoading}
+                        failed={Boolean(runsQuery.error)}
+                        retry={() => void runsQuery.refetch()}
+                        onActivity={setActivity}
+                        composerInset={room.composerInset}
+                        listRef={room.listRef}
+                        followKey={room.sends}
+                      />
+                    ) : (
+                      <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <WorkingMark /> : <Text className="text-ink-4">Thread not found</Text>}</View>
+                    )}
+                  </CommitScopeContext.Provider>
                 </NoteReplyContext.Provider>
               </CloudFileScopeContext.Provider>
             </VoicesContext.Provider>

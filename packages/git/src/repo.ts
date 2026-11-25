@@ -226,10 +226,15 @@ export async function onRemote(cwd: string, sha: string, remote = "origin"): Pro
   return (await git(cwd, ["for-each-ref", "--count=1", "--contains", sha, `refs/remotes/${remote}`])).stdout.trim() !== "";
 }
 
+/** What a commit's changes are measured against: its first parent, or the empty tree for a first commit. */
+export async function commitBase(cwd: string, sha: string): Promise<{ parent: string | null; base: string }> {
+  const parent = await firstCommit(cwd, [`${sha}^`]);
+  return { parent, base: parent ?? (await emptyTree(cwd)) };
+}
+
 /** A commit's changes against its first parent, or against nothing for a first commit: the patch and the files it names. */
 export async function commitPatch(cwd: string, sha: string): Promise<{ parent: string | null; patch: string; files: FileChange[] }> {
-  const parent = await firstCommit(cwd, [`${sha}^`]);
-  const base = parent ?? (await emptyTree(cwd));
+  const { parent, base } = await commitBase(cwd, sha);
   const [patch, files] = await Promise.all([git(cwd, ["diff", "--no-color", "--no-ext-diff", "-M", base, sha], { okCodes: [0, 1] }), trackedChanges(cwd, base, sha)]);
   return { parent, patch: patch.stdout, files };
 }

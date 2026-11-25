@@ -1,4 +1,4 @@
-export { changeStats, filePatch, type ChangeList } from "./changes.js";
+export { changeStats, commitFilePatch, commitStats, filePatch, type ChangeList } from "./changes.js";
 export { diskUsage } from "./disk.js";
 export { GitError, git, gitToFile, run, useGitHubSignIn, type ExecOptions, type ExecResult } from "./exec.js";
 export { GitHubAppClient, appJwt, reviewerAppManifest, type GitHubAppCredentials, type GitHubAppIdentity } from "./github-app.js";

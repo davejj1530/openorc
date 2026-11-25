@@ -108,15 +108,17 @@ function CloudPublishBar({ thread, state, changes, stateError }: { thread: Threa
   );
 }
 
-/** The thread's commits, newest first, each "Not pushed" until the one GitHub has. */
-function Commits({ commits }: { commits: HostedThreadCommits }) {
+/** The thread's commits, newest first, each "Not pushed" until the one GitHub has, and each opening its changes. */
+function Commits({ threadId, commits }: { threadId: string; commits: HostedThreadCommits }) {
+  const nav = usePanelNav();
+  const open = (sha: string) => nav.open({ name: "commit-changes", params: { threadId, sha, cloud: "1" } });
   const pushedAt = commits.pushed ? commits.commits.findIndex((commit) => commit.sha === commits.pushed) : -1;
   if (!commits.commits.length) return null;
   return (
     <>
       <CommitsHead text="Commits" />
       {commits.commits.map((commit, index) => (
-        <CommitRow key={commit.sha} commit={commit} unpushed={pushedAt === -1 ? !commits.pushed : index < pushedAt} />
+        <CommitRow key={commit.sha} commit={commit} unpushed={pushedAt === -1 ? !commits.pushed : index < pushedAt} onOpen={open} />
       ))}
     </>
   );
@@ -171,7 +173,7 @@ export function CloudChangesScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: footer + 12 }}>
         {/* A server that says it does not serve changes is answered by its reason alone: nothing failed to retry. */}
         {off ? <Text className="px-5 py-10 text-center text-ink-4">{off}</Text> : <Files threadId={threadId} changes={changes.data} error={changes.error} retry={() => void changes.refetch()} />}
-        {commits.data ? <Commits commits={commits.data} /> : null}
+        {commits.data ? <Commits threadId={threadId} commits={commits.data} /> : null}
       </ScrollView>
       {thread.data ? (
         <View onLayout={({ nativeEvent }) => setFooter(nativeEvent.layout.height)} className="absolute inset-x-0 bottom-0">

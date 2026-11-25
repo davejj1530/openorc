@@ -2,11 +2,12 @@ import { Host, Picker, Text as MenuText } from "@expo/ui/swift-ui";
 import { accessibilityLabel, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
 import { LegendList, type LegendListRef } from "@legendapp/list/react-native";
 import { comparisons, panelToolLabels } from "@openorc/client";
-import type { ChangeComparison } from "@openorc/protocol";
+import { COMMIT_READS, type ChangeComparison } from "@openorc/protocol";
 import { useCallback, useMemo, useRef, useState, type RefObject } from "react";
 import { RefreshControl, View } from "react-native";
 import { useLinkState } from "../client";
 import { linkReason } from "../connection/link-reason";
+import { useShares } from "../connection/use-shares";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { useMode } from "../ui/mode";
@@ -43,7 +44,7 @@ function ComparePicker({ value, onChange }: { value: ChangeComparison; onChange:
   );
 }
 
-function Row({ item, open }: { item: ChangesItem; open: (path: string) => void }) {
+function Row({ item, open, openCommit }: { item: ChangesItem; open: (path: string) => void; openCommit: ((sha: string) => void) | undefined }) {
   switch (item.kind) {
     case "file":
       return <FileRow file={item.file} onOpen={open} />;
@@ -52,7 +53,7 @@ function Row({ item, open }: { item: ChangesItem; open: (path: string) => void }
     case "commits":
       return <CommitsHead text={item.text} />;
     case "commit":
-      return <CommitRow commit={item.commit} unpushed={item.unpushed} />;
+      return <CommitRow commit={item.commit} unpushed={item.unpushed} onOpen={openCommit} />;
   }
 }
 
@@ -74,6 +75,9 @@ function ChangesList({ threadId, reads, comparison, onComparison, footer, dim, l
   const items = useMemo(() => changesItems(changes.data, log.data, push.data), [changes.data, log.data, push.data]);
   const nav = usePanelNav();
   const open = useCallback((path: string) => nav.open({ name: "diff", params: { threadId, path, comparison } }), [nav, threadId, comparison]);
+  // An older Mac lists commits and reads none of them.
+  const commitReads = useShares(COMMIT_READS) === true;
+  const openCommit = useMemo(() => (commitReads ? (sha: string) => nav.open({ name: "commit-changes", params: { threadId, sha } }) : undefined), [commitReads, nav, threadId]);
   if (!changes.data && changes.error) return <FailedBlock message={changes.error.message} onRetry={() => void changes.refetch()} />;
   if (!changes.data) return <View className="flex-1 items-center justify-center">{late ? <WorkingMark /> : null}</View>;
   const refresh = () => {
@@ -88,7 +92,7 @@ function ChangesList({ threadId, reads, comparison, onComparison, footer, dim, l
       getItemType={(item) => item.kind}
       getFixedItemSize={(item) => ITEM_HEIGHTS[item.kind]}
       recycleItems
-      renderItem={({ item }) => <Row item={item} open={open} />}
+      renderItem={({ item }) => <Row item={item} open={open} openCommit={openCommit} />}
       ListHeaderComponent={
         <View>
           {thread.data?.worktreePath ? <ComparePicker value={comparison} onChange={onComparison} /> : null}

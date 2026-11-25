@@ -14,7 +14,20 @@ import { DiffLines } from "./DiffLines";
 import { DiffPerf } from "./DiffPerf";
 import { PanelHeader, usePanelNav, usePanelParams, type PanelTool } from "../panel/host";
 
-type Params = { threadId: string; path: string; comparison?: ChangeComparison };
+/** `commit` names the commit the file is read in; without it the file is one of the thread's changes. */
+type Params = { threadId: string; path: string; comparison?: ChangeComparison; commit?: string };
+
+/** The file's diff and the list it steps through: a commit's, or the thread's changes for the comparison. */
+function useDiffReads({ threadId, path, comparison = "head", commit }: Params) {
+  const inCommit = commit !== undefined;
+  const sha = commit ?? "";
+  const changed = useRpc("review.threadFileDiff", { threadId, comparison, path: path as FolderPath }, { enabled: !inCommit });
+  const changes = useRpc("review.threadChanges", { threadId, comparison }, { enabled: !inCommit });
+  // A commit never changes, so its reads are made once.
+  const committed = useRpc("review.threadCommitFileDiff", { threadId, sha, path: path as FolderPath }, { enabled: inCommit, staleTime: Infinity });
+  const commitChanges = useRpc("review.threadCommitChanges", { threadId, sha }, { enabled: inCommit, staleTime: Infinity });
+  return { diff: inCommit ? committed : changed, files: (inCommit ? commitChanges.data : changes.data)?.files };
+}
 
 /** Previous and next file in the list's order, dimmed at either end. */
 function fileSteps(paths: string[], path: string, go: (path: string) => void): PanelTool[] {
@@ -49,16 +62,16 @@ function DiffBody({ diff }: { diff: FileDiff }) {
 }
 
 /**
- * One file's diff, read alone so a big branch never crosses the link whole. The title is the file's name; the
- * toolbar steps through the Changes list's files in its order.
+ * One file's diff, in the thread's changes or in one of its commits, read alone so a big branch never crosses the link
+ * whole. The title is the file's name; the toolbar steps through the list's files in its order.
  */
 export function DiffScreen() {
-  const { threadId, path, comparison = "head" } = usePanelParams<Params>();
+  const params = usePanelParams<Params>();
+  const { path } = params;
   const nav = usePanelNav();
   const insets = useSafeAreaInsets();
-  const diff = useRpc("review.threadFileDiff", { threadId, comparison, path: path as FolderPath });
-  const list = useRpc("review.threadChanges", { threadId, comparison });
-  const steps = fileSteps(list.data?.files.map((file) => file.path) ?? [], path, (next) => nav.setParams({ path: next }));
+  const { diff, files } = useDiffReads(params);
+  const steps = fileSteps(files?.map((file) => file.path) ?? [], path, (next) => nav.setParams({ path: next }));
   const [sheet] = useState(createSheetWindow);
   const scroller = useRef<ScrollViewInstance>(null);
   const contentHeight = useRef(0);

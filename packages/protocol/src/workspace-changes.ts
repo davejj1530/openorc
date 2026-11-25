@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { FileChange } from "./domain.js";
+import { CommitId, type Commit, type FileChange } from "./domain.js";
 import { FolderPath } from "./files.js";
 
 /** What a move or a restore would change, for its confirmation. `blocked` says why it cannot run at all. */
@@ -40,6 +40,13 @@ export interface WorkspaceChanges {
   unlisted: number;
 }
 
+/** One commit's changes against its first parent as a list: the commit, and its files as a changes list names them. */
+export interface CommitChanges extends Pick<WorkspaceChanges, "totals" | "files" | "unlisted"> {
+  commit: Commit;
+  /** Null for a first commit. */
+  parent: string | null;
+}
+
 /** One file's hunks without git's header lines, cut at FILE_DIFF_LINES or FILE_DIFF_BYTES at a line end. */
 export interface FileDiff {
   path: string;
@@ -56,4 +63,8 @@ export const workspaceChangeRpcParams = {
   "review.threadChanges": z.object({ threadId: z.string(), comparison: ChangeComparison.optional() }),
   /** One changed file's diff, capped. A path with no changes is refused. */
   "review.threadFileDiff": z.object({ threadId: z.string(), comparison: ChangeComparison.optional(), path: FolderPath }),
+  /** The commit an id names, short ids included, with its changes as that capped list. An id that names none is refused. */
+  "review.threadCommitChanges": z.object({ threadId: z.string(), sha: CommitId }),
+  /** One file of a commit's changes, capped. A path the commit does not change is refused. */
+  "review.threadCommitFileDiff": z.object({ threadId: z.string(), sha: CommitId, path: FolderPath }),
 };

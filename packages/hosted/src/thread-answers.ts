@@ -112,6 +112,8 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "git.commitRange": refused(HOSTED_REASONS.commitHistory),
   "git.threadCommit": refused(HOSTED_REASONS.commitHistory),
   "review.threadCommitDiff": refused(HOSTED_REASONS.commitHistory),
+  "review.threadCommitChanges": refused(HOSTED_REASONS.commitHistory),
+  "review.threadCommitFileDiff": refused(HOSTED_REASONS.commitHistory),
   "git.threadPushState": NO_FILES,
   "threads.moveWorkspace": NO_FILES,
   "threads.movePreview": NO_FILES,

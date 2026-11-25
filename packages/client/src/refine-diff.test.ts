@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { alignBlocks, similarity, wordDiff } from "./refine-diff";
-import { labelList } from "./task-draft";
 
 describe("Refine's diff", () => {
   it("reads a replaced phrase as one replacement, keeping what didn't change", () => {
@@ -37,9 +36,8 @@ describe("Refine's diff", () => {
     ]);
   });
 
-  it("measures shared words and reads typed labels", () => {
+  it("measures shared words", () => {
     expect(similarity("a b c d", "a b c d")).toBe(1);
     expect(similarity("one two", "three four")).toBe(0);
-    expect(labelList(" tasks, ui ,, tasks ")).toEqual(["tasks", "ui"]);
   });
 });

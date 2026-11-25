@@ -7,12 +7,30 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { FakeMac } from "../test-fixtures/fake-mac";
 import { alerts, nativeProps } from "../test-fixtures/react-native";
 
-const mac = vi.hoisted(() => ({ phone: null as FakeMac | null, task: null as unknown as Task, saved: [] as unknown[], refuse: null as string | null }));
+const mac = vi.hoisted(() => ({
+  phone: null as FakeMac | null,
+  task: null as unknown as Task,
+  saved: [] as unknown[],
+  refuse: null as string | null,
+  /** What the Mac was asked to do with the task's work, and the Refine it holds. */
+  work: [] as unknown[],
+  refine: null as unknown,
+  buttons: [] as unknown[],
+  threads: [] as unknown[],
+}));
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
   mac.phone = fakeMac(async (method, params) => {
     if (method === "tasks.get") return mac.task;
-    if (method === "projects.list") return [{ id: "p", name: "Website" }];
+    if (method === "projects.list") return [{ id: "p", name: "Website", settings: { taskButtons: mac.buttons } }];
+    if (method === "tasks.threads") return mac.threads;
+    if (method === "tasks.refine.get") return mac.refine;
+    if (method === "tasks.runButton" || method === "tasks.refine.dismiss") {
+      mac.work.push([method, params]);
+      if (method === "tasks.refine.dismiss") mac.refine = null;
+      return method === "tasks.runButton" ? { threadId: "t-review", message: "Review the task", draft: "Review the task" } : null;
+    }
+    if (method === "agents.models" || method === "orclings.chats") return [];
     if (method === "threads.get") return { id: (params as { id: string }).id, title: "Fix the login form" };
     if (method === "tasks.update") {
       const { patch } = params as { patch: Partial<Task> };
@@ -65,6 +83,12 @@ beforeEach(() => {
   mac.task = { ...base };
   mac.saved = [];
   mac.refuse = null;
+  mac.work = [];
+  mac.refine = null;
+  mac.buttons = [];
+  mac.threads = [];
+  mac.phone!.shared.clear();
+  mac.phone!.saved.clear();
   alerts.length = 0;
   mac.phone!.module.queryClient.clear();
   vi.mocked(router.push).mockClear();
@@ -150,4 +174,60 @@ it("saves a written description and closes, asking first when the Mac's changed 
   expect(mac.saved).toEqual([]);
   act(() => alerts.at(-1)!.buttons!.find((button) => button.text === "Replace")!.onPress!());
   await waitFor(() => expect(mac.saved).toEqual([{ spec: "Mine" }]));
+});
+
+it("lists every thread of the task, runs a button into its thread's draft, and uses a suggestion, where the Mac shares task work", async () => {
+  mac.phone!.shared.add("task-work");
+  mac.buttons = [
+    { id: "review", label: "Review", prompt: "Review the task", runsIn: "new", mode: "thread", autoSend: false },
+    { id: "ship", label: "Ship", prompt: "Ship it", runsIn: "task", mode: "thread", statuses: ["review"] },
+  ];
+  const thread = (id: string, title: string) => ({ id, title, activity: "idle", updatedAt: Date.now(), lastActivityAt: Date.now() });
+  mac.threads = [
+    { thread: thread("t-now", "Ship the badge"), label: null, current: true },
+    { thread: thread("t-old", "First try"), label: null, current: false },
+    { thread: thread("t-review", "Review the badge"), label: "Review", current: false },
+  ];
+  mac.refine = {
+    id: "r1",
+    taskId: "task-1",
+    state: "ready",
+    recipient: { agent: "claude", model: "opus", effort: null },
+    instruction: "",
+    base: { title: base.title, spec: base.spec, labels: base.labels },
+    suggestion: { title: "Show a badge on new threads", description: "## Goal\n\nShow a badge on new threads.", labels: ["ui", "home"], note: "Split the goal out." },
+    step: null,
+    error: null,
+    runId: null,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  render(<TaskScreen />, { wrapper: mac.phone!.wrapper });
+  expect(await screen.findByRole("button", { name: /^Current thread.*, Ship the badge$/ })).toBeTruthy();
+  expect(screen.getByRole("button", { name: /^Earlier thread.*, First try$/ })).toBeTruthy();
+  expect(screen.getByRole("button", { name: /^Review.*, Review the badge$/ })).toBeTruthy();
+  // A button shows only on the statuses it is set for.
+  expect(screen.queryByRole("button", { name: "Ship" })).toBeNull();
+
+  fireEvent.click(screen.getByRole("button", { name: "Review" }));
+  await waitFor(() => expect(router.push).toHaveBeenCalledWith({ pathname: "/thread/[id]", params: { id: "t-review" } }));
+  expect(mac.work).toEqual([["tasks.runButton", { taskId: "task-1", buttonId: "review" }]]);
+  expect(JSON.parse(mac.phone!.saved.get("draft.mac-1.t-review")!)).toMatchObject({ text: "Review the task" });
+
+  // The suggestion stands in the description's place until it is used.
+  expect(screen.getByText("Suggested by opus")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Edit description" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Use suggestion" }));
+  await waitFor(() => expect(mac.saved).toEqual([{ title: "Show a badge on new threads", spec: "## Goal\n\nShow a badge on new threads.", labels: ["ui", "home"] }]));
+  await waitFor(() => expect(mac.work.at(-1)).toEqual(["tasks.refine.dismiss", { taskId: "task-1" }]));
+  expect(await screen.findByRole("button", { name: "Edit description" })).toBeTruthy();
+});
+
+it("shows the conversation doing the work, and neither buttons nor Refine, for a Mac that shares no task work", async () => {
+  mac.buttons = [{ id: "review", label: "Review", prompt: "Review the task", runsIn: "new", mode: "thread" }];
+  mac.task = { ...base, executionThreadId: "t-now" };
+  render(<TaskScreen />, { wrapper: mac.phone!.wrapper });
+  expect(await screen.findByRole("button", { name: "Working in, Fix the login form" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Review" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Refine this task" })).toBeNull();
 });

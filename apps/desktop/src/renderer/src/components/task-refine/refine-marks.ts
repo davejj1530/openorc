@@ -2,7 +2,7 @@ import { Extension } from "@tiptap/react";
 import type { Node as DocumentNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-import { alignBlocks, type DiffBlock, type Segment } from "../../lib/refine-diff";
+import { alignBlocks, type DiffBlock, type Segment } from "@openorc/client";
 
 type Textblock = DiffBlock & { pos: number; size: number; map: number[] };
 

@@ -85,6 +85,7 @@ export default function RootLayout() {
                   <Stack.Screen name="thread/[id]" dangerouslySingular={onePerThread} options={opened} />
                   <Stack.Screen name="task/[id]" dangerouslySingular={onePerThread} options={opened} />
                   <Stack.Screen name="task-description" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
+                  <Stack.Screen name="task-refine" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
                   <Stack.Screen name="subthreads" dangerouslySingular={onePerPanel} options={pushed} />
                   <Stack.Screen name="changes" dangerouslySingular={onePerPanel} options={pushed} />
                   <Stack.Screen name="cloud-changes" dangerouslySingular={onePerPanel} options={pushed} />

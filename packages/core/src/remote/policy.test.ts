@@ -1,4 +1,4 @@
-import { deviceRpcParams, isRemoteMethod, type Task, REMOTE_ATTACHMENT_BYTES, REMOTE_METHODS, remoteRpcParams, rpcParams, type FileDiff } from "@openorc/protocol";
+import { deviceRpcParams, isRemoteMethod, type AppSettings, type Task, REMOTE_ATTACHMENT_BYTES, REMOTE_METHODS, remoteRpcParams, rpcParams, type FileDiff } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { remoteError, type MacRoots } from "./phone-words.js";
 import { admitRemoteRequest, remotePush, remoteReplies, remoteReply, type GuardContext } from "./policy.js";
@@ -61,6 +61,16 @@ describe("phone policy", () => {
       ...usage,
       message: null,
     });
+  });
+
+  it("hands what the desktop draws behind New thread only to a phone that declares it reads it", () => {
+    const shaping = { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) };
+    const settings = { defaultHarness: null, look: { palette: "linear", colors: { dark: { "--accent": "#5e6ad2" } }, backdrop: "painting" } } as unknown as AppSettings;
+    expect(remoteReply("app.settings.get", settings, { ...shaping, capabilities: ["look-backdrop"] })).toBe(settings);
+    // An installed phone's look is the palette and its colors, as that phone was built to read it.
+    expect(remoteReply("app.settings.get", settings, shaping).look).toEqual({ palette: "linear", colors: { dark: { "--accent": "#5e6ad2" } } });
+    const none = { ...settings, look: null };
+    expect(remoteReply("app.settings.get", none, shaping)).toBe(none);
   });
 
   it("lists a conversation's skills for the picker, without the Mac's paths or a token in a description", () => {
@@ -199,6 +209,45 @@ describe("phone policy", () => {
       worktreePath: null,
     });
     expect(saved).toMatchObject({ worktreePath: null, spec: expect.stringContaining("[redacted:github-token]") });
+  });
+
+  it("lists a task's threads, presses its buttons and refines it for a phone, a token in the text redacted and no suggestion edited there", () => {
+    for (const method of ["tasks.threads", "tasks.refine.get", "tasks.refine.stop", "tasks.refine.dismiss"])
+      expect(admitRemoteRequest(method, { taskId: "task-1" }, context), method).toEqual({ ok: true });
+    expect(admitRemoteRequest("tasks.runButton", { taskId: "task-1", buttonId: "review" }, context)).toEqual({ ok: true });
+    for (const method of ["tasks.newThread", "tasks.openThread"]) expect(admitRemoteRequest(method, { taskId: "task-1" }, context).ok, method).toBe(false);
+    const start = { taskId: "task-1", recipient: { agent: "claude", model: "opus", effort: null }, instruction: "Tighten the goal" };
+    expect(admitRemoteRequest("tasks.refine.start", start, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("tasks.refine.start", { ...start, again: true, edited: { title: "Mine", description: "Edited on the phone", labels: [] } }, context)).toEqual({
+      ok: false,
+      message: "Make this change on your Mac.",
+    });
+    expect(admitRemoteRequest("tasks.refine.start", { ...start, instruction: "Tighten\u202Ethe goal" }, context).ok).toBe(false);
+
+    const words = { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) };
+    const refine = {
+      id: "r1",
+      taskId: "task-1",
+      state: "ready" as const,
+      recipient: { agent: "claude" as const, model: "opus", effort: null },
+      instruction: "",
+      base: { title: "Publish", spec: `Publish with ${TOKEN}`, labels: [] },
+      suggestion: { title: "Publish the site", description: `Publish with ${TOKEN}`, labels: [], note: "Named what is published." },
+      step: null,
+      error: null,
+      runId: null,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const shaped = remoteReply("tasks.refine.get", refine, words);
+    expect(JSON.stringify(shaped)).not.toContain(TOKEN);
+    expect(shaped).toMatchObject({ base: { spec: "Publish with [redacted:github-token]" }, suggestion: { title: "Publish the site", description: "Publish with [redacted:github-token]" } });
+    expect(remoteReply("tasks.refine.get", null, words)).toBeNull();
+    expect(remoteReply("tasks.runButton", { threadId: "t", message: `Review ${TOKEN}`, draft: `Review ${TOKEN}` }, words)).toEqual({
+      threadId: "t",
+      message: "Review [redacted:github-token]",
+      draft: "Review [redacted:github-token]",
+    });
   });
 
   it("starts a thread under another from a phone, in the parent's folder, never in one the phone names", () => {

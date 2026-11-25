@@ -13,6 +13,7 @@ export const PHONE_CAPABILITIES = [
   "cloud-session",
   "thread-files",
   "commit-reads",
+  "task-work",
   "look-backdrop",
 ] as const;
 export const supportsSubagents = (capabilities: readonly string[] = []): boolean => capabilities.includes("subagent-threads");
@@ -30,8 +31,12 @@ export const supportsSubthreadStarts = (capabilities: readonly string[] = []): b
 export const supportsOrclingEdits = (capabilities: readonly string[] = []): boolean => capabilities.includes("orcling-edits");
 /** A phone that declares it reads what the desktop draws behind New thread from the look; an older phone's look comes without it. */
 export const supportsLookBackdrop = (capabilities: readonly string[] = []): boolean => capabilities.includes("look-backdrop");
+/** A Mac that shares it lists a task's threads, runs its buttons and refines it for a phone; an older Mac refuses `tasks.threads`, `tasks.runButton` and `tasks.refine.*`. */
+export const TASK_WORK = "task-work";
+export const supportsTaskWork = (capabilities: readonly string[] = []): boolean => capabilities.includes(TASK_WORK);
 /** A Mac that shares it finds the commit an id names and reads one commit's changes for a phone; an older Mac refuses `git.threadCommit`, `review.threadCommitChanges` and `review.threadCommitFileDiff`. */
 export const COMMIT_READS = "commit-reads";
+export const supportsCommitReads = (capabilities: readonly string[] = []): boolean => capabilities.includes(COMMIT_READS);
 
 /**
  * Frozen at the installed builds, App Store 1.0.0 (202610270002, 85bf1c5e) and TestFlight 202610270003, whose

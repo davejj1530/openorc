@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { acknowledgeTaskDraft, createTaskDraftBarrier, readTaskDraft, sameTaskDraft, taskDraftPatch, type TaskDocumentDraft } from "./task-draft";
+import { acknowledgeTaskDraft, createTaskDraftBarrier, labelList, readTaskDraft, sameTaskDraft, taskDraftPatch, type TaskDocumentDraft } from "./task-draft";
 
 const draft = (spec: string): TaskDocumentDraft => ({ title: "Task", spec, labels: "bug, bug, review" });
 const key = "openorc.draft.task.task";
@@ -150,5 +150,9 @@ describe("task action draft barrier", () => {
     acknowledgeTaskDraft("task", old);
     expect(readTaskDraft("task")).toEqual(newer);
     expect(taskDraftPatch(newer)).toEqual({ title: "Task", spec: newer.spec, labels: ["bug", "review"] });
+  });
+
+  it("reads typed labels", () => {
+    expect(labelList(" tasks, ui ,, tasks ")).toEqual(["tasks", "ui"]);
   });
 });

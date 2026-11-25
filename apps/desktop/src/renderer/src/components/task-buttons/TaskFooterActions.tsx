@@ -1,3 +1,4 @@
+import { buttonPendingLabel, showsOn } from "@openorc/client";
 import { useState, type ReactNode } from "react";
 import { WORKSPACE_ID, type Task, type TaskButton } from "@openorc/protocol";
 import { useRpcMutation } from "../../lib/client";
@@ -5,10 +6,7 @@ import { addToConversationDraft } from "../../lib/conversation-draft";
 import { openProject, openThread } from "../../lib/router";
 import { SlidersHorizontal } from "../icons";
 import { Button, IconButton, Tooltip } from "../ui";
-import { showsOn } from "./task-button-rules";
 import "./task-buttons.css";
-
-const pendingLabel = (button: TaskButton) => (button.autoSend === false ? "Opening…" : "Starting…");
 
 export function TaskFooterActions({
   task,
@@ -52,7 +50,7 @@ export function TaskFooterActions({
         .filter((button) => showsOn(button, task.status))
         .map((button) => (
           <Button key={button.id} data-tip={button.prompt} disabled={disabled || running !== null} onClick={() => void press(button)}>
-            {running === button.id ? pendingLabel(button) : button.label}
+            {running === button.id ? buttonPendingLabel(button) : button.label}
           </Button>
         ))}
       {task.projectId === WORKSPACE_ID ? null : (

@@ -163,6 +163,12 @@ function taskUpdate({ id, patch }: RpcParams<"tasks.update">, context: GuardCont
   return phoneTitle(patch.title) ?? taskLabels(patch.labels) ?? taskSpec(id, patch.spec, context);
 }
 
+/** A Refine a phone starts: what should change in plain text, never a suggestion edited on the phone, whose text it reads redacted. */
+function taskRefine({ instruction, edited }: RpcParams<"tasks.refine.start">): string | null {
+  if (edited !== undefined) return "Make this change on your Mac.";
+  return MESSAGE_FORBIDDEN.test(instruction) ? "What should change must be plain text." : null;
+}
+
 /** A task as a phone reads it: a worktree's path names the Mac's folders, and a description may hold a token. */
 const phoneTask = <T extends RpcResults["tasks.update"] | null>(task: T): T => (task ? { ...task, worktreePath: null, spec: task.spec === null ? null : redact(task.spec).text } : task);
 
@@ -270,6 +276,13 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "tasks.get": allow,
   "tasks.create": taskCreate,
   "tasks.update": taskUpdate,
+  "tasks.threads": allow,
+  // A press on the task's screen, by ids alone: the core finds the button in the project's settings and runs it as a window's press.
+  "tasks.runButton": allow,
+  "tasks.refine.get": allow,
+  "tasks.refine.start": taskRefine,
+  "tasks.refine.stop": allow,
+  "tasks.refine.dismiss": allow,
   // Faces, names and their own conversations' state; the reply leaves the rest of each Orcling on the Mac.
   "orclings.chats": allow,
   "orclings.profile": allow,
@@ -376,6 +389,14 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "tasks.get": phoneTask,
   "tasks.create": phoneTask,
   "tasks.update": phoneTask,
+  "tasks.threads": same,
+  // A button set not to send answers with the message it wrote, which carries the task's description.
+  "tasks.runButton": (pressed) => redactValue(pressed).value,
+  // The task's text as the refine read it, and the agent's own: any of it may hold a token.
+  "tasks.refine.get": (refine) => redactValue(refine).value,
+  "tasks.refine.start": (refine) => redactValue(refine).value,
+  "tasks.refine.stop": same,
+  "tasks.refine.dismiss": same,
   "orclings.chats": same,
   // Instructions and memories are text that may hold a token.
   "orclings.profile": (profile) => ({

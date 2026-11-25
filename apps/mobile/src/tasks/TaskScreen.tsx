@@ -1,5 +1,5 @@
 import { relativeTime } from "@openorc/client";
-import type { Task } from "@openorc/protocol";
+import type { Task, TaskButton } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
@@ -7,7 +7,7 @@ import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLinkState, useRpc } from "../client";
 import { useLinkWords } from "../connection/use-link-words";
-import { ArrowUpRight, GitBranch, MessageSquare } from "../generated/icons";
+import { GitBranch } from "../generated/icons";
 import { Markdown } from "../thread/Markdown";
 import { arrive } from "../ui/motion";
 import { Measure } from "../ui/pane";
@@ -16,29 +16,13 @@ import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { boardStatus } from "./board";
 import { holdsSecret, SECRET_SPEC, typedTitle, useTaskEdit, type TaskPatch } from "./task-edit";
+import { TaskButtons } from "./TaskButtons";
 import { TaskProperties } from "./TaskProperties";
+import { openRefine, showsSuggestion, TaskRefine } from "./TaskRefine";
+import { TaskThreads, ThreadLink } from "./TaskThreads";
+import { useTaskRefine, useTaskWork, type TaskRefineView } from "./use-task-refine";
 
-/** A conversation the task belongs to, one tap away: the one doing its work, or the one it came from. */
-function ThreadLink({ threadId, label }: { threadId: string; label: string }) {
-  const thread = useRpc("threads.get", { id: threadId }).data;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${label}${thread ? `, ${thread.title}` : ""}`}
-      onPress={() => router.push({ pathname: "/thread/[id]", params: { id: threadId } })}
-      className="min-h-touch-row flex-row items-center gap-3 rounded-3xl bg-surface px-4 py-3 active:bg-surface-2"
-    >
-      <MessageSquare size={18} className="text-ink-4" />
-      <View className="min-w-0 flex-1 gap-0.5">
-        <Text className="text-detail text-ink-4">{label}</Text>
-        <Text numberOfLines={2} className="text-lg">
-          {thread?.title ?? "Conversation"}
-        </Text>
-      </View>
-      <ArrowUpRight size={16} className="text-ink-4" />
-    </Pressable>
-  );
-}
+const NO_BUTTONS: readonly TaskButton[] = [];
 
 /**
  * The bar's title, as a thread's: the task's title over where it stands, once the title on the page has scrolled under
@@ -120,8 +104,11 @@ function TaskFacts({ task }: { task: Task }) {
   );
 }
 
-/** The spec as the reply's prose, under a heading with Edit, which opens it as text; one that holds a secret stays the Mac's to edit. */
-function Description({ task }: { task: Task }) {
+/**
+ * The spec as the reply's prose, under a heading with Edit, which opens it as text; one that holds a secret stays the
+ * Mac's to edit. With `onRefine`, Refine stands beside Edit.
+ */
+function Description({ task, onRefine }: { task: Task; onRefine: (() => void) | null }) {
   const spec = task.spec?.trim() ? task.spec : null;
   const secret = holdsSecret(spec);
   const edit = () => router.push({ pathname: "/task-description", params: { id: task.id } });
@@ -132,9 +119,16 @@ function Description({ task }: { task: Task }) {
           Description
         </Text>
         {secret ? null : (
-          <Pressable accessibilityRole="button" accessibilityLabel="Edit description" onPress={edit} hitSlop={14} className="active:opacity-60">
-            <Text className="text-detail text-ink-2">Edit</Text>
-          </Pressable>
+          <View className="flex-row items-center gap-5">
+            {onRefine ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Refine this task" onPress={onRefine} hitSlop={14} className="active:opacity-60">
+                <Text className="text-detail text-ink-2">Refine</Text>
+              </Pressable>
+            ) : null}
+            <Pressable accessibilityRole="button" accessibilityLabel="Edit description" onPress={edit} hitSlop={14} className="active:opacity-60">
+              <Text className="text-detail text-ink-2">Edit</Text>
+            </Pressable>
+          </View>
         )}
       </View>
       {secret ? <Text className="text-detail text-ink-4">{SECRET_SPEC}</Text> : null}
@@ -157,9 +151,20 @@ function useTitleUnder() {
   return { under, onScroll, setBottom };
 }
 
-function TaskPage({ task, project, onSave, onTitle }: { task: Task; project: string | null; onSave: (patch: TaskPatch) => void; onTitle: (bottom: number) => void }) {
-  const working = task.executionThreadId;
-  const origin = task.threadId && task.threadId !== working ? task.threadId : null;
+interface PageProps {
+  task: Task;
+  project: string | null;
+  buttons: readonly TaskButton[];
+  /** The Mac lists the task's threads, runs its buttons and refines it for a phone. */
+  work: boolean;
+  refine: TaskRefineView;
+  onSave: (patch: TaskPatch) => void;
+  onTitle: (bottom: number) => void;
+}
+
+function TaskPage({ task, project, buttons, work, refine, onSave, onTitle }: PageProps) {
+  // One Refine at a time: while one runs or waits to be used, its own card offers what comes next.
+  const offerRefine = work && !refine.refine ? () => openRefine(task.id) : null;
   return (
     <>
       <View className="gap-3">
@@ -167,20 +172,18 @@ function TaskPage({ task, project, onSave, onTitle }: { task: Task; project: str
         <TaskProperties task={task} project={project} onSave={onSave} />
         <TaskFacts task={task} />
       </View>
-      {working || origin ? (
-        <View className="gap-2">
-          {working ? <ThreadLink threadId={working} label="Working in" /> : null}
-          {origin ? <ThreadLink threadId={origin} label="Started from" /> : null}
-        </View>
-      ) : null}
-      <Description task={task} />
+      {work ? <TaskButtons task={task} buttons={buttons} /> : null}
+      <TaskThreads task={task} listed={work} />
+      <TaskRefine task={task} view={refine} />
+      {showsSuggestion(refine) ? null : <Description task={task} onRefine={offerRefine} />}
     </>
   );
 }
 
 /**
- * One task on the phone, as its document reads and edits on the Mac: the title, its properties, the conversations it
- * belongs to, and its description. Starting it, its workspace and deleting it stay on the Mac.
+ * One task on the phone, as its document reads and edits on the Mac: the title, its properties, the project's buttons
+ * for it, every conversation it has had, Refine, and its description. Its first start, its workspace and deleting it
+ * stay on the Mac.
  */
 export function TaskScreen() {
   // `thread` is the conversation to offer if the Mac cannot open the task itself, as one from before task details.
@@ -189,11 +192,13 @@ export function TaskScreen() {
   const task = useRpc("tasks.get", { id });
   const { shown, save } = useTaskEdit(task.data);
   const projects = useRpc("projects.list", {});
-  const project = projects.data?.find((each) => each.id === shown?.projectId)?.name ?? null;
+  const project = projects.data?.find((each) => each.id === shown?.projectId);
+  const work = useTaskWork();
+  const refine = useTaskRefine(id, work && Boolean(shown));
   const title = useTitleUnder();
   return (
     <Measure className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => <TaskBarTitle task={shown} project={project} shown={title.under} /> }} />
+      <Stack.Screen options={{ headerTitle: () => <TaskBarTitle task={shown} project={project?.name ?? null} shown={title.under} /> }} />
       {shown ? (
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -203,7 +208,7 @@ export function TaskScreen() {
           contentContainerClassName="gap-6 px-5 pt-3"
           contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         >
-          <TaskPage task={shown} project={project} onSave={save} onTitle={title.setBottom} />
+          <TaskPage task={shown} project={project?.name ?? null} buttons={project?.settings.taskButtons ?? NO_BUTTONS} work={work} refine={refine} onSave={save} onTitle={title.setBottom} />
         </ScrollView>
       ) : (
         <View className="flex-1 items-center justify-center gap-4 px-8">

@@ -76,6 +76,14 @@ export const REMOTE_METHODS = [
   "tasks.get",
   "tasks.create",
   "tasks.update",
+  // Every thread a task has had, its buttons pressed as the Mac's task page presses them, and Refine: started, stopped
+  // and put away, its suggestion read with text redacted. A suggestion is used by an edit of the task, as any other.
+  "tasks.threads",
+  "tasks.runButton",
+  "tasks.refine.get",
+  "tasks.refine.start",
+  "tasks.refine.stop",
+  "tasks.refine.dismiss",
   // Orclings by face, name and their own conversation's state, and tapbacks in that conversation. One Orcling's profile
   // (model, permission, check-ins, current instructions and memories, text redacted) and every change its designer and
   // panel on the Mac make: making one, its look, name, model, account and permission, its check-ins and instructions,

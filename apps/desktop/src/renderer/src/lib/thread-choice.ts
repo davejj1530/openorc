@@ -1,15 +1,6 @@
 import { useMemo } from "react";
-import { projectAccountChoice, type AccountsProject } from "@openorc/client";
-import {
-  commentMentionOptions,
-  commentRecipientKey,
-  executionModeAvailable,
-  harnessLoggedIn,
-  type ClaudeAccount,
-  type CommentMentionOption,
-  type ModelOption,
-  type ThreadChoice,
-} from "@openorc/protocol";
+import { projectAccountChoice, threadModelOptions, type AccountsProject } from "@openorc/client";
+import { commentRecipientKey, harnessLoggedIn, type ClaudeAccount, type CommentMentionOption, type ModelOption, type ThreadChoice } from "@openorc/protocol";
 import { useRpc } from "./client";
 
 type ThreadModel = Pick<ThreadChoice, "agent" | "model" | "effort">;
@@ -31,13 +22,7 @@ const NO_OPTIONS: readonly CommentMentionOption[] = [];
 export function useThreadModels(plan: boolean, first = NO_OPTIONS): { models: ModelOption[] | undefined; options: CommentMentionOption[] } {
   const models = useRpc("agents.models", {}, { staleTime: 300000 }).data;
   const signedIn = useSignedInAgents();
-  const options = useMemo(
-    () =>
-      [...first, ...commentMentionOptions((models ?? []).filter((model) => !model.unavailable))].filter(
-        ({ recipient }) => (!signedIn || signedIn.has(recipient.agent)) && (!plan || executionModeAvailable(recipient.agent, "plan")),
-      ),
-    [first, models, plan, signedIn],
-  );
+  const options = useMemo(() => threadModelOptions(models, signedIn, plan, first), [first, models, plan, signedIn]);
   return { models, options };
 }
 

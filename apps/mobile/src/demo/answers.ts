@@ -99,6 +99,25 @@ const answers: Answers = {
   "tasks.update": () => {
     throw new Error("The demo Mac has no saved tasks.");
   },
+  // The demo Mac shares no task work (its negotiate leaves "task-work" out), so the phone never asks for it.
+  "tasks.threads": () => {
+    throw new Error(NOT_IN_DEMO);
+  },
+  "tasks.runButton": () => {
+    throw new Error(NOT_IN_DEMO);
+  },
+  "tasks.refine.get": () => {
+    throw new Error(NOT_IN_DEMO);
+  },
+  "tasks.refine.start": () => {
+    throw new Error(NOT_IN_DEMO);
+  },
+  "tasks.refine.stop": () => {
+    throw new Error(NOT_IN_DEMO);
+  },
+  "tasks.refine.dismiss": () => {
+    throw new Error(NOT_IN_DEMO);
+  },
   "orclings.chats": () => [],
   "orclings.profile": () => {
     throw new Error("The demo Mac has no Orclings.");

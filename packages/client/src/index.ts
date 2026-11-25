@@ -50,6 +50,8 @@ export { patchStat } from "./diff-stat.js";
 export { editedPaths } from "./edited-paths.js";
 export { citationLinks } from "./file-citations.js";
 export { quotedMessage, quoteRuns, type Quote } from "./quotes.js";
+export { alignBlocks, similarity, wordDiff, type BlockOp, type DiffBlock, type Segment } from "./refine-diff.js";
+export { buttonPendingLabel, refineChoice, showsOn, taskThreadRole, threadModelOptions } from "./task-work.js";
 export {
   compareUrl,
   comparisons,
@@ -89,7 +91,7 @@ export { decodeNewThreadDraft, newThreadChoice, newThreadStartInput, newThreadWo
 export { noticeVisible, type NoticePresence, type NoticeTarget } from "./notice-visible.js";
 export { panelToolLabels, tabsFor, type PanelTool, type PanelToolContext } from "./panel-tools.js";
 export { projectGitView, type ProjectGitView } from "./project-git.js";
-export { creditBalanceLabel, allowanceState, formatUsageTime, usageResetLabel } from "./provider-usage.js";
+export { creditBalanceLabel, allowanceState, formatUsageTime, meteredWindows, usageMeter, type UsageMeter, usageResetLabel } from "./provider-usage.js";
 export { invalidatesFor, tagsFor } from "./query-tags.js";
 export type { RpcQueryOptions } from "./query.js";
 export type { LoadRequest, RunStore } from "./run-store.js";

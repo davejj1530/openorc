@@ -1,12 +1,11 @@
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
-import { defaultChoice, type AccountsProject } from "@openorc/client";
+import { refineChoice, type AccountsProject } from "@openorc/client";
 import {
   commentRecipientKey,
   orclingMentionOptions,
   sameTaskDocument,
   type CommentMentionOption,
   type CommentRecipient,
-  type HarnessId,
   type ModelOption,
   type Orcling,
   type TaskRefine,
@@ -60,25 +59,12 @@ function remember(key: string, value: string | undefined): void {
   }
 }
 
-/** The last choice, else the default model a new thread offers, from those listed, else the first listed. */
-function initialChoice(options: CommentMentionOption[], models: ModelOption[] | undefined, defaultAgent: HarnessId | undefined): string {
-  const keys = options.map((option) => commentRecipientKey(option.recipient));
-  const last = remembered(REMEMBERED);
-  if (last && keys.includes(last)) return last;
-  const own = options.filter((option) => !option.recipient.orclingId);
-  const listed = (model: ModelOption) => own.some(({ recipient }) => recipient.agent === model.agent && recipient.model === model.id);
-  const preferred = defaultChoice((models ?? []).filter(listed), defaultAgent ?? null);
-  const atModel = own.filter(({ recipient }) => recipient.agent === preferred?.agent && recipient.model === preferred.model);
-  const option = atModel.find(({ recipient }) => recipient.effort === preferred?.effort) ?? atModel[0];
-  return option ? commentRecipientKey(option.recipient) : (keys[0] ?? "");
-}
-
 function useRefineRecipient(options: CommentMentionOption[], models: ModelOption[] | undefined, choice: string): CommentMentionOption | undefined {
   const defaultAgent = useDefaultAgent();
   const key = (option: CommentMentionOption) => commentRecipientKey(option.recipient);
   const picked = options.find((option) => key(option) === choice);
   if (picked) return picked;
-  const initial = initialChoice(options, models, defaultAgent);
+  const initial = refineChoice(options, models, defaultAgent ?? null, remembered(REMEMBERED));
   return options.find((option) => key(option) === initial);
 }
 

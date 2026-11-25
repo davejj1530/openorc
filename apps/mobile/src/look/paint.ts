@@ -50,7 +50,10 @@ function mixOperand(operand: string): { color: string; weight: number | null } {
   return match ? { color: match[1]!, weight: Number(match[2]) / 100 } : { color: operand, weight: null };
 }
 
-/** `color-mix(in srgb, a p%, b)` between opaque colors, as CSS Color 5 defines it. Anything else fails. */
+/**
+ * `color-mix(in srgb, a p%, b)` as CSS Color 5 defines it: channels are mixed weighted by each color's alpha, so a
+ * translucent operand tints the result only as far as it is there. Any other color space fails.
+ */
 function mix(body: string, resolve: (value: string) => Rgba, value: string): Rgba {
   const [space, ...operands] = splitArguments(body);
   if (space !== "in srgb" || operands.length !== 2) throw new Error(`Unsupported color-mix: ${value}`);
@@ -59,9 +62,9 @@ function mix(body: string, resolve: (value: string) => Rgba, value: string): Rgb
   const secondWeight = second.weight ?? 1 - firstWeight;
   if (Math.abs(firstWeight + secondWeight - 1) > 1e-9) throw new Error(`color-mix weights must add up to 100%: ${value}`);
   const [a, b] = [resolve(first.color), resolve(second.color)] as [Rgba, Rgba];
-  if (a.a < 1 || b.a < 1) throw new Error(`color-mix of a translucent color is not supported: ${value}`);
-  const channel = (key: "r" | "g" | "b") => a[key] * firstWeight + b[key] * secondWeight;
-  return { r: channel("r"), g: channel("g"), b: channel("b"), a: 1 };
+  const alpha = a.a * firstWeight + b.a * secondWeight;
+  const channel = (key: "r" | "g" | "b") => (alpha === 0 ? 0 : (a[key] * a.a * firstWeight + b[key] * b.a * secondWeight) / alpha);
+  return { r: channel("r"), g: channel("g"), b: channel("b"), a: alpha };
 }
 
 /** Resolves hex, 8-digit hex, `var()` and srgb `color-mix()` against the declarations. Any other syntax fails. */

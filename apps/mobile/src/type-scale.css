@@ -1,0 +1,45 @@
+/*
+ * The phone's type scale: the steps' names are the desktop's, so a class reads the same in both apps, and the sizes
+ * are the phone's own. design-sync reads this file in place of the desktop's `--text-*` steps and writes them into
+ * generated/theme.css and generated/tokens.ts; nothing imports it. Letter spacing is in em, as the desktop writes it.
+ */
+@theme static {
+  --text-xs: 12.5px;
+  --text-xs--line-height: 16px;
+  --text-xs--letter-spacing: 0em;
+  --text-sm: 13px;
+  --text-sm--line-height: 16px;
+  --text-sm--letter-spacing: 0em;
+  --text-base: 14px;
+  --text-base--line-height: 20px;
+  --text-base--letter-spacing: -0.005em;
+  --text-md: 15px;
+  --text-md--line-height: 24px;
+  --text-md--letter-spacing: -0.01em;
+  --text-header: 15px;
+  --text-header--line-height: 20px;
+  --text-header--letter-spacing: -0.01em;
+  --text-prose: 15px;
+  --text-prose--line-height: 24px;
+  --text-prose--letter-spacing: -0.005em;
+  --text-lg: 16px;
+  --text-lg--line-height: 22px;
+  --text-lg--letter-spacing: -0.01em;
+  --text-xl: 18px;
+  --text-xl--line-height: 24px;
+  --text-xl--letter-spacing: -0.01em;
+  --text-title-sm: 22px;
+  --text-title-sm--line-height: 28px;
+  --text-title-sm--letter-spacing: -0.015em;
+  --text-title: 28px;
+  --text-title--line-height: 34px;
+  --text-title--letter-spacing: -0.02em;
+  --text-stat: 18px;
+  --text-stat--line-height: 22px;
+  --text-stat-sm: 16px;
+  --text-stat-sm--line-height: 20px;
+  --text-2xl: 22px;
+  --text-2xl--line-height: 28px;
+  --text-3xl: 28px;
+  --text-3xl--line-height: 34px;
+}

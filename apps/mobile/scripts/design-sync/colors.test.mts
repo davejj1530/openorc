@@ -5,6 +5,24 @@ import { lchToHex, paletteColors, resolvePalette, stylesheetColors, type Cascade
 
 const hex = (value: string, declarations: Record<string, string> = {}) => toHex(resolveColor(value, declarations)).slice(1);
 
+// A small app.css: a ground, a color per mode, references into the palette, a ground-dependent fill, and values that are
+// not colors.
+const cascade: Cascade = {
+  root: {
+    "--bg": "#ababab",
+    "--tone-think": "#000001",
+    "--accent-ink": "#000003",
+    "--navigation-soft": "#000004",
+    "--ring": "var(--accent-ink)",
+    "--current-row-fill": "var(--navigation-soft)",
+    "--hairline": "1px",
+    "--seam": "var(--hairline)",
+    "--shadow-overlay": "0 0 32px -12px rgb(0 0 0 / 0.24)",
+    "--lit-mark": "none",
+  },
+  dark: { "--tone-think": "#000002" },
+};
+
 describe("resolveColor", () => {
   it("follows var() chains and fallbacks", () => {
     expect(hex("var(--a)", { "--a": "var(--b)", "--b": "#112233" })).toBe("112233");
@@ -21,11 +39,15 @@ describe("resolveColor", () => {
     expect(hex("color-mix(in srgb, #000000 25%, #ffffff 75%)")).toBe("bfbfbf");
   });
 
+  it("mixes a translucent color by how much of it is there, as CSS Color 5 does", () => {
+    expect(hex("color-mix(in srgb, #ff000080, #0000ff)")).toBe("5500aac0");
+    expect(hex("color-mix(in srgb, #ff000000, #0000ff)")).toBe("0000ff80");
+  });
+
   it("fails on syntax it does not resolve", () => {
     expect(() => resolveColor("lch(50% 10 20)", {})).toThrow("Unsupported color syntax");
     expect(() => resolveColor("oklch(50% 0.1 20)", {})).toThrow("Unsupported color syntax");
     expect(() => resolveColor("color-mix(in oklab, #000000 50%, #ffffff)", {})).toThrow("Unsupported color-mix");
-    expect(() => resolveColor("color-mix(in srgb, #00000080 50%, #ffffff)", {})).toThrow("translucent");
     expect(() => resolveColor("var(--a)", { "--a": "var(--b)", "--b": "var(--a)" })).toThrow("Circular");
     expect(() => resolveColor("var(--nothing)", {})).toThrow("not defined");
   });
@@ -45,17 +67,13 @@ describe("lch()", () => {
   });
 
   it("writes lch() as hex wherever a palette uses it, mixes included, so the phone never meets it", () => {
-    const linear = paletteColors("linear", "light");
+    const linear = paletteColors("linear", "light", cascade);
     expect(linear["--selection"]).toBe("#cad3f3");
     expect(Object.values(linear).filter((value) => /lch/i.test(value))).toEqual([]);
   });
 });
 
 describe("resolvePalette", () => {
-  const cascade: Cascade = {
-    root: { "--bg": "#ababab", "--tone-think": "#000001", "--ring": "var(--accent-ink)", "--current-row-fill": "var(--navigation-soft)", "--hairline": "1px" },
-    dark: { "--tone-think": "#000002" },
-  };
   const authored = themePresets.find((preset) => preset.id === "openorc")!.colors;
 
   it("paints the palette over app.css, as the desktop's inline style does", () => {
@@ -79,8 +97,8 @@ describe("resolvePalette", () => {
 
   it("carries an override to every color that names it, as the desktop's live custom properties do", () => {
     const sheet = stylesheetColors(cascade, "light");
-    const plain = paintPalette(paletteColors("openorc", "light"), sheet);
-    const changed = paintPalette(paletteColors("openorc", "light"), sheet, { "--surface": "#fafaf0", "--accent": "#2768a5" });
+    const plain = paintPalette(paletteColors("openorc", "light", cascade), sheet);
+    const changed = paintPalette(paletteColors("openorc", "light", cascade), sheet, { "--surface": "#fafaf0", "--accent": "#2768a5" });
     expect(changed.surface).toBe("#fafaf0");
     expect(changed.paper).toBe("#fafaf0");
     expect(changed["accent-ink"]).not.toBe(plain["accent-ink"]);
@@ -91,6 +109,9 @@ describe("resolvePalette", () => {
     const light = resolvePalette("openorc", "light", cascade);
     expect(light).not.toHaveProperty("current-row-fill");
     expect(light).not.toHaveProperty("hairline");
+    expect(light).not.toHaveProperty("seam");
+    expect(light).not.toHaveProperty("shadow-overlay");
+    expect(light).not.toHaveProperty("lit-mark");
     expect(light).not.toHaveProperty("surface-gradient");
     expect(light).not.toHaveProperty("well-ring");
   });

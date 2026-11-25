@@ -16,7 +16,7 @@ function useIconColor(className: string | undefined): string | undefined {
 /** The desktop's icon root (components/icons.tsx); design-sync fails if the desktop changes it. */
 function Outline({ size, color, children }: { size: number; color: string | undefined; children: ReactNode }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" color={color} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+    <Svg width={size} height={size} viewBox="0 0 24 24" color={color} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       {children}
     </Svg>
   );

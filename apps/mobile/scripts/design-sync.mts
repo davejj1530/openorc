@@ -101,7 +101,7 @@ function palettesTs(cascade: Cascade, colors: Colors): string {
     }
   }
   const byMode = (read: (mode: (typeof modes)[number]) => Record<string, string>) => Object.fromEntries(modes.map((mode) => [mode, read(mode)]));
-  const palettes = Object.fromEntries(themePresets.map(({ id }) => [id, byMode((mode) => paletteColors(id, mode))]));
+  const palettes = Object.fromEntries(themePresets.map(({ id }) => [id, byMode((mode) => paletteColors(id, mode, cascade))]));
   return [
     `// ${header}`,
     'import type { Mode, ThemePreset } from "@openorc/client/theme";',
@@ -129,7 +129,8 @@ async function formatted(path: string, source: string): Promise<Output> {
 
 async function outputs(): Promise<Output[]> {
   const css = await readFile(appCss, "utf8");
-  const { cascade, scales } = readStylesheet(css, appCss);
+  const typeCss = resolve(app, "src/type-scale.css");
+  const { cascade, scales } = readStylesheet({ css, from: appCss }, { css: await readFile(typeCss, "utf8"), from: typeCss });
   const colors = Object.fromEntries(modes.map((mode) => [mode, resolvePalette(palette, mode, cascade)])) as Colors;
   const faces = await convertFonts(desktopFonts, resolve(app, "assets/fonts"));
   const fonts: Fonts = { text: faces[0]!.postScriptName, bold: faces[1]!.postScriptName, mono: postScriptName(await readFile(monoFont)) };

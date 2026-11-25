@@ -50,25 +50,35 @@ function bezier(value: string, name: string): Bezier {
   return points as Bezier;
 }
 
-type Families = Omit<Scales, "height" | "container"> & { control: Record<string, number> };
+type Families = Omit<Scales, "height" | "container" | "text"> & { control: Record<string, number> };
+
+/** The phone's type steps from its own `@theme static` block: each a size, a line height and tracking in points. */
+function readType(declarations: Declarations): Scales["text"] {
+  const text: Scales["text"] = {};
+  for (const [name, value] of Object.entries(declarations)) {
+    if (!name.startsWith("--text-")) throw new Error(`type-scale.css: ${name} is not a type step`);
+    const [key, part] = name.slice("--text-".length).split("--") as [string, string | undefined];
+    const entry = (text[key] ??= { size: 0, lineHeight: 0, letterSpacing: 0 });
+    if (part === undefined) entry.size = px(value, name);
+    else if (part === "line-height") entry.lineHeight = px(value, name);
+    // Kept in em until every step's size is known; React Native tracking is absolute.
+    else if (part === "letter-spacing") entry.letterSpacing = em(value, name);
+    else throw new Error(`${name}: unknown text property`);
+  }
+  for (const [name, step] of Object.entries(text)) {
+    if (!step.size || !step.lineHeight) throw new Error(`--text-${name} needs a size and a line height`);
+    step.letterSpacing = Math.round(step.letterSpacing * step.size * 1000) / 1000;
+  }
+  return text;
+}
 
 /**
  * Each `@theme static` family the phone reads, by prefix. A declaration matching none of them fails the run, so a new
  * desktop scale is a decision here rather than a silent gap.
  */
 const families: { prefix: string; read: (families: Families, step: string, value: string, name: string) => void }[] = [
-  {
-    prefix: "--text-",
-    read: ({ text }, step, value, name) => {
-      const [key, part] = step.split("--") as [string, string | undefined];
-      const entry = (text[key] ??= { size: 0, lineHeight: 0, letterSpacing: 0 });
-      if (part === undefined) entry.size = px(value, name);
-      else if (part === "line-height") entry.lineHeight = px(value, name);
-      // Kept in em until every step's size is known; React Native tracking is absolute.
-      else if (part === "letter-spacing") entry.letterSpacing = em(value, name);
-      else throw new Error(`${name}: unknown text property`);
-    },
-  },
+  // The phone sets its own type (src/type-scale.css): its sizes are a phone's, not a window's.
+  { prefix: "--text-", read: () => undefined },
   {
     prefix: "--radius-",
     read: ({ radius }, step, value, name) => {
@@ -109,16 +119,12 @@ const families: { prefix: string; read: (families: Families, step: string, value
   { prefix: "--font-", read: () => undefined },
 ];
 
-function readScales(statics: Declarations, inline: Declarations): Scales {
-  const read: Families = { text: {}, radius: {}, control: {}, motion: { ease: {}, duration: {}, stagger: 0, arrive: {} } };
+function readScales(statics: Declarations, inline: Declarations, type: Declarations): Scales {
+  const read: Families = { radius: {}, control: {}, motion: { ease: {}, duration: {}, stagger: 0, arrive: {} } };
   for (const [name, value] of Object.entries(statics)) {
     const family = families.find(({ prefix }) => name.startsWith(prefix));
     if (!family) throw new Error(`app.css @theme static: ${name} belongs to no scale design-sync knows`);
     family.read(read, name.slice(family.prefix.length), value, name);
-  }
-  for (const [name, step] of Object.entries(read.text)) {
-    if (!step.size || !step.lineHeight) throw new Error(`--text-${name} needs a size and a line height`);
-    step.letterSpacing = Math.round(step.letterSpacing * step.size * 1000) / 1000;
   }
   const height: Record<string, number> = {};
   for (const [name, value] of Object.entries(inline)) {
@@ -133,14 +139,17 @@ function readScales(statics: Declarations, inline: Declarations): Scales {
     if (name.startsWith("--container-")) container[name.slice("--container-".length)] = px(value, name);
   }
   const { control: _control, ...scales } = read;
-  return { ...scales, height, container };
+  return { ...scales, text: readType(type), height, container };
 }
 
-/** Everything the phone reads from app.css: the cascade under every palette, and the scales. */
-export function readStylesheet(css: string, from: string): { cascade: Cascade; scales: Scales } {
-  const root = postcss.parse(css, { from });
+/**
+ * Everything the phone reads from the stylesheets: from the desktop's app.css the cascade under every palette and the
+ * scales, and from the phone's own type-scale.css its type.
+ */
+export function readStylesheet(app: { css: string; from: string }, type: { css: string; from: string }): { cascade: Cascade; scales: Scales } {
+  const root = postcss.parse(app.css, { from: app.from });
   return {
     cascade: { root: topLevelRule(root, ":root"), dark: topLevelRule(root, ':root[data-theme="dark"]') },
-    scales: readScales(themeBlock(root, "static"), themeBlock(root, "inline")),
+    scales: readScales(themeBlock(root, "static"), themeBlock(root, "inline"), themeBlock(postcss.parse(type.css, { from: type.from }), "static")),
   };
 }

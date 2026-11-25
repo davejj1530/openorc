@@ -5,12 +5,47 @@ export type { Declarations, Hex };
 /** The two `:root` rules of app.css that every palette sits on: the light defaults and the dark overrides. */
 export type Cascade = { root: Declarations; dark: Declarations };
 
-// Not colors: widths, images, shadows and filters stay with the desktop's CSS.
-const notColors = new Set(["--hairline", "--surface-gradient", "--shadow-overlay", "--raised-shadow", "--well-ring", "--lit", "--lit-strong", "--lit-mark"]);
 // These change with the ground a control sits on (DESIGN.md, the Contextual Fill Rule), so the phone names its fills directly.
 const contextualFills = new Set(["--current-row-fill", "--control-fill", "--float-fill"]);
 
 const lchPattern = /lch\(([^)]*)\)/gi;
+const hexPattern = /^#[0-9a-f]{3,8}$/i;
+const referencePattern = /^var\(\s*(--[a-z0-9-]+)\s*(?:,\s*(.+))?\)$/i;
+// Every CSS color function, the ones the painter cannot resolve too, so an unsupported color fails there instead of
+// going missing here.
+const colorFunctions = new Set(["rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch", "color", "color-mix"]);
+
+/** The function's name when the whole value is one call, such as `lch(...)`; null for a list, a keyword or a length. */
+function soleCall(value: string): string | null {
+  const open = value.indexOf("(");
+  if (open < 1 || !value.endsWith(")")) return null;
+  let depth = 0;
+  for (let index = open; index < value.length - 1; index++) {
+    if (value[index] === "(") depth++;
+    else if (value[index] === ")" && --depth === 0) return null;
+  }
+  return value.slice(0, open).toLowerCase();
+}
+
+/**
+ * Whether a property holds a color, read from its value: a hex, one color function, or a reference to a property that
+ * holds one. Widths, shadows, images and filters are none of these and stay with the desktop's CSS. An empty value
+ * unsets a property and says nothing of its kind, so it passes.
+ */
+function isColor(value: string, scope: Declarations, seen: readonly string[] = []): boolean {
+  const trimmed = value.trim();
+  if (trimmed === "" || hexPattern.test(trimmed)) return true;
+  const reference = referencePattern.exec(trimmed);
+  if (reference) {
+    const [, name, fallback] = reference as unknown as [string, string, string | undefined];
+    const target = seen.includes(name) ? undefined : scope[name] || fallback;
+    if (!target) throw new Error(`${name} is not defined or names itself (in ${value})`);
+    return isColor(target, scope, [...seen, name]);
+  }
+  const call = soleCall(trimmed);
+  return call !== null && colorFunctions.has(call);
+}
+
 // CSS Color 4: Lab is relative to D50; sRGB to D65, reached through Bradford adaptation.
 const d50 = [0.3457 / 0.3585, 1, (1 - 0.3457 - 0.3585) / 0.3585] as const;
 const d50ToD65 = [
@@ -65,23 +100,27 @@ function normalized(value: string): string {
   return /var\(/i.test(plain) ? plain : toHex(resolveColor(plain, {}));
 }
 
-function colors(declarations: Declarations): Record<string, string> {
-  return Object.fromEntries(Object.entries(declarations).flatMap(([name, value]) => (notColors.has(name) || contextualFills.has(name) ? [] : [[name, normalized(value)]])));
+/** The colors among the declarations, whose references are read against `scope`: every property in force where they apply. */
+function colors(declarations: Declarations, scope: Declarations): Record<string, string> {
+  return Object.fromEntries(Object.entries(declarations).flatMap(([name, value]) => (contextualFills.has(name) || !isColor(value, scope) ? [] : [[name, normalized(value)]])));
 }
+
+const inMode = (cascade: Cascade, mode: Mode): Declarations => (mode === "dark" ? { ...cascade.root, ...cascade.dark } : cascade.root);
 
 /** app.css's colors in a mode: its `:root` rule, with the dark one over it in dark. */
 export function stylesheetColors(cascade: Cascade, mode: Mode): Record<string, string> {
-  return colors(mode === "dark" ? { ...cascade.root, ...cascade.dark } : cascade.root);
+  const sheet = inMode(cascade, mode);
+  return colors(sheet, sheet);
 }
 
 /** One palette's own properties in a mode, which the phone paints over the stylesheet's at runtime. */
-export function paletteColors(preset: ThemePreset, mode: Mode): Record<string, string> {
+export function paletteColors(preset: ThemePreset, mode: Mode, cascade: Cascade): Record<string, string> {
   const template = themePresets.find((candidate) => candidate.id === preset);
   if (!template) throw new Error(`Unknown palette ${preset}`);
-  return colors(template.colors[mode]);
+  return colors(template.colors[mode], { ...inMode(cascade, mode), ...template.colors[mode] });
 }
 
 /** One palette in one mode with nothing changed on it, as the desktop paints it. */
 export function resolvePalette(preset: ThemePreset, mode: Mode, cascade: Cascade): Record<string, Hex> {
-  return paintPalette(paletteColors(preset, mode), stylesheetColors(cascade, mode));
+  return paintPalette(paletteColors(preset, mode, cascade), stylesheetColors(cascade, mode));
 }

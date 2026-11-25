@@ -420,8 +420,6 @@ export const CalendarClock = icon(
 export const History = icon("History", <path d="M3 10a9 9 0 1 1 1 7 M3 4v6h6 M12 7v5l4 2" />);
 export const RotateCcw = icon("RotateCcw", <path d="M3 10a9 9 0 1 1 1 7 M3 4v6h6" />);
 export const RefreshCw = icon("RefreshCw", <path d="M3.5 10A8.5 8.5 0 0 1 18 6l2.5 3 M20.5 3v6h-6 M20.5 14A8.5 8.5 0 0 1 6 18l-2.5-3 M3.5 21v-6h6" />);
-export const Loader2 = icon("Loader2", <path d="M12 3.5A8.5 8.5 0 1 1 3.5 12" />);
-export const LoaderCircle = icon("LoaderCircle", <path d="M12 3.5A8.5 8.5 0 1 1 3.5 12" />);
 export const CircleDashed = icon("CircleDashed", <circle cx="12" cy="12" r="8.5" strokeDasharray="3.3 3.38" />);
 export const CircleReview = icon(
   "CircleReview",

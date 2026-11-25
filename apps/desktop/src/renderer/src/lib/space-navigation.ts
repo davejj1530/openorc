@@ -114,15 +114,16 @@ export function createSpaceNavigation(deps: Dependencies) {
       },
       reconcile(inventory) {
         get().remember();
-        inventory = retainUnavailable(get().inventory, inventory, get().views, get().current);
-        const views = Object.fromEntries(inventory.map((space) => [space.id, validSpaceView(held.take(space, get().views[space.id]), space)]));
+        const before = get().views;
+        inventory = retainUnavailable(get().inventory, inventory, before, get().current);
+        const views = Object.fromEntries(inventory.map((space) => [space.id, validSpaceView(held.take(space, before[space.id]), space)]));
         const current = inventory.some((space) => space.id === get().current) ? get().current! : get().personal;
         set({ inventory, views });
         if (!current) return;
         const view = views[current] ?? emptySpaceView();
-        const captured = deps.capture(get().ownership);
-        // Compared regardless of key order: restoring an unchanged view would close the panel.
-        if (current !== get().current || (!isGlobal(deps, captured) && sameShape(captured) !== sameShape(view))) restore(current, view);
+        const was = before[current];
+        // Restored only when the new list changes what the space shows: restoring would close the panel.
+        if (current !== get().current || (!isGlobal(deps, deps.capture(get().ownership)) && (!was || shownShape(was) !== shownShape(view)))) restore(current, view);
       },
       end() {
         const view = validSpaceView(localView, localInventory(get().inventory));
@@ -158,9 +159,12 @@ function departDetachedSpace(state: Navigation, id: string, set: (value: Partial
   save(previous.id, view);
 }
 
-/** A view as JSON with every object's keys in order, so two equal views read the same however each was built. */
-const sameShape = (view: SpaceView): string =>
-  JSON.stringify(view, (_key, value: unknown) =>
+/**
+ * What a view shows, as JSON with every object's keys in order, so two equal views read the same however each was built.
+ * The steps back and forward are left out: losing one changes nothing on screen.
+ */
+const shownShape = ({ history: _history, future: _future, ...shown }: SpaceView): string =>
+  JSON.stringify(shown, (_key, value: unknown) =>
     value && typeof value === "object" && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : 1))) : value,
   );
 

@@ -92,22 +92,18 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
 .title-crumb-divider {
   color: var(--ink-4);
 }
+/* The scope's glyph, a size over its name and in the name's own ink. */
 .project-scope-icon {
   display: inline-flex;
   flex-shrink: 0;
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   justify-content: center;
   align-items: center;
-  opacity: 0.6;
-  transition: opacity var(--duration-leave) var(--ease-out);
 }
 .project-scope-icon > * {
-  width: 14px;
-  height: 14px;
-}
-.title-crumb-link:is(:hover, [data-popup-open]) .project-scope-icon {
-  opacity: 1;
+  width: 18px;
+  height: 18px;
 }
 .project-scope-name {
   min-width: 0;
@@ -134,14 +130,14 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
 .sidebar-scope-icon {
   display: inline-flex;
   flex-shrink: 0;
-  width: 13px;
-  height: 13px;
+  width: 18px;
+  height: 18px;
   align-items: center;
   justify-content: center;
 }
 .sidebar-scope-icon > * {
-  width: 13px;
-  height: 13px;
+  width: 18px;
+  height: 18px;
 }
 .sidebar-scope-name {
   flex: 1;
@@ -161,7 +157,7 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
 }
 
 /* New thread, then the screens by name, 34px apart: an 18px glyph, a size over its name, filling the sidebar's 18px lead slot
-   16px in, so the name starts at 42 as a project's does, and a count at the end only where something waits. New thread keeps full ink at rest. Settings lists its sections the
+   16px in and in its name's own ink, so the name starts at 42 as a project's does, and a count at the end only where something waits. New thread keeps full ink at rest. Settings lists its sections the
    same way in their place. */
 .sidebar-nav {
   display: grid;
@@ -213,7 +209,6 @@ button.sidebar-nav-row:active:not([aria-current="page"]) {
   flex-shrink: 0;
   justify-content: center;
   width: 18px;
-  color: var(--ink-4);
 }
 .sidebar-nav-label {
   flex: 1;
@@ -222,8 +217,7 @@ button.sidebar-nav-row:active:not([aria-current="page"]) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sidebar-nav-row:is([aria-current="page"], [data-lead]),
-.sidebar-nav-row:is([aria-current="page"], [data-lead]) .sidebar-nav-icon {
+.sidebar-nav-row:is([aria-current="page"], [data-lead]) {
   color: var(--navigation-ink);
 }
 .sidebar-nav-row[aria-current="page"]:not(:focus-visible) {

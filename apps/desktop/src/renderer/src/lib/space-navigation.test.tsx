@@ -2,7 +2,7 @@ import { afterEach, expect, it } from "vitest";
 import { createSpaceNavigation, spaceNavigation } from "./space-navigation";
 import { closedSpace, emptySpaceView, type SpaceInventory, type SpaceView } from "./space-view";
 import { navigationScope } from "./navigation-scope";
-import { useRouter } from "./router";
+import { useRouter, type Route } from "./router";
 import { useThreadTabs } from "./thread-tabs";
 import { queryClient } from "./client";
 import { useLayout } from "./layout";
@@ -292,6 +292,28 @@ it("leaves an open panel and the view as they are when the space list is read ag
   spaceNavigation.getState().initialize("key", "personal", spaces);
   expect(useLayout.getState().panelOpen).toBe(true);
   expect(useRouter.getState().route).toBe(before);
+});
+
+it.each<[string, Route[], SpaceInventory[]]>([
+  ["Settings among the steps back", [{ view: "settings" }, { view: "thread", threadId: "a" }], spaces],
+  ["a thread opened at a message", [{ view: "thread", threadId: "a", message: { runId: "run", turn: 1, messageId: "message" } }], spaces],
+  [
+    "a deleted thread among the steps back",
+    [
+      { view: "thread", threadId: "b" },
+      { view: "thread", threadId: "a" },
+    ],
+    [spaces[0]!, { ...spaces[1]!, threads: spaces[1]!.threads.filter((thread) => thread.id !== "b") }],
+  ],
+])("leaves an open panel and the view as they are when the space list is read again with %s", (_name, steps, reread) => {
+  spaceNavigation.getState().initialize("key", "personal", spaces);
+  spaceNavigation.getState().select("birch");
+  for (const step of steps) useRouter.getState().navigate(step);
+  useLayout.getState().setPanel(true);
+  const before = useRouter.getState();
+  spaceNavigation.getState().initialize("key", "personal", reread);
+  expect(useLayout.getState().panelOpen).toBe(true);
+  expect(useRouter.getState()).toBe(before);
 });
 
 const open: Partial<SpaceView> = {

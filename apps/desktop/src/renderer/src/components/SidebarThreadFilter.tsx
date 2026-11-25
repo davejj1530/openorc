@@ -56,7 +56,7 @@ export function SidebarThreadFilter({ workspaces }: { workspaces: readonly Group
                 <div className="sidebar-filter-workspaces">
                   {workspaces.map((workspace) => (
                     <Menu.CheckboxItem key={workspace.id} className={menuItem} checked={!hidden.includes(workspace.id)} onCheckedChange={() => useLayout.getState().toggleWorkspace(workspace.id)}>
-                      <ProjectLogo project={workspace} />
+                      <ProjectLogo project={workspace} size={18} />
                       <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
                       <Check size={13} className={hidden.includes(workspace.id) ? "text-transparent" : "text-accent-ink"} />
                     </Menu.CheckboxItem>

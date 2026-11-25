@@ -5,7 +5,10 @@ import type { PanelTab } from "../lib/layout";
 import { useHostedCapabilities } from "../hooks/useHostedCapabilities";
 import { HostedControlReason } from "./HostedControlReason";
 
-/** A blank tab's page: every tool this context offers, in launcher order, then the pages visited lately. */
+/**
+ * A blank tab's page: every tool this context offers, in launcher order, then the pages visited lately. Each row's
+ * glyph is 18px, a size over its name and in the name's own ink, as the sidebar's screens are.
+ */
 export function PanelNewTab({ context, onTool, onNavigate, recentUrls }: { context: PanelContext; onTool: (tool: PanelTab) => void; onNavigate: (url: string) => void; recentUrls: string[] }) {
   const availability = useHostedCapabilities(context.kind === "thread" ? context.thread : null);
   return (
@@ -21,14 +24,14 @@ export function PanelNewTab({ context, onTool, onNavigate, recentUrls }: { conte
               return (
                 <HostedControlReason key={tool} label={label} reason={reason}>
                   <button className="panel-tool-shortcut w-full disabled:text-ink-4! disabled:pointer-events-none" disabled>
-                    <Icon size={15} />
+                    <Icon size={18} />
                     <span>{label}</span>
                   </button>
                 </HostedControlReason>
               );
             return (
               <button key={tool} className="panel-tool-shortcut" onClick={() => onTool(tool)}>
-                <Icon size={15} />
+                <Icon size={18} />
                 <span>{label}</span>
               </button>
             );
@@ -41,7 +44,7 @@ export function PanelNewTab({ context, onTool, onNavigate, recentUrls }: { conte
           <div className="panel-tool-grid">
             {recentUrls.map((url) => (
               <button key={url} className="panel-recent-page" data-tip={url} onClick={() => onNavigate(url)}>
-                <Globe size={15} />
+                <Globe size={18} />
                 <span>{pageHost(url)}</span>
               </button>
             ))}

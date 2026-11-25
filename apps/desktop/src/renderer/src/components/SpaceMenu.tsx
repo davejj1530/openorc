@@ -50,9 +50,7 @@ export function SpaceMenu({ actions, list, waitingOrclings }: { actions: Organiz
       {!data ? <SpaceRow space={{ id: "", kind: "personal" }} person={actions?.person ?? ""} checked={!list.orclings} onClick={() => pick(shown)} /> : null}
       {actions && !data ? <SpaceReadState actions={actions} /> : null}
       {actions && data?.invitations.length ? <Menu.Separator className={menuSeparator} /> : null}
-      {actions
-        ? data?.invitations.map((invitation) => <ReceivedInvitationRow key={invitation.id} invitation={invitation} actions={actions.invitations} />)
-        : null}
+      {actions ? data?.invitations.map((invitation) => <ReceivedInvitationRow key={invitation.id} invitation={invitation} actions={actions.invitations} />) : null}
       <Menu.Separator className={menuSeparator} />
       <OrclingsRow checked={list.orclings} waiting={waitingOrclings} onClick={list.showOrclings} />
       {actions ? <SpaceActions actions={actions} create={data?.create} /> : null}
@@ -89,14 +87,14 @@ function SpaceActions({ actions, create }: { actions: OrganizationActions; creat
           <Menu.Separator className={menuSeparator} />
           <Menu.Item className={menuItem} onClick={() => actions.people()}>
             <span className="space-menu-mark">
-              <People size={15} />
+              <People size={18} />
             </span>
             People
           </Menu.Item>
           {actions.organization.role === "admin" ? (
             <Menu.Item className={menuItem} onClick={actions.invite}>
               <span className="space-menu-mark">
-                <PersonPlus size={15} />
+                <PersonPlus size={18} />
               </span>
               Invite people…
             </Menu.Item>
@@ -146,7 +144,7 @@ function CreateAction({ allowed, reason, run }: { allowed: boolean; reason: stri
   const content = (
     <>
       <span className="space-menu-mark">
-        <Plus size={15} />
+        <Plus size={18} />
       </span>
       Create organization…
     </>

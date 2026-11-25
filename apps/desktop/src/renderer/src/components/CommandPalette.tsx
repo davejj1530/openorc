@@ -89,7 +89,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                     search.newFileReason && label === "New file" ? (
                       <HostedPaletteUnavailable key={label} label={label} reason={search.newFileReason} />
                     ) : (
-                      <Item key={label} onSelect={() => go(run)} icon={<Icon size={15} />} label={label} />
+                      <Item key={label} onSelect={() => go(run)} icon={<Icon size={18} />} label={label} />
                     ),
                   )}
                 <OrganizationPalette go={go} />
@@ -117,7 +117,7 @@ function PlaceGroup({ heading, places, go }: { heading: string; places: Place[];
 
 /** A thread's mark: what it needs or the working cube, else its agent's. */
 function threadIcon(thread: ThreadSummary): ReactNode {
-  const agent = isHarnessId(thread.agent) ? <HarnessLogo id={thread.agent} size={15} /> : <MessageSquare size={15} />;
+  const agent = isHarnessId(thread.agent) ? <HarnessLogo id={thread.agent} size={18} /> : <MessageSquare size={18} />;
   return <ThreadStatusIndicator thread={thread} idle={agent} />;
 }
 
@@ -149,7 +149,7 @@ function PlaceGroups({ typed, go }: { typed: boolean; go: (fn: () => void) => vo
       <PlaceGroup
         heading="Orclings"
         go={go}
-        places={orclings.map((o) => ({ key: o.id, value: `orcling ${o.name}`, label: o.name, icon: <Orclings size={15} />, open: () => openThread(o.threadId) }))}
+        places={orclings.map((o) => ({ key: o.id, value: `orcling ${o.name}`, label: o.name, icon: <Orclings size={18} />, open: () => openThread(o.threadId) }))}
       />
       <PlaceGroup
         heading="Tasks"
@@ -182,7 +182,7 @@ function MessageHits({ hits, go }: { hits: RpcHits; go: (fn: () => void) => void
             const message = { runId: h.runId, turn: h.turn, messageId: h.messageId, ...(h.role === "note" ? { note: true as const } : {}) };
             go(() => (h.taskId ? openTask(h.taskId, "chat", message) : openThread(h.threadId, message)));
           }}
-          icon={<MessageSquare size={15} />}
+          icon={<MessageSquare size={18} />}
           label={h.snippet}
           place={h.member ? `${h.member.name} in ${h.taskTitle ?? h.threadTitle}` : (h.taskTitle ?? h.threadTitle)}
           age={rowAge(h.ts, now)}
@@ -201,7 +201,7 @@ function ProjectGroup({ go }: { go: (fn: () => void) => void }) {
     <PlaceGroup
       heading="Projects"
       go={go}
-      places={projects.map((p) => ({ key: p.id, value: `project ${p.name}`, label: p.name, icon: <ProjectLogo project={p} />, open: () => navigate({ view: "project", projectId: p.id }) }))}
+      places={projects.map((p) => ({ key: p.id, value: `project ${p.name}`, label: p.name, icon: <ProjectLogo project={p} size={18} />, open: () => navigate({ view: "project", projectId: p.id }) }))}
     />
   );
 }

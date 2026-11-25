@@ -20,7 +20,7 @@ export function TurnReceipt({ items, open, controls, onToggle }: { items: Receip
         const Icon = itemIcon(item);
         return (
           <span key={`${item.kind}:${item.label}`} className="turn-receipt-item" data-kind={item.kind} data-tone={item.failed ? "bad" : undefined}>
-            <Icon size={14} />
+            <Icon size={15} />
             {item.label}
           </span>
         );

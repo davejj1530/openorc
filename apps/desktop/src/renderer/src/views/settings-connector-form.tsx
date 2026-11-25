@@ -45,7 +45,7 @@ function Pairs({ rows, onChange, keyLabel }: { rows: Pair[]; onChange: (rows: Pa
         </div>
       ))}
       <Button size="sm" variant="ghost" onClick={() => onChange([...rows, { key: "", value: "" }])}>
-        <Plus size={13} />
+        <Plus size={16} />
         Add {keyLabel.toLowerCase()}
       </Button>
     </div>

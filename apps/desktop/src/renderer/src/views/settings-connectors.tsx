@@ -201,7 +201,7 @@ export function ConnectorSettings({ active, description }: { active: boolean; de
             </IconButton>
           </Tooltip>
           <Button size="lg" onClick={() => setDraft({ name: "", spec: null, agents: [] })}>
-            <Plus size={14} />
+            <Plus size={16} />
             Add connector
           </Button>
         </div>

@@ -46,9 +46,9 @@ export function SidebarNav({ route, projectId }: { route: Route; projectId: stri
   const standIn = organizationPage || frozen !== null;
   return (
     <nav className="sidebar-nav" aria-label="Screens">
-      <NavRow icon={<PenSquare size={16} />} label="New thread" lead current={route.view === "newthread" && !standIn} onClick={() => newThread(projectId ?? undefined)} />
+      <NavRow icon={<PenSquare size={18} />} label="New thread" lead current={route.view === "newthread" && !standIn} onClick={() => newThread(projectId ?? undefined)} />
       {SCREENS.map(({ id, label, Icon, route: to, views }) => (
-        <NavRow key={id} icon={<Icon size={16} />} label={label} count={counts[id]} current={!standIn && views.includes(route.view)} onClick={() => useRouter.getState().navigate(to)} />
+        <NavRow key={id} icon={<Icon size={18} />} label={label} count={counts[id]} current={!standIn && views.includes(route.view)} onClick={() => useRouter.getState().navigate(to)} />
       ))}
     </nav>
   );

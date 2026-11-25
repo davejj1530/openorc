@@ -133,7 +133,6 @@
 .panel-tool-shortcut svg,
 .panel-recent-page svg {
   flex-shrink: 0;
-  color: var(--ink-3);
 }
 .panel-tool-shortcut:hover,
 .panel-recent-page:hover {

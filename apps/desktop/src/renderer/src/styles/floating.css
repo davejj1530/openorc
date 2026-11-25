@@ -223,11 +223,16 @@
     background-color var(--duration-quick) var(--ease-out),
     opacity var(--duration-leave) var(--ease-out) var(--row-delay, 0ms);
 }
-/* In the components layer so a glyph's own utilities (text-transparent, invisible, text-ink)
-   still win over the muted default. */
+/* A row's glyph is 18px, a size over its name and in the name's own ink, as a sidebar row's is. Its tick and its
+   chevron are marks, not glyphs: they stay 15px and quiet. In the components layer so a glyph's own utilities
+   (text-transparent, invisible, text-ink) still win. */
 @layer components {
   .menu-item > svg {
     flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+  }
+  .menu-item > svg:is([data-icon="Check"], [data-icon^="Chevron"]) {
     width: 15px;
     height: 15px;
     color: var(--ink-3);
@@ -631,6 +636,10 @@
   display: inline-flex;
   flex-shrink: 0;
   color: var(--ink-3);
+}
+/* A result's glyph is 18px in its name's own ink; the field's lens above stays quiet. */
+.command-palette-item .command-palette-icon {
+  color: inherit;
 }
 .command-palette-label {
   min-width: 0;

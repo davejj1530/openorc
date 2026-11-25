@@ -70,7 +70,7 @@ export function SidebarProjectGroup({
             }}
           >
             <span className="sidebar-project-mark" aria-hidden="true">
-              <ProjectLogo project={project} cube={{ activity }} />
+              <ProjectLogo project={project} cube={{ activity }} size={16} />
             </span>
             <span className="sidebar-project-name" data-tip={project.name}>
               {project.name}

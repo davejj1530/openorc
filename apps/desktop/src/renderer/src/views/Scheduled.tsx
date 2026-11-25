@@ -64,7 +64,7 @@ export function Scheduled() {
       <TopBar
         actions={
           <Button variant="primary" size="lg" className="pl-2.5" onClick={() => setEditing("new")} disabled={!canCreate}>
-            <Plus size={14} /> New schedule
+            <Plus size={16} /> New schedule
           </Button>
         }
       >

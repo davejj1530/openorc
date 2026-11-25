@@ -78,7 +78,7 @@ function TaskListContent({ onNewTask }: { onNewTask: () => void }) {
               project={shared ? { id: projectId, projects: projects.data ?? [], onChange: (id) => useLayout.getState().setWorkspace(id ?? ALL_WORKSPACES) } : undefined}
             />
             <Button variant="primary" size="lg" className="ml-1 pl-2.5" onClick={onNewTask}>
-              <Plus size={14} />
+              <Plus size={16} />
               New task
             </Button>
           </>

@@ -73,7 +73,7 @@ export function ProjectScope() {
     <>
       <Menu.Root>
         <Menu.Trigger className="title-crumb-link no-drag" aria-label={`Project: ${project?.name ?? ALL_PROJECTS}`}>
-          <span className="project-scope-icon">{project ? <ProjectLogo project={project} /> : <Folders size={14} />}</span>
+          <span className="project-scope-icon">{project ? <ProjectLogo project={project} size={18} /> : <Folders size={18} />}</span>
           <span className="project-scope-name">{project?.name ?? ALL_PROJECTS}</span>
         </Menu.Trigger>
         <Menu.Portal>
@@ -81,9 +81,16 @@ export function ProjectScope() {
           <Menu.Positioner sideOffset={6} align="start" className="z-40" collisionPadding={8}>
             <Menu.Popup ref={floatingGround} className={cn(menuPopup, "sidebar-scope-menu")}>
               <div {...edges} className="sidebar-scope-list scroll-edges">
-                <ScopeItem icon={<Folders size={13} />} name={ALL_PROJECTS} chosen={!project} onSelect={() => onSelect(ALL_WORKSPACES)} />
+                <ScopeItem icon={<Folders size={18} />} name={ALL_PROJECTS} chosen={!project} onSelect={() => onSelect(ALL_WORKSPACES)} />
                 {(projects.data ?? []).map((each) => (
-                  <ScopeItem key={each.id} icon={<ProjectLogo project={each} />} name={each.name} chosen={each.id === project?.id} mark={marks.get(each.id)} onSelect={() => onSelect(each.id)} />
+                  <ScopeItem
+                    key={each.id}
+                    icon={<ProjectLogo project={each} size={18} />}
+                    name={each.name}
+                    chosen={each.id === project?.id}
+                    mark={marks.get(each.id)}
+                    onSelect={() => onSelect(each.id)}
+                  />
                 ))}
               </div>
               <Menu.Separator className={menuSeparator} />

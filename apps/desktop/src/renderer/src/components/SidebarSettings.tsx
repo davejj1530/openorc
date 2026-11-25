@@ -29,10 +29,10 @@ export function SidebarSettings({ route }: { route: Extract<Route, { view: "sett
   const opener = useRouter((s) => s.history.findLast((entry) => entry.view !== "settings"));
   return (
     <div className="settings-destinations">
-      <NavItem route={opener ?? { view: "newthread" }} icon={<ChevronLeft size={16} />} label="Back to app" active={false} />
+      <NavItem route={opener ?? { view: "newthread" }} icon={<ChevronLeft size={18} />} label="Back to app" active={false} />
       <nav className="grid grid-cols-1 gap-0.5 min-w-0" aria-label="Settings">
         {sections.map(({ id, label, Icon }) => (
-          <NavItem key={id} route={{ view: "settings", section: id }} icon={<Icon size={16} />} label={label} active={id === current.id} />
+          <NavItem key={id} route={{ view: "settings", section: id }} icon={<Icon size={18} />} label={label} active={id === current.id} />
         ))}
       </nav>
     </div>

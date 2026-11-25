@@ -168,7 +168,7 @@ function HeaderRows({ rows, onChange, onFromMac }: { rows: Row[]; onChange: (row
         ))}
         <div className="flex items-center gap-1">
           <Button size="sm" variant="ghost" onClick={() => onChange([...rows, { key: "", value: "", saved: false }])}>
-            <Plus size={13} />
+            <Plus size={16} />
             Add header
           </Button>
           <Button size="sm" variant="ghost" disabled={!onFromMac} onClick={() => onFromMac?.()}>

@@ -51,7 +51,7 @@ function PanelTab({ tab, page, active, unsaved, onSelect, onClose, onKeyDown }: 
         onKeyDown={onKeyDown}
       >
         <span className="work-tab-icon" aria-hidden="true">
-          {unsaved ? <span className="panel-tab-dot" /> : <Icon size={14} />}
+          {unsaved ? <span className="panel-tab-dot" /> : <Icon size={16} />}
         </span>
         <span className="work-tab-title">{label}</span>
       </button>
@@ -74,7 +74,7 @@ function FoldingTab({ tab }: { tab: WorkTab }) {
     <div role="presentation" aria-hidden="true" data-tab={tab.id} data-leaving="" inert className="work-tab">
       <span className="work-tab-face">
         <span className="work-tab-icon">
-          <Icon size={14} />
+          <Icon size={16} />
         </span>
         <span className="work-tab-title">{tabLabel(page)}</span>
       </span>

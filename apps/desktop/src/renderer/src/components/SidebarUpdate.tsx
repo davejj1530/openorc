@@ -62,7 +62,7 @@ export function SidebarUpdate() {
             <circle cx="14" cy="14" r="12" pathLength="100" strokeDasharray={`${Math.min(100, step.percent)} 100`} transform="rotate(-90 14 14)" className="sidebar-update-fill" />
           </svg>
         ) : null}
-        <Download size={16} />
+        <Download size={18} />
         {step.act ? <span aria-hidden="true" className="sidebar-update-dot" /> : null}
       </button>
     </Tooltip>

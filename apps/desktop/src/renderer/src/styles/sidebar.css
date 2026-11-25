@@ -160,7 +160,7 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   padding-left: 33px;
 }
 
-/* New thread, then the screens by name, 34px apart: a 16px glyph centred in the sidebar's 18px lead slot
+/* New thread, then the screens by name, 34px apart: an 18px glyph, a size over its name, filling the sidebar's 18px lead slot
    16px in, so the name starts at 42 as a project's does, and a count at the end only where something waits. New thread keeps full ink at rest. Settings lists its sections the
    same way in their place. */
 .sidebar-nav {
@@ -533,19 +533,20 @@ button.sidebar-nav-row:active:not([aria-current="page"]) {
   display: inline-flex;
   flex-shrink: 0;
   width: 18px;
-  height: 14px;
+  height: 16px;
   margin-right: 4px;
   align-items: center;
   justify-content: center;
 }
+/* A project's mark keeps a step under a screen's glyph, as its name keeps the screens' size. */
 .sidebar-project-mark > * {
-  width: 14px;
-  height: 14px;
-}
-/* The cube's frame sits inside its box, so it takes the row's 16px to match the other marks' weight. */
-.sidebar-project-mark > .project-cube {
   width: 16px;
   height: 16px;
+}
+/* The cube's frame sits inside its box, so it takes 18px to match the other marks' weight. */
+.sidebar-project-mark > .project-cube {
+  width: 18px;
+  height: 18px;
 }
 
 /* One title line on the navigation rhythm: 32px high and a 2px list gap. */
@@ -738,15 +739,17 @@ button.browser-empty:hover,
   margin-top: 2px;
 }
 
-/* The footer, on the sidebar's ground with no line over it: its tools at the row's end, its start kept for the
-   signed-in person. */
+/* The footer, on the sidebar's ground under a hairline seam that runs the sidebar's width to meet the one at its
+   edge: its tools at the row's end, its start kept for the signed-in person. */
 .sidebar-footer {
   container: account-footer / inline-size;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 2px;
-  height: var(--height-chrome);
+  /* Taller than the header, so the person's two lines stand clear of the seam over them. */
+  height: 52px;
+  box-shadow: inset 0 var(--hairline) 0 var(--line);
   /* The gear's centre sits on the list's centre line, 24px in from the edge. */
   padding: 0 8px;
 }
@@ -757,7 +760,7 @@ button.browser-empty:hover,
   align-items: center;
   gap: 10px;
   min-width: 0;
-  height: 36px;
+  height: 40px;
   margin-right: auto;
   padding: 0 8px;
   border-radius: var(--radius-md);

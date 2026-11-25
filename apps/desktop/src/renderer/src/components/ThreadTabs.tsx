@@ -33,7 +33,7 @@ function TabFace({ tab, title }: { tab: ThreadTab; title?: ReactNode }) {
   if (tab.route.view === "newthread") {
     return (
       <>
-        <PenSquare size={14} className="work-tab-icon" />
+        <PenSquare size={16} className="work-tab-icon" />
         <span className="work-tab-title">New thread</span>
       </>
     );
@@ -57,11 +57,11 @@ function TabGlyph({ thread }: { thread: ThreadSummary | null | undefined }) {
   if (!thread) return <span className="work-tab-icon" />;
   if (thread.session && threadStatus(thread)) return <ThreadStatusIndicator thread={thread} className="work-tab-icon" />;
   const orcling = orclingById(orclings, thread.orclingId);
-  if (orcling) return <OrclingAvatar orcling={orcling} size={16} className="work-tab-icon work-tab-orcling" />;
+  if (orcling) return <OrclingAvatar orcling={orcling} size={18} className="work-tab-icon work-tab-orcling" />;
   const group = groups.find((each) => each.threadId === thread.id);
-  if (group) return <OrclingFaces members={orclings.filter((each) => group.memberIds.includes(each.id))} size={14} max={2} className="work-tab-icon work-tab-orclings" />;
-  if (isHarnessId(thread.agent)) return <HarnessLogo id={thread.agent} size={14} className="work-tab-icon" />;
-  return <MessageSquare size={14} className="work-tab-icon" />;
+  if (group) return <OrclingFaces members={orclings.filter((each) => group.memberIds.includes(each.id))} size={16} max={2} className="work-tab-icon work-tab-orclings" />;
+  if (isHarnessId(thread.agent)) return <HarnessLogo id={thread.agent} size={16} className="work-tab-icon" />;
+  return <MessageSquare size={16} className="work-tab-icon" />;
 }
 
 /*

@@ -21,17 +21,20 @@ export function WindowCorner({ sidebarOpen, className }: { sidebarOpen: boolean;
   );
 }
 
-/** Back and Forward through the window's history, the same as ⌘[ and ⌘]. Each is off while there is nowhere to go. */
+/**
+ * Back and Forward through the window's history, the same as ⌘[ and ⌘]. Each is off while there is nowhere to go.
+ * Their glyphs and the sidebar toggle's are 18px, the size of the screens' icons under them.
+ */
 export function HistoryButtons({ size, className }: { size: IconSize; className?: string }) {
   const canBack = useRouter((s) => s.history.length > 0);
   const canForward = useRouter((s) => s.future.length > 0);
   return (
     <div className={cn("history-buttons", className)} role="group" aria-label="History">
       <HistoryButton size={size} label="Back" disabled={!canBack} onClick={() => useRouter.getState().back()}>
-        <ArrowLeft size={16} />
+        <ArrowLeft size={18} />
       </HistoryButton>
       <HistoryButton size={size} label="Forward" disabled={!canForward} onClick={() => useRouter.getState().forward()}>
-        <ArrowRight size={16} />
+        <ArrowRight size={18} />
       </HistoryButton>
     </div>
   );
@@ -62,7 +65,7 @@ export function SidebarToggle({ open }: { open: boolean }) {
   return (
     <Tooltip label={open ? "Hide sidebar" : "Show sidebar"}>
       <IconButton size="lg" onClick={toggle} aria-label="Toggle sidebar" className="no-drag">
-        <PanelLeft size={16} />
+        <PanelLeft size={18} />
       </IconButton>
     </Tooltip>
   );

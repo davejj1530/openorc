@@ -22,6 +22,11 @@ export function useOrclingsMode(route: Route, orclings: readonly Orcling[]) {
   }, [chat, route]);
   return {
     active,
+    /** Whether the route as it is now, past what this render saw, is still the Orclings'. */
+    showing: () => {
+      const now = useRouter.getState().route;
+      return now.view === "orcling" || (now.view === "thread" && chats.has(now.threadId));
+    },
     open: () => {
       const selected = lastOrcling.current && chats.has(lastOrcling.current) ? lastOrcling.current : orclings[0]?.threadId;
       useRouter.getState().navigate(selected ? { view: "thread", threadId: selected } : { view: "orcling" });

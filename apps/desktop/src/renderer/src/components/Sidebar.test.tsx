@@ -242,13 +242,13 @@ it("fetches another child page and keeps rows while loading", async () => {
   }
 });
 
-it("heads the sidebar with OpenOrc's mark and name, then Back and Forward, and leads the screens with New thread, lit while its screen is open", () => {
+it("heads the sidebar with its toggle, then Back and Forward, with no wordmark, and leads the screens with New thread, lit while its screen is open", () => {
   fixture.projects = [{ id: "notes", name: "notes", rootPath: "/projects/notes" }];
   useLayout.setState({ workspace: "notes" });
   useRouter.setState({ route: { view: "tasks" } });
   mountSidebar();
-  const header = screen.getByRole("img", { name: "OpenOrc" }).closest("header")!;
-  expect(screen.getByRole("img", { name: "OpenOrc" }).textContent).toBe("OpenOrc");
+  const header = screen.getByRole("button", { name: "Toggle sidebar" }).closest("header")!;
+  expect(screen.queryByRole("img", { name: "OpenOrc" })).toBeNull();
   expect(screen.queryByRole("group", { name: "Window" })).toBeNull();
   expect(
     within(header)
@@ -262,8 +262,6 @@ it("heads the sidebar with OpenOrc's mark and name, then Back and Forward, and l
   fireEvent.click(newThread);
   expect(useRouter.getState().route).toEqual({ view: "newthread", projectId: "notes" });
   expect(newThread.getAttribute("aria-current")).toBe("page");
-  act(() => useWindow.setState({ fullscreen: true }));
-  expect(screen.getAllByRole("img", { name: "OpenOrc" })).toHaveLength(1);
 });
 
 it("heads Workspaces with Add project alone until there is a project", () => {
@@ -292,29 +290,34 @@ it("heads Workspaces with the app's one search, Add project and the filter", () 
 
 const screens = () => screen.getByRole("navigation", { name: "Screens" });
 
-it("switches between project threads and Orclings with the Orclings row, remembering the project thread", () => {
+const switcher = () => screen.getByRole("button", { name: /^Switch list/ });
+const pickList = async (name: string | RegExp) => {
+  fireEvent.click(switcher());
+  fireEvent.click(await screen.findByRole("menuitemradio", { name }));
+};
+
+it("switches the list between project threads and Orclings from its name, remembering the project thread", async () => {
   open("notes");
   expect(screen.getByRole("region", { name: "Workspaces" })).toBeTruthy();
   expect(screen.queryByRole("region", { name: "Orclings" })).toBeNull();
-  const orclings = () => within(screens()).getByRole("button", { name: "Orclings" });
-  expect(orclings().getAttribute("aria-pressed")).toBe("false");
-  fireEvent.click(orclings());
+  expect(switcher().textContent).toBe("My workspaces");
+  await pickList(/^Orclings/);
   expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "rini-home" });
   expect(screen.queryByRole("region", { name: "Workspaces" })).toBeNull();
   expect(screen.getByRole("region", { name: "Orclings" })).toBeTruthy();
-  expect(orclings().getAttribute("aria-pressed")).toBe("true");
-  // Their row names them once and carries their tools; the list has no head repeating the name.
-  expect(within(screens()).getByRole("button", { name: "New Orcling" })).toBeTruthy();
-  expect(screen.getAllByText("Orclings")).toHaveLength(1);
-  fireEvent.click(orclings());
+  expect(switcher().textContent).toBe("Orclings");
+  // Their head carries their tools, and they are off the screens.
+  expect(screen.getByRole("button", { name: "New Orcling" })).toBeTruthy();
+  expect(within(screens()).queryByRole("button", { name: "Orclings" })).toBeNull();
+  await pickList("My workspaces");
   expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "notes" });
   expect(screen.getByRole("region", { name: "Workspaces" })).toBeTruthy();
   expect(screen.queryByRole("region", { name: "Orclings" })).toBeNull();
 });
 
-it("opens project conversations when Orclings is turned off from an initial Orcling chat", () => {
+it("opens a new thread when the list leaves the Orclings from an initial Orcling chat", async () => {
   open("rini-home");
-  fireEvent.click(within(screens()).getByRole("button", { name: "Orclings" }));
+  await pickList("My workspaces");
   expect(useRouter.getState().route).toMatchObject({ view: "newthread" });
   expect(screen.queryByRole("region", { name: "Orclings" })).toBeNull();
 });
@@ -325,7 +328,7 @@ it("names the app's screens as rows after New thread, each with its icon, markin
     within(screens())
       .getAllByRole("button")
       .map((button) => button.textContent),
-  ).toEqual(["New thread", "Tasks", "Pull requests", "Schedules", "Orclings"]);
+  ).toEqual(["New thread", "Tasks", "Pull requests", "Schedules"]);
   expect(
     within(screens())
       .getAllByRole("button")
@@ -472,25 +475,6 @@ it("pages a long group with Show N more", async () => {
   fireEvent.click(within(group("Second project")).getByRole("button", { name: "Show 3 more" }));
   expect(rowTitles(group("Second project"))).toHaveLength(17);
   expect(within(group("Second project")).queryByRole("button", { name: /^Show \d+ more$/ })).toBeNull();
-});
-
-it("folds Workspaces as a whole, counting what waits inside only while folded, and keeps the fold", async () => {
-  projectThreads();
-  fixture.threads[3] = { ...fixture.threads[3]!, activity: "waiting" };
-  const view = mountSidebar();
-  await screen.findByRole("button", { name: /Other notes/ });
-  const fold = () => within(screen.getByRole("region", { name: "Workspaces" })).getAllByRole("button")[0]!;
-  expect(fold().textContent).toBe("Workspaces");
-  fireEvent.click(fold());
-  expect(fold().getAttribute("aria-expanded")).toBe("false");
-  expect(fold().getAttribute("aria-label")).toBe("Workspaces, 1 waiting");
-  expect(screen.queryByRole("button", { name: /Other notes/ })).toBeNull();
-  await waitFor(() => expect(useUi.getState().threadOrder).toEqual([]));
-  view.unmount();
-  mountSidebar();
-  expect(fold().getAttribute("aria-expanded")).toBe("false");
-  fireEvent.click(fold());
-  await screen.findByRole("button", { name: /Other notes/ });
 });
 
 it("lists Cloud among Settings' sections for a Pro person only, whose OpenOrc Cloud it sets up", () => {

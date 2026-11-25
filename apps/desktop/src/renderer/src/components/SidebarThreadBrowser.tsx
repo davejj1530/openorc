@@ -37,8 +37,6 @@ import {
   threadResolved,
   useChildThreadPages,
   useSidebarNow,
-  waitingRoots,
-  WORKSPACES_FOLD,
 } from "@openorc/client";
 import { useOrclingChatIds } from "../lib/orclings";
 import { useSpaceRpc as useRpc, useSpaceRpcs as useRpcs } from "../lib/space-queries";
@@ -101,7 +99,7 @@ function withFamily(page: ThreadSummary[] | undefined, family: ThreadSummary[] |
 }
 
 /** The list keeps its filters and loaded pages across app destinations, and while it is folded. */
-export function SidebarThreadBrowser() {
+export function SidebarThreadBrowser({ name }: { name: ReactNode }) {
   const children = useChildThreadPages();
   const saved = useLayout((s) => s.collapsed);
   const ids = threadFoldIds(saved);
@@ -113,7 +111,7 @@ export function SidebarThreadBrowser() {
   useEffect(() => {
     useLayout.getState().pruneThreadFolds(new Set(JSON.parse(missingKey) as string[]));
   }, [missingKey]);
-  return <ThreadGroups children={children} />;
+  return <ThreadGroups children={children} name={name} />;
 }
 
 /**
@@ -353,16 +351,14 @@ function useProjectResolved(state: ThreadList, list: SidebarDayList, reading: re
  * The threads grouped by project, in the order projects come and the most recently active first inside each, held still while
  * the pointer or the keyboard is in the list. Pinned threads lead in a group of their own that never scrolls away,
  * each project ends with its own Resolved, and snoozed threads follow the projects. A line at an edge names what calls
- * the person past it. The whole list folds under its head, which keeps Search and the filter; folded, it counts what
- * waits on the person.
+ * the person past it. Its head is `name`, the sidebar's switcher, then Search, Add project and the filter.
  */
-function ThreadGroups({ children }: { children: ChildPages }) {
+function ThreadGroups({ children, name }: { children: ChildPages; name: ReactNode }) {
   const state = useThreadList(children);
   const { projects, activeId, pinnedOnly, pending } = state;
   const collapsed = useLayout((s) => s.collapsed);
   const now = useSidebarNow();
   const list = dayList(state, now);
-  const open = !collapsed.includes(WORKSPACES_FOLD);
   const hold = useListHold();
   const shownProjects = groupProjects(projects.data, state.seen);
   const ready = !pending && !sidebarGroupsGrow({ end: list.end, hasMore: list.hasMore, limit: state.limit });
@@ -379,7 +375,7 @@ function ThreadGroups({ children }: { children: ChildPages }) {
   const named = new Map<string, RowProject>(shownProjects.map((project) => [project.id, { name: project.name }]));
   const inList = (roots: ThreadSummary[]): ListPart => ({ roots, all: list.all });
   const shown = [inList(pins), ...drawn.flatMap(({ group, part }) => [inList(group.rows), part]), inList(snoozed)];
-  useListUpkeep(state, list, open ? shown : [], children);
+  useListUpkeep(state, list, shown, children);
   const rows = (roots: ThreadSummary[], mixed = false, all = list.all) => (
     <ThreadTreeList childLimits={children.limits} onShowMore={children.showMore} roots={roots} all={all} activeId={activeId} projects={mixed ? named : undefined} />
   );
@@ -397,7 +393,6 @@ function ThreadGroups({ children }: { children: ChildPages }) {
       </ProjectResolved>
     );
   };
-  const waiting = waitingRoots(list.pinned, list.all) + groups.reduce((sum, group) => sum + group.waiting, 0);
   const pinned = list.pinned.length ? (
     <Section label="Pinned" count={list.pinned.length} open={pinsOpen} onToggle={toggle(sidebarFoldKey.pinned(SIDEBAR_LIST))}>
       {rows(pins, true)}
@@ -405,13 +400,9 @@ function ThreadGroups({ children }: { children: ChildPages }) {
     </Section>
   ) : null;
   return (
-    <section className="sidebar-workspaces" data-open={open || undefined} aria-label="Workspaces" {...hold.props}>
-      <SidebarListHead
-        label="Workspaces"
-        fold={{ open, waiting, onToggle: toggle(WORKSPACES_FOLD) }}
-        tools={<ListTools empty={projects.data?.length === 0} workspaces={allGroups.map((group) => group.project)} />}
-      />
-      <div className="conversation-browser" hidden={!open}>
+    <section className="sidebar-workspaces" aria-label="Workspaces" {...hold.props}>
+      <SidebarListHead name={name} tools={<ListTools empty={projects.data?.length === 0} workspaces={allGroups.map((group) => group.project)} />} />
+      <div className="conversation-browser">
         {pinnedOnly ? null : <div className="sidebar-pinned">{pinned}</div>}
         <GroupsView calls={edgeCalls(groups, list.all)} resolved={resolvedIds}>
           <ProjectsFailed projects={projects} />

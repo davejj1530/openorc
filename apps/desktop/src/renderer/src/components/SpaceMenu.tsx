@@ -3,21 +3,34 @@ import { Menu } from "@base-ui/react/menu";
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip";
 import type { Space } from "@openorc/protocol";
 import type { OrganizationActions } from "../lib/organization-context";
+import { useOrclings } from "../lib/orclings";
+import { spaceName } from "../lib/space-name";
 import { useSpaceNavigation } from "../lib/space-navigation";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { cn } from "../lib/cn";
 import { OpenOrcMark } from "./OpenOrcMark";
 import { OrganizationMark } from "./OrganizationMark";
-import { Check, People, PersonPlus, Plus } from "./icons";
+import { Check, Orclings, People, PersonPlus, Plus } from "./icons";
+import type { ListChoice } from "./ListSwitcher";
 import { menuItem, menuSeparator } from "./menu";
 import { ReceivedInvitationRow } from "./ReceivedInvitationRow";
 import { TextButton, Tooltip } from "./ui";
 import { useUnreadChatSpaces } from "../lib/team-chat-unread";
 import { useMentionSpaces } from "../lib/mention-spaces";
 
-export function SpaceMenu({ actions }: { actions: OrganizationActions }) {
+/**
+ * What the list can hold: each organization, the person's own workspaces, then the Orclings, with the one that holds it
+ * ticked. Signed in, an organization's own actions and a way to create one follow.
+ */
+export function SpaceMenu({ actions, list, waitingOrclings }: { actions: OrganizationActions | null; list: ListChoice; waitingOrclings: number }) {
   const current = useSpaceNavigation((state) => state.current);
-  const data = actions.status?.state === "ready" ? actions.status : null;
+  const data = actions?.status?.state === "ready" ? actions.status : null;
+  const shown = current ?? data?.personalSpaceId;
+  const pick = (id: string | undefined) => {
+    const stayed = id === shown;
+    if (id && !stayed) actions?.select(id);
+    if (list.orclings) list.showThreads(stayed);
+  };
   const spaces = data ? [...data.spaces.filter((space) => space.kind === "organization"), ...data.spaces.filter((space) => space.kind === "personal")] : [];
   const unread = useUnreadChatSpaces(data?.userId ?? null);
   const mentioned = useMentionSpaces(data?.userId ?? null);
@@ -27,19 +40,50 @@ export function SpaceMenu({ actions }: { actions: OrganizationActions }) {
         <SpaceRow
           key={space.id}
           space={space}
-          person={actions.person}
-          checked={space.id === (current ?? data?.personalSpaceId)}
+          person={actions?.person ?? ""}
+          checked={!list.orclings && space.id === shown}
           unread={space.id !== current && unread.includes(space.id)}
           mentioned={mentioned.includes(space.id)}
-          onClick={() => actions.select(space.id)}
+          onClick={() => pick(space.id)}
         />
       ))}
-      {!data ? <SpaceRow space={{ id: "", kind: "personal" }} person={actions.person} checked onClick={() => {}} /> : null}
-      {!data ? <SpaceReadState actions={actions} /> : null}
-      {data?.invitations.length ? <Menu.Separator className={menuSeparator} /> : null}
-      {data?.invitations.map((invitation) => (
-        <ReceivedInvitationRow key={invitation.id} invitation={invitation} actions={actions.invitations} />
-      ))}
+      {!data ? <SpaceRow space={{ id: "", kind: "personal" }} person={actions?.person ?? ""} checked={!list.orclings} onClick={() => pick(shown)} /> : null}
+      {actions && !data ? <SpaceReadState actions={actions} /> : null}
+      {actions && data?.invitations.length ? <Menu.Separator className={menuSeparator} /> : null}
+      {actions
+        ? data?.invitations.map((invitation) => <ReceivedInvitationRow key={invitation.id} invitation={invitation} actions={actions.invitations} />)
+        : null}
+      <Menu.Separator className={menuSeparator} />
+      <OrclingsRow checked={list.orclings} waiting={waitingOrclings} onClick={list.showOrclings} />
+      {actions ? <SpaceActions actions={actions} create={data?.create} /> : null}
+    </>
+  );
+}
+
+/** The Orclings as a thing the list can hold: who they are, and how many of their chats wait on the person. */
+function OrclingsRow({ checked, waiting, onClick }: { checked: boolean; waiting: number; onClick(): void }) {
+  const names = useOrclings()
+    .map((orcling) => orcling.name)
+    .join(", ");
+  return (
+    <Menu.Item className={cn(menuItem, "space-menu-row")} role="menuitemradio" aria-checked={checked} onClick={onClick}>
+      <span className="space-menu-mark">
+        <Orclings size={20} />
+      </span>
+      <span className="space-menu-label">
+        <span>Orclings</span>
+        {names ? <span className="space-menu-detail">{names}</span> : null}
+      </span>
+      {waiting ? <span className="sidebar-count tabular">{waiting > 99 ? "99+" : waiting}</span> : null}
+      {checked ? <Check size={14} /> : null}
+    </Menu.Item>
+  );
+}
+
+/** What a signed-in person does with organizations from here: the open one's people, and creating another. */
+function SpaceActions({ actions, create }: { actions: OrganizationActions; create: { allowed: boolean; reason: string | null } | undefined }) {
+  return (
+    <>
       {actions.organization ? (
         <>
           <Menu.Separator className={menuSeparator} />
@@ -60,7 +104,7 @@ export function SpaceMenu({ actions }: { actions: OrganizationActions }) {
         </>
       ) : null}
       <Menu.Separator className={menuSeparator} />
-      <CreateAction allowed={Boolean(data?.create.allowed)} reason={data?.create.reason ?? actions.error ?? "Loading spaces…"} run={actions.create} />
+      <CreateAction allowed={Boolean(create?.allowed)} reason={create?.reason ?? actions.error ?? "Loading spaces…"} run={actions.create} />
     </>
   );
 }
@@ -78,14 +122,15 @@ function MentionedMark({ children }: { children: ReactNode }) {
 }
 
 function SpaceRow({ space, person, checked, unread = false, mentioned = false, onClick }: { space: Space; person: string; checked: boolean; unread?: boolean; mentioned?: boolean; onClick(): void }) {
-  const label = space.kind === "personal" ? "Personal" : space.name;
+  const label = spaceName(space);
   const mark = space.kind === "personal" ? <OpenOrcMark size={24} /> : <OrganizationMark {...space} size={24} />;
+  const detail = space.kind === "personal" ? person : `${space.memberCount} ${space.memberCount === 1 ? "person" : "people"}`;
   return (
     <Menu.Item className={cn(menuItem, "space-menu-row")} role="menuitemradio" aria-checked={checked} onClick={onClick}>
       <span className="space-menu-mark">{mentioned ? <MentionedMark>{mark}</MentionedMark> : mark}</span>
       <span className="space-menu-label">
         <span data-tip={label}>{label}</span>
-        <span className="space-menu-detail">{space.kind === "personal" ? person : `${space.memberCount} ${space.memberCount === 1 ? "person" : "people"}`}</span>
+        {detail ? <span className="space-menu-detail">{detail}</span> : null}
       </span>
       {unread ? (
         <Tooltip label="Unread chat">

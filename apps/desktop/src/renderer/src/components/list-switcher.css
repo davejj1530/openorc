@@ -1,55 +1,35 @@
-.sidebar-header:has(.space-switcher) {
-  gap: 4px;
-}
-.sidebar-header[data-space-history="true"] .sidebar-history {
-  display: flex;
-}
-.space-switcher {
+/* The list's name as its switcher: quiet as a list's name is, with a fill only under the pointer or its open menu. */
+.list-switcher {
   display: inline-flex;
-  position: relative;
+  flex: 0 1 auto;
   align-items: center;
-  gap: 7px;
-  padding: 0;
-  border-radius: var(--radius-md);
-  height: 30px;
-  max-width: 100%;
+  gap: 6px;
   min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  transition: color var(--duration-quick) var(--ease-out);
+}
+.list-switcher:hover,
+.list-switcher[data-popup-open] {
+  background: var(--navigation-hover);
   color: var(--ink);
-  font-family: "Immaculate Gothic", var(--font-sans);
-  font-size: var(--text-md);
-  letter-spacing: -0.02em;
+}
+.list-switcher-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.space-switcher:hover,
-.space-switcher[data-popup-open] {
-  background: var(--surface-2);
-}
-.space-switcher-name {
-  display: flex;
-  flex-wrap: wrap;
-  overflow: hidden;
-  height: 23px;
-  line-height: 23px;
-  min-width: 0;
-}
-.space-switcher-name > span {
-  white-space: pre;
-}
-.space-switcher-chevron {
-  margin-left: -2.5px;
-  color: var(--ink-4);
+.list-switcher-chevron {
   flex-shrink: 0;
+  color: var(--ink-4);
 }
-.space-switcher-measure {
-  position: absolute;
-  visibility: hidden;
-  width: max-content;
-  white-space: pre;
-  pointer-events: none;
-}
-.space-switcher-hidden {
-  margin: 0 10px 0 6px;
-  max-width: 200px;
+/* The head's tools keep the row's end beside a name that takes only its own width. */
+.list-switcher ~ .sidebar-list-tools {
+  margin-left: auto;
 }
 .space-menu {
   width: 264px;
@@ -84,8 +64,8 @@
 }
 .space-menu-detail {
   color: var(--ink-4);
-  font-size: var(--text-xs);
-  line-height: 18px;
+  font-size: 12.5px;
+  line-height: 16px;
   margin-top: 1px;
 }
 .space-menu-read {
@@ -94,7 +74,7 @@
   gap: 6px;
   padding: 10px;
   color: var(--ink-3);
-  font-size: var(--text-sm);
+  font-size: 13px;
 }
 .space-menu-read > span {
   flex: 1;

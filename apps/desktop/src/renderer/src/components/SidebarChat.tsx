@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import type { TeamChatRow } from "@openorc/client";
 import type { TeamConversation } from "@openorc/protocol";
 import { useTeamChatOrder } from "../lib/use-team-chat-order";
-import { SidebarListHead } from "./SidebarListHead";
+import { ListFold, SidebarListHead } from "./SidebarListHead";
 import { SidebarTeamChatRow, TeamChatMarks } from "./SidebarTeamChatRow";
 import "../styles/team-chat-unread.css";
 import { Tooltip } from "./ui";
@@ -28,13 +28,18 @@ export function SidebarChat({ rows, self, selected, opening, error, onOpen, onRe
   return (
     <section className="sidebar-chat" aria-label="Chat" {...order.props}>
       <SidebarListHead
-        label="Chat"
-        fold={{
-          open,
-          waiting: 0,
-          onToggle: () => setOpen(!open),
-          folded: total > 0 ? { marks: <TeamChatMarks count={total} mention={mention} />, words: `${total} unread${mention ? ", mentions you" : ""}` } : undefined,
-        }}
+        open={open}
+        name={
+          <ListFold
+            label="Chat"
+            fold={{
+              open,
+              waiting: 0,
+              onToggle: () => setOpen(!open),
+              folded: total > 0 ? { marks: <TeamChatMarks count={total} mention={mention} />, words: `${total} unread${mention ? ", mentions you" : ""}` } : undefined,
+            }}
+          />
+        }
         tools={tools}
       />
       {open ? (

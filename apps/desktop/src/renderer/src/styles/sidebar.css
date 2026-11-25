@@ -26,40 +26,25 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   flex-shrink: 0;
 }
 
-/* The header: the traffic lights where the OS draws them, then whose workspace this is, then Back and
-   Forward. No line under it. The header is a container so the two can go when it is too narrow. */
+/* The header: the traffic lights where the OS draws them, the sidebar toggle beside them on the spot the window's
+   corner keeps it once the sidebar hides, then Back and Forward at the header's end. No line under it. Without
+   traffic lights the toggle's glyph stands on the rows' icons. */
 .sidebar-header {
-  container-type: inline-size;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px 0 16px;
+  padding: 0 12px 0 8px;
 }
 .workspace-navigation[data-traffic-lights="true"] .sidebar-header {
   padding-left: var(--spacing-traffic);
 }
-.sidebar-identity {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  min-width: 0;
-}
-/* Only a floating sidebar covers the toggle in the first header, so only it carries its own. */
-.sidebar-header .sidebar-header-toggle {
-  display: none;
+.sidebar-history {
+  margin-left: auto;
 }
 .window-corner,
 .history-buttons {
   display: flex;
   align-items: center;
   flex-shrink: 0;
-}
-/* Back and Forward need the name's width, a gap and their own 48px beside it. Short of that they go, and the keys
-   still step through the history. Forward's centre sits on the counts' line, 24px in from the edge. */
-@container (max-width: 139px) {
-  .sidebar-history {
-    display: none;
-  }
 }
 
 /* Under the header: the screens, then the threads or the Orclings, which take the rest and scroll. */
@@ -220,27 +205,7 @@ button.sidebar-nav-row:hover {
   color: var(--ink);
   transition-duration: 0s;
 }
-button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) {
-  background-color: var(--surface-3);
-}
-/* A row with tools at its end lays them over the row, as a project's label does. */
-.sidebar-nav-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-}
-.sidebar-nav-item > * {
-  grid-area: 1 / 1;
-}
-/* Its tools stand on the list head's columns, 28px apart, the last one on the counts' line. */
-.sidebar-nav-tools {
-  display: flex;
-  align-items: center;
-  align-self: center;
-  justify-self: end;
-  gap: 4px;
-  margin-right: 4px;
-}
-.sidebar-nav-tools button:hover {
+button.sidebar-nav-row:active:not([aria-current="page"]) {
   background-color: var(--surface-3);
 }
 .sidebar-nav-icon {
@@ -257,11 +222,11 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sidebar-nav-row:is([aria-current="page"], [aria-pressed="true"], [data-lead]),
-.sidebar-nav-row:is([aria-current="page"], [aria-pressed="true"], [data-lead]) .sidebar-nav-icon {
+.sidebar-nav-row:is([aria-current="page"], [data-lead]),
+.sidebar-nav-row:is([aria-current="page"], [data-lead]) .sidebar-nav-icon {
   color: var(--navigation-ink);
 }
-.sidebar-nav-row:is([aria-current="page"], [aria-pressed="true"]):not(:focus-visible) {
+.sidebar-nav-row[aria-current="page"]:not(:focus-visible) {
   background-color: var(--current-row-fill);
   box-shadow: var(--lit);
 }
@@ -277,8 +242,7 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   color: var(--warn);
 }
 
-/* The wordmark leads the window's corner, after the traffic lights where the OS draws them, else with
-   its cube on the project icons' line. It is always set in Immaculate Gothic, whatever the interface
+/* The wordmark, which heads onboarding. It is always set in Immaculate Gothic, whatever the interface
    font. Short of room it never truncates: the name wraps onto a second line the box clips, leaving
    the cube. */
 .sidebar-wordmark {
@@ -298,12 +262,9 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   line-height: 18px;
   white-space: nowrap;
 }
-.workspace-navigation:not([data-traffic-lights="true"]) .sidebar-wordmark {
-  padding-left: 2px;
-}
 
-/* Workspaces, or the Orclings in its place: the list takes the room the screens leave and folds as a
-   whole under its head. Folded, the head stays and the footer keeps the window's foot. */
+/* A space's threads, or the Orclings in their place, under a head whose name switches between them: the list takes
+   the room the screens leave, and the footer keeps the window's foot. */
 .sidebar-browser-slot,
 .sidebar-workspaces {
   display: flex;
@@ -314,16 +275,8 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
 .sidebar-browser-slot[hidden] {
   display: none;
 }
-.sidebar-workspaces > .conversation-browser[hidden] {
-  display: none;
-}
-/* The Orclings have no head of their own (their row above names them and carries their tools), so their list keeps
-   the room a head would leave between the screens and the list. */
-.orcling-browser {
-  margin-top: 18px;
-}
-/* The list's head: its quiet name 16px in, then Search, Add project and the filter at the end as 24px
-   buttons, the last one centred on the line the counts and row marks share, 24px in from the edge. */
+/* The list's head: its quiet name 16px in, which switches what the list holds or folds it, then its tools at the
+   end as 24px buttons, the last one centred on the line the counts and row marks share, 24px in from the edge. */
 .sidebar-list-head {
   display: flex;
   align-items: center;
@@ -332,8 +285,7 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   margin: 12px 8px 2px;
   flex-shrink: 0;
 }
-.sidebar-list-fold,
-.sidebar-list-name {
+.sidebar-list-fold {
   display: flex;
   flex: 1;
   align-items: center;
@@ -341,11 +293,9 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   min-width: 0;
   height: 28px;
   padding: 0 8px;
+  border-radius: var(--radius-md);
   font-size: var(--text-sm);
   color: var(--ink-3);
-}
-.sidebar-list-fold {
-  border-radius: var(--radius-md);
   transition: color var(--duration-quick) var(--ease-out);
 }
 .sidebar-list-fold:hover {
@@ -497,12 +447,13 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
 }
 /* Inside an open project, a faint label over each day's rows that holds some: Today, Yesterday. It sits on the
    titles' line in the fourth ink, a size under the project's name, with a hairline from 8px after the word to the
-   rows' end. It belongs to the rows under it: its words rest 4px over them, with 10px between it and the day before. */
+   rows' end. It belongs to the rows under it: its words rest 4px over them, with 10px between it and the day before,
+   and the first one stands 4px clear of the project's name so the two lines of words do not crowd. */
 .sidebar-day-label {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  height: 20px;
+  height: 22px;
   padding: 0 8px 2px;
   font-size: var(--text-xs);
   line-height: 18px;
@@ -513,6 +464,9 @@ button.sidebar-nav-row:active:not([aria-current="page"], [aria-pressed="true"]) 
   flex: 1;
   align-self: center;
   border-top: var(--hairline) solid var(--line);
+}
+.sidebar-day-label:first-child {
+  margin-top: 4px;
 }
 .sidebar-day-label:not(:first-child) {
   margin-top: 10px;
@@ -1220,9 +1174,6 @@ button.browser-empty:hover,
   .app-shell .resize-handle[data-edge="sidebar"] {
     display: none;
   }
-  .sidebar-header .sidebar-header-toggle {
-    display: inline-flex;
-  }
   .app-shell .workspace-navigation,
   html[data-transparent-shell="true"] .app-shell .workspace-navigation {
     position: absolute;
@@ -1246,7 +1197,7 @@ button.browser-empty:hover,
 }
 
 @media (forced-colors: active) {
-  .sidebar-nav-row:is([aria-current="page"], [aria-pressed="true"]),
+  .sidebar-nav-row[aria-current="page"],
   .orcling-contact[aria-current="page"] {
     outline: 1px solid Highlight;
   }

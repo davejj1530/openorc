@@ -89,11 +89,7 @@ export function TopBar({
       {/* Native regions follow declaration order: controls must follow this layer. */}
       {windowDragSurface ? <span className="thread-header-drag-surface" aria-hidden="true" /> : null}
       <div className={cn("flex items-center gap-2 min-w-0 flex-1 text-base truncate", tabs && "self-stretch")}>
-        {first ? (
-          <span className="workspace-window-nav flex items-center mr-1">
-            <WindowCorner sidebarOpen={sidebarOpen} />
-          </span>
-        ) : null}
+        {first ? <WindowCorner sidebarOpen={sidebarOpen} className="mr-1" /> : null}
         {typeof children === "string" ? <PageTitle>{children}</PageTitle> : children}
       </div>
       {/* A clipped navigation control can still contribute its full native no-drag

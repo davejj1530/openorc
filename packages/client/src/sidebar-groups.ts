@@ -4,10 +4,7 @@ import { sidebarFoldKey } from "./sidebar-thread-groups.js";
 import { threadStatus, threadTreeStatus, type ThreadStatus } from "./thread-row.js";
 import { subthreadStatuses } from "./thread-tree.js";
 
-/** The saved key that marks the whole Workspaces list folded. It starts open. */
-export const WORKSPACES_FOLD = "workspaces-closed";
-
-const GROUPED_FOLDS: ReadonlySet<string> = new Set([sidebarFoldKey.pinned(SIDEBAR_LIST), sidebarFoldKey.snoozed(SIDEBAR_LIST), sidebarFoldKey.resolved(SIDEBAR_LIST), WORKSPACES_FOLD]);
+const GROUPED_FOLDS: ReadonlySet<string> = new Set([sidebarFoldKey.pinned(SIDEBAR_LIST), sidebarFoldKey.snoozed(SIDEBAR_LIST), sidebarFoldKey.resolved(SIDEBAR_LIST)]);
 
 /**
  * Whether a saved fold names a part of the list grouped by project: a sub thread tree, a project's group or its

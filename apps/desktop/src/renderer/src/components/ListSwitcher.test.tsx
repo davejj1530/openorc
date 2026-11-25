@@ -5,7 +5,7 @@ import type { OrganizationSpace, SpacesStatus } from "@openorc/protocol";
 import { queryClient } from "../lib/client";
 import { OrganizationContext, type OrganizationActions } from "../lib/organization-context";
 import { core } from "../lib/rpc";
-import { SpaceSwitcher } from "./SpaceSwitcher";
+import { ListSwitcher, type ListChoice } from "./ListSwitcher";
 import { TooltipProvider } from "./ui";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onPush: () => () => {}, onReady: () => () => {} } }));
@@ -45,12 +45,13 @@ function actions(patch: Partial<OrganizationActions> = {}): OrganizationActions 
   };
 }
 let queries = new QueryClient();
-function view(value: OrganizationActions) {
+const threads: ListChoice = { orclings: false, showOrclings: vi.fn(), showThreads: vi.fn() };
+function view(value: OrganizationActions, list: ListChoice = threads) {
   return (
     <QueryClientProvider client={queries}>
       <TooltipProvider>
         <OrganizationContext.Provider value={value}>
-          <SpaceSwitcher fallback={<span>Wordmark</span>} />
+          <ListSwitcher list={list} />
         </OrganizationContext.Provider>
       </TooltipProvider>
     </QueryClientProvider>
@@ -74,16 +75,38 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it("keeps the old wordmark when signed out and never renders a switcher", () => {
-  render(view(actions({ signedIn: false, organization: null })));
-  expect(screen.getByText("Wordmark")).toBeTruthy();
-  expect(screen.queryByRole("button")).toBeNull();
+it("offers the person's own workspaces and the Orclings when signed out, with nothing about organizations", async () => {
+  const list = { ...threads, showOrclings: vi.fn() };
+  render(view(actions({ signedIn: false, organization: null }), list));
+  fireEvent.click(screen.getByRole("button", { name: "Switch list, My workspaces" }));
+  expect((await screen.findByRole("menuitemradio", { name: "My workspaces" })).getAttribute("aria-checked")).toBe("true");
+  expect(screen.queryByRole("menuitem", { name: "Create organization…" })).toBeNull();
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Orclings" }));
+  expect(list.showOrclings).toHaveBeenCalledTimes(1);
+});
+
+it("names the Orclings while they hold the list, and leaves them for the space picked: back where it was in the one in view, to its own place in another", async () => {
+  const value = actions({ organization: null });
+  const list = { orclings: true, showOrclings: vi.fn(), showThreads: vi.fn() };
+  render(view(value, list));
+  const trigger = screen.getByRole("button", { name: "Switch list, Orclings" });
+  fireEvent.click(trigger);
+  expect((await screen.findByRole("menuitemradio", { name: "Orclings" })).getAttribute("aria-checked")).toBe("true");
+  const mine = screen.getByRole("menuitemradio", { name: "My workspaces Alex Rivera" });
+  expect(mine.getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(mine);
+  expect(value.select).not.toHaveBeenCalled();
+  expect(list.showThreads).toHaveBeenLastCalledWith(true);
+  fireEvent.click(trigger);
+  fireEvent.click(await screen.findByRole("menuitemradio", { name: /Birch Studio/ }));
+  expect(value.select).toHaveBeenCalledWith("birch");
+  expect(list.showThreads).toHaveBeenLastCalledWith(false);
 });
 
 it("opens complete admin actions, reacts to a role change while open and restores keyboard focus", async () => {
   const value = actions();
   const mounted = render(view(value));
-  const trigger = screen.getByRole("button", { name: "Switch space, Birch Studio" });
+  const trigger = screen.getByRole("button", { name: "Switch list, Birch Studio" });
   fireEvent.click(trigger);
   expect(await screen.findByRole("menuitem", { name: "People" })).toBeTruthy();
   expect(screen.getByRole("menuitem", { name: "Invite people…" })).toBeTruthy();
@@ -94,12 +117,12 @@ it("opens complete admin actions, reacts to a role change while open and restore
   await waitFor(() => expect(document.activeElement).toBe(trigger));
 });
 
-it("keeps Personal checked on a first read failure with an explicit retry and a disabled create reason", async () => {
+it("keeps My workspaces checked on a first read failure with an explicit retry and a disabled create reason", async () => {
   const error = "OpenOrc Cloud can't be reached.";
   const value = actions({ status: { state: "loading", error }, organization: null, error });
   render(view(value));
-  fireEvent.click(screen.getByRole("button", { name: "Switch space, OpenOrc" }));
-  const personal = await screen.findByRole("menuitemradio", { name: "Personal Alex Rivera" });
+  fireEvent.click(screen.getByRole("button", { name: "Switch list, My workspaces" }));
+  const personal = await screen.findByRole("menuitemradio", { name: "My workspaces Alex Rivera" });
   expect(personal.getAttribute("aria-checked")).toBe("true");
   expect(screen.getByRole("menuitem", { name: "Create organization…" }).hasAttribute("data-disabled")).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
@@ -112,8 +135,8 @@ it("adds an unread mention to the one neutral dot, in the open space too, with i
   vi.mocked(core.call).mockImplementation((async (method: string) => (method === "spaces.mentions" ? { spaceIds: ["birch"] } : undefined)) as typeof core.call);
   render(view(actions()));
   await waitFor(() => expect(screen.getByLabelText("Unread mention in Birch Studio")).toBeTruthy());
-  expect(screen.getByRole("button", { name: "Switch space, Birch Studio, unread mention in Birch Studio" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: /Switch space/ }));
+  expect(screen.getByRole("button", { name: "Switch list, Birch Studio, unread mention in Birch Studio" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Switch list/ }));
   const row = await screen.findByRole("menuitemradio", { name: /Birch Studio/ });
   expect(row.querySelector('[aria-label="Unread mention"]')).toBeTruthy();
 });
@@ -121,7 +144,7 @@ it("adds an unread mention to the one neutral dot, in the open space too, with i
 it("adds unread chat in another organization to the one neutral dot, with its words on demand and on its menu row", async () => {
   vi.mocked(core.call).mockImplementation((async (method: string) => (method === "teamChat.unreadSpaces" ? { spaceIds: ["birch"] } : undefined)) as typeof core.call);
   render(view(actions({ organization: null })));
-  const trigger = await screen.findByRole("button", { name: "Switch space, OpenOrc, unread chat in Birch Studio" });
+  const trigger = await screen.findByRole("button", { name: "Switch list, My workspaces, unread chat in Birch Studio" });
   expect(screen.getByLabelText("Unread chat in Birch Studio")).toBeTruthy();
   fireEvent.click(trigger);
   const row = await screen.findByRole("menuitemradio", { name: /Birch Studio/ });

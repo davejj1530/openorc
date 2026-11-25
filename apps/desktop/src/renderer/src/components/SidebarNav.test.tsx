@@ -23,7 +23,6 @@ vi.mock("../lib/organization-content-gate", () => ({
 
 const organization = { id: "north", kind: "organization", name: "Northwind", logo: null, memberId: "m1", role: "admin", memberCount: 1 } as OrganizationSpace;
 const actions = { organization } as OrganizationActions;
-const orclings = { active: false, toggle: () => {}, tools: null };
 
 beforeEach(() => {
   spaceNavigation.getState().initialize("account-a", "personal", [
@@ -41,7 +40,7 @@ afterEach(() => {
 const newThreadRow = () => {
   render(
     <OrganizationContext.Provider value={actions}>
-      <SidebarNav route={{ view: "newthread" }} projectId={null} orclings={orclings} />
+      <SidebarNav route={{ view: "newthread" }} projectId={null} />
     </OrganizationContext.Provider>,
   );
   return screen.getByRole("button", { name: "New thread" });
@@ -69,7 +68,7 @@ it("lights no row while the frozen screen stands in for the organization's work"
   gate.frozen = true;
   render(
     <OrganizationContext.Provider value={actions}>
-      <SidebarNav route={{ view: "tasks" }} projectId={null} orclings={orclings} />
+      <SidebarNav route={{ view: "tasks" }} projectId={null} />
     </OrganizationContext.Provider>,
   );
   expect(screen.getAllByRole("button").filter((row) => row.getAttribute("aria-current") === "page")).toEqual([]);

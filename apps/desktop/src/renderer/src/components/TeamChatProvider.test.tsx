@@ -63,7 +63,7 @@ it("removes organization project names while keeping Personal navigation availab
   spaceNavigation.setState({ key: "account", current: "team", personal: "personal" });
   organizationContentGate.reset();
   const view = render(
-    <OrganizationSidebarWork>
+    <OrganizationSidebarWork closed={null}>
       <span>Private project</span>
     </OrganizationSidebarWork>,
   );

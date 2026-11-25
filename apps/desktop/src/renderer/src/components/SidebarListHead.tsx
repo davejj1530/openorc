@@ -12,39 +12,40 @@ export function Wordmark() {
   );
 }
 
-/**
- * The head of one of the sidebar's lists: its quiet name, then its tools at the row's end. A list that folds names
- * itself with a button, its chevron showing on hover and while folded; folded, it counts what inside waits on the
- * person, when anything does.
- */
-export function SidebarListHead({
-  label,
-  fold,
-  tools,
-}: {
-  label: string;
-  fold?: { open: boolean; waiting: number; onToggle: () => void; folded?: { marks: ReactNode; words: string } | undefined };
-  tools: ReactNode;
-}) {
+/** The head of one of the sidebar's lists: what names it, then its tools at the row's end, which wait while it is folded. */
+export function SidebarListHead({ name, open = true, tools }: { name: ReactNode; open?: boolean; tools: ReactNode }) {
   return (
-    <div className="sidebar-list-head" data-open={!fold || fold.open || undefined}>
-      {fold ? (
-        <button type="button" aria-expanded={fold.open} aria-label={foldedLabel(label, fold)} className="sidebar-list-fold no-drag" onClick={fold.onToggle}>
-          <span>{label}</span>
-          <ChevronRight size={12} className="sidebar-section-chevron" />
-          {!fold.open && fold.waiting ? <span className="sidebar-count tabular">{fold.waiting}</span> : null}
-          {!fold.open && fold.folded ? fold.folded.marks : null}
-        </button>
-      ) : (
-        <h2 className="sidebar-list-name">{label}</h2>
-      )}
+    <div className="sidebar-list-head" data-open={open || undefined}>
+      {name}
       <div className="sidebar-list-tools">{tools}</div>
     </div>
   );
 }
 
+interface Fold {
+  open: boolean;
+  waiting: number;
+  onToggle: () => void;
+  folded?: { marks: ReactNode; words: string } | undefined;
+}
+
+/**
+ * A list's quiet name as the button that folds it, its chevron showing on hover and while folded; folded, it counts
+ * what inside waits on the person, when anything does.
+ */
+export function ListFold({ label, fold }: { label: string; fold: Fold }) {
+  return (
+    <button type="button" aria-expanded={fold.open} aria-label={foldedLabel(label, fold)} className="sidebar-list-fold no-drag" onClick={fold.onToggle}>
+      <span>{label}</span>
+      <ChevronRight size={12} className="sidebar-section-chevron" />
+      {!fold.open && fold.waiting ? <span className="sidebar-count tabular">{fold.waiting}</span> : null}
+      {!fold.open && fold.folded ? fold.folded.marks : null}
+    </button>
+  );
+}
+
 /** What a folded list says it holds, for a screen reader: its own words when it has them, else what waits. */
-function foldedLabel(label: string, fold: { open: boolean; waiting: number; folded?: { words: string } | undefined }): string | undefined {
+function foldedLabel(label: string, fold: Fold): string | undefined {
   if (fold.open) return undefined;
   if (fold.folded) return `${label}, ${fold.folded.words}`;
   return fold.waiting ? `${label}, ${fold.waiting} waiting` : undefined;

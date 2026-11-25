@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { sidebarGroupsGrow, threadNeedsYou } from "./sidebar-days.js";
 import { projectMeta } from "./sidebar-thread-groups.js";
 import { callsThePerson, rootStatuses } from "./sidebar-list.js";
-import { cloudProjects, inShownWorkspaces, liveGroupedFold, liveHiddenWorkspaces, projectGroups, threadFilterLabel, toggleWorkspace, waitingRoots, WORKSPACES_FOLD } from "./sidebar-groups.js";
+import { cloudProjects, inShownWorkspaces, liveGroupedFold, liveHiddenWorkspaces, projectGroups, threadFilterLabel, toggleWorkspace, waitingRoots } from "./sidebar-groups.js";
 
 function thread(id: string, projectId: string, values: Partial<ThreadSummary> = {}): ThreadSummary {
   return {
@@ -78,9 +78,9 @@ describe("sidebar project groups", () => {
     expect(sidebarGroupsGrow({ end: "today", hasMore: true, limit: 400 })).toBe(false);
   });
 
-  it("keeps the folds the grouped list has across launches, a project's and Workspaces' among them, and drops the days'", () => {
+  it("keeps the folds the grouped list has across launches, a project's among them, and drops the days' and the whole list's", () => {
     expect(liveGroupedFold("project:openorc")).toBe(true);
-    expect(liveGroupedFold(WORKSPACES_FOLD)).toBe(true);
+    expect(liveGroupedFold("workspaces-closed")).toBe(false);
     expect(liveGroupedFold("thread-closed:a")).toBe(true);
     expect(liveGroupedFold("resolved-open:threads")).toBe(true);
     expect(liveGroupedFold("day-closed:recent")).toBe(false);

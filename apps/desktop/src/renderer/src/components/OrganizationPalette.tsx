@@ -1,5 +1,6 @@
 import { Command } from "cmdk";
 import { useOrganization } from "../lib/organization-context";
+import { spaceName } from "../lib/space-name";
 import { People, PersonPlus, Plus, FolderPlus } from "./icons";
 import { OpenOrcMark } from "./OpenOrcMark";
 import { OrganizationMark } from "./OrganizationMark";
@@ -37,7 +38,7 @@ export function OrganizationPalette({ go }: { go(action: () => void): void }) {
       {data?.spaces.map((space) => (
         <Command.Item key={space.id} className="command-palette-item" onSelect={() => go(() => actions.select(space.id))}>
           <span className="command-palette-icon">{space.kind === "personal" ? <OpenOrcMark size={15} /> : <OrganizationMark {...space} size={15} />}</span>
-          <span className="command-palette-label">Switch to {space.kind === "personal" ? "Personal" : space.name}</span>
+          <span className="command-palette-label">Switch to {spaceName(space)}</span>
         </Command.Item>
       ))}
     </>

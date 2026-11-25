@@ -159,7 +159,6 @@ export {
   toggleWorkspace,
   waitingRoots,
   waitsOnYou,
-  WORKSPACES_FOLD,
   type GroupProject,
   type ProjectGroup,
 } from "./sidebar-groups.js";

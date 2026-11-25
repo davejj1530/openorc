@@ -68,7 +68,7 @@ const mount = (threadId: string) => {
   useRouter.setState({ route: { view: "thread", threadId }, history: [], future: [], threadIds: [] });
   render(
     <QueryClientProvider client={queryClient}>
-      <SidebarThreadBrowser />
+      <SidebarThreadBrowser name={null} />
     </QueryClientProvider>,
   );
 };

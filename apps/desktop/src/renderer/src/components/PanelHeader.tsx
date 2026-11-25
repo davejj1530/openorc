@@ -46,11 +46,7 @@ export function PanelHeader({
       // The tabs line up with the page under them, and step past the traffic lights or the Windows controls at the window's edges.
       className={cn("panel-header drag-region px-2.5", outerLeft && corner && cornerInset[corner], outerRight && windowsControls && "pr-controls")}
     >
-      {left ? (
-        <span className="workspace-window-nav flex items-center">
-          <WindowCorner sidebarOpen={sidebarOpen} />
-        </span>
-      ) : null}
+      {left ? <WindowCorner sidebarOpen={sidebarOpen} /> : null}
       <PanelTabs
         key={scope}
         session={session}

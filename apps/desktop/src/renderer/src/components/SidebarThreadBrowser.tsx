@@ -435,13 +435,13 @@ function ThreadGroups({ children, name }: { children: ChildPages; name: ReactNod
 }
 
 /**
- * An open project's rows under the days they last worked, each day a faint label over its rows and only while it holds
- * some. A folded project keeps only the open thread's tree, with no label.
+ * An open project's rows by the days they last worked: today's lead with no label, each later day a faint label over
+ * its rows and only while it holds some. A folded project keeps only the open thread's tree, with no label.
  */
 function ProjectDays({ sections, rows }: { sections: ProjectDaySection[]; rows: (roots: ThreadSummary[]) => ReactNode }) {
   return sections.map(({ day, label, roots }) => (
     <Fragment key={day}>
-      <p className="sidebar-day-label">{label}</p>
+      {label ? <p className="sidebar-day-label">{label}</p> : null}
       {rows(roots)}
     </Fragment>
   ));

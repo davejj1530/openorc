@@ -108,10 +108,11 @@ export function sidebarDaySections(roots: readonly ThreadSummary[], all: readonl
 /** A day inside a project's group: today and yesterday, then Earlier for a tree kept past them because it waits on the person. */
 export type ProjectDay = "today" | "yesterday" | "earlier";
 
-export type ProjectDaySection = { day: ProjectDay; label: string; roots: ThreadSummary[] };
+/** A day's rows and the label over them. Today's rows lead the group with none: a row with no day over it is today's. */
+export type ProjectDaySection = { day: ProjectDay; label: string | null; roots: ThreadSummary[] };
 
-const PROJECT_DAYS: readonly { day: ProjectDay; label: string }[] = [
-  { day: "today", label: "Today" },
+const PROJECT_DAYS: readonly { day: ProjectDay; label: string | null }[] = [
+  { day: "today", label: null },
   { day: "yesterday", label: "Yesterday" },
   { day: "earlier", label: "Earlier" },
 ];

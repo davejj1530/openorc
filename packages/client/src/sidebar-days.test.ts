@@ -184,9 +184,9 @@ describe("sidebar days", () => {
 describe("a project's rows under their days", () => {
   const days = (rows: ThreadSummary[]) => projectDaySections(rows, rows, now).map(({ label, roots }) => [label, ...roots.map((root) => root.id)]);
 
-  it("labels only the days that hold rows, by calendar day, and files a tree kept past yesterday under Earlier", () => {
+  it("leads with today's rows unlabelled, labels the later days that hold rows, and files a tree kept past yesterday under Earlier", () => {
     expect(days([thread("new", now - 1000), thread("morning", at(6, 9)), thread("waiting", at(2), { activity: "waiting" })])).toEqual([
-      ["Today", "new", "morning"],
+      [null, "new", "morning"],
       ["Earlier", "waiting"],
     ]);
   });

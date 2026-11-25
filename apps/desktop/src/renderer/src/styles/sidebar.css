@@ -445,10 +445,11 @@ button.sidebar-nav-row:active:not([aria-current="page"]) {
   grid-template-columns: minmax(0, 1fr);
   gap: 2px;
 }
-/* Inside an open project, a faint label over each day's rows that holds some: Today, Yesterday. It sits on the
-   titles' line in the fourth ink, a size under the project's name, with a hairline from 8px after the word to the
-   rows' end. It belongs to the rows under it: its words rest 4px over them, with 10px between it and the day before,
-   and the first one stands 4px clear of the project's name so the two lines of words do not crowd. */
+/* Inside an open project, a faint label over each day's rows after today's, which lead with none: Yesterday, Earlier.
+   It sits on the titles' line in the fourth ink, a size under the project's name, with a hairline from 8px after the
+   word to the rows' end. It belongs to the rows under it: its words rest 4px over them, with 10px between it and the
+   rows before, and one that leads the group stands 4px clear of the project's name so the two lines of words do not
+   crowd. */
 .sidebar-day-label {
   display: flex;
   align-items: flex-end;

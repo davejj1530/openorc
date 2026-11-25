@@ -1,17 +1,6 @@
 import { Popover } from "@base-ui/react/popover";
-import {
-  DEFAULT_CLAUDE_ACCOUNT,
-  harnessCatalog,
-  isHarnessId,
-  type HarnessId,
-  percentLeft,
-  sessionWindow,
-  weeklyWindow,
-  type AllowanceWindow,
-  type ProviderUsage,
-  type ThreadSummary,
-} from "@openorc/protocol";
-import { allowanceState, cloudAccountChoices, conversationCost, creditBalanceLabel, formatCost, formatUsageTime, usageResetLabel, type ModelChoice } from "@openorc/client";
+import { DEFAULT_CLAUDE_ACCOUNT, harnessCatalog, isHarnessId, type HarnessId, percentLeft, type AllowanceWindow, type ProviderUsage, type ThreadSummary } from "@openorc/protocol";
+import { allowanceState, cloudAccountChoices, conversationCost, creditBalanceLabel, formatCost, formatUsageTime, usageMeter, usageResetLabel, type ModelChoice } from "@openorc/client";
 import { useEffect, useState, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/client";
@@ -267,36 +256,6 @@ interface UsageMark {
   mark: ReactNode;
 }
 
-/** A share left as the chip shows it: filled on its disc. Its number is the meter's hover words. */
-function ShareLeft({ left }: { left: number }) {
-  return <AmountShare fraction={left / 100} size={MARK} />;
-}
-
-/** The week's share left. */
-function weekMark(account: UsageAccount, left: number): UsageMark {
-  const shown = Math.round(left);
-  return { tooltip: `${shown}% left this week`, label: `${account.name}: ${shown}% left this week`, low: shown <= 10, mark: <ShareLeft left={left} /> };
-}
-
-/** An account with no weekly limit has nothing to measure: a plain glyph, opening on what the conversation has cost. */
-function noLimitMark(account: UsageAccount): UsageMark {
-  return { tooltip: "No weekly limit", label: `${account.name}: no weekly limit`, low: false, mark: <Signal size={MARK} /> };
-}
-
-function fxMark(account: UsageAccount, windows: AllowanceWindow[], credits: UsageAccountReport["credits"]): UsageMark | null {
-  const primary = windows.filter((window) => window.group === windows[0]?.group);
-  const window = weeklyWindow(primary) ?? sessionWindow(primary) ?? primary.find((window) => percentLeft(window) !== null);
-  if (window) {
-    const left = percentLeft(window)!;
-    const tooltip = `${Math.round(left)}% left · ${window.label}`;
-    return { tooltip, label: `${account.name}: ${tooltip}`, low: left <= 10, mark: <ShareLeft left={left} /> };
-  }
-  const credit = credits.find((credit) => credit.unlimited || credit.balance !== null);
-  if (!credit) return null;
-  const tooltip = `${credit.label}: ${creditBalanceLabel(credit)}`;
-  return { tooltip, label: `fx: ${tooltip}`, low: !credit.unlimited && Number(credit.balance) <= 0, mark: <Signal size={MARK} /> };
-}
-
 /** Where the table opens: over the model chip, as the chip's own picker does. */
 const PLACE = { side: "top", align: "start", sideOffset: 6 } as const;
 
@@ -394,14 +353,9 @@ function LocalAccountUsage({ choice }: { choice: ModelChoice | null }) {
   );
 }
 
+/** The meter as the chip draws it: the share left filled on its disc, or a plain glyph where there is none to measure. Its number is the meter's hover words. */
 function accountMark(account: UsageAccount, report: ProviderUsage | undefined, cost: number | null): UsageMark | null {
-  // Antigravity exposes Gemini to OpenOrc; its native CLI also reports a separate Claude/GPT pool.
-  const windows = account.provider === "antigravity" ? report?.windows.filter((window) => window.id.startsWith("gemini-")) : report?.windows;
-  const week = windows ? weeklyWindow(windows) : null;
-  const left = week ? percentLeft(week) : null;
-  let mark: UsageMark | null = null;
-  if (account.provider === "fx") mark = fxMark(account, windows ?? [], report?.credits ?? []);
-  else if (left !== null) mark = weekMark(account, left);
-  if (!mark && cost !== null) mark = noLimitMark(account);
-  return mark;
+  const meter = usageMeter(account, report, cost);
+  if (!meter) return null;
+  return { tooltip: meter.words, label: meter.label, low: meter.low, mark: meter.left === null ? <Signal size={MARK} /> : <AmountShare fraction={meter.left / 100} size={MARK} /> };
 }

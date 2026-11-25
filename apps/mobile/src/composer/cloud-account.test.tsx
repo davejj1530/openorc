@@ -50,7 +50,10 @@ vi.mock("../client", async () => {
   });
   return cloud.phone.module;
 });
-vi.mock("react-native-keyboard-controller", () => ({ KeyboardStickyView: ({ children }: { children: ReactNode }) => <>{children}</> }));
+vi.mock("react-native-keyboard-controller", () => ({
+  KeyboardStickyView: ({ children }: { children: ReactNode }) => <>{children}</>,
+  useReanimatedKeyboardAnimation: () => ({ height: { value: 0 }, progress: { value: 0 } }),
+}));
 vi.mock("expo-router", () => ({
   router: { replace: vi.fn(), push: vi.fn(), back: vi.fn() },
   useLocalSearchParams: () => ({ projectId: "cloud-project:h-notes", composerId: "new-thread" }),

@@ -14,7 +14,9 @@ import { useClaudeAccountChoice, useComposerModels } from "./claude-account";
 import { useCloudAccountChoice } from "./cloud-account";
 import { AccountMenu } from "./AccountMenu";
 import { AgentTabs } from "./AgentTabs";
+import { useComposerUsage } from "./composer-usage";
 import { sheetList, type SheetList, type SheetModel } from "./model-sheet-list";
+import { ModelUsage } from "./ModelUsage";
 import { recentModels, rememberModel } from "./recent-models";
 import { useSharedModelSettings, type AccountChoice, type ModelSettings } from "./settings-bridge";
 
@@ -205,6 +207,44 @@ function useAccountChoice(settings: ModelSettings | undefined): AccountChoice | 
 }
 
 /**
+ * The sheet's pinned head: its title with the shown agent's name, the account that agent runs on, the agents' tabs
+ * where there are several, and the search.
+ */
+function SheetHead({
+  shown,
+  agents,
+  account,
+  query,
+  onQuery,
+  onShow,
+}: {
+  shown: AgentKind | null;
+  agents: AgentKind[];
+  account: AccountChoice | null;
+  query: string;
+  onQuery: (query: string) => void;
+  onShow: (agent: AgentKind) => void;
+}) {
+  return (
+    <View collapsable={false} className="gap-4 bg-bg px-5 pb-3 pt-6">
+      <View className="flex-row items-baseline justify-between gap-3">
+        <Text accessibilityRole="header" className="text-xl">
+          Model
+        </Text>
+        {shown ? (
+          <Text className="text-sm text-ink-3" accessibilityLiveRegion="polite">
+            {harnessShortName(shown)}
+          </Text>
+        ) : null}
+      </View>
+      {account && shown === account.section ? <AccountMenu choice={account} /> : null}
+      {agents.length > 1 && shown ? <AgentTabs agents={agents} shown={shown} onShow={onShow} /> : null}
+      <ModelSearch query={query} onQuery={onQuery} agent={shown} />
+    </View>
+  );
+}
+
+/**
  * The models a composer can run, their effort and Fast mode, and the account it runs on: on a Claude thread the Mac's,
  * once it has more than one; on OpenOrc Cloud the person's for the agent, where the server keeps several. One agent's models show at a time. An agent with many, as OpenCode and Oh My Pi have, opens
  * on a short list of the current, recent and default models and a row per provider; a search looks through them all.
@@ -233,6 +273,7 @@ export function ModelSheet() {
   const [recents, setRecents] = useState(recentModels);
   const shown = shownAgent(agents, tab, choice);
   const list = shown ? sheetList({ catalog, agent: shown, choice, recents, query, provider }) : null;
+  const usage = useComposerUsage(settings, shown ?? undefined);
   const pick = (model: ModelOption) => {
     if (!settings || model.unavailable) return;
     haptic.select();
@@ -249,31 +290,19 @@ export function ModelSheet() {
       keyboardShouldPersistTaps="handled"
       onAccessibilityEscape={() => router.back()}
     >
-      <View collapsable={false} className="gap-4 bg-bg px-5 pb-3 pt-6">
-        <View className="flex-row items-baseline justify-between gap-3">
-          <Text accessibilityRole="header" className="text-xl">
-            Model
-          </Text>
-          {shown ? (
-            <Text className="text-sm text-ink-3" accessibilityLiveRegion="polite">
-              {harnessShortName(shown)}
-            </Text>
-          ) : null}
-        </View>
-        {account && shown === account.section ? <AccountMenu choice={account} /> : null}
-        {agents.length > 1 && shown ? (
-          <AgentTabs
-            agents={agents}
-            shown={shown}
-            onShow={(agent) => {
-              setTab(agent);
-              setProvider(null);
-            }}
-          />
-        ) : null}
-        <ModelSearch query={query} onQuery={setQuery} agent={shown} />
-      </View>
+      <SheetHead
+        shown={shown}
+        agents={agents}
+        account={account}
+        query={query}
+        onQuery={setQuery}
+        onShow={(agent) => {
+          setTab(agent);
+          setProvider(null);
+        }}
+      />
       <View className="gap-5 px-5">
+        {usage ? <ModelUsage usage={usage} /> : null}
         <ModelStatus loading={models.isLoading} error={failure} empty={!shown && !current} />
         {list ? <ModelList list={list} choice={choice} onPick={pick} onProvider={setProvider} /> : null}
         <ModelControls shown={shown} settings={settings} state={state} />

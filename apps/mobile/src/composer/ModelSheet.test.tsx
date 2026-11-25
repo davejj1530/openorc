@@ -53,7 +53,10 @@ vi.mock("../client", async () => {
   });
   return mac.phone.module;
 });
-vi.mock("react-native-keyboard-controller", () => ({ KeyboardStickyView: ({ children }: { children: ReactNode }) => <>{children}</> }));
+vi.mock("react-native-keyboard-controller", () => ({
+  KeyboardStickyView: ({ children }: { children: ReactNode }) => <>{children}</>,
+  useReanimatedKeyboardAnimation: () => ({ height: { value: 0 }, progress: { value: 0 } }),
+}));
 vi.mock("expo-router", () => ({
   router: { replace: vi.fn(), push: vi.fn(), back: vi.fn() },
   useLocalSearchParams: () => ({ projectId: "openorc", composerId: "new-thread" }),

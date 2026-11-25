@@ -27,13 +27,14 @@ const BEAT_MS = 30_000;
 const NO_LIMITS: readonly PlanLimits[] = [];
 
 /**
- * The shown Mac's plan limits. Reads `providers.limits` while mounted, so the Mac starts its CLIs for a phone only while
- * Usage is on screen, and only while connected: a read made while the phone is not would wait for a session and fail.
+ * The shown Mac's plan limits. Reads `providers.limits` while mounted and `wanted`, so the Mac starts its CLIs for a
+ * phone only while Usage or a composer's meter is on screen, and only while connected: a read made while the phone is
+ * not would wait for a session and fail.
  * The Mac answers from a report up to a minute old, and the phone counts its answer fresh as long, as the desktop does.
  * The answer is kept with the Mac's lists, so Settings opened while not connected, even after a cold start, still shows
  * the last read.
  */
-export function useUsage(): Usage {
+export function useUsage(wanted = true): Usage {
   const state = useLinkState();
   const live = state.kind === "connected";
   // Under `useRpc`'s key, and asked as a person's own read each time.
@@ -42,7 +43,7 @@ export function useUsage(): Usage {
       queryKey: ["providers.limits", {}],
       queryFn: () => link.connection.call("providers.limits", {}),
       meta: { tags: tagsFor("providers.limits", {}) },
-      enabled: live,
+      enabled: live && wanted,
       staleTime: 60_000,
       gcTime: Infinity,
     },

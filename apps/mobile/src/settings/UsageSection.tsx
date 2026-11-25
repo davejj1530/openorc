@@ -1,4 +1,4 @@
-import { creditBalanceLabel, allowanceState, usageResetLabel } from "@openorc/client";
+import { creditBalanceLabel } from "@openorc/client";
 import { percentLeft, type AllowanceWindow, type PlanLimits } from "@openorc/protocol";
 import { Fragment } from "react";
 import { View } from "react-native";
@@ -10,9 +10,8 @@ import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { Card, Divider, RowLines, rowClass, Section } from "./parts";
 import { useCloudLimits, useUsage, type Usage } from "./use-usage";
+import { limitStale, resetWords, usageTime } from "./usage-words";
 import { UsageRing } from "./UsageRing";
-
-const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 
 const emptyWords: Record<PlanLimits["status"], string> = {
   available: "No limits reported",
@@ -21,20 +20,13 @@ const emptyWords: Record<PlanLimits["status"], string> = {
   error: "Couldn’t read usage",
 };
 
-/** Under a limit: when it resets; for a reading of OpenOrc Cloud's, when it was taken; out of date, that with why. */
-function resetWords(window: AllowanceWindow, now: number, stale: boolean, turnRead: boolean): string {
-  const reported = time.format(window.observedAt);
-  if (stale) return `Out of date · reported ${reported}`;
-  return turnRead ? `Reported ${reported}` : usageResetLabel(window.resetsAt, now);
-}
-
 /**
  * One limit: its ring, its label and the share left on one line, and when it resets under them. Only the share warns.
  * A reading of OpenOrc Cloud's (`turnRead`) comes only from a turn on the account, so it says when it was taken and is
  * never out of date by age, as the desktop's Settings shows it.
  */
 function LimitRow({ window, now, outdated, turnRead }: { window: AllowanceWindow; now: number; outdated: boolean; turnRead: boolean }) {
-  const stale = outdated || (!turnRead && allowanceState(window, now).stale);
+  const stale = limitStale(window, now, { outdated, turnRead });
   const left = percentLeft(window);
   const reset = resetWords(window, now, stale, turnRead);
   const value = left === null ? "Not reported" : `${Math.round(left)}% left`;
@@ -125,7 +117,7 @@ export function UsageSection() {
   const accounts = [...mac.map((limits) => ({ limits, turnRead: false })), ...cloud.map((limits) => ({ limits, turnRead: true }))];
   const none = state === "failed" && live ? <ReadFailed retry={retry} /> : <NoCards words={noCardsWords({ state, live, hostName })} reading={state === "loading" && live} />;
   return (
-    <Section title="Usage" note={live || readAt === null ? null : `Last read at ${time.format(readAt)}`}>
+    <Section title="Usage" note={live || readAt === null ? null : `Last read at ${usageTime(readAt)}`}>
       {accounts.length > 0 ? (
         <View className="gap-3">
           {accounts.map(({ limits, turnRead }) => (

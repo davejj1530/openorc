@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-/** Private drag type: text, files, and cross-window payloads cannot open panes. */
+/** Private drag type: text, files, and cross-window payloads cannot open tabs. */
 export const THREAD_DRAG_TYPE = "application/x-openorc-thread";
 let draggedThread: string | null = null;
 let shownThread: string | null = null;
@@ -14,7 +14,7 @@ function show(id: string | null): void {
 
 export function startThreadDrag(transfer: DataTransfer, id: string): void {
   draggedThread = id;
-  // Copy opens it beside; move puts it in or out of Resolved.
+  // Copy opens it in a tab; move puts it in or out of Resolved.
   transfer.effectAllowed = "copyMove";
   transfer.setData(THREAD_DRAG_TYPE, id);
   // Chromium drops a drag whose page changes while it starts.

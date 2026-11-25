@@ -21,6 +21,7 @@ import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useRun } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { endThreadDrag, startThreadDrag } from "../lib/thread-drag";
+import { useThreadTabs } from "../lib/thread-tabs";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { useMentionWords } from "../lib/mention-words";
 import { AccountFace } from "./AccountFace";
@@ -55,7 +56,6 @@ export function rowHasState(thread: ThreadSummary, subthreads: ThreadStatus | nu
  */
 export function ThreadRow({ thread, subthreads = null, active, project, compact = false, roots = false }: ThreadRowProps) {
   const navigate = useRouter((s) => s.navigate);
-  const addPane = useRouter((s) => s.addThreadPane);
   // Every visible work pane is marked alike; aria-current names only the focused one.
   const open = useRouter((s) => s.route.view !== "team-chat" && s.threadIds.includes(thread.id)) || active;
   const menu = useRef<ContextMenu.Root.Actions>(null);
@@ -77,11 +77,9 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
             onDragStart={(event) => startThreadDrag(event.dataTransfer, thread.id)}
             onDragEnd={endThreadDrag}
             onClick={(e) => {
-              if (e.metaKey || e.ctrlKey) addPane(thread.id);
-              else {
-                dismissCompactNavigation();
-                navigate({ view: "thread", threadId: thread.id });
-              }
+              dismissCompactNavigation();
+              if (e.metaKey || e.ctrlKey) useThreadTabs.getState().openThread(thread.id);
+              else navigate({ view: "thread", threadId: thread.id });
             }}
             aria-current={active ? "page" : undefined}
             aria-description={rowDescription(thread, detail)}

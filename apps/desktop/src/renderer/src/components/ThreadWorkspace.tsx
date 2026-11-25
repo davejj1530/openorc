@@ -3,18 +3,15 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { isSubagentThread } from "@openorc/protocol";
 import { useLayout } from "../lib/layout";
 import { useRpc } from "../lib/client";
-import { MAX_THREAD_PANES, useRouter } from "../lib/router";
+import { useRouter } from "../lib/router";
 import { core } from "../lib/rpc";
 import { threadDragId } from "../lib/thread-drag";
+import { useThreadTabs } from "../lib/thread-tabs";
 import { ThreadView } from "../views/ThreadView";
 import { Panel } from "./Panel";
 import { ThreadPaneDivider } from "./ThreadPaneDivider";
 
-function dropPreviewReason(id: string, visibleThreadIds: readonly string[]): string {
-  if (visibleThreadIds.includes(id)) return "This thread is already visible";
-  if (visibleThreadIds.length >= MAX_THREAD_PANES) return "Three threads are open · close a pane to add another";
-  return "Drop to open beside these threads";
-}
+const dropPreviewReason = (id: string, visibleThreadIds: readonly string[]): string => (visibleThreadIds.includes(id) ? "This thread is already visible" : "Drop to open in a tab");
 
 /** The shared panel's thread while it is one of these panes, and which side of them it docks on while open. */
 function useSharedPanel(ids: readonly string[]) {
@@ -69,7 +66,7 @@ export function ThreadWorkspace() {
             if (!id) return;
             event.preventDefault();
             event.stopPropagation();
-            event.dataTransfer.dropEffect = ids.includes(id) || ids.length >= MAX_THREAD_PANES ? "none" : "copy";
+            event.dataTransfer.dropEffect = ids.includes(id) ? "none" : "copy";
             setPreview(dropPreviewReason(id, ids));
           }}
           onDragLeave={(event) => {
@@ -82,13 +79,13 @@ export function ThreadWorkspace() {
             event.stopPropagation();
             setPreview(null);
             setDropError(null);
-            if (ids.includes(id) || ids.length >= MAX_THREAD_PANES) return;
-            // The row may have been deleted while dragging. Don't open a phantom pane.
+            if (ids.includes(id)) return;
+            // The row may have been deleted while dragging. Don't open a phantom tab.
             void core
               .call("threads.get", { id })
               .then((thread) => {
-                if (thread && useRouter.getState().threadIds === ids) useRouter.getState().addThreadPane(id);
-                else if (!thread) setDropError("This thread is no longer available.");
+                if (thread) useThreadTabs.getState().openThread(id);
+                else setDropError("This thread is no longer available.");
               })
               .catch(() => setDropError("Could not open this thread. Try dragging it again."));
           }}

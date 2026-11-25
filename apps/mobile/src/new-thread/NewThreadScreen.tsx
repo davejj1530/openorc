@@ -48,37 +48,41 @@ function NewThreadForm({ project, choices, onProject }: FormProps) {
   // A cloud start shows as the thread it is becoming until the server holds it; a failure brings the composer back.
   if (form.cloudStart) return <NewThreadStarting start={form.cloudStart} />;
   return (
-    <NewThreadStage painted={painted}>
+    <NewThreadStage
+      painted={painted}
+      composer={
+        <View className="gap-2">
+          {form.error ? (
+            <Text accessibilityRole="alert" className="text-center text-sm text-bad">
+              {form.error}
+            </Text>
+          ) : null}
+          {!form.error && form.dimReason ? (
+            <Text accessibilityRole="alert" className="text-center text-sm text-ink-4">
+              {form.dimReason}
+            </Text>
+          ) : null}
+          <ComposerPlane
+            composerId={COMPOSER_ID}
+            skillScope={{ kind: "project", id: projectId }}
+            settings={form.settings}
+            draft={{ text: form.draft.prompt, images: form.draft.images }}
+            uploading={form.uploading}
+            placeholder="Ask OpenOrc to build, fix bugs, explore"
+            autoFocus
+            onText={form.setText}
+            onRemoveImage={form.removeImage}
+            onAttach={form.chooseImages}
+            surface={painted ? "glass" : "hero"}
+          >
+            {activity ? <Text className="text-sm text-ink-4">{activity}</Text> : null}
+            <SendButton state="send" label="Start" disabled={!form.controls.canSend} onPress={startSpoken} onDimPress={form.explainDim} />
+          </ComposerPlane>
+        </View>
+      }
+    >
       <NewThreadMark />
       <NewThreadQuestion composerId={COMPOSER_ID} project={project} disabled={form.starting || form.uploading > 0} painted={painted} />
-      <View className="gap-2">
-        {form.error ? (
-          <Text accessibilityRole="alert" className="text-center text-sm text-bad">
-            {form.error}
-          </Text>
-        ) : null}
-        {!form.error && form.dimReason ? (
-          <Text accessibilityRole="alert" className="text-center text-sm text-ink-4">
-            {form.dimReason}
-          </Text>
-        ) : null}
-        <ComposerPlane
-          composerId={COMPOSER_ID}
-          skillScope={{ kind: "project", id: projectId }}
-          settings={form.settings}
-          draft={{ text: form.draft.prompt, images: form.draft.images }}
-          uploading={form.uploading}
-          placeholder="Ask OpenOrc to build, fix bugs, explore"
-          autoFocus
-          onText={form.setText}
-          onRemoveImage={form.removeImage}
-          onAttach={form.chooseImages}
-          surface={painted ? "glass" : "hero"}
-        >
-          {activity ? <Text className="text-sm text-ink-4">{activity}</Text> : null}
-          <SendButton state="send" label="Start" disabled={!form.controls.canSend} onPress={startSpoken} onDimPress={form.explainDim} />
-        </ComposerPlane>
-      </View>
     </NewThreadStage>
   );
 }
@@ -98,11 +102,11 @@ function useProjectChoices(): { choices: ProjectChoice[]; known: boolean; space:
 }
 
 /**
- * Starts a thread from the phone as the desktop's New thread does: the mark, the question with the project in it (in
- * Personal, Workspace first; the one it was opened for chosen) and the composer with its defaults, centred on the
- * screen above the keyboard, over the Mac's painting where it shows one. Each project keeps its own
- * draft, so switching projects switches drafts. Start swaps this screen for the new thread, streaming; on OpenOrc Cloud
- * the message and the start's step show first, until the server holds the thread.
+ * Starts a thread from the phone as the desktop's New thread does: the mark and the question with the project in it (in
+ * Personal, Workspace first; the one it was opened for chosen) centred on the screen, and the composer with its
+ * defaults: at the foot on a phone, under the question on an iPad. All over the Mac's painting where it shows one. Each
+ * project keeps its own draft, so switching projects switches drafts. Start swaps this screen for the new thread,
+ * streaming; on OpenOrc Cloud the message and the start's step show first, until the server holds the thread.
  */
 export function NewThreadScreen() {
   const { projectId: opened } = useLocalSearchParams<{ projectId?: string }>();

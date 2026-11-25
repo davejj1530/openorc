@@ -1,7 +1,10 @@
 import { execFile } from "node:child_process";
 import { captureProcessEnvironment, antigravityAuthenticated, cursorAuthenticated, piAuthenticated, fxAuthenticated, launchCommand } from "@openorc/agents";
+import type { Db } from "@openorc/db";
 import { hasGh } from "@openorc/git";
-import { harnessIds, type HarnessId, type HarnessInfo, type SystemInfo } from "@openorc/protocol";
+import { HarnessId, harnessIds, type HarnessInfo, type SystemInfo } from "@openorc/protocol";
+import { z } from "zod";
+import { keptAnswers, type Kept } from "./kept-answers.js";
 import { resolveBinary, type EnvSnapshot, type RefreshResult, type ShellEnvironment } from "./shell-environment.js";
 
 type CommandResult = { status: "ok"; output: string } | { status: "exit"; output: string } | { status: "failed"; output: string };
@@ -84,19 +87,59 @@ const runCommand: CommandProbe = (binary, args, env) =>
     child.stdin?.end();
   });
 
+const KeptChecks: z.ZodType<SystemInfo> = z.object({
+  dataDir: z.string(),
+  harnesses: z.array(z.object({ id: HarnessId, state: z.enum(["ready", "sign_in", "not_found", "check_failed"]), path: z.string().nullable(), version: z.string().nullable(), revision: z.number() })),
+  gh: z.object({ installed: z.boolean(), path: z.string().nullable() }),
+});
+
+/** The last checks, by the Claude account they were run for. */
+export const keptChecks = (db: Db): Kept<SystemInfo> => keptAnswers(db, "system.last", KeptChecks);
+
+interface Options {
+  command?: CommandProbe;
+  probes?: Record<HarnessId, HarnessProbe>;
+  gh?: () => Promise<boolean>;
+  /** Where the last checks outlive the app. */
+  kept?: Kept<SystemInfo>;
+  /** Checks a window had already been shown turned out different when run again. */
+  changed?: () => void;
+}
+
+const cacheKey = (snapshot: EnvSnapshot) => `${snapshot.revision}:${snapshot.scope ?? ""}`;
+/** Whose checks these are, whichever environment ran them. */
+const checkedFor = (snapshot: EnvSnapshot) => snapshot.claudeAccountId ?? snapshot.scope ?? "";
+const sameChecks = (a: SystemInfo, b: SystemInfo) =>
+  a.gh.installed === b.gh.installed &&
+  a.gh.path === b.gh.path &&
+  a.harnesses.length === b.harnesses.length &&
+  a.harnesses.every((row, index) => {
+    const other = b.harnesses[index];
+    return other?.id === row.id && other.state === row.state && other.path === row.path && other.version === row.version;
+  });
+
 /** What agents and tools this machine has, derived from the environment that launches them. */
 export class SystemService {
   private readonly cache = new Map<string, { at: number; info: SystemInfo }>();
   private readonly inFlight = new Map<string, Promise<SystemInfo>>();
+  /** The latest checks per account, from any environment. */
+  private readonly last = new Map<string, SystemInfo>();
+  /** What `shown` answered from `last` while these checks ran, by cache key. */
+  private readonly shownEarly = new Map<string, SystemInfo>();
   private ghAnswer: { at: number; installed: Promise<boolean> } | null = null;
+  private readonly command: CommandProbe;
+  private readonly probes: Record<HarnessId, HarnessProbe>;
+  private readonly ghProbe: () => Promise<boolean>;
 
   constructor(
     private readonly dataDir: string,
     private readonly environment: Pick<ShellEnvironment, "current" | "refresh">,
-    private readonly command: CommandProbe = runCommand,
-    private readonly probes: Record<HarnessId, HarnessProbe> = harnessProbes,
-    private readonly ghProbe: () => Promise<boolean> = hasGh,
-  ) {}
+    private readonly options: Options = {},
+  ) {
+    this.command = options.command ?? runCommand;
+    this.probes = options.probes ?? harnessProbes;
+    this.ghProbe = options.gh ?? hasGh;
+  }
 
   /** Whether gh runs, asked at most every 30 s. Unlike `info`, nothing about the Mac's paths or harnesses. */
   async gh(): Promise<{ installed: boolean }> {
@@ -113,7 +156,7 @@ export class SystemService {
 
   /** Reads one explicit snapshot, used by admitted runs that must not drift across awaits. */
   infoFor(snapshot: EnvSnapshot, env: Readonly<NodeJS.ProcessEnv> = captureProcessEnvironment(snapshot)): Promise<SystemInfo> {
-    const key = `${snapshot.revision}:${snapshot.scope ?? ""}`;
+    const key = cacheKey(snapshot);
     for (const [storedKey, value] of this.cache) if (Date.now() - value.at >= 60_000) this.cache.delete(storedKey);
     const cached = this.cache.get(key);
     if (cached) return Promise.resolve(cached.info);
@@ -124,11 +167,51 @@ export class SystemService {
     return next;
   }
 
+  /**
+   * What windows show: the last checks of the same binaries at once, however old, run again behind the answer. Whoever
+   * decides a launch from the checks reads `infoFor`, which waits for current ones.
+   */
+  shown(snapshot: EnvSnapshot, env: Readonly<NodeJS.ProcessEnv> = captureProcessEnvironment(snapshot)): Promise<SystemInfo> {
+    const key = cacheKey(snapshot);
+    const current = this.infoFor(snapshot, env);
+    // `infoFor` has dropped what is past its minute, so checks still cached are current.
+    const early = this.cache.has(key) ? undefined : this.lastFor(snapshot);
+    if (!early) return current;
+    this.shownEarly.set(key, early);
+    current.catch(() => this.shownEarly.delete(key));
+    return Promise.resolve(early);
+  }
+
+  /** The last checks stand only for the binaries they were about: a harness installed, moved or removed since is checked first. */
+  private lastFor(snapshot: EnvSnapshot): SystemInfo | undefined {
+    const name = checkedFor(snapshot);
+    const last = this.last.get(name) ?? this.options.kept?.read(name);
+    if (!last || last.harnesses.length !== harnessIds.length || !harnessIds.every((id, index) => last.harnesses[index]?.id === id && last.harnesses[index]?.path === snapshot.binaries[id])) {
+      return undefined;
+    }
+    return this.systemInfo(
+      last.harnesses.map((row) => ({ ...row, revision: snapshot.revision })),
+      last.gh,
+    );
+  }
+
+  private remember(snapshot: EnvSnapshot, info: SystemInfo): void {
+    const name = checkedFor(snapshot);
+    const before = this.last.get(name) ?? this.options.kept?.read(name);
+    this.last.set(name, info);
+    if (!before || !sameChecks(before, info)) this.options.kept?.write(name, info);
+    const key = cacheKey(snapshot);
+    const early = this.shownEarly.get(key);
+    this.shownEarly.delete(key);
+    if (early && !sameChecks(early, info)) this.options.changed?.();
+  }
+
   private async probeAll(snapshot: EnvSnapshot, env: Readonly<NodeJS.ProcessEnv>): Promise<SystemInfo> {
     const harnesses = await Promise.all(harnessIds.map((id) => this.probeHarness(id, snapshot, env)));
     const ghPath = await resolveBinary("gh", snapshot.path);
     const info = this.systemInfo(harnesses, { installed: ghPath !== null, path: ghPath });
-    this.cache.set(`${snapshot.revision}:${snapshot.scope ?? ""}`, { at: Date.now(), info });
+    this.cache.set(cacheKey(snapshot), { at: Date.now(), info });
+    this.remember(snapshot, info);
     return info;
   }
 
@@ -151,7 +234,7 @@ export class SystemService {
 
   /** A failed login-shell refresh is not proof that either installed harness disappeared. */
   private failedRefreshInfo(snapshot: EnvSnapshot): SystemInfo {
-    const previous = this.cache.get(`${snapshot.revision}:${snapshot.scope ?? ""}`)?.info;
+    const previous = this.cache.get(cacheKey(snapshot))?.info;
     const harnesses = harnessIds.map((id): HarnessInfo => {
       const known = previous?.harnesses.find((row) => row.id === id);
       return {

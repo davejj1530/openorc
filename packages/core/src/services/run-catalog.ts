@@ -1,5 +1,5 @@
 import { claudeAccountFastBlock, claudeModelsFrom, withClaudeAccountFastMode, withClaudeLegacyModels } from "./claude-model-catalog.js";
-import { ModelCatalogCache, type DiscoveredModels, type CatalogEntry } from "./model-catalog.js";
+import { keptCatalogs, ModelCatalogCache, type DiscoveredModels, type CatalogEntry } from "./model-catalog.js";
 import {
   captureLaunchEnvironment,
   listClaudeModels,
@@ -13,6 +13,7 @@ import {
 } from "@openorc/agents";
 import { ULTRACODE_EFFORT } from "@openorc/protocol";
 import { harnessCatalog, harnessIds, harnessName, isHarnessId, type HarnessId, type ModelCatalog, type ModelOption } from "@openorc/protocol";
+import type { Db } from "@openorc/db";
 import type { RunHooks } from "./run-types.js";
 import type { EnvSnapshot } from "./shell-environment.js";
 
@@ -149,9 +150,18 @@ export function acpOptions(agent: "opencode" | "omp" | "cursor" | "antigravity" 
   }));
 }
 
+/** The entry of an agent whose list could not be read. */
+function unavailable(agent: HarnessId, error: unknown): CatalogEntry {
+  return { models: [], provider: { agent, status: "error", refreshedAt: null, message: error instanceof Error ? error.message : "This account is unavailable." } };
+}
+
+/** The model lists kept between starts, which tell the windows when a fresh reading replaces one. */
+export function keptModelCache(db: Db, invalidate: (keys: string[]) => void) {
+  return new ModelCatalogCache({ kept: keptCatalogs(db), changed: () => invalidate(["models"]) });
+}
+
 /** Provider catalog discovery has one owner. */
 export class RunCatalog {
-  private readonly modelCache = new ModelCatalogCache();
   /**
    * Fast blocks a Claude turn reported, by account. Claude Code's initialize answer says Fast is on until a request
    * is refused, and the next session has forgotten the refusal, so the app keeps it until Fast serves a turn again or
@@ -169,6 +179,7 @@ export class RunCatalog {
     private readonly pi = { listModels: listPiModels },
     private readonly antigravity: Pick<AcpAdapter, "listModels">,
     private readonly fx: Pick<AcpAdapter, "listModels">,
+    private readonly modelCache = new ModelCatalogCache(),
   ) {}
 
   assertEnabled(agent: string): void {
@@ -206,15 +217,22 @@ export class RunCatalog {
             const snapshot = id === "claude" && !admitted ? (this.hooks.claudeEnvironment?.(environment, claudeAccountId) ?? environment) : environment;
             const account = id === "claude" ? snapshot.claudeAccountId : undefined;
             if (refresh && account) this.claudeFastBlocks.delete(account);
-            const read = this.modelCache.read(id, snapshot.revision, () => this.modelLists[id](snapshot, admitted), refresh, admitted?.scope ?? snapshot.scope);
-            const block = shown && account ? this.claudeFastBlocks.get(account) : undefined;
-            return block ? read.then((entry) => ({ ...entry, models: withClaudeAccountFastMode(entry, block).models })) : read;
+            // A launch reads the list of the environment it was admitted in, which says nothing of the account.
+            const last = admitted ? undefined : { keptAs: `${id}:${account ?? ""}`, shown };
+            const read = this.modelCache.read(id, snapshot.revision, () => this.modelLists[id](snapshot, admitted), refresh, admitted?.scope ?? snapshot.scope, last);
+            return shown ? this.withoutBlockedFast(read, account) : read;
           } catch (error) {
-            return Promise.resolve({ models: [], provider: { agent: id, status: "error", refreshedAt: null, message: error instanceof Error ? error.message : "This account is unavailable." } });
+            return Promise.resolve(unavailable(id, error));
           }
         }),
     );
     return { models: entries.flatMap((entry) => entry.models), providers: entries.map((entry) => entry.provider) };
+  }
+
+  /** The list people pick from, with Fast taken off a Claude account a turn found cannot use it. */
+  private withoutBlockedFast(read: Promise<CatalogEntry>, account?: string) {
+    const block = account ? this.claudeFastBlocks.get(account) : undefined;
+    return block ? read.then((entry) => ({ ...entry, models: withClaudeAccountFastMode(entry, block).models })) : read;
   }
 
   private readonly modelLists: Record<HarnessId, (environment: EnvSnapshot, admitted?: AgentLaunchEnvironment) => Promise<DiscoveredModels>> = {

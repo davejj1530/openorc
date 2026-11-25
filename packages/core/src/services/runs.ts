@@ -26,7 +26,7 @@ import { AgentUpdateGate } from "./agent-update-gate.js";
 import { McpAppService } from "./mcp-apps.js";
 import { RunApprovals } from "./run-approvals.js";
 import { RunBriefs } from "./run-briefs.js";
-import { RunCatalog } from "./run-catalog.js";
+import { keptModelCache, RunCatalog } from "./run-catalog.js";
 import { RunEvents } from "./run-events.js";
 import { deliverable, steerable, steerBlocker, takesQueued, type RunInput } from "./run-input.js";
 import { RunLaunch } from "./run-launch.js";
@@ -186,7 +186,7 @@ export class RunService {
     this.antigravity = new AcpAdapter({ profile: antigravityAcp, onApproval: (request) => this.approvals.handleAcpApproval(request) });
     const fx = new AcpAdapter({ profile: fxAcp, onApproval: (request) => this.approvals.handleAcpApproval(request) });
     this.adapters = adapters ?? { codex: this.codex, claude: this.claude, opencode: this.opencode, omp: this.omp, cursor: this.cursor, pi: this.pi, antigravity: this.antigravity, fx };
-    this.catalog = new RunCatalog(this.hooks, this.codex, this.opencode, this.omp, this.cursor, (agent) => this.agentUpdating(agent), this.pi, this.antigravity, fx);
+    this.catalog = new RunCatalog(this.hooks, this.codex, this.opencode, this.omp, this.cursor, (agent) => this.agentUpdating(agent), this.pi, this.antigravity, fx, keptModelCache(db, invalidate));
     this.briefs = new RunBriefs(this.db, this.hooks);
     this.liveView = new RunLive({
       db: this.db,

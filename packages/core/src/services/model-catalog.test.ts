@@ -1,7 +1,7 @@
 import { RunCatalog } from "./run-catalog.js";
 import { describe, expect, it, vi } from "vitest";
 import type { HarnessId, ModelOption } from "@openorc/protocol";
-import { ModelCatalogCache, type DiscoveredModels } from "./model-catalog.js";
+import { ModelCatalogCache, type CatalogEntry, type DiscoveredModels } from "./model-catalog.js";
 import { claudeModelLabel, claudeModelsFrom, withClaudeAccountFastMode, withClaudeLegacyModels } from "./claude-model-catalog.js";
 
 const model: ModelOption = {
@@ -28,17 +28,28 @@ describe("catalog cache", () => {
     expect((await cache.read("claude", 1, fail, false, "work:2")).models).toEqual([]);
     expect((await cache.read("claude", 1, fail, false, "personal:1")).models[0]?.id).toBe("personal:1");
   });
-  it("coalesces concurrent reads, expires after five minutes and forces refresh", async () => {
+  it("coalesces concurrent reads, and after five minutes shows the old list while it lists again", async () => {
+    const shown = { keptAs: "claude:", shown: true };
     let now = 1000;
-    const cache = new ModelCatalogCache(() => now);
-    const discover = vi.fn(async () => result());
+    const changed = vi.fn();
+    const cache = new ModelCatalogCache({ now: () => now, changed });
+    let listed = "first";
+    const discover = vi.fn(async () => result(listed));
     await Promise.all([cache.read("claude", 1, discover), cache.read("claude", 1, discover, true)]);
     await cache.read("claude", 1, discover);
     expect(discover).toHaveBeenCalledTimes(1);
     now += 300_000;
-    await cache.read("claude", 1, discover);
+    listed = "second";
+    expect((await cache.read("claude", 1, discover, false, "", shown)).models[0]?.id).toBe("first");
+    expect(discover).toHaveBeenCalledTimes(2);
+    // Whoever launches from the list waits for the one being read.
+    expect((await cache.read("claude", 1, discover)).models[0]?.id).toBe("second");
+    expect(discover).toHaveBeenCalledTimes(2);
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect((await cache.read("claude", 1, discover, false, "", shown)).models[0]?.id).toBe("second");
     await cache.read("claude", 1, discover, true);
     expect(discover).toHaveBeenCalledTimes(3);
+    expect(changed).toHaveBeenCalledTimes(1);
   });
   it("keeps last-good data and provider error state without crossing revisions", async () => {
     const cache = new ModelCatalogCache();
@@ -52,6 +63,43 @@ describe("catalog cache", () => {
     expect(JSON.stringify(stale)).not.toContain("private stderr");
     expect((await cache.read("codex", 1, async () => result("gpt-new"))).provider.status).toBe("ready");
     expect(await cache.read("claude", 2, fail)).toMatchObject({ models: [], provider: { status: "error" } });
+  });
+  it("shows a new environment the earlier list while it lists its own, and a failure there keeps none of it", async () => {
+    const changed = vi.fn();
+    const cache = new ModelCatalogCache({ changed });
+    const shown = { keptAs: "claude:", shown: true };
+    const fail = async () => {
+      throw new Error("offline");
+    };
+    await cache.read("claude", 1, async () => result(), false, "", shown);
+    expect((await cache.read("claude", 2, fail, false, "", shown)).models).toHaveLength(1);
+    await vi.waitFor(() => expect(changed).toHaveBeenCalledTimes(1));
+    expect(await cache.read("claude", 2, fail, false, "", shown)).toMatchObject({ models: [], provider: { status: "error" } });
+  });
+  it("answers a new start with the list kept from the last one, and keeps what it then lists", async () => {
+    const rows = new Map<string, CatalogEntry>();
+    const kept = { read: (name: string) => rows.get(name), write: (name: string, entry: CatalogEntry) => void rows.set(name, entry) };
+    const work = { keptAs: "claude:work", shown: true };
+    const first = new ModelCatalogCache({ kept });
+    await first.read("claude", 1, async () => result("kept"), false, "work:0", { ...work, shown: false });
+    expect(rows.get("claude:work")?.models[0]?.id).toBe("kept");
+
+    const changed = vi.fn();
+    const next = new ModelCatalogCache({ kept, changed });
+    const discover = vi.fn(async () => result("newer"));
+    expect((await next.read("claude", 1, discover, false, "work:0", work)).models[0]?.id).toBe("kept");
+    expect((await next.read("claude", 1, discover, true, "work:0", work)).models[0]?.id).toBe("newer");
+    expect(discover).toHaveBeenCalledTimes(1);
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(rows.get("claude:work")?.models[0]?.id).toBe("newer");
+    // A list that cannot be read is kept only where there is none to lose.
+    const fail = async () => {
+      throw new Error("offline");
+    };
+    await next.read("claude", 1, fail, true, "work:0", work);
+    expect(rows.get("claude:work")?.models[0]?.id).toBe("newer");
+    await next.read("claude", 1, fail, true, "other:0", { keptAs: "claude:other", shown: true });
+    expect(rows.get("claude:other")).toMatchObject({ models: [], provider: { status: "error" } });
   });
   it("does not replace a live list with fallback or let an old revision overwrite a new one", async () => {
     const cache = new ModelCatalogCache();

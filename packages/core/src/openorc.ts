@@ -93,6 +93,7 @@ import { AgentUpdateService } from "./services/agent-updates.js";
 import { AttachmentService } from "./services/attachments.js";
 import { ClaudeAccountSwitch } from "./services/claude-account-switch.js";
 import { ClaudeSignInRetry } from "./services/claude-sign-in-retry.js";
+import { ClaudeAccountChecks } from "./services/claude-account-checks.js";
 import { ClaudeAccountService } from "./services/claude-accounts.js";
 import { claudeRunAccount } from "./services/claude-run-account.js";
 import { createFileService } from "./services/file-service-setup.js";
@@ -118,7 +119,7 @@ import { OrclingWakeService } from "./services/orcling-wakes.js";
 import { AppSettingsService } from "./services/settings.js";
 import { ShellEnvironment, inheritedProbe } from "./services/shell-environment.js";
 import { SlackService } from "./services/slack/service.js";
-import { SystemService } from "./services/system.js";
+import { keptChecks, SystemService } from "./services/system.js";
 import { TaskCheckoutService } from "./services/task-checkout.js";
 import { TaskCommentService } from "./services/task-comments.js";
 import { TaskRefineService } from "./services/task-refine.js";
@@ -163,6 +164,7 @@ export class OpenOrc {
   readonly agentUpdates: AgentUpdateService;
   /** The environment agents launch with. Runs capture `current()` at admission; Rescan calls `refresh()`. */
   readonly claudeAccounts: ClaudeAccountService;
+  private readonly claudeChecks: ClaudeAccountChecks;
   private connectorService: ConnectorService | null = null;
   private cloudMoveService: CloudMoves | null = null;
   private cloudFolderService: CloudFolders | null = null;
@@ -243,7 +245,7 @@ export class OpenOrc {
     this.settings = new AppSettingsService(db);
     this.environment = new ShellEnvironment({ probe: options.shellProbe ?? (options.ephemeral ? inheritedProbe() : undefined), ...(options.shellEnv ? { env: options.shellEnv } : {}) });
     this.devices = new DeviceService({ db, dataDir: options.dataDir, environment: () => this.environment.current(), transport: options.transport, log: this.log, system: options.deviceSystem });
-    this.system = new SystemService(options.dataDir, this.environment);
+    this.system = new SystemService(options.dataDir, this.environment, { kept: keptChecks(db), changed: () => invalidate(["system"]) });
     this.claudeAccounts = new ClaudeAccountService(
       db,
       options.dataDir,
@@ -255,6 +257,7 @@ export class OpenOrc {
       (id) => Boolean(this.runs?.agentUpdating("claude") || this.memory?.hasPendingWork || this.textGeneration?.hasPendingWork || this.runs?.hasClaudeSessions(id)),
       (id) => this.runs.retireIdleClaudeSessions(id),
     );
+    this.claudeChecks = new ClaudeAccountChecks(this.system, this.environment, this.claudeAccounts);
     this.agentUpdates = new AgentUpdateService({
       info: (refresh) => this.system.info(refresh),
       environment: () => this.environment.current(),
@@ -424,9 +427,9 @@ export class OpenOrc {
     return {
       models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
       loggedIn: (accountId) =>
-        this.claudeSystemInfo(accountId).then(
-          (info) => Object.fromEntries(info.harnesses.map((row) => [row.id, this.settings.enabledHarnesses().includes(row.id) && harnessLoggedIn(row)])) as Record<HarnessId, boolean>,
-        ),
+        this.claudeChecks
+          .info(accountId)
+          .then((info) => Object.fromEntries(info.harnesses.map((row) => [row.id, this.settings.enabledHarnesses().includes(row.id) && harnessLoggedIn(row)])) as Record<HarnessId, boolean>),
       launch: (agent, accountId) => {
         if (!this.settings.enabledHarnesses().includes(agent)) return null;
         if (this.runs.agentUpdating(agent)) return null;
@@ -699,11 +702,6 @@ export class OpenOrc {
     this.db.close();
   }
 
-  private async claudeSystemInfo(id?: string | null, refresh = false) {
-    if (refresh) await this.environment.refresh();
-    return this.system.infoFor(this.claudeAccounts.inspectionEnvironment(this.environment.current(), id ?? undefined));
-  }
-
   /** One call into the core as the Mac's own windows make it, for an Orcling acting for the person. */
   private async callAsPerson(method: string, params: unknown): Promise<unknown> {
     const reply = await this.handle({ type: "rpc", id: 0, method, params });
@@ -716,7 +714,7 @@ export class OpenOrc {
     return readPlanLimits({
       db: this.db,
       usage: this.providerUsage,
-      availability: async () => harnessAvailability(await this.claudeSystemInfo()).filter((row) => this.settings.enabledHarnesses().includes(row.id)),
+      availability: async () => harnessAvailability(await this.claudeChecks.info()).filter((row) => this.settings.enabledHarnesses().includes(row.id)),
     });
   }
 
@@ -745,8 +743,8 @@ export class OpenOrc {
       createConnectorHandlers({ db: this.db, connectors: this.connectors }),
       createSystemHandlers({
         system: this.system,
-        accountInfo: (refresh, id) => (id ? this.claudeSystemInfo(id, refresh) : this.system.info(refresh)),
-        defaultAccountInfo: () => this.claudeSystemInfo(),
+        accountInfo: (refresh, id) => this.claudeChecks.shown(refresh, id),
+        defaultAccountInfo: () => this.claudeChecks.shownDefault(),
         enabledHarnesses: () => this.settings.enabledHarnesses(),
         agentUpdates: this.agentUpdates,
         providerUsage: this.providerUsage,

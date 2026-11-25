@@ -15,6 +15,7 @@ import { NewThreadMark } from "../components/NewThreadMark";
 import { DitherBackdrop } from "../components/DitherBackdrop";
 import { ThreadTabs } from "../components/ThreadTabs";
 import { TopBar } from "../components/TopBar";
+import { WorkingMark } from "../components/StateMark";
 import { Button, TextButton } from "../components/ui";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { usePermissionSelection, useRpc, useRpcMutation } from "../lib/client";
@@ -28,7 +29,7 @@ import { NewThreadStage, useCloudStart } from "./new-thread-starting";
 import { useDefaultHarness } from "../lib/default-harness";
 import { focusedProject, useLayout } from "../lib/layout";
 import { swapInPlace } from "../lib/motion";
-import { evaluateNewThreadAvailability, initialThreadChoice } from "../lib/new-thread-availability";
+import { evaluateNewThreadAvailability, initialThreadChoice, type NewThreadIssue } from "../lib/new-thread-availability";
 import { readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, writeNewThreadDraft } from "../lib/new-thread-draft";
 import { useNewThreadLocation } from "../lib/new-thread-location";
 import { useNewThreadPreparation } from "../lib/new-thread-preparation";
@@ -204,8 +205,7 @@ function NewThreadProject({
 
   const {
     selectedProject: selected,
-    targetIssue,
-    projectIssue,
+    issue,
     disabledReason: targetDisabledReason,
   } = evaluateNewThreadAvailability({
     projectId,
@@ -337,7 +337,7 @@ function NewThreadProject({
                       />
                     </Composer>
                   </div>
-                  <NewThreadIssue issue={targetIssue ?? projectIssue} retry={retry} />
+                  <NewThreadIssueLine issue={issue} retry={retry} />
                 </NewThreadStage>
               </>
             )}
@@ -403,13 +403,23 @@ function NewThreadModelControl({
   return <ComposerModelPicker value={choice} onChange={choose} onSelectModel={choose} orclings={orclings} accounts={accounts} limits={limits} disabled={disabled} />;
 }
 
-function NewThreadIssue({ issue, retry }: { issue: string | null; retry(): void }) {
-  return issue ? (
+/** What holds the start back, under the composer: a read under way as the mark at work, a problem with a way to try again. */
+function NewThreadIssueLine({ issue, retry }: { issue: NewThreadIssue | null; retry(): void }) {
+  if (!issue) return null;
+  if (issue.waiting) {
+    return (
+      <p role="status" className="mt-2 flex items-center gap-1.5 text-xs text-ink-3">
+        <WorkingMark size={12} />
+        {issue.words}
+      </p>
+    );
+  }
+  return (
     <p role="status" className="text-xs text-warn mt-2 break-words">
-      {issue}{" "}
+      {issue.words}{" "}
       <TextButton type="button" underline tone="strong" onClick={retry}>
         Retry checks
       </TextButton>
     </p>
-  ) : null;
+  );
 }

@@ -1,6 +1,5 @@
-/* Tabs on the window's chrome line, shared by the work column's threads and the panel. A tab's close shows on the
-   current one, under the pointer and while focus is in it. The panel's tabs are pills (below); the threads' are
-   plain words, the current one underlined (further below). */
+/* Tabs on the window's chrome line, the work column's threads and the panel's alike: plain words, the current one
+   underlined (below). A tab's close shows on the current one, under the pointer and while focus is in it. */
 .work-tabs-row {
   display: flex;
   align-items: center;
@@ -141,75 +140,48 @@
   color: var(--ink-3);
 }
 
-/* The panel's tabs: 28px pills on the soft fill, the current one on the strong fill with no edge; the strip's 2px
-   keeps a dragged pill inside its clip. The fills are tints, so a dragged pill draws its own over the chrome's colour. */
-.panel-tabs {
-  padding: 2px;
-}
-/* As the threads' tabs (below): a pill gives way as the strip fills, down to 136px or its own width if that is less,
-   and past that the strip scrolls sideways. */
-.panel-tabs .work-tab {
-  min-width: calc-size(max-content, min(size, 136px));
-  background-color: var(--surface-2);
-}
-.panel-tabs .work-tab:hover {
-  background-color: var(--surface-3);
-}
-.panel-tabs .work-tab-current,
-.panel-tabs .work-tab-current:hover {
-  background-color: var(--surface-3);
-}
-.panel-tabs .work-tab[data-dragged] {
-  background: linear-gradient(var(--surface-2), var(--surface-2)) var(--bg);
-}
-.panel-tabs .work-tab-current[data-dragged] {
-  background-image: linear-gradient(var(--surface-3), var(--surface-3));
-}
-/* Only the current pill keeps room for its close, easing as it comes and goes; another pill's name runs to its end,
-   and its close fades in over the last letters under the pointer or focus. */
-.panel-tabs .work-tab-face {
-  padding: 0 28px 0 10px;
-  transition: padding var(--duration-resize) var(--ease-out);
-}
-.panel-tabs .work-tab:not(.work-tab-current) .work-tab-face {
-  padding-right: 10px;
-}
-.panel-tabs .work-tab:not(.work-tab-current):is(:hover, :focus-within) .work-tab-title {
-  mask-image: linear-gradient(to left, transparent 14px, #000 30px);
-}
-
-/* The work column's threads: each its mark and name as plain words in the third ink, the second under the pointer and
-   full ink with a 2px line on the header's foot for the current one. The strip runs the header's full height so that
-   line meets the header's hairline. Every tab keeps the room for its close, so choosing one never changes a width.
+/* Both strips draw a tab the same way: its mark and name as plain words in the third ink, the second under the pointer
+   and full ink with a 2px line, round at its ends, on the header's foot for the current one. The strip runs the header's full height so
+   that line meets the header's foot. Every tab keeps the room for its close, so choosing one never changes a width.
    A tab takes its name's width up to 220px and gives way, as the row fills, down to 136px (room for a name to read)
    or its own width if that is less; past that the strip scrolls sideways. */
 .work-tabs-row:has(> .thread-tabs) {
   align-self: stretch;
 }
-.thread-tabs {
+.thread-tabs,
+.panel-tabs {
   align-self: stretch;
   align-items: stretch;
 }
-.thread-tabs .work-tab {
-  flex: 0 1 auto;
+.thread-tabs .work-tab,
+.panel-tabs .work-tab {
   min-width: calc-size(max-content, min(size, 136px));
   height: auto;
   margin-inline-end: 0;
   border-radius: 0;
 }
-.thread-tabs .work-tab-current::after {
+.thread-tabs .work-tab {
+  flex: 0 1 auto;
+}
+.thread-tabs .work-tab-current::after,
+.panel-tabs .work-tab-current::after {
   content: "";
   position: absolute;
   inset: auto 0 0;
   height: 2px;
+  /* Round ends, so the line closes softly where a square cut would. */
+  border-radius: var(--radius-pill);
   background-color: currentColor;
 }
 /* The face stays a 28px control in the middle of the tab, so its focus ring and fill hug the words. */
-.thread-tabs .work-tab-face {
+.thread-tabs .work-tab-face,
+.panel-tabs .work-tab-face {
+  align-self: center;
   height: var(--control-sm);
   padding: 0 26px 0 8px;
   border-radius: var(--radius-md);
 }
-.thread-tabs .work-tab-close {
+.thread-tabs .work-tab-close,
+.panel-tabs .work-tab-close {
   right: 4px;
 }

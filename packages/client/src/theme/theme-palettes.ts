@@ -11,7 +11,8 @@ export interface ThemeTemplate {
 }
 // Each palette fills the roles in theme-roles.ts.
 // OpenOrc: one ground under the sidebar, the columns, every header and the panel, and depth as a step in fill, never
-// a line. Dark is a black room: pieces one quiet step up, off-white ink, and white as the one lit action. Light is a
+// a line. Dark is a soft black room, lifted off black so long sessions rest the eyes, and neutral, never warm: pieces
+// one quiet step up, off-white ink, and white as the one lit action. Light is a
 // warm off-white room: pieces and planes in plain white on it, fills and lines a few percent of the ink over the
 // ground, a neutral near-black ink with its greys mixed from that ink, and the ink as the action. Light is
 // the accent: the open row, the primary pill, a ready send button and a working cube are lit, a glow in dark and a
@@ -58,41 +59,41 @@ const openorcColors: ThemeTemplate["colors"] = {
   ),
   dark: palette(
     {
-      sidebar: "#050505",
-      body: "#101010",
-      raised: "#161616",
-      hover: "#1e1e1e",
-      border: "#181818",
-      borderStrong: "#2b2b2b",
+      sidebar: "#141414",
+      body: "#1c1c1c",
+      raised: "#222222",
+      hover: "#2a2a2a",
+      border: "#242424",
+      borderStrong: "#363636",
       text: "#ededeb",
-      secondaryText: "#b9b9b6",
-      mutedText: "#8f8f8c",
-      faintText: "#848481",
-      bubble: "#131313",
+      secondaryText: "#bdbdba",
+      mutedText: "#999996",
+      faintText: "#8e8e8b",
+      bubble: "#1f1f1f",
     },
     "#ffffff",
     "#ffffff",
-    "#050505",
+    "#141414",
     {
-      "--navigation-soft": "#191919",
-      "--navigation-hover": "#0e0e0e",
-      "--raised-shadow": "0 0 0 var(--hairline) #2b2b2b, 0 12px 32px -12px rgb(0 0 0 / 0.8)",
-      "--prose-ink": "#dededb",
+      "--navigation-soft": "#272727",
+      "--navigation-hover": "#1d1d1d",
+      "--raised-shadow": "0 0 0 var(--hairline) #363636, 0 12px 32px -12px rgb(0 0 0 / 0.6)",
+      "--prose-ink": "#dededc",
       "--bubble-ink": "#ededeb",
-      "--line-number": "#6a6a67",
-      "--accent-soft": "#1b1b1b",
-      "--selection": "#2c2c2c",
-      "--well": "#101010",
-      "--key": "#1a1a1a",
+      "--line-number": "#737370",
+      "--accent-soft": "#292929",
+      "--selection": "#3a3a3a",
+      "--well": "#1c1c1c",
+      "--key": "#262626",
       "--lit": "inset 0 1px 0 rgb(255 255 255 / 0.1), 0 0 28px -10px rgb(255 255 255 / 0.22)",
       "--lit-strong": "inset 0 1px 0 rgb(255 255 255 / 0.6), 0 0 32px -6px rgb(255 255 255 / 0.36)",
       "--lit-mark": "drop-shadow(0 0 5px rgb(255 255 255 / 0.6))",
       "--working-ink": "var(--accent)",
       "--ok": "#58b98a",
-      "--ok-soft": "#12201a",
+      "--ok-soft": "#222c27",
       "--warn": "#f0b35a",
       "--bad": "#d98a7e",
-      "--bad-soft": "#241715",
+      "--bad-soft": "#2f2726",
       "--attention": "#f0b35a",
     },
   ),
@@ -156,7 +157,7 @@ const presets: ThemeTemplate[] = [
   {
     id: "openorc",
     name: "OpenOrc",
-    description: "A black room, an off-white room · light as the accent",
+    description: "A soft black room, an off-white room · light as the accent",
     colors: openorcColors,
   },
   // Solid blue controls keep white labels in both modes; the fill meets 4.5:1 contrast.

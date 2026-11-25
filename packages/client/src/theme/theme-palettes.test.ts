@@ -4,7 +4,7 @@ import { themePresets } from "./theme-palettes.js";
 const colors = (id: string) => themePresets.find((theme) => theme.id === id)!.colors;
 
 describe("themePresets", () => {
-  it("gives OpenOrc a black and a warm off-white ground, pieces a quiet step off it with keys inside, two inks, and light as the accent", () => {
+  it("gives OpenOrc a soft black and a warm off-white ground, pieces a quiet step off it with keys inside, two inks, and light as the accent", () => {
     expect(colors("openorc").light).toMatchObject({
       "--bg": "#f5f5f2",
       "--sidebar": "var(--bg)",
@@ -30,20 +30,20 @@ describe("themePresets", () => {
     });
     expect(colors("openorc").light["--raised-shadow"]).toContain("rgb(23 23 23 / 0.06)");
     expect(colors("openorc").dark).toMatchObject({
-      "--bg": "#050505",
+      "--bg": "#141414",
       "--sidebar": "var(--bg)",
-      "--surface": "#101010",
+      "--surface": "#1c1c1c",
       "--paper": "var(--surface)",
-      "--well": "#101010",
+      "--well": "#1c1c1c",
       "--well-ring": "0 0 #0000",
-      "--key": "#1a1a1a",
+      "--key": "#262626",
       "--composer-input": "var(--well)",
-      "--surface-2": "#161616",
-      "--navigation-soft": "#191919",
+      "--surface-2": "#222222",
+      "--navigation-soft": "#272727",
       "--ink": "#ededeb",
-      "--prose-ink": "#dededb",
+      "--prose-ink": "#dededc",
       "--accent": "#ffffff",
-      "--accent-fg": "#050505",
+      "--accent-fg": "#141414",
       "--working-ink": "var(--accent)",
     });
     for (const mode of ["light", "dark"] as const) {

@@ -22,16 +22,23 @@ export function NewThreadMark() {
   );
 }
 
+/** A space a line never breaks at. */
+const GLUE = "\u00a0";
+
+/** Words as one unit of a line: no break at their spaces, nor after their hyphens. */
+const whole = (words: string) => words.replace(/ /g, GLUE).replace(/-/g, "-\u2060");
+
 /**
- * The question, centred over the composer as a title over the one thing on the screen. The project in it is the
- * switch, as on the desktop: a word of the sentence, underlined, that opens the projects. Over a picture (`painted`)
- * the words keep a halo of the ground.
+ * The question, centred in the room over the composer as the screen's title. Its words break before "in" or
+ * "outside" and never after: the project wraps whole with the word before it, as on the desktop, so a second line
+ * starts where the sentence turns. The project in it is the switch: a word of the sentence, underlined, that opens the
+ * projects. Over a picture (`painted`) the words keep a halo of the ground.
  */
 export function NewThreadQuestion({ composerId, project, disabled, painted }: { composerId: string; project: ProjectChoice; disabled: boolean; painted: boolean }) {
   const colors = useColors();
   const away = projectReach(project, useMacReach());
   const outside = project.id === WORKSPACE_ID;
-  const name = outside ? "a project" : project.name;
+  const name = whole(outside ? "a project" : project.name);
   const choose = () => {
     // The keyboard goes first: a focused prompt would keep it up over the sheet.
     Keyboard.dismiss();
@@ -43,7 +50,8 @@ export function NewThreadQuestion({ composerId, project, disabled, painted }: { 
       className="text-center text-title text-ink"
       style={painted ? { textShadowColor: colors.bg, textShadowRadius: 18, textShadowOffset: { width: 0, height: 2 } } : undefined}
     >
-      What should we work on {outside ? "outside" : "in"}{" "}
+      What should we work on {outside ? "outside" : "in"}
+      {GLUE}
       <Text
         accessibilityRole="button"
         accessibilityLabel={away ? `Project, ${project.name}, ${away}` : `Project, ${project.name}`}

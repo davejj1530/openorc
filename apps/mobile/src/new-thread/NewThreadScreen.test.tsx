@@ -159,7 +159,7 @@ it("opens a searchable project list and restores the draft when switching back",
   expect(screen.getByLabelText("Message").textContent).toBe("Fix the build");
   await chooseProject("Workspace");
   expect(button("Project, Workspace")).toBeTruthy();
-  expect(screen.getByRole("header").textContent).toBe("What should we work on outside a project?");
+  expect(screen.getByRole("header").textContent).toBe("What should we work on outside\u00a0a\u00a0project?");
 });
 
 it("keeps the project and draft when an empty search is dismissed", async () => {

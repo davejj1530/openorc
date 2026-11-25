@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { View } from "react-native";
-import { AlarmClock, ChevronDown, CircleCheck, Cloud, Folder, Globe, Pin } from "../generated/icons";
+import { AlarmClock, ChevronDown, Cloud, Folder, Globe, Pin } from "../generated/icons";
 import type { ProjectActivity } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import type { ComponentType } from "react";
@@ -34,7 +34,7 @@ function Moving({ motion, children }: { motion: RowMotion; children: ReactNode }
   return <Animated.View style={movingStyle(motion, useReducedMotion())}>{children}</Animated.View>;
 }
 
-const partMarks: Record<Section["part"], ComponentType<IconProps>> = { pinned: Pin, snoozed: AlarmClock, resolved: CircleCheck };
+const partMarks: Record<Section["part"], ComponentType<IconProps>> = { pinned: Pin, snoozed: AlarmClock };
 
 /**
  * A label that folds what is under it, in one shape for every part of the list, as the desktop's sidebar heads its
@@ -88,14 +88,14 @@ function FoldLabel({
   );
 }
 
-/** Pinned, Snoozed or Resolved: its mark, its label and, for Pinned and Snoozed, how many it holds. */
+/** Pinned or Snoozed: its mark, its label and how many it holds. */
 export function SectionToggle({ section, room = "after-rows", motion, onToggle }: { section: Section; room?: HeadingRoom; motion: RowMotion; onToggle: () => void }) {
   const Mark = partMarks[section.part];
   return (
     <FoldLabel
       mark={<Mark size={16} className="text-ink-3" />}
       words={section.label}
-      spoken={section.count === undefined ? section.label : `${section.label}, ${section.count}`}
+      spoken={`${section.label}, ${section.count}`}
       count={section.count}
       open={section.open && !motion.folding}
       room={room}
@@ -152,7 +152,57 @@ export function ShowMoreInGroup({ count, motion, onPress }: { count: number; mot
   );
 }
 
-/** The foot of Resolved, or of Pinned under the pinned filter, while the host has more threads to give: the next page. */
+/**
+ * The day an open project's rows under it last worked, as the desktop's sidebar labels them: a faint word where titles
+ * start and a hairline from it to the rows' end. It does not fold.
+ */
+export function DayLabel({ label, motion }: { label: string; motion: RowMotion }) {
+  return (
+    <Moving motion={motion}>
+      <View accessibilityRole="header" className="mx-3 mt-1 h-7 flex-row items-center gap-2 pr-2" style={{ paddingLeft: TITLE_PAD }}>
+        <Text className="text-xs text-ink-4">{label}</Text>
+        <View className="h-px flex-1 bg-line" />
+      </View>
+    </Moving>
+  );
+}
+
+/**
+ * A project's Resolved, the last part of its rows: the word where titles start and the chevron after it, turning as it
+ * opens, quieter than the project's own label over it.
+ */
+export function ResolvedDoor({ open, motion, onToggle }: { open: boolean; motion: RowMotion; onToggle: () => void }) {
+  const still = useReducedMotion();
+  return (
+    <Moving motion={motion}>
+      <ListPressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        onPress={onToggle}
+        className="mx-3 min-h-touch flex-row items-center gap-2 rounded-lg active:bg-surface-2"
+        style={{ paddingLeft: TITLE_PAD }}
+      >
+        <Text className="text-detail text-ink-4">Resolved</Text>
+        <Animated.View style={turn(open, still)}>
+          <ChevronDown size={14} className="text-ink-4" />
+        </Animated.View>
+      </ListPressable>
+    </Moving>
+  );
+}
+
+/** An open Resolved with nothing to list, in the desktop's words. */
+export function NoResolved({ pending, motion }: { pending: boolean; motion: RowMotion }) {
+  return (
+    <Moving motion={motion}>
+      <View className="mx-3 h-9 justify-center" style={{ paddingLeft: TITLE_PAD }}>
+        <Text className="text-detail text-ink-4">{pending ? "Loading threads…" : "No resolved threads."}</Text>
+      </View>
+    </Moving>
+  );
+}
+
+/** The foot of a project's Resolved, or of Pinned under the pinned filter, while the host has more threads to give: the next page. */
 export function ShowMore({ motion, onPress }: { motion: RowMotion; onPress: () => void }) {
   return (
     <Moving motion={motion}>
@@ -161,7 +211,7 @@ export function ShowMore({ motion, onPress }: { motion: RowMotion; onPress: () =
         accessibilityLabel="Show more"
         onPress={onPress}
         className="mx-3 min-h-touch justify-center rounded-lg active:bg-surface-2"
-        style={{ paddingLeft: LABEL_PAD }}
+        style={{ paddingLeft: TITLE_PAD }}
       >
         <Text className="text-detail text-ink-4">Show more</Text>
       </ListPressable>

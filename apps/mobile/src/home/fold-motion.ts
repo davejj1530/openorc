@@ -29,9 +29,18 @@ const SETTLE_MS = 70 + motion.stagger * 8 + motion.duration.arrive + 100;
 /** A closing fold commits once its rows have all but faded, so the list's own latency overlaps the end of the fade. */
 const FOLD_AFTER_MS = motion.duration.leave - 40;
 
-/** Whether `item` is held by the fold at `holder`: a part of the list or a project holds its rows and paging, a parent its tree. */
+const ROWS: ReadonlySet<HomeItem["kind"]> = new Set(["thread", "children-more"]);
+/** What each fold holds besides rows: a part of the list its paging, a project its days, its paging and its Resolved, a Resolved its foot. */
+const HELD: Partial<Record<HomeItem["kind"], ReadonlySet<HomeItem["kind"]>>> = {
+  section: new Set(["more"]),
+  project: new Set(["day", "group-more", "resolved", "resolved-more", "resolved-none"]),
+  resolved: new Set(["resolved-more", "resolved-none"]),
+};
+
+/** Whether `item` is held by the fold at `holder`: a part of the list, a project or its Resolved holds its rows and what goes with them, a parent its tree. */
 function holds(holder: HomeItem, item: HomeItem): boolean {
-  if (holder.kind === "section" || holder.kind === "project") return item.kind === "thread" || item.kind === "children-more" || item.kind === "more" || item.kind === "group-more";
+  const held = HELD[holder.kind];
+  if (held) return ROWS.has(item.kind) || held.has(item.kind);
   if (holder.kind !== "thread") return false;
   const depth = holder.tree.depth;
   if (item.kind === "thread") return item.tree.depth > depth;

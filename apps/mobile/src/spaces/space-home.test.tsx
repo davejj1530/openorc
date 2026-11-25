@@ -89,9 +89,12 @@ it("lists Personal first, then the space the person chooses, every list naming i
   await waitFor(() => expect(rows(home.result.current.items).sort()).toEqual(["cloud-thread:Canvas", "mac-thread:Canvas"]));
   expect(lists().length).toBeGreaterThan(0);
   expect(lists().every((params) => params["spaceId"] === birch.id && !("projectIds" in params))).toBe(true);
-  // Once the space's projects are known, the count of resolved threads names the Mac's folders among them.
+  // Once the space's projects are known, each project's resolved threads are counted by every id a thread may carry
+  // for it: the Mac counts its own folder among them, and OpenOrc Cloud the project's threads there.
   await waitFor(() =>
-    expect(mac.calls.filter((call) => call.method === "threads.resolvedCount").map((call) => call.params)).toContainEqual(expect.objectContaining({ spaceId: birch.id, projectIds: ["p-mac"] })),
+    expect(mac.calls.filter((call) => call.method === "threads.resolvedCount").map((call) => call.params)).toContainEqual(
+      expect.objectContaining({ spaceId: birch.id, projectIds: ["canvas", "p-mac", "p-cloud"] }),
+    ),
   );
 });
 

@@ -1,6 +1,7 @@
 import {
   callsThePerson,
   listLayout,
+  projectDaySections,
   projectRows,
   rootStatuses,
   SIDEBAR_LIST,
@@ -18,9 +19,23 @@ import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 /** A project as its group heads Home's list: the key every id of it maps to, its name, and whether only OpenOrc Cloud has it. */
 export type HomeProject = { id: string; name: string; cloud?: true };
 
+/**
+ * A project's Resolved as its group ends with it: folded, only the open thread's tree when that one is resolved; open,
+ * its own read of the project, a page at a time.
+ */
+export interface ProjectResolved {
+  open: boolean;
+  roots: readonly ThreadSummary[];
+  /** The threads the roots' trees are made of. */
+  all: readonly ThreadSummary[];
+  hasMore: boolean;
+  /** Its read has not answered yet. */
+  pending: boolean;
+}
+
 /** What Home read from a host: its threads as the sidebar lists them, and every project's name. */
 export interface HomeList {
-  /** Pins, the rest, snoozed threads and Resolved, as the desktop's sidebar reads them. */
+  /** Pins, the rest and snoozed threads, as the desktop's sidebar reads them. */
   days: SidebarDayList;
   /** Every project's name by id, Workspace's included. */
   names: ReadonlyMap<string, string>;
@@ -30,22 +45,25 @@ export interface HomeList {
   groupOf: ReadonlyMap<string, string>;
   /** The host could not list its threads. */
   failed: boolean;
-  /** The host answered with its list, so Resolved has a place to stand. */
+  /** The host answered with its list. */
   listed: boolean;
-  /** How many threads Resolved holds, once the host has said; an older Mac never does. */
-  resolvedCount?: number;
+  /**
+   * A project's Resolved by its group's key, or null where the host says the project holds no resolved thread. An older
+   * Mac never says, so there every project keeps one.
+   */
+  resolved: (projectId: string) => ProjectResolved | null;
 }
 
-/** A part of the list that folds under its label: Pinned, Snoozed or Resolved. */
-export type HomePart = "pinned" | "snoozed" | "resolved";
+/** A part of the whole list that folds under its label: Pinned or Snoozed. */
+export type HomePart = "pinned" | "snoozed";
 
 /** The room above a label: a little at the list's top, none right under another label, so a run of folded groups stacks tight. */
 export type HeadingRoom = "first" | "after-rows" | "after-heading";
 
 /** One row of Home's list. Labels and threads share one flat list so the virtualizer can recycle by kind. */
 export type HomeItem =
-  /** Pinned, Snoozed or Resolved's label. `count` where it is the part's whole. */
-  | { kind: "section"; key: string; part: HomePart; label: string; count?: number; open: boolean; room?: HeadingRoom }
+  /** Pinned's or Snoozed's label, with how many it holds. */
+  | { kind: "section"; key: string; part: HomePart; label: string; count: number; open: boolean; room?: HeadingRoom }
   /**
    * A project's label over its threads, with how many of them wait on the person. `offline` when it is a cloud project
    * none of whose threads OpenOrc Cloud reaches now: its rows leave the cloud to its label, which dims.
@@ -56,7 +74,15 @@ export type HomeItem =
    * say none. `cloudLabel` when its group's label wears the cloud already. `arriving` rises it in.
    */
   | { kind: "thread"; key: string; thread: ThreadSummary; tree: ThreadTreeRow; project: string | null; arriving: boolean; cloudLabel?: true }
-  /** The foot of Resolved (or of Pinned, under the pinned filter) while the host has more threads to give. */
+  /** The day a project's rows under it last worked: Yesterday, or Earlier. Today's rows lead with none. */
+  | { kind: "day"; key: string; label: string }
+  /** The last part of an open project's group: its Resolved, folded until the reader opens it. */
+  | { kind: "resolved"; key: string; projectId: string; open: boolean }
+  /** The foot of a project's open Resolved while the host has more of it to give. */
+  | { kind: "resolved-more"; key: string; projectId: string }
+  /** An open Resolved with nothing to list: still reading (`pending`), or empty. */
+  | { kind: "resolved-none"; key: string; pending: boolean }
+  /** The foot of Pinned, under the pinned filter, while the host has more threads to give. */
   | { kind: "more"; key: string }
   /** The foot of a project's group while it holds more threads than it shows. */
   | { kind: "group-more"; key: string; projectId: string; count: number }
@@ -114,9 +140,9 @@ function treeRows(
   roots: readonly ThreadSummary[],
   list: HomeList,
   options: HomeOptions,
-  { named, arriving, cloudLabel = false }: { named: boolean; arriving: boolean; cloudLabel?: boolean },
+  { named, arriving, cloudLabel = false, all = list.days.all }: { named: boolean; arriving: boolean; cloudLabel?: boolean; all?: readonly ThreadSummary[] },
 ): HomeItem[] {
-  const trees = threadTreeRows(roots, list.days.all, options.collapsed, options.selectedId ? [options.selectedId] : [], options.childLimits);
+  const trees = threadTreeRows(roots, all, options.collapsed, options.selectedId ? [options.selectedId] : [], options.childLimits);
   const items: HomeItem[] = [];
   const pages: ThreadTreeRow[] = [];
   const end = () => {
@@ -138,34 +164,63 @@ interface Part {
   part: HomePart;
   label: string;
   roots: readonly ThreadSummary[];
-  /** Shows how many roots it holds: Pinned and Snoozed, whose rows are all loaded. */
-  counted?: boolean;
   more?: boolean;
-  /** Resolved stands with none of it loaded, since it reads its threads once opened. */
-  standsEmpty?: boolean;
 }
 
-function partItems({ part, label, roots, counted, more, standsEmpty }: Part, list: HomeList, options: HomeOptions): HomeItem[] {
-  if (!roots.length && !standsEmpty) return [];
+function partItems({ part, label, roots, more }: Part, list: HomeList, options: HomeOptions): HomeItem[] {
+  if (!roots.length) return [];
   const key = sidebarFoldKey[part](SIDEBAR_LIST);
   const open = sidebarSectionOpen(options.collapsed, part, SIDEBAR_LIST);
   return [
-    { kind: "section", key, part, label, open, ...(counted ? { count: roots.length } : {}) },
+    { kind: "section", key, part, label, open, count: roots.length },
     ...treeRows(list.days.shown(roots, open), list, options, { named: true, arriving: options.opened === key }),
     ...(open && more ? [{ kind: "more", key: `more:${key}` } as const] : []),
   ];
 }
 
 /**
- * Each project's group in the layout's order: its label with what waits on the person counted, then its rows, then
- * "Show N more". A group with nothing in it stands only when it is the only project's.
+ * An open project's rows by the days they last worked, as the desktop's sidebar files them: today's lead with no
+ * label, each later day under its own.
+ */
+function dayItems(project: HomeProject, rows: readonly ThreadSummary[], list: HomeList, options: HomeOptions, drawn: { arriving: boolean; cloudLabel: boolean }): HomeItem[] {
+  return projectDaySections(rows, list.days.all, options.now).flatMap(({ day, label, roots }) => [
+    ...(label ? [{ kind: "day", key: `day:${project.id}:${day}`, label } as const] : []),
+    ...treeRows(roots, list, options, { named: false, ...drawn }),
+  ]);
+}
+
+/**
+ * A project's Resolved, the last part of its group: its door, then, open, its rows and its paging, or why it lists
+ * none. A folded project keeps only the open thread's tree, with no door. `listed` are the roots the list already
+ * shows, which a read a moment older may still hold.
+ */
+function resolvedItems(project: HomeProject, groupOpen: boolean, listed: ReadonlySet<string>, list: HomeList, options: HomeOptions): HomeItem[] {
+  const part = list.resolved(project.id);
+  if (!part) return [];
+  const key = sidebarFoldKey.resolved(project.id);
+  const roots = part.roots.filter((root) => !listed.has(root.id));
+  const rows = treeRows(roots, list, options, { named: false, arriving: options.opened === key, cloudLabel: Boolean(project.cloud), all: part.all });
+  if (!groupOpen) return rows;
+  const foot = (): HomeItem[] => {
+    if (part.hasMore) return [{ kind: "resolved-more", key: `more:${key}`, projectId: project.id }];
+    return roots.length ? [] : [{ kind: "resolved-none", key: `none:${key}`, pending: part.pending }];
+  };
+  return [{ kind: "resolved", key, projectId: project.id, open: part.open }, ...rows, ...(part.open ? foot() : [])];
+}
+
+/**
+ * Each project's group in the layout's order: its label with what waits on the person counted, then its rows by day,
+ * then "Show N more", then its Resolved. A group with nothing in it, resolved threads neither, stands only when it is
+ * the only project's.
  */
 function groupItems(list: HomeList, options: HomeOptions): HomeItem[] {
-  // No project stands only while it holds threads, as on the Mac's sidebar.
-  const all = groupsOf(list).filter((group) => group.project.id !== WORKSPACE_ID || group.roots.length);
-  const groups = all.length === 1 ? all : all.filter((group) => group.roots.length);
+  const holds = (group: Group) => group.roots.length > 0 || list.resolved(group.project.id) !== null;
+  // No project stands only while it holds threads, resolved ones too, as on the Mac's sidebar.
+  const all = groupsOf(list).filter((group) => group.project.id !== WORKSPACE_ID || holds(group));
+  const groups = all.length === 1 ? all : all.filter(holds);
   const place = (group: Group) => options.layout.projects.indexOf(group.project.id);
   const active = holding(list);
+  const listed = new Set([...list.days.pinned, ...list.days.rest, ...list.days.snoozed].map((root) => root.id));
   return [...groups]
     .sort((a, b) => place(a) - place(b))
     .flatMap(({ project, roots }) => {
@@ -182,38 +237,29 @@ function groupItems(list: HomeList, options: HomeOptions): HomeItem[] {
           ...(roots.some((root) => root.activity === "running") ? { working: true as const } : {}),
           ...(project.cloud && cloudOffline(roots) ? { offline: true as const } : {}),
         } as const,
-        ...treeRows(shown.rows, list, options, { named: false, arriving: options.opened === key, cloudLabel: Boolean(project.cloud) }),
+        ...(open
+          ? dayItems(project, shown.rows, list, options, { arriving: options.opened === key, cloudLabel: Boolean(project.cloud) })
+          : treeRows(shown.rows, list, options, { named: false, arriving: false, cloudLabel: Boolean(project.cloud) })),
         ...(shown.hidden ? [{ kind: "group-more", key: `group-more:${project.id}`, projectId: project.id, count: shown.hidden } as const] : []),
-        ...(roots.length || list.days.pinned.length || list.failed || !list.listed ? [] : [{ kind: "empty", key: "empty" } as const]),
+        ...resolvedItems(project, open, listed, list, options),
+        ...(holds({ project, roots }) || list.days.pinned.length || list.failed || !list.listed ? [] : [{ kind: "empty", key: "empty" } as const]),
       ];
     });
 }
 
 /**
- * Home, as the desktop's sidebar lists threads since its redesign: pinned threads first, then each project's group, then
- * snoozed threads and Resolved, which holds everything quiet since before yesterday, folded at the foot. Under the
- * pinned filter, the pins alone.
+ * Home, as the desktop's sidebar lists threads: pinned threads first, then each project's group, its rows by the day
+ * they last worked and its own Resolved at its end, which holds what was put there and everything quiet since before
+ * yesterday, then snoozed threads. Under the pinned filter, the pins alone.
  */
 export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {
   const { days } = list;
   return withRooms([
     ...(options.projectsFailed ? [{ kind: "retry", key: "retry:projects", projects: true } as const] : []),
-    ...partItems({ part: "pinned", label: "Pinned", roots: days.pinned, counted: true, more: options.pinnedOnly && days.hasMore }, list, options),
+    ...partItems({ part: "pinned", label: "Pinned", roots: days.pinned, more: options.pinnedOnly && days.hasMore }, list, options),
     ...(options.pinnedOnly ? [] : groupItems(list, options)),
     ...(list.failed ? [{ kind: "retry", key: "retry:threads", projects: false } as const] : []),
-    ...partItems({ part: "snoozed", label: "Snoozed", roots: days.snoozed, counted: true }, list, options),
-    ...partItems(
-      {
-        part: "resolved",
-        label: "Resolved",
-        roots: days.resolved.roots,
-        more: days.resolved.hasMore,
-        // Not once the host says it holds nothing: an empty fold at the foot opens on nothing.
-        standsEmpty: list.listed && !options.pinnedOnly && list.resolvedCount !== 0,
-      },
-      list,
-      options,
-    ),
+    ...partItems({ part: "snoozed", label: "Snoozed", roots: days.snoozed }, list, options),
   ]);
 }
 

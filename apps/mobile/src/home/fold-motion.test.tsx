@@ -33,7 +33,7 @@ const items: HomeItem[] = [
   ...rows.slice(0, 4).map(thread),
   { kind: "children-more", key: "children-more:parent", tree: rows[0]!, count: 2 },
   thread(rows[4]!),
-  { kind: "section", key: "snoozed-open:threads", part: "snoozed", label: "Snoozed", open: true },
+  { kind: "section", key: "snoozed-open:threads", part: "snoozed", label: "Snoozed", count: 1, open: true },
 ];
 const order = items.map((item) => item.key);
 

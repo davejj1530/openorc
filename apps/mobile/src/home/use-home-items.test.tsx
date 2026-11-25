@@ -10,7 +10,15 @@ import { useHomeItems } from "./use-home-items";
 import { useChildThreadPages } from "@openorc/client";
 
 /** A Mac with only Workspace, whose pages of threads arrive when the test sends them, by how many each asked for. */
-const mac = vi.hoisted(() => ({ phone: null as FakeMac | null, pages: new Map<number, (threads: ThreadSummary[]) => void>(), failing: false, waiting: [] as ThreadSummary[], inboxReads: 0 }));
+const mac = vi.hoisted(() => ({
+  phone: null as FakeMac | null,
+  pages: new Map<number, (threads: ThreadSummary[]) => void>(),
+  failing: false,
+  waiting: [] as ThreadSummary[],
+  inboxReads: 0,
+  /** How many resolved threads the Mac counts in a project; null for an older Mac, which has no count. */
+  resolved: 0 as number | null,
+}));
 
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
@@ -22,6 +30,9 @@ vi.mock("../client", async () => {
     }
     if (method === "threads.get") return Promise.resolve(mac.waiting.find((thread) => thread.id === (params as { id: string }).id) ?? null);
     if (mac.failing) return Promise.reject(new Error("The phone is not connected to its Mac."));
+    if (method === "threads.resolvedCount") return mac.resolved === null ? Promise.reject(new Error("This is not available from a phone.")) : Promise.resolve(mac.resolved);
+    // Nothing was put in Resolved by hand: what it holds is quiet since before yesterday, from the project's own list.
+    if ((params as { filter?: string }).filter === "archived") return Promise.resolve([]);
     return new Promise((resolve) => mac.pages.set((params as { limit: number }).limit, resolve as (threads: ThreadSummary[]) => void));
   });
   return mac.phone.module;
@@ -69,9 +80,12 @@ it("keeps parent page sizes in session memory only and isolates projects", () =>
   expect(renderHook(useChildThreadPages).result.current.limits).toEqual({});
 });
 
-afterEach(() => {
+afterEach(async () => {
+  const { savedFolds, toggleFold } = await import("./folds");
+  savedFolds().forEach(toggleFold);
   cleanup();
   mac.failing = false;
+  mac.resolved = 0;
   mac.waiting = [];
   mac.pages.clear();
   mac.phone!.module.queryClient.clear();
@@ -102,9 +116,28 @@ it("reads the next page by itself until the threads reach Resolved, keeping its 
   await answer(THREAD_PAGE);
   const shown = threads.slice(0, 4).map((thread) => thread.id);
   await waitFor(() => expect(mac.pages.has(THREAD_PAGE * 2 + 1)).toBe(true));
-  expect(outline(home.result.current.items)).toEqual(["project", ...shown, `more ${THREAD_PAGE - 4}`, "section"]);
+  expect(outline(home.result.current.items)).toEqual(["project", ...shown, `more ${THREAD_PAGE - 4}`]);
   await answer(THREAD_PAGE * 2);
-  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["project", ...shown, `more ${threads.length - 4}`, "section"]));
+  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["project", ...shown, `more ${threads.length - 4}`]));
+});
+
+it.each([
+  ["the Mac counts some", 3],
+  ["an older Mac cannot count", null],
+])("ends a project with its Resolved when %s, and reads that project's own once the reader opens it", async (_, counted) => {
+  const { toggleFold } = await import("./folds");
+  mac.resolved = counted;
+  const old = { ...threads[0]!, id: "old", lastActivityAt: Date.now() - 5 * 86_400_000 };
+  const home = renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
+  await waitFor(() => expect(mac.pages.has(THREAD_PAGE + 1)).toBe(true));
+  await act(async () => mac.pages.get(THREAD_PAGE + 1)!([threads[0]!]));
+  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["project", "w-0", "resolved"]), { timeout: 3_000 });
+  mac.pages.clear();
+  act(() => toggleFold(`resolved-open:${WORKSPACE_ID}`));
+  await waitFor(() => expect(mac.pages.has(THREAD_PAGE + 1)).toBe(true));
+  expect(outline(home.result.current.items)).toEqual(["project", "w-0", "resolved", "resolved-none"]);
+  await act(async () => mac.pages.get(THREAD_PAGE + 1)!([threads[0]!, old]));
+  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["project", "w-0", "resolved", "old"]));
 });
 
 it("shows a thread that needs you from past the loaded pages in its project's group, beside the group's latest", async () => {
@@ -115,7 +148,7 @@ it("shows a thread that needs you from past the loaded pages in its project's gr
   await waitFor(() => expect(mac.pages.has(THREAD_PAGE + 1) && mac.pages.has(NEEDS_YOU_PAGE)).toBe(true));
   await act(async () => mac.pages.get(THREAD_PAGE + 1)!(yesterday));
   await act(async () => mac.pages.get(NEEDS_YOU_PAGE)!([unread]));
-  await waitFor(() => expect(outline(home.result.current.items).slice(0, 6)).toEqual(["project", "yesterday-0", "yesterday-1", "yesterday-2", "yesterday-3", "unread-past-page"]));
+  await waitFor(() => expect(outline(home.result.current.items).slice(0, 7)).toEqual(["project", "day", "yesterday-0", "yesterday-1", "yesterday-2", "yesterday-3", "unread-past-page"]));
 });
 
 it("asks again for a list that failed while connected, and leaves a failure while not connected to the header", async () => {

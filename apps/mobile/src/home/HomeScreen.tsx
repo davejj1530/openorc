@@ -28,7 +28,7 @@ import { useNewAction } from "./new-action";
 import { TabLayers } from "./TabLayers";
 import { HOME_BAR_HEIGHT, HomeBar } from "./header/HomeBar";
 import type { HomeScroll } from "./header/MacLine";
-import { NoThreadsYet, ProjectLabel, RetryRow, SectionToggle, ShowMore, ShowMoreChildren, ShowMoreInGroup } from "./HomeHeading";
+import { DayLabel, NoResolved, NoThreadsYet, ProjectLabel, ResolvedDoor, RetryRow, SectionToggle, ShowMore, ShowMoreChildren, ShowMoreInGroup } from "./HomeHeading";
 import type { HomeItem } from "./home-items";
 import { refreshHome } from "./refresh";
 import { ThreadRow } from "./ThreadRow";
@@ -72,6 +72,14 @@ function HomeRow({ item, home, motion, fold, shownId }: { item: HomeItem; home: 
           shown={item.thread.id === shownId}
         />
       );
+    case "day":
+      return <DayLabel label={item.label} motion={motion} />;
+    case "resolved":
+      return <ResolvedDoor open={item.open && !motion.folding} motion={motion} onToggle={() => fold(item.key, !(item.open && !motion.folding))} />;
+    case "resolved-more":
+      return <ShowMore motion={motion} onPress={() => home.showMoreResolved(item.projectId)} />;
+    case "resolved-none":
+      return <NoResolved pending={item.pending} motion={motion} />;
     case "more":
       return <ShowMore motion={motion} onPress={home.showMore} />;
     case "group-more":
@@ -90,7 +98,7 @@ function useHomeFolds(home: Home) {
   return useFoldMotion(home.items, (key, open) => {
     const item = home.items.find((each) => (each.kind === "thread" ? each.thread.id : each.key) === key);
     if (item?.kind === "thread") home.toggleThread(item.thread.id, !open);
-    else if (item?.kind === "section" || item?.kind === "project") home.toggle(item.key);
+    else if (item?.kind === "section" || item?.kind === "project" || item?.kind === "resolved") home.toggle(item.key);
   });
 }
 

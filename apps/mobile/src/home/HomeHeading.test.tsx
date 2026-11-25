@@ -3,11 +3,11 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { CloudOutOfReach } from "../spaces/cloud-reach";
 import { nativeProps } from "../test-fixtures/react-native";
-import { ProjectLabel, SectionToggle } from "./HomeHeading";
+import { ProjectLabel, ResolvedDoor, SectionToggle } from "./HomeHeading";
 
 afterEach(cleanup);
 
-it("folds a part of the list from its label, naming Pinned's count but none on Resolved", () => {
+it("folds a part of the list from its label, naming Pinned's count, and opens a project's Resolved from its door", () => {
   const toggled = vi.fn();
   const pinned = render(<SectionToggle section={{ kind: "section", key: "pinned:threads", part: "pinned", label: "Pinned", count: 2, open: true }} motion={{}} onToggle={toggled} />);
   const button = pinned.getByRole("button", { name: "Pinned, 2" });
@@ -15,8 +15,11 @@ it("folds a part of the list from its label, naming Pinned's count but none on R
   fireEvent.click(button);
   expect(toggled).toHaveBeenCalledOnce();
   cleanup();
-  const resolved = render(<SectionToggle section={{ kind: "section", key: "resolved-open:threads", part: "resolved", label: "Resolved", open: false }} motion={{}} onToggle={toggled} />);
-  expect(resolved.getByRole("button", { name: "Resolved" }).getAttribute("aria-expanded")).toBe("false");
+  const resolved = render(<ResolvedDoor open={false} motion={{}} onToggle={toggled} />);
+  const door = resolved.getByRole("button", { name: "Resolved" });
+  expect(door.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.click(door);
+  expect(toggled).toHaveBeenCalledTimes(2);
 });
 
 it("heads a project's group with its name and, at the end, what waits on the person, folding it from the label", () => {

@@ -10,7 +10,9 @@ import {
   supportsReplyImages,
   supportsSkillLists,
   supportsSubthreadStarts,
+  supportsCommitReads,
   supportsTaskDetails,
+  supportsTaskWork,
 } from "@openorc/protocol";
 
 /** A watched Preview's newest state, or the end of the watch, which only its screen hears. */
@@ -59,8 +61,13 @@ export const OLDER_MAC_ORCLING_EDITS = "Update OpenOrc on your Mac to change its
 export const OLDER_MAC_TASKS = "Update OpenOrc on your Mac to open its tasks here.";
 export const OLDER_MAC_TASK_EDITS = "Update OpenOrc on your Mac to edit its tasks here.";
 export const OLDER_MAC_TASK_CREATES = "Update OpenOrc on your Mac to add tasks from your phone.";
+export const OLDER_MAC_TASK_WORK = "Update OpenOrc on your Mac to work on its tasks from your phone.";
+export const OLDER_MAC_COMMITS = "Update OpenOrc on your Mac to open commits here.";
 export const OLDER_MAC_SUBTHREADS = "Update OpenOrc on your Mac to start subthreads from your phone.";
 export const OLDER_MAC_CLOUD = "Update OpenOrc on your Mac to see OpenOrc Cloud here.";
+
+/** What a Mac answers for a method it does not have for phones: an older Mac, for one added since. */
+export const NOT_FROM_PHONE = "This is not available from a phone.";
 
 /** Methods an older Mac refuses as not available from a phone, each with what it takes to have them. */
 const gated: Partial<Record<RpcMethod, Gate>> = {
@@ -68,6 +75,15 @@ const gated: Partial<Record<RpcMethod, Gate>> = {
   "tasks.get": { supports: supportsTaskDetails, refusal: OLDER_MAC_TASKS },
   "tasks.create": { supports: supportsTaskDetails, refusal: OLDER_MAC_TASK_CREATES },
   "tasks.update": { supports: supportsTaskDetails, refusal: OLDER_MAC_TASK_EDITS },
+  "tasks.threads": { supports: supportsTaskWork, refusal: OLDER_MAC_TASK_WORK },
+  "tasks.runButton": { supports: supportsTaskWork, refusal: OLDER_MAC_TASK_WORK },
+  "tasks.refine.get": { supports: supportsTaskWork, refusal: OLDER_MAC_TASK_WORK },
+  "tasks.refine.start": { supports: supportsTaskWork, refusal: OLDER_MAC_TASK_WORK },
+  "tasks.refine.stop": { supports: supportsTaskWork, refusal: OLDER_MAC_TASK_WORK },
+  "tasks.refine.dismiss": { supports: supportsTaskWork, refusal: OLDER_MAC_TASK_WORK },
+  "git.threadCommit": { supports: supportsCommitReads, refusal: OLDER_MAC_COMMITS },
+  "review.threadCommitChanges": { supports: supportsCommitReads, refusal: OLDER_MAC_COMMITS },
+  "review.threadCommitFileDiff": { supports: supportsCommitReads, refusal: OLDER_MAC_COMMITS },
   "orclings.chats": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
   "orclings.profile": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
   "orclings.wakes.save": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },

@@ -1,12 +1,16 @@
 import { sidebarDayList, sidebarThreadPage, THREAD_PAGE, type ListLayout, type SidebarFilter } from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { homeCalls, homeItems, homeLayout, type HomeItem, type HomeList, type HomeOptions, type HomeProject } from "./home-items";
+import { homeCalls, homeItems, homeLayout, type HomeItem, type HomeList, type HomeOptions, type HomeProject, type ProjectResolved } from "./home-items";
 import { fixtureProjects, fixtureThreads } from "./test-fixtures/threads";
 
 const outline = (items: HomeItem[]) =>
   items.map((item) => {
-    if (item.kind === "section") return `§ ${item.label}${item.count === undefined ? "" : ` ${item.count}`}${item.open ? "" : " folded"}`;
+    if (item.kind === "section") return `§ ${item.label} ${item.count}${item.open ? "" : " folded"}`;
+    if (item.kind === "day") return `~ ${item.label}`;
+    if (item.kind === "resolved") return `> Resolved${item.open ? "" : " folded"}`;
+    if (item.kind === "resolved-more") return "more resolved";
+    if (item.kind === "resolved-none") return item.pending ? "loading resolved" : "no resolved";
     if (item.kind === "project") return `# ${item.project.name}${item.waiting ? ` (${item.waiting})` : ""}${item.open ? "" : " folded"}`;
     if (item.kind === "group-more") return `show ${item.count} more`;
     if (item.kind === "children-more") return `more ${item.count} in ${item.tree.thread.id}`;
@@ -18,24 +22,25 @@ const outline = (items: HomeItem[]) =>
 /** The project labels and their rows alone. */
 const groups = (items: HomeItem[]) => {
   const lines = outline(items);
+  const end = lines.findIndex((line) => line.startsWith("§ Snoozed"));
   return lines.slice(
     lines.findIndex((line) => line.startsWith("#")),
-    lines.findIndex((line) => line.startsWith("§ Snoozed") || line.startsWith("§ Resolved")),
+    end === -1 ? undefined : end,
   );
 };
 
 const now = Date.UTC(2026, 9, 23, 12);
 const names = new Map([[WORKSPACE_ID, "Workspace"], ...fixtureProjects.map(({ id, name }): [string, string] => [id, name])]);
 const projects: HomeProject[] = [...fixtureProjects.map(({ id, name }) => ({ id, name })), { id: WORKSPACE_ID, name: "No project" }];
-/** Resolved open, so tests about something else see every row. */
-const allOpen = ["resolved-open:threads"];
+/** Nothing folded or opened by the reader: every project open, every Resolved folded. */
+const allOpen: string[] = [];
 
 /** What a host's lists give Home: one page across projects, newest work first, and every pin from its own read. */
 function list(
   threads: readonly ThreadSummary[] = fixtureThreads,
-  more: { pinnedOnly?: boolean; limit?: number; failed?: boolean; activeId?: string; at?: number; groups?: HomeProject[] } = {},
+  more: { pinnedOnly?: boolean; limit?: number; failed?: boolean; activeId?: string; at?: number; groups?: HomeProject[]; resolvedOpen?: string[]; counted?: boolean } = {},
 ): HomeList {
-  const { pinnedOnly = false, limit = 100, failed = false, activeId, at = now, groups: shown = projects } = more;
+  const { pinnedOnly = false, limit = 100, failed = false, activeId, at = now, groups: shown = projects, resolvedOpen = [], counted = true } = more;
   const sorted = threads.filter((thread) => !pinnedOnly || thread.pinnedAt).sort((a, b) => b.lastActivityAt - a.lastActivityAt);
   const page = (filter: SidebarFilter, rows: readonly ThreadSummary[], count: number) => sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: rows, selected: null, filter, limit: count, now: at });
   const pins = pinnedOnly
@@ -45,14 +50,23 @@ function list(
         sorted.filter((thread) => thread.pinnedAt),
         Number.MAX_SAFE_INTEGER,
       );
-  const resolved = pinnedOnly ? undefined : page("archived", sorted, limit);
+  const days = sidebarDayList({ pages: [page("active", sorted, limit)], pins, pinnedOnly, activeId, now: at });
+  // Each project's Resolved as Home reads it: none where the host counts none (`counted`), an opened one from the project's own read.
+  const resolved = (projectId: string): ProjectResolved | null => {
+    const own = sorted.filter((thread) => thread.projectId === projectId);
+    const read = sidebarDayList({ pages: [page("active", own, limit)], resolved: page("archived", own, limit), pinnedOnly: false, activeId, now: at });
+    if (counted && !read.resolved.roots.length) return null;
+    if (resolvedOpen.includes(projectId)) return { open: true, roots: read.resolved.roots, all: read.all, hasMore: read.resolved.hasMore, pending: false };
+    return { open: false, roots: days.shown(days.resolved.roots, false).filter((root) => root.projectId === projectId), all: days.all, hasMore: false, pending: false };
+  };
   return {
-    days: sidebarDayList({ pages: [page("active", sorted, limit)], pins, resolved, pinnedOnly, activeId, now: at }),
+    days,
     names,
     groups: shown,
     groupOf: new Map(shown.map(({ id }) => [id, id])),
     failed,
     listed: !failed,
+    resolved,
   };
 }
 const options = (listed: HomeList, more: Partial<HomeOptions> & { reached?: string[]; previous?: ListLayout } = {}): HomeOptions => {
@@ -93,7 +107,7 @@ describe("homeItems", () => {
     expect(rooms.map(([, room]) => room)).toContain("after-rows");
   });
 
-  it("lists Pinned first, then each project's group in the space's order with the rest newest first, then Snoozed and Resolved", () => {
+  it("lists Pinned first, then each project's group in the space's order: its rows newest first by day, then its own Resolved", () => {
     const lines = outline(items(list()));
     expect(lines.slice(0, 3)).toEqual(["§ Pinned 2", "t-notes @ openorc", "t-headline @ openorc"]);
     // Inside its group a row names no project; the Workspace's threads are No project's, last.
@@ -102,6 +116,8 @@ describe("homeItems", () => {
       "t-paging",
       "t-pairing",
       "t-ledger",
+      // Today's rows lead with no label; a later day's sit under theirs.
+      "~ Yesterday",
       "t-settings",
       "# website (2)",
       "t-hero",
@@ -109,12 +125,23 @@ describe("homeItems", () => {
       "t-phone",
       "# immaculate",
       "t-tokens",
+      // Only a project that holds resolved threads ends with the door, folded until the reader opens it.
+      "> Resolved folded",
       "# No project",
       "t-slack",
       "t-plan",
     ]);
-    // Resolved, open here, holds what has been quiet since before yesterday, each row naming its project.
-    expect(lines.slice(-2)).toEqual(["§ Resolved", "t-canvas @ immaculate"]);
+    // Open, it holds what has been quiet since before yesterday, under its project, naming none.
+    const open = groups(items(list(fixtureThreads, { resolvedOpen: ["immaculate"] })));
+    expect(open.slice(open.indexOf("# immaculate"), open.indexOf("# No project"))).toEqual(["# immaculate", "t-tokens", "> Resolved", "t-canvas"]);
+    expect(lines.filter((line) => line.startsWith("§"))).toEqual(["§ Pinned 2"]);
+  });
+
+  it("keeps a project whose threads are all resolved, with its Resolved alone, and folds the door away with its project", () => {
+    const old = { ...quiet("old", "website", 0), lastActivityAt: Date.UTC(2026, 8, 1) };
+    const listed = list([quiet("o", "openorc", 5), old, { ...old, id: "kept", projectId: WORKSPACE_ID }]);
+    expect(groups(items(listed))).toEqual(["# openorc", "o", "# website", "> Resolved folded", "# No project", "> Resolved folded"]);
+    expect(groups(items(listed, { collapsed: ["project:website"] }))).toEqual(["# openorc", "o", "# website folded", "# No project", "> Resolved folded"]);
   });
 
   it("shows a project's four latest threads and every one that is not quiet, then Show N more, which brings ten more", () => {
@@ -182,43 +209,60 @@ describe("homeItems", () => {
     const snoozed = fixtureThreads.map((thread) => (thread.id === "t-ledger" || thread.id === "t-headline" ? { ...thread, snoozedUntil: now + 3_600_000 } : thread));
     const open = outline(items(list(snoozed)));
     expect(open.slice(0, 2)).toEqual(["§ Pinned 1", "t-notes @ openorc"]);
-    expect(open[open.indexOf("§ Resolved") - 1]).toBe("§ Snoozed 2 folded");
+    expect(open.at(-1)).toBe("§ Snoozed 2 folded");
     const folded = outline(items(list(snoozed), { collapsed: [...allOpen, "pinned:threads", "snoozed-open:threads"] }));
     expect(folded[1]).not.toBe("t-notes @ openorc");
     const snoozedAt = folded.indexOf("§ Snoozed 2");
-    expect(folded.slice(snoozedAt, snoozedAt + 4)).toEqual(["§ Snoozed 2", "t-ledger @ openorc", "t-headline @ openorc", "§ Resolved"]);
+    expect(folded.slice(snoozedAt)).toEqual(["§ Snoozed 2", "t-ledger @ openorc", "t-headline @ openorc"]);
   });
 
-  it("shows more in Resolved while the host lists more, and names no count on it", () => {
-    const many: ThreadSummary[] = Array.from({ length: THREAD_PAGE + 1 }, (_, index) => ({ ...quiet(`w-${index}`, WORKSPACE_ID, 0), lastActivityAt: Date.UTC(2026, 8, 1) - index }));
-    const lines = outline(homeItems({ ...list(many, { limit: THREAD_PAGE }), resolvedCount: 120 }, options(list(many, { limit: THREAD_PAGE }))));
-    expect(lines[0]).toBe("§ Resolved");
-    expect(lines[1]).toBe("w-0 @ Workspace");
-    expect(lines.at(-1)).toBe("more");
-    expect(outline(items(list(many, { limit: THREAD_PAGE }), { collapsed: [] })).at(-1)).toBe("§ Resolved folded");
+  it("pages an open Resolved while the host lists more of it, and says so when it holds nothing", () => {
+    const many: ThreadSummary[] = Array.from({ length: THREAD_PAGE + 1 }, (_, index) => ({ ...quiet(`w-${index}`, "website", 0), lastActivityAt: Date.UTC(2026, 8, 1) - index }));
+    const lines = groups(items(list(many, { limit: THREAD_PAGE, resolvedOpen: ["website"] })));
+    expect(lines.slice(0, 3)).toEqual(["# website", "> Resolved", "w-0"]);
+    expect(lines.at(-1)).toBe("more resolved");
+    // A host that cannot count keeps every door; one opened on nothing says so.
+    const uncounted = list([quiet("o", "openorc", 5)], { counted: false, resolvedOpen: ["openorc"], groups: projects.slice(0, 1) });
+    expect(groups(items(uncounted))).toEqual(["# openorc", "o", "> Resolved", "no resolved"]);
+  });
+
+  it("keeps the open thread's tree under its project while its Resolved is folded, with or without its project", () => {
+    const put = fixtureThreads.map((thread) => (thread.id === "t-tokens" ? { ...thread, archivedAt: 1 } : thread));
+    const page = (rows: readonly ThreadSummary[], selected: ThreadSummary | null) =>
+      sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: rows, selected, filter: "archived" as const, limit: THREAD_PAGE, now });
+    const tokens = put.find((thread) => thread.id === "t-tokens")!;
+    const base = list(put, { activeId: "t-tokens" });
+    const days = sidebarDayList({
+      pages: [sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: put, selected: null, filter: "active", limit: 100, now })],
+      resolved: page([], tokens),
+      pinnedOnly: false,
+      activeId: "t-tokens",
+      now,
+    });
+    const held: HomeList = { ...base, days, resolved: (projectId) => (projectId === "immaculate" ? { open: false, roots: [tokens], all: days.all, hasMore: false, pending: false } : null) };
+    const open = groups(homeItems(held, options(held, { selectedId: "t-tokens" })));
+    expect(open.slice(open.indexOf("# immaculate"), open.indexOf("# No project"))).toEqual(["# immaculate", "> Resolved folded", "t-tokens"]);
+    const folded = groups(homeItems(held, options(held, { selectedId: "t-tokens", collapsed: ["project:immaculate"] })));
+    expect(folded.slice(folded.indexOf("# immaculate folded"), folded.indexOf("# No project"))).toEqual(["# immaculate folded", "t-tokens"]);
   });
 
   it("offers a retry where the host could not list its threads, or its projects", () => {
     const lines = outline(items(list(fixtureThreads, { failed: true }), { projectsFailed: true }));
     expect(lines.slice(0, 2)).toEqual(["retry projects", "§ Pinned 2"]);
+    expect(lines.at(-1)).toBe("retry threads");
     expect(lines.indexOf("retry threads")).toBeGreaterThan(lines.indexOf("# No project"));
-    expect(lines.indexOf("retry threads")).toBeLessThan(lines.indexOf("§ Resolved"));
   });
 
-  it("lists only the pinned threads under the pinned filter, and puts the resolved ones in Resolved at the foot", () => {
+  it("lists only the pinned threads under the pinned filter, with no project and no Resolved", () => {
     expect(outline(items(list(fixtureThreads, { pinnedOnly: true }), { pinnedOnly: true }))).toEqual(["§ Pinned 2", "t-notes @ openorc", "t-headline @ openorc"]);
-    const resolved = fixtureThreads.map((thread) => (thread.projectId === "website" ? { ...thread, archivedAt: 1, pinnedAt: null } : thread));
-    const lines = outline(items(list(resolved)));
-    expect(lines).not.toContain("# website");
-    const website = lines.flatMap((line, index) => (line.endsWith("@ website") ? [index] : []));
-    expect(website).toHaveLength(3);
-    expect(website.every((index) => index > lines.indexOf("§ Resolved"))).toBe(true);
   });
 
-  it("leaves Resolved out once the host says it holds nothing, and keeps it while the host has not said", () => {
-    const current = fixtureThreads.map((thread) => ({ ...thread, archivedAt: null, lastActivityAt: now }));
-    expect(outline(homeItems({ ...list(current), resolvedCount: 0 }, options(list(current)))).filter((line) => line.startsWith("§ Resolved"))).toEqual([]);
-    expect(outline(items(list(current))).at(-1)).toBe("§ Resolved");
+  it("never lists a row twice when a project's Resolved read still holds one the list shows", () => {
+    const listed = list(fixtureThreads, { resolvedOpen: ["immaculate"] });
+    const tokens = fixtureThreads.find((thread) => thread.id === "t-tokens")!;
+    const stale: HomeList = { ...listed, resolved: (projectId) => (projectId === "immaculate" ? { open: true, roots: [tokens], all: listed.days.all, hasMore: false, pending: false } : null) };
+    const keys = homeItems(stale, options(stale)).map((item) => item.key);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });
 

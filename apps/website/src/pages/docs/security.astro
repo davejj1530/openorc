@@ -72,8 +72,8 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
         afterwards only a paired phone's key completes the handshake.
       </li>
       <li>
-        A phone can call only the actions the phone app needs: reading projects, threads, and their work, sending messages, answering approvals, starting and organizing threads, committing, pushing, and opening pull requests, and driving the
-        thread's Preview. It can't change settings, delete threads, read files outside a thread's changes, or open a terminal. It sees your Claude accounts' names, never their email addresses.
+        A phone can call only the actions the phone app needs: reading projects, threads, their work, and the files in a thread's folder, sending messages, answering approvals, starting and organizing threads, reading and changing tasks, pressing a task's buttons and refining it, committing, pushing, and opening pull requests, and driving the
+        thread's Preview. It can't change settings, delete threads, read files outside a thread's folder, or open a terminal. It sees your Claude accounts' names, never their email addresses.
       </li>
       <li>Removing a phone in Settings deletes this computer's record of its key, so it can't connect again without pairing.</li>
     </ul>
@@ -118,7 +118,7 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
       <li><strong>Devices.</strong> With device support on and <strong>Agents can use devices</strong> on, an agent may open, close, and drive your simulators and emulators in every mode except Plan.</li>
       <li><strong>Orclings</strong> can read every project, save tasks, and message any thread. Starting work in a project asks first unless the Orcling works in Autonomous, and is blocked in Plan.</li>
       <li>
-        <strong>Reviewing a pull request.</strong> The review runs in a copy of the pull request, and no agent loads settings, hooks, or MCP servers from that copy. Agents only add comments to your draft; you decide what to post.
+        <strong>Reviewing a pull request.</strong> The review runs in a copy of the pull request, and no agent loads settings, hooks, or MCP servers from that copy. It starts in the mode your new threads start in, so the agent can run the pull request's code in that copy to test it. A pull request from a fork starts in Plan instead, where its code is read and not run. Agents add, reword, and remove comments in your draft; you decide what to post.
       </li>
     </ul>
     <p>
@@ -194,7 +194,7 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
     <h2 id="secrets">Secrets and your data</h2>
     <ul>
       <li>
-        Slack tokens, the optional Anthropic API key for memory, the reviewer app's private key, this computer's key for phone connections, the Apple push key, and your OpenOrc Cloud session are encrypted with your system's
+        Slack tokens, the optional Anthropic API key for memory, the optional OpenAI API key for dictation, the reviewer app's private key, this computer's key for phone connections, the Apple push key, and your OpenOrc Cloud session are encrypted with your system's
         protected storage and written to files only you can read. They are never in the database. See <a
           href={docHref("storage") + "#secrets"}>Data and storage</a
         >.

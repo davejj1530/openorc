@@ -120,6 +120,11 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
             <td>Your shell as a login shell, one per Terminal tab</td>
           </tr>
           <tr>
+            <td>Speech process</td>
+            <td>Main, when you first dictate on this computer</td>
+            <td>A process named <code>openorc-speech</code> that runs the speech model for dictation. It stays for the next recording and ends after 5 quiet minutes.</td>
+          </tr>
+          <tr>
             <td>Device helpers</td>
             <td>Core, while device support is on</td>
             <td><code>expo-device-hub</code> and <code>agent-device</code>, on your own Node.js, to start simulators and emulators and stream their screens</td>
@@ -144,7 +149,7 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
     <pre><code set:text={envelope} /></pre>
     <ul>
       <li>
-        About 270 methods are grouped by name, such as <code>threads.*</code>, <code>runs.*</code>, <code>tasks.*</code>, <code>review.*</code>, <code>pulls.*</code>, and <code>memory.*</code>. Each has a parameter schema, and <code>packages/protocol/src/rpc.ts</code> collects them all.
+        About 280 methods are grouped by name, such as <code>threads.*</code>, <code>runs.*</code>, <code>tasks.*</code>, <code>review.*</code>, <code>pulls.*</code>, and <code>memory.*</code>. Each has a parameter schema, and <code>packages/protocol/src/rpc.ts</code> collects them all.
       </li>
       <li>The core checks the envelope, then the method's parameters, and replies with a result or an error. A malformed message is dropped without a reply. Requests have no timeout.</li>
       <li>The core sends each reply only to the window that asked.</li>

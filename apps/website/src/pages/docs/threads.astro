@@ -51,10 +51,20 @@ import { docHref } from "../../data/docs";
             <td><strong>+</strong>, paste, or drop</td>
             <td>Attaches files of up to 20 MB each. Images show as thumbnails.</td>
           </tr>
+          <tr>
+            <td>The microphone, or <kbd>⌘⇧D</kbd></td>
+            <td>Dictates into the message. See <a href="#dictate">Dictate a message</a>.</td>
+          </tr>
         </tbody>
       </table>
     </div>
-    <p>The ring beside the model shows context usage when the agent reports it. <strong>Compact context</strong> uses native compaction for Codex, Claude Code, OpenCode, Oh My Pi, and Pi. For Cursor, Antigravity, and fx, it starts a fresh session with a short handover brief. Either can lose earlier detail; the brief preserves less than native compaction.</p>
+    <p>The disc before the microphone shows how full the context is, when the agent reports it. Click it for the amount and <strong>Compact context</strong>, which uses native compaction for Codex, Claude Code, OpenCode, Oh My Pi, and Pi. For Cursor, Antigravity, and fx, it starts a fresh session with a short handover brief. Either can lose earlier detail; the brief preserves less than native compaction.</p>
+    <p>The disc at the end of the model button shows how much of this week's allowance is left on the account your next message would use. Click it for every account's limits. See <a href={docHref("agents") + "#usage"}>Usage and allowances</a>.</p>
+    <h3>Quote the conversation</h3>
+    <p>Select words in a message of the conversation and a note field opens under them. Type a note, or leave it empty, and click <strong>Save</strong> or press <kbd>Enter</kbd>. The passage joins your message as a quote above the text, with its note under it. Click the quote to read the whole passage or change the note, and <strong>×</strong> to remove it.</p>
+    <h3 id="dictate">Dictate a message</h3>
+    <p>Click the microphone beside the send button, or press <kbd>⌘⇧D</kbd>, and speak. Your words are written into the message where the cursor was, as they are heard. The microphone becomes a check that finishes the recording, and <strong>Cancel</strong> or <kbd>Esc</kbd> takes the words back out. Sending while you dictate finishes the recording first, then sends.</p>
+    <p>Dictation runs on this computer by default. The first time, the microphone offers to download the speech model, Parakeet, which is about 731 MB and understands English; your voice stays on this computer. To transcribe with OpenAI on your own API key instead, see <a href={docHref("settings") + "#general"}>Settings</a>.</p>
   </section>
 
   <section aria-labelledby="while-working">
@@ -63,13 +73,14 @@ import { docHref } from "../../data/docs";
       You don't have to wait for a turn to end. Type while the agent works and press <kbd>Enter</kbd>: Codex, Claude Code, OpenCode, Oh My Pi, Pi, Antigravity, and fx read text messages during the current turn, so you can
       correct course without stopping them. The placeholder reads <strong>Say it during this turn…</strong>
     </p>
-    <p>Cursor queues messages for the next turn. fx also queues images. A message waits after you switch the agent or change the mode, and while the conversation compacts. To hold a message for the next turn on purpose, click <strong>Queue</strong> instead of sending.</p>
-    <p>Queued messages wait above the composer under <strong>Queued</strong> and go out one at a time, each as a new turn. Each has <strong>Send now</strong>, which hands it to the running turn when the agent can take it, and <strong>×</strong> to remove it. The queue survives a restart: OpenOrc sends what's left when it opens again.</p>
+    <p>Cursor queues messages for the next turn. fx also queues images. A message waits after you switch the agent or change the mode, and while the conversation compacts.</p>
+    <p>Once you type during a turn, the send button shows what <kbd>Enter</kbd> does: an arrow when the message goes into the turn, a pile when it queues. A second button beside it sends the other way, <strong>Queue</strong> or <strong>Send now</strong>, and so does <kbd>⌘Enter</kbd>. To hold a message for the next turn on purpose, click <strong>Queue</strong>.</p>
+    <p>Queued messages wait above the composer as a pile that reads like <strong>2 queued</strong>, and go out one at a time, each as a new turn. Click the pile to list them. Each has <strong>Send now</strong>, which hands it to the running turn when the agent can take it, and <strong>×</strong> to remove it. Click a message's words to take it back into the composer. The queue survives a restart: OpenOrc sends what's left when it opens again.</p>
   </section>
 
   <section aria-labelledby="stop">
     <h2 id="stop">Stop a turn</h2>
-    <p>While the agent works and the composer is empty, the send button becomes a stop button (<strong>Stop this turn</strong>). Once you type, the send button comes back with a separate stop button beside it. Stopping ends the turn and denies any approval the agent was waiting for. The agent keeps its session, so your next message continues the conversation.</p>
+    <p>While the agent works and the composer is empty, the send button becomes a stop button (<strong>Stop</strong>). Once you type, the send button comes back with a separate stop button beside it. Stopping ends the turn and denies any approval the agent was waiting for. The agent keeps its session, so your next message continues the conversation.</p>
     <Callout>
       <p>Stopping doesn't clear the queue. When the turn ends, the next queued message is sent, so remove queued messages first if you want the agent to stay idle.</p>
     </Callout>
@@ -90,7 +101,7 @@ import { docHref } from "../../data/docs";
     <h2 id="side-by-side">Open threads side by side</h2>
     <p>You can show up to three threads at once, each in its own pane.</p>
     <ul>
-      <li>To add a pane, <kbd>⌘</kbd>-click a thread in the sidebar, drag it onto the open thread, or choose <strong>Open beside</strong> in its menu.</li>
+      <li>To add a pane, choose <strong>Open beside</strong> in a sidebar thread's menu. <kbd>⌘</kbd>-clicking a thread or dragging it onto the open thread opens it in a tab of its own instead.</li>
       <li>Click inside a pane to focus it. Clicking a thread in the sidebar replaces the focused pane.</li>
       <li>Drag the divider between two panes to resize them, and double-click it to reset.</li>
       <li>To close a pane, click its <strong>Close pane</strong> button (×). <kbd>⌘\</kbd> closes every pane except the focused one.</li>
@@ -100,11 +111,15 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="sidebar">
     <h2 id="sidebar">The sidebar</h2>
-    <p>The OpenOrc wordmark sits at the top of the sidebar, beside <strong>Back</strong> and <strong>Forward</strong>, which step through the screens you've visited (<kbd>⌘[</kbd> and <kbd>⌘]</kbd>). The button that hides the sidebar leads the header beside it. Under the wordmark, <strong>New thread</strong> and the app's screens are rows: <strong>Tasks</strong>, <strong>Pull requests</strong>, <strong>Schedules</strong>, and <strong>Orclings</strong>. A row shows an amber count only when something there waits on you or failed. Your threads follow under <strong>Workspaces</strong>, whose head holds <strong>Search</strong>, which opens the command palette, <strong>Add project</strong>, and the filter. At the sidebar's foot are how much of this week's allowance is left on the account your next message would use (click it for every account's limits), the update button while an update waits, and <strong>Settings</strong>.</p>
-    <p>Each row is one line: the thread's title, then a mark when there's something to report. The cube turns while the agent works, an amber question mark shows while the thread waits for your approval or your answer, a red triangle when it failed, and a dot when it has a result you haven't read. A cloud thread also shows a cloud, and a thread with a pull request shows its state. Hover a row for its branch, agent, and when it last changed.</p>
+    <p>At the top of the sidebar, after the window's buttons, are the button that hides the sidebar (<kbd>⌘B</kbd>), then <strong>Back</strong> and <strong>Forward</strong>, which step through the screens you've visited (<kbd>⌘[</kbd> and <kbd>⌘]</kbd>). With the sidebar hidden, the three lead the window's first header instead. Under them, <strong>New thread</strong> and the app's screens are rows: <strong>Tasks</strong>, <strong>Pull requests</strong>, and <strong>Schedules</strong>. <strong>Tasks</strong> shows an amber count while tasks wait on you.</p>
+    <p>Your threads follow under the list's name, <strong>My workspaces</strong>. The name is a menu that switches what the list holds: your own workspaces, an <a href={docHref("organizations")}>organization</a> you belong to, or your <a href={docHref("orclings")}>Orclings</a>. A dot on it says something waits behind it: an invitation, an unread chat or mention in an organization, or an Orcling. Beside the name are <strong>Search</strong>, which opens the command palette, <strong>Add project</strong>, and the filter.</p>
+    <p>At the sidebar's foot are your picture, name, and plan once you sign in to <a href={docHref("cloud")}>OpenOrc Cloud</a>, or <strong>Sign in</strong>, then the update button while an update waits, and <strong>Settings</strong>.</p>
+    <p>Each row is one line. A cube of dots leads it when there's something to report, then comes the thread's title. The cube moves while the agent works, and how it moves follows the work, such as reading, editing, or running a command. It is amber while the thread waits for your approval or your answer, red when it failed, and whole when it has a result you haven't read. A thread at rest with a pull request shows the pull request's state instead. A cloud thread also shows a cloud at the end of its row. Hover a row for when it last worked, where it works, and its branch.</p>
+    <p>A project's name leads with the project's icon, or with an open cube when it has none. The cube's top fills while the project's threads work, and turns amber when one of them waits on you.</p>
     <p>Threads that an agent started, and the subagents an agent runs, sit under their parent thread. Click the chevron on the parent's row to fold or open them. See <a href={docHref("messaging")}>Threads working together</a>.</p>
     <h3>How the list is grouped</h3>
-    <p>The list groups threads by project, under each project's name, the most recently active first. A thread with threads under it goes by the latest work anywhere among them.</p>
+    <p>The list groups threads by project, under each project's name. Projects start the day ordered by their latest work, the most recent first, and hold that order until the next day, so work in one project doesn't move it past another. A project you add during the day goes to the top. Threads in the Workspace come last, under <strong>No project</strong>.</p>
+    <p>Inside a project, threads are listed by the day they last worked, the most recent first: today's with no label, then <strong>Yesterday</strong>. A thread with threads under it goes by the latest work anywhere among them. While your pointer or the keyboard is in the list, rows hold their places; a row that would arrive, leave, or move does so shortly after you leave the list.</p>
     <div class="docs-table">
       <table>
         <thead>
@@ -120,25 +135,25 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td>A project</td>
-            <td>Its four latest threads and every other thread that's working or waiting on you, then <strong>Show N more</strong>.</td>
-          </tr>
-          <tr>
-            <td><strong>Snoozed</strong></td>
-            <td>Snoozed threads, until they wake.</td>
+            <td>Its four latest threads and every other thread that's working or waiting on you, then <strong>Show N more</strong>. An older thread that still waits on you stays, under <strong>Earlier</strong>. The project's own <strong>Resolved</strong> ends its rows.</td>
           </tr>
           <tr>
             <td><strong>Resolved</strong></td>
-            <td>Threads you resolved, and threads with no work since before yesterday. It sits at the bottom of the sidebar.</td>
+            <td>The last row of each project: the project's threads you resolved, and those with no work since before yesterday.</td>
+          </tr>
+          <tr>
+            <td><strong>Snoozed</strong></td>
+            <td>Snoozed threads, until they wake. It follows the projects.</td>
           </tr>
         </tbody>
       </table>
     </div>
     <p>Click a project's name to fold or open its threads. A folded project still shows the thread you have open, and an amber count tells you how many of its threads wait on you. Point at the name for <strong>New thread</strong> in that project and <strong>More</strong>, which also has <strong>New task</strong>, <strong>Choose icon…</strong>, <strong>Project settings</strong>, and <strong>Remove project…</strong>.</p>
     <h3>Resolve a thread</h3>
-    <p>Resolve a thread when you're done with it. Choose <strong>Resolve</strong> in its menu, press <kbd>⌘⇧A</kbd>, or drag it onto <strong>Resolved</strong> at the bottom of the sidebar. Its subthreads go with it, except pinned or snoozed ones. A thread that has seen no work since before yesterday moves there by itself, unless it's pinned or snoozed.</p>
-    <p>Click <strong>Resolved</strong> to open it over the list. To bring a thread back, choose <strong>Reopen</strong> in its menu, press <kbd>⌘⇧A</kbd>, or drag it out of Resolved onto the list. Sending a message to a resolved thread also reopens it. A reopened thread comes back at the top of its project, with the subthreads that were resolved along with it.</p>
+    <p>Resolve a thread when you're done with it. Choose <strong>Resolve</strong> in its menu, press <kbd>⌘⇧A</kbd>, or drag it onto its project's <strong>Resolved</strong>. Its subthreads go with it, except pinned or snoozed ones. A thread that has seen no work since before yesterday moves there by itself, unless it's pinned, snoozed, or waiting on you.</p>
+    <p>Click a project's <strong>Resolved</strong> to open it under the project's rows. To bring a thread back, choose <strong>Reopen</strong> in its menu, press <kbd>⌘⇧A</kbd>, or drag it out of Resolved onto the list. Sending a message to a resolved thread also reopens it. Reopening counts as work on the thread now, so it comes back as the first of its project's rows, with the subthreads that were resolved along with it.</p>
     <h3>Filter the list</h3>
-    <p>The filter button at the end of the <strong>Workspaces</strong> head has these choices:</p>
+    <p>The filter button beside the list's name has these choices:</p>
     <div class="docs-table">
       <table>
         <thead>
@@ -169,7 +184,7 @@ import { docHref } from "../../data/docs";
     </div>
     <p>To find a thread that isn't in view, or anything that was said in one, click <strong>Search</strong> or press <kbd>⌘K</kbd>.</p>
     <h3>Projects</h3>
-    <p>Every project has its own group in the sidebar. On the New thread page, click the project's name in <strong>What should we work on in</strong> to start in another project, or choose <strong>Add project</strong> there or in the <strong>Workspaces</strong> head. To take a project off the list, point at its name in the sidebar, click <strong>More</strong>, and choose <strong>Remove project…</strong>. Its files, worktrees, and history are kept.</p>
+    <p>Every project has its own group in the sidebar. On the New thread page, click the project's name in <strong>What should we work on in</strong> to start in another project, or choose <strong>Add project</strong> there or beside the list's name in the sidebar. To take a project off the list, point at its name in the sidebar, click <strong>More</strong>, and choose <strong>Remove project…</strong>. Its files, worktrees, and history are kept.</p>
     <h3>Thread actions</h3>
     <p>Right-click a thread, or open <strong>Thread actions</strong> (⋯) in its header. A right-click starts with <strong>New subthread</strong> and the ways to open the thread. Then comes where the thread works: its branch, marked <strong>Worktree</strong> or <strong>Checkout</strong>, then <strong>OpenOrc Cloud</strong> for a cloud thread. Point at either one for the moves from there. The header's menu starts with where the thread works and leaves out the choices that only apply to a thread you aren't looking at.</p>
     <div class="docs-table">
@@ -239,7 +254,7 @@ import { docHref } from "../../data/docs";
     <h2 id="import">Import terminal sessions</h2>
     <p>You can continue a Claude Code or Codex session that you started in a terminal.</p>
     <ol class="docs-steps">
-      <li>Click the filter button in the <strong>Workspaces</strong> head and choose <strong>Import terminal sessions…</strong></li>
+      <li>Click the filter button beside the list's name in the sidebar and choose <strong>Import terminal sessions…</strong></li>
       <li>If you have more than one project, choose the one the session ran in.</li>
       <li>Check the sessions you want, or click <strong>Select all</strong>, then click <strong>Import</strong>.</li>
     </ol>

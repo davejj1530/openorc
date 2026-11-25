@@ -13,7 +13,7 @@ import { docHref } from "../../data/docs";
       of their own.
     </p>
     <p>
-      Each agent finds and runs its own skills. OpenOrc lists the skills each agent can use in a project and helps you call one from the composer. It doesn't install or change skills.
+      Each agent finds and runs its own skills. OpenOrc lists the skills each agent can use in a project, helps you call one from the composer, and has a Settings page to add, edit, switch off, and remove them.
     </p>
   </section>
 
@@ -23,7 +23,7 @@ import { docHref } from "../../data/docs";
       <li>Click <strong>Settings</strong> at the bottom of the sidebar, then <strong>Skills</strong>.</li>
       <li>Choose a project in <strong>Project</strong>. Project skills differ from one project to the next.</li>
       <li>Choose one of your enabled agents. Each button shows how many skills that agent has in the project.</li>
-      <li>Type in <strong>Search skills</strong> to filter by name, description, or path. Click a skill to see its <strong>Location</strong>.</li>
+      <li>Type in <strong>Search skills</strong> to filter the list. Click a skill to open it beside the list.</li>
     </ol>
     <p>The list groups skills by where they come from:</p>
     <div class="docs-table">
@@ -36,25 +36,32 @@ import { docHref } from "../../data/docs";
         </thead>
         <tbody>
           <tr>
-            <td><strong>Project skills</strong></td>
+            <td><strong>This project</strong></td>
             <td>Skills in the project's own skill folders</td>
           </tr>
           <tr>
-            <td><strong>Your skills</strong></td>
+            <td><strong>Yours</strong></td>
             <td>Skills in your home folder, available in every project</td>
           </tr>
           <tr>
-            <td><strong>Plugin skills</strong></td>
+            <td><strong>Plugins</strong></td>
             <td>Skills from plugins you installed</td>
           </tr>
           <tr>
-            <td><strong>Built-in skills</strong></td>
+            <td><strong>Built in</strong></td>
             <td>Skills that come with the agent</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p>Click <strong>Refresh skills</strong> after you add or remove a skill. The <strong>Project</strong> menu lists the projects you've added to OpenOrc. Workspace conversations have their own list, described below.</p>
+    <p>An open skill shows who it was <strong>Added by</strong>, its <strong>Folder</strong>, and its <strong>Trigger</strong>, then the files in its folder. Choose a file to read it as <strong>Preview</strong> or <strong>Source</strong>. <strong>Edit</strong> changes a file of a skill you can change, and <strong>Save</strong> writes it; other files are marked <strong>Read only</strong>.</p>
+    <ul>
+      <li>A skill has a switch where its agent lets it be turned off. Off, the agent doesn't use it.</li>
+      <li><strong>Add a skill</strong> (+) offers <strong>Write a skill</strong>, which takes a name, a description, and instructions and adds it to your skills or the project's; <strong>Create with an agent</strong>, which starts a new thread that writes one; and <strong>Upload a skill</strong>, which copies in a skill folder you choose.</li>
+      <li>A skill's menu has <strong>Try in a new thread</strong>, <strong>Open folder</strong>, and, for a skill of yours, <strong>Remove skill</strong>, which moves its folder to the Trash.</li>
+    </ul>
+    <p>Click <strong>Refresh skills</strong> after you add or remove a skill outside OpenOrc. The <strong>Project</strong> menu lists the projects you've added to OpenOrc. Workspace conversations have their own list, described below.</p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/views/settings-skills.tsx</code>, <code>settings-skills-list.tsx</code>, <code>settings-skills-detail.tsx</code>, <code>settings-skills-file.tsx</code>, <code>settings-skills-add.tsx</code>, <code>settings-skills-actions.tsx</code></p>
   </section>
 
   <section aria-labelledby="sources">

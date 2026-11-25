@@ -9,7 +9,7 @@ import { docHref } from "../../data/docs";
 
 <DocsLayout slug="git">
   <DocsVisual
-    label="OpenOrc with the thread Simplify the design tokens open in its own worktree and its menu open. The menu's first row names the branch, openorc/design-tokens-2c91f0, marked Worktree. Over the composer, the Commit chip shows 12 lines added and 4 removed. In the sidebar, another thread in the project is still working."
+    label="OpenOrc with the thread Simplify the design tokens open in its own worktree and its menu open. The menu's first row names the branch, openorc/design-tokens-2c91f0, marked Worktree. In the composer's bar, the Commit chip shows 12 lines added and 4 removed. In the sidebar, another thread in the project is still working."
   >
     <WorktreeMock menu />
   </DocsVisual>
@@ -38,7 +38,7 @@ import { docHref } from "../../data/docs";
       <li>Send your first message. A worktree is created now, before the agent starts.</li>
     </ol>
     <p>New threads start with the location set in <strong>Settings</strong> under <strong>General</strong>, <strong>New thread workspace</strong>: <strong>Local checkout</strong> or <strong>Isolated worktree</strong>. Tasks have their own <strong>Execution location</strong>, and schedules a <strong>Works in</strong> field. Forks, subthreads, and threads an agent starts with <code>thread_start</code> work in the same folder as the thread they came from.</p>
-    <p>A thread's menu starts with the branch it works on, marked <strong>Worktree</strong> or <strong>Checkout</strong>. In the sidebar, each thread's row names its project, then its branch or <strong>worktree</strong>.</p>
+    <p>A thread's menu starts with the branch it works on, marked <strong>Worktree</strong> or <strong>Checkout</strong>. Point at a thread's row in the sidebar for where it works: <strong>Worktree</strong> or <strong>This Mac</strong>, then its branch.</p>
   </section>
 
   <section aria-labelledby="worktrees">
@@ -61,7 +61,7 @@ import { docHref } from "../../data/docs";
         </tbody>
       </table>
     </div>
-    <p>Before the agent starts, OpenOrc copies your <code>.env</code> and <code>.env.*</code> files into the new folder, sets up any submodules, and runs the project's setup script. Change the prefix, the copied files and the script on the project's <strong>Settings</strong> tab: press <kbd>⌘K</kbd>, choose the project, then <strong>Settings</strong>.</p>
+    <p>Before the agent starts, OpenOrc copies your <code>.env</code> and <code>.env.*</code> files into the new folder, sets up any submodules, and runs the project's setup script. Change the prefix, the copied files and the script in the project's settings: point at the project's name in the sidebar, click <strong>More</strong>, and choose <strong>Project settings</strong>. Or press <kbd>⌘K</kbd>, type the project's name, and choose it.</p>
     <div class="docs-table">
       <table>
         <thead>
@@ -107,12 +107,12 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="remove">
     <h2 id="remove">Remove a worktree</h2>
     <p>Worktrees take disk space, mostly from installed dependencies and build output. <strong>Remove worktree</strong>, in the branch row's submenu of the thread's menu, removes the folder and keeps the thread. OpenOrc commits the worktree's uncommitted changes to its branch first, as deleting does, and the branch and the conversation stay. The thread's next message makes the worktree again on that branch. Files Git ignores in the folder are deleted, so the project's setup script runs again.</p>
-    <p>To remove many at once, open Settings, then Data, and choose <strong>Clean up…</strong> beside Worktrees. It lists every worktree on this Mac by project with its size, and ticks those whose thread is resolved or whose pull request is merged or closed. A worktree whose agent is working, waiting on you, or running a background command can't be removed until it stops, and neither can one that follows a cloud sandbox or one a legacy task shares.</p>
+    <p>To remove many at once, open Settings, then Data, and choose <strong>Clean up…</strong> beside Worktrees. It lists every worktree on this Mac by project with its size, and ticks those whose thread is resolved or whose pull request is merged or closed. A worktree whose agent is working, waiting on you, or running a background command can't be removed until it stops, and neither can one whose folder other saved work uses, such as a legacy task's.</p>
   </section>
 
   <section aria-labelledby="delete">
     <h2 id="delete">Delete a thread</h2>
-    <p><strong>Delete thread</strong>, in the thread's menu, removes the conversation and its worktree:</p>
+    <p><strong>Delete</strong>, in the thread's menu, removes the conversation and its worktree:</p>
     <ol class="docs-steps">
       <li>OpenOrc commits the worktree's uncommitted changes to its branch, with the message "Save uncommitted work before removing the worktree".</li>
       <li>It removes the worktree folder. Ignored files in it, such as a copied <code>.env</code>, go with it.</li>

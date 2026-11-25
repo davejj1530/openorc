@@ -39,7 +39,7 @@ Memory is optional. Turn it off or configure automatic extraction in Settings.
 
 Capture an idea as a task, ask multiple models for input, then start implementation when you're ready. Work in your local checkout or an isolated worktree, and review changes beside the conversation. The same panel opens the project's files to read, edit, or have explained in plain English, along with a terminal, a browser preview, and iOS Simulators or Android Emulators that you and your agents can drive.
 
-![OpenOrc with New thread and the screens as rows in the sidebar, the threads listed under their projects with the weekly usage at its foot, two conversations open in tabs marked with their agents' logos, a Codex turn showing its three steps, its change card and how long it worked, ending in the OpenOrc cube, and a source diff in the Changes panel beside Files and Terminal tabs](docs/images/readme/workspace.png)
+![OpenOrc with New thread and the screens as rows in the sidebar and the threads listed under their projects, two conversations open in tabs marked with their agents' logos, a finished Codex turn with its work open as three steps, the reply with a proof mark for the file it changed, its change card and how long it worked, and the same change as a source diff in the Changes panel beside Files and Terminal tabs](docs/images/readme/workspace.png)
 
 _Screenshots use sample projects and conversations._
 
@@ -54,7 +54,7 @@ Get a second perspective before you build. Request implementation when you're re
 
 ### Keep working from your phone
 
-Get [OpenOrc for iPhone](https://apps.apple.com/app/openorc/id6827221510) from the App Store and pair it with the desktop in **Settings → Phone**. The phone shows your threads live, answers approvals and questions, sends and steers messages, starts new threads and subthreads, and commits, pushes, and opens pull requests. It opens, adds, and edits tasks, and you can text your Orclings from it. It connects straight to the desktop over your local network or Tailscale, encrypted end to end, with no OpenOrc server in between.
+Get [OpenOrc for iPhone and iPad](https://apps.apple.com/app/openorc/id6827221510) from the App Store and pair it with the desktop in **Settings → Phone**. The phone shows your threads live, answers approvals and questions, sends and steers messages, takes dictation on the device, starts new threads and subthreads, reads a thread's files, and commits, pushes, and opens pull requests. It opens, adds, edits, and refines tasks, and you can text your Orclings from it. On an iPad, the list, the thread, and its panel stand side by side. It connects straight to the desktop over your local network or Tailscale, encrypted end to end, with no OpenOrc server in between.
 
 ### Keep working while your Mac sleeps
 
@@ -71,7 +71,7 @@ OpenOrc was initially built in private and is now open source. It is in active b
 | Windows x64          | Supported. Each release is installed and smoke-tested on Windows, and CI typechecks and builds there. A beta installer can be unsigned; its release notes say so.                             |
 | Linux x64            | Supported. Releases ship as an rpm, a deb and an AppImage; the deb and AppImage are installed and smoke-tested, and CI runs the full test suite on Ubuntu. Install each new version yourself. |
 
-The iPhone app in `apps/mobile` is on the App Store, and is built and tested against the desktop app on a Mac. Sign-up for OpenOrc Cloud is by invitation for now.
+The iPhone and iPad app in `apps/mobile` is on the App Store, and is built and tested against the desktop app on a Mac. Sign-up for OpenOrc Cloud is by invitation for now.
 
 On Windows, OpenOrc can also run inside a WSL distribution, with the agents, Git and shell installed there: choose it under **Settings → General → Runs on**, or pick a folder under `\\wsl.localhost\`. This is new and only partly checked on Windows; see [running inside WSL](docs/wsl.md).
 
@@ -105,7 +105,7 @@ pnpm dev
 
 Start a thread with **⌘N** (**Ctrl+N** on Windows and Linux). Its heading asks what to work on in the current project. Click the project name to choose another, or choose **Add project** at the end of that list to add a folder. **Workspace** holds conversations that belong to no project.
 
-The sidebar lists threads by when they last worked: **Recent** for the last three hours, then **Today** and **Yesterday**. Pinned and snoozed threads keep their own groups. Other threads quiet since before yesterday, and the ones you resolve, collect in the **Resolved** drawer at the foot of the sidebar. Drag a thread there to resolve it, or out to reopen it. The buttons beside your usage at the bottom open Tasks, Pull requests, Schedules, and Settings, and switch the list to your Orclings.
+The sidebar lists threads under their projects, by the day they last worked: today's first, then **Yesterday**. Each row leads with a cube of dots that shows what its thread is doing. Pinned and snoozed threads keep their own groups. Threads quiet since before yesterday, and the ones you resolve, collect in each project's **Resolved**. Drag a thread there to resolve it, or out to reopen it. **Tasks**, **Pull requests**, and **Schedules** are rows above the list, the list's name switches it to an organization or your Orclings, and **Settings** is at the sidebar's foot. The composer's model button shows how much of the week's allowance is left.
 
 Tasks save to the backlog until you start them. Choose a local checkout or isolated worktree in the task's **Execution settings**. New tasks default to **Settings → General → Workspace**; tasks created from a conversation use that thread's location. Changing the location after work starts moves the task's conversation.
 
@@ -121,7 +121,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for native dependency troubleshooting, ve
 
 ## Data and credentials
 
-Conversations, task records, and project memory are stored on your machine. Each agent's requests go to its own provider, and a small model from the conversation's own agent names the conversation and writes the code explanations you ask for. Memory is off until you turn it on. While it is on, the agent that ran each finished run summarizes it, unless you choose one provider for every run, and the first search by meaning downloads a 91 MB embedding model from Hugging Face, each file checked against a pinned SHA-256. Installed macOS and Windows releases check GitHub Releases for newer stable and beta versions, without an installation identifier; Settings → General turns automatic checks off. **Device support** in Settings → Devices installs its two pinned helper tools with your own npm into the data folder when it first needs them. [Network connections](https://openorc.app/docs/network/) lists every connection the app makes.
+Conversations, task records, and project memory are stored on your machine. Each agent's requests go to its own provider, and a small model from the conversation's own agent names the conversation and writes the code explanations you ask for. Memory is off until you turn it on. While it is on, the agent that ran each finished run summarizes it, unless you choose one provider for every run, and the first search by meaning downloads a 91 MB embedding model from Hugging Face, each file checked against a pinned SHA-256. Installed macOS and Windows releases check GitHub Releases for newer stable and beta versions, without an installation identifier; Settings → General turns automatic checks off. **Device support** in Settings → Devices installs its two pinned helper tools with your own npm into the data folder when it first needs them. Dictation runs on a 731 MB speech model that OpenOrc downloads from Hugging Face when you choose Download, or, if you choose it in Settings → General, on OpenAI with your own API key. [Network connections](https://openorc.app/docs/network/) lists every connection the app makes.
 
 Phone access is off until you turn on **Allow paired phones** in **Settings → Phone**. While it is on, the desktop listens on port 47820, or another free port when that one is taken, on every network interface. It drops connections from outside private networks, link-local addresses, and Tailscale's address range before reading them, and paired phones talk to it over a Noise session encrypted end to end. Phone notifications need an Apple push key added in the same section; the desktop then seals each alert for one phone and sends it through Apple's Push Notification service.
 
@@ -129,7 +129,7 @@ Signing in to OpenOrc Cloud in **Settings → Account** connects the desktop to 
 
 The desktop stores its SQLite ledger, attachments, images tools return, and managed workspaces in the application data directory: `~/Library/Application Support/OpenOrc` on macOS, `%APPDATA%\OpenOrc` on Windows, and `~/.config/OpenOrc` on Linux. `OPENORC_USER_DATA` selects a different profile. Treat this directory as private: it can contain prompts, source snippets, terminal output, and project history. Native provider output goes to a debug log in `logs/provider` there, kept for 14 days or 512 MB; deleting a thread does not remove its lines from that log before they expire. Redaction of the ledger, its search index, run results, memories, and logs is a best-effort filter, not a guarantee that all sensitive content is removed. Plans and task comments are stored as written because agents receive them later. The ledger also records each paired phone with its push token.
 
-Agent execution uses the installed CLIs and their existing login flows. The Claude usage display asks the installed Claude Code CLI for its plan usage; OpenOrc never reads the credential Claude Code stores. OpenOrc's own secrets use Electron's OS-backed protected storage: direct Slack credentials, the optional memory-extraction API key, the reviewer app's key, the desktop's key for paired phones, the Apple push key, and the OpenOrc Cloud session. See [credential storage](docs/credential-storage.md) for recovery and backup considerations.
+Agent execution uses the installed CLIs and their existing login flows. The Claude usage display asks the installed Claude Code CLI for its plan usage; OpenOrc never reads the credential Claude Code stores. OpenOrc's own secrets use Electron's OS-backed protected storage: direct Slack credentials, the optional memory-extraction API key, the OpenAI API key for dictation, the reviewer app's key, the desktop's key for paired phones, the Apple push key, and the OpenOrc Cloud session. See [credential storage](docs/credential-storage.md) for recovery and backup considerations.
 
 ## Develop and verify
 
@@ -149,7 +149,7 @@ CI runs these checks. [Code quality checks](docs/code-quality.md) explains the l
 | Location            | Responsibility                                                                 |
 | ------------------- | ------------------------------------------------------------------------------ |
 | `apps/desktop`      | Electron shell, core utility-process entry point, and React interface          |
-| `apps/mobile`       | Expo iPhone app that pairs with the desktop                                    |
+| `apps/mobile`       | Expo iPhone and iPad app that pairs with the desktop                           |
 | `apps/website`      | Astro website, docs, and HTML/CSS product demos                                |
 | `packages/core`     | Application workflows, validated RPC handling, phone access, and cloud threads |
 | `packages/protocol` | Shared domain records, events, harness catalog, and RPC schemas                |

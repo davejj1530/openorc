@@ -56,7 +56,7 @@ import { docHref } from "../../data/docs";
     <h2 id="choose">Choose the agent and model</h2>
     <p>Every thread has its own agent and model. To change them, click the model name in the composer's bottom row.</p>
     <ul>
-      <li>The rail on the left switches between your enabled agents. On iPhone, use the icon tabs; the selected agent's name appears above them. An agent that isn't installed or signed in is marked, and its models stay unavailable until you fix that.</li>
+      <li>The rail on the left switches between your enabled agents. On the phone, use the icon tabs; the selected agent's name appears above them. An agent that isn't installed or signed in is marked, and its models stay unavailable until you fix that.</li>
       <li><strong>Search models</strong> filters the list. Older models wait under <strong>Legacy models</strong>.</li>
       <li>A model the installed CLI can't run stays in the list with the reason, such as a model that needs a newer Claude Code.</li>
       <li>OpenOrc asks each agent for its models and keeps the list for 5 minutes. <strong>Refresh models</strong> asks again.</li>
@@ -119,21 +119,22 @@ import { docHref } from "../../data/docs";
     </ol>
     <p>Each account's row has <strong>Make default</strong>, <strong>Sign in again</strong>, and <strong>Disable</strong>. The default account is the one new threads start with. Changing it doesn't move existing threads.</p>
     <ul>
-      <li>To start a thread on another account, pick it at the end of the line under the New thread composer. The choice appears for Claude models.</li>
+      <li>To start a thread on another account, open the model picker on the New thread page and pick the account in Claude's section.</li>
       <li>To move a thread to another account, open its model picker and choose the account. The switch waits until the current turn ends. Your next message continues the same conversation on the new account. While <strong>Keep accounts separate</strong> is on, a thread stays on its account, and the picker greys out the other accounts and says why.</li>
       <li>When a turn stops on a usage limit, the thread offers your other signed-in accounts. Choosing one sends <strong>Continue where you left off.</strong> from that account. While <strong>Keep accounts separate</strong> is on, it offers none.</li>
       <li>Schedules and <a href={docHref("orclings")}>Orclings</a> each keep the account you choose for them.</li>
+      <li>To hold one project to some of your accounts, open its <strong>Project settings</strong> and turn on <strong>Use only selected accounts</strong> under <strong>Claude accounts</strong>. Threads in that project then start, switch, and continue on the accounts you select there. Other projects keep every enabled account.</li>
     </ul>
   </section>
 
   <section aria-labelledby="usage">
     <h2 id="usage">Usage and allowances</h2>
-    <p>The usage button at the sidebar's foot shows how much of this week's allowance is left on the account your next message would use: the open thread's account, or the one the New thread page has chosen. Click it for a table of every account's 5-hour and weekly limits. Settings → <strong>Usage</strong> shows each account's limits in full, as the agents report them through their own CLIs.</p>
+    <p>The disc at the end of the composer's model button shows how much of this week's allowance is left on the account your next message would use: the open thread's account, or the one the model button has chosen where no thread is open. It turns amber at 10% or less. Click it for a table of every account's 5-hour and weekly limits, with what the open conversation has cost under it when the agent reports costs. Settings → <strong>Usage</strong> shows each account's limits in full, as the agents report them through their own CLIs.</p>
     <ul>
       <li>For Codex and Claude Code, each allowance window, such as <strong>5-hour window</strong> or <strong>7-day window</strong>, shows how much is used or remaining and when it resets. <strong>Open usage</strong> opens the account's own page.</li>
       <li>Codex also shows any usage resets you have. When Codex allows it, <strong>Use reset</strong> spends one after you confirm.</li>
       <li>Antigravity shows the model quota pools and reset times reported by its Google sign-in. API-key usage belongs to the Google AI Studio account instead.</li>
-      <li>fx shows AI Gateway balances and budgets, plus Codex or Grok plan allowances and reported resets. The sidebar follows the thread's selected connection; Settings uses fx's saved connection. Custom connections use their provider's dashboard.</li>
+      <li>fx shows AI Gateway balances and budgets, plus Codex or Grok plan allowances and reported resets. The composer's disc follows the thread's selected connection; Settings uses fx's saved connection. Custom connections use their provider's dashboard.</li>
       <li>Cursor allowances are on the Cursor dashboard. OpenCode, Oh My Pi, and Pi bill their configured providers; use those dashboards or the agent's native usage commands.</li>
     </ul>
     <p>Settings also has <strong>Cost</strong> and <strong>Tokens</strong> views for OpenOrc's recorded history, where the agent reports those numbers. Missing usage or unknown prices stay unavailable. The limits include activity outside OpenOrc. When a thread hits one, its error links to <strong>Manage usage</strong>.</p>

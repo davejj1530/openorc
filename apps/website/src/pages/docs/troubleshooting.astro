@@ -42,10 +42,10 @@ import { docHref } from "../../data/docs";
     <h2 id="stuck">A thread seems stuck</h2>
     <ol class="docs-steps">
       <li>
-        Check whether the agent is waiting for you. Its row in the sidebar says <strong>Needs your approval</strong> (or <strong>Needs approval</strong> and the command) or <strong>Has a question for you</strong>, and the thread shows the
-        approval or question.
+        Check whether the agent is waiting for you. Its row in the sidebar leads with an amber cube, which says <strong>Needs you</strong> when you point at it, and the thread shows the
+        approval or question docked on the composer.
       </li>
-      <li>Press Stop (<strong>Stop this turn</strong>). With an empty message box, the Send button turns into Stop. Stopping keeps the session, so your next message continues where the agent was.</li>
+      <li>Press <strong>Stop</strong>. With an empty message box, the Send button turns into Stop. Stopping keeps the session, so your next message continues where the agent was.</li>
       <li>
         If nothing responds, not even Stop, reload the window: View, then <strong>Reload</strong> (<kbd>⌘R</kbd>). If OpenOrc's core had stopped, this starts a new one, and the interrupted run is marked as failed. Send a message to continue.
       </li>
@@ -92,8 +92,8 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="approvals">
     <h2 id="approvals">Approvals don't appear</h2>
     <p>
-      An approval shows as a card docked on the composer, naming the command or tool the agent wants to run, with <strong>Allow once</strong>, <strong>Allow for this run</strong>, and <strong>Deny</strong>. The thread's row in the
-      sidebar shows an amber question mark, and its project's name counts it.
+      An approval docks onto the top of the composer, showing the command or tool the agent wants to run, with <strong>Allow once</strong>, <strong>Allow for this run</strong>, and <strong>Deny</strong>. The thread's row in the
+      sidebar leads with an amber cube, and its project's name counts it.
     </p>
     <ul>
       <li>

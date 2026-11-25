@@ -14,36 +14,38 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="browse">
     <h2 id="browse">Browse and filter</h2>
-    <p>The project chip in the header picks one project, or <strong>All projects</strong>: every project whose remote is on github.com, each under its own heading.</p>
+    <p>The page's title names the project it lists, or <strong>All projects</strong>: every project whose remote is on github.com, each under its own heading. After it comes the view, such as <strong>All pull requests</strong>.</p>
     <div class="docs-table">
       <table>
         <thead>
           <tr>
-            <th scope="col">Filter</th>
-            <th scope="col">Shows</th>
+            <th scope="col">Control</th>
+            <th scope="col">What it does</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td><strong>Open</strong></td>
-            <td>Every open pull request.</td>
+            <td>The state tabs</td>
+            <td><strong>Open</strong>, <strong>Drafts</strong>, <strong>Merged</strong>, <strong>Closed</strong>, and <strong>All</strong>, each with how many pull requests it holds.</td>
           </tr>
           <tr>
-            <td><strong>To review</strong></td>
-            <td>Open pull requests that ask for your review.</td>
+            <td>The view, in the title</td>
+            <td>A saved list. <strong>All pull requests</strong>, <strong>Needs my review</strong>, and <strong>Mine</strong> are built in. <strong>Save as a new view…</strong> keeps the filters you set under a name, and the same menu makes a view the one the page opens with, or deletes a view of yours.</td>
           </tr>
           <tr>
-            <td><strong>Yours</strong></td>
-            <td>Open pull requests you wrote.</td>
+            <td><strong>Filter pull requests</strong></td>
+            <td>Narrows the list by person, label, review, milestone, or project, as GitHub's own filters do. Words you type there can also search titles, numbers, authors, and branches. Each filter shows under the tabs, where you can remove it.</td>
           </tr>
           <tr>
-            <td><strong>Closed</strong></td>
-            <td>Closed and merged pull requests.</td>
+            <td>The sort menu</td>
+            <td>Orders the list, such as <strong>Newest</strong>, <strong>Recently updated</strong>, or <strong>Most commented</strong>.</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p><strong>Search pull requests…</strong> narrows the list by title, number, author or branch. Each row shows the number, the author, the branch it merges from and into, the lines added and removed, and when it last changed. Drafts are marked <strong>Draft</strong>, and GitHub's review state shows as <strong>Approved</strong>, <strong>Changes requested</strong> or <strong>Review required</strong>. Each project lists up to 50 pull requests per filter.</p>
+    <p>Each row shows the title and its labels, then the number, the author, and the branch it merges from and into. At its end are a status, the lines added and removed, the number of comments, and when it last changed. The status is <strong>Open</strong>, <strong>Draft</strong>, <strong>Approved</strong>, <strong>Changes requested</strong>, <strong>Review required</strong>, <strong>Merged</strong>, or <strong>Closed</strong>. It names the reviewer while a model reviews, and counts your draft comments while a review of yours waits to be posted.</p>
+    <p>A status is amber when the next move is yours, and those rows lead their project with a button for the move: <strong>Review</strong>, <strong>Finish review</strong>, or <strong>Open thread</strong>. Beside <strong>Review</strong>, a button named after the model or Orcling you last reviewed with starts that review at once. Point at a row for <strong>Copy link</strong> and <strong>Open in new tab</strong>. Each project lists up to 50 pull requests.</p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/views/PullRequestList.tsx</code>, <code>components/PullRequestPalette.tsx</code>, <code>PullRequestViewMenu.tsx</code>, <code>lib/pull-requests.ts</code>, <code>packages/git/src/github.ts</code></p>
   </section>
 
   <section aria-labelledby="read">
@@ -69,9 +71,9 @@ import { docHref } from "../../data/docs";
       <li>Pick a model, or an <a href={docHref("orclings")}>Orcling</a> to review with its own model. For a Claude model, in a project that uses more than one Claude account, the picker also lists the accounts, and the review runs on the one you pick.</li>
       <li>Choose <strong>Start review</strong>.</li>
     </ol>
-    <p>The model reviews in a thread of its own, named <code>Review #&lt;number&gt;: &lt;title&gt;</code>, in Plan mode. It works on a separate copy of the pull request on no branch, so your checkout isn't touched. It records each finding as a draft comment on the changed line and finishes with a summary. Its comments join your draft, labeled with the model's name. A link beside <strong>Reviewer</strong> opens the review thread. It says the model is reviewing while it works, and reads <strong>Review conversation</strong> once it is done.</p>
+    <p>The model reviews in a thread of its own, named <code>Review #&lt;number&gt;: &lt;title&gt;</code>. It works on a separate copy of the pull request on no branch, so your checkout isn't touched. The copy is readied like a new worktree, with your copied files, submodules, and the project's setup script, and the review starts in the mode your new threads start in, so the model can type-check, lint, test, and run the change before it writes its findings. A pull request from a fork is reviewed in Plan mode instead, where its code is read and not run; you can change the mode in the review thread. It records each finding as a draft comment on the changed line and finishes with a summary. Its comments join your draft, labeled with the model's name. A link beside <strong>Reviewer</strong> opens the review thread. It says the model is reviewing while it works, and reads <strong>Review conversation</strong> once it is done.</p>
     <p>After the author pushes again, choose <strong>Review again</strong>. The same thread continues on the new commits, checks whether its earlier findings were addressed and comments only on what is left or new. A draft with comments on the older commits has to be posted or discarded first. If you resolved the review thread, the next review starts a fresh one. So does a review on another Claude account than the thread's, which starts its thread on that account; while <strong>Keep accounts separate</strong> is on, post or discard a draft written on the thread's account first.</p>
-    <p>The model can't post, push or change files. You edit or remove its comments and decide what to submit.</p>
+    <p>The model can read the draft and reword or remove its comments, yours included, when you ask it to in the review thread. What it changes in its copy stays there. OpenOrc tells it not to fix the pull request, commit, push, or post to GitHub: its comments and summary are drafts, and you decide what to submit.</p>
     <p>For a project that is only on OpenOrc Cloud, with no folder on this computer, the review runs in a cloud thread, and the picker offers the models OpenOrc Cloud runs. OpenOrc Cloud keeps the draft. An Orcling can't review there.</p>
   </section>
 

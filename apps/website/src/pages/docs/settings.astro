@@ -7,7 +7,7 @@ import { docHref } from "../../data/docs";
 
 <DocsLayout slug="settings">
   <p>
-    Open <strong>Settings</strong> at the sidebar's foot, or choose <strong>Settings</strong> in the command palette (<kbd>⌘K</kbd>). The sidebar then lists the sections, under <strong>Back to app</strong>. With the sidebar
+    Open <strong>Settings</strong> at the sidebar's foot, or choose <strong>Settings</strong> in the command palette (<kbd>⌘K</kbd>). The sidebar then lists the sections under its <strong>Settings</strong> title; click the title, or the home icon at the sidebar's foot, to go back to where you were. With the sidebar
     hidden, the section's title at the top of the page is a menu of every section.
   </p>
   <p>
@@ -24,7 +24,7 @@ import { docHref } from "../../data/docs";
     </p>
     <p>
       <strong>Limits</strong> lists your enabled agents and Claude accounts, named such as <strong>Claude · Work</strong>. Codex, Claude Code, and signed-in Antigravity accounts report allowances; other agents link to their provider's usage page. An <strong>Anthropic API</strong> card joins them when you choose or save an Anthropic API
-      key under Memory &amp; models. The usage button at the sidebar's foot shows the same numbers for the account your next message would use.
+      key under Memory &amp; models. The disc at the end of the composer's model button opens the same numbers for the account your next message would use.
     </p>
     <div class="docs-table">
       <table>
@@ -268,7 +268,7 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="phone">
     <h2 id="phone">Phone</h2>
-    <p>Phone lets the OpenOrc iPhone app reach this computer. See <a href={docHref("phone")}>Phone app</a>.</p>
+    <p>Phone lets the OpenOrc app on an iPhone or iPad reach this computer. See <a href={docHref("phone")}>Phone app</a>.</p>
     <div class="docs-table">
       <table>
         <thead>
@@ -301,14 +301,29 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="skills">
     <h2 id="skills">Skills</h2>
-    <p>Skills lists the skills each agent can use in a project. It only reads them; nothing here changes or runs a skill.</p>
+    <p>Skills lists the skills each agent can use in a project, with each skill's files to read and edit.</p>
     <ul>
       <li><strong>Project</strong> chooses which project's skills you see. Each agent also has personal and plugin skills that apply in every project.</li>
       <li>The agent buttons switch between your enabled agents and show how many skills each one has.</li>
-      <li>Skills are grouped as <strong>Project skills</strong>, <strong>Your skills</strong>, <strong>Plugin skills</strong>, and <strong>Built-in skills</strong>. Open one to see its location.</li>
-      <li><strong>Search skills</strong> filters by name, description, or path. <strong>Refresh skills</strong> reads the folders again.</li>
+      <li>Skills are grouped as <strong>This project</strong>, <strong>Yours</strong>, <strong>Plugins</strong>, and <strong>Built in</strong>. Open one for its folder, its trigger, and its files. A skill has a switch where its agent lets it be turned off.</li>
+      <li><strong>Add a skill</strong> writes a new skill, has an agent write one in a new thread, or copies in a skill folder.</li>
+      <li><strong>Search skills</strong> filters the list. <strong>Refresh skills</strong> reads the folders again.</li>
     </ul>
     <p>Use <code>$name</code> for Codex or fx, <code>/name</code> for Claude Code, Cursor, or Antigravity, and <code>/skill:name</code> for Pi or Oh My Pi. OpenCode loads skills with its own skill tool, so ask it to use one by name. See <a href={docHref("skills")}>Skills</a>.</p>
+  </section>
+
+  <section aria-labelledby="connectors">
+    <h2 id="connectors">Connectors</h2>
+    <p>Connectors lists the tools and services your agents reach through MCP servers. <strong>Yours</strong> holds the connectors you added, and <strong>From projects, plugins and accounts</strong> holds the rest.</p>
+    <ul>
+      <li>Each connector is a card with a line for each agent that has it. The line says how the connector stands with that agent, and has a switch where it can be turned on or off there.</li>
+      <li><strong>Sign in</strong> shows on a connector that needs it, and opens the sign-in in your browser.</li>
+      <li><strong>Add connector</strong> takes a <strong>Name</strong>, a <strong>Connection type</strong> of <strong>Server URL</strong> or <strong>Command</strong>, and the agents to use it with.</li>
+      <li>A card's menu has <strong>Edit</strong> and <strong>Remove</strong> for a connector of yours, and <strong>Sign out</strong> once you are signed in.</li>
+      <li><strong>Check again</strong> reads every agent's connectors again.</li>
+    </ul>
+    <p>A connector of yours can also be set up for cloud threads from its card. See <a href={docHref("cloud-threads")}>Cloud threads</a>.</p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/views/settings-connectors.tsx</code>, <code>settings-connector-form.tsx</code></p>
   </section>
 
   <section aria-labelledby="devices">
@@ -372,9 +387,14 @@ import { docHref } from "../../data/docs";
             <td>OpenOrc</td>
           </tr>
           <tr>
+            <td><strong>New thread backdrop</strong></td>
+            <td>The picture or pattern behind the New thread page: <strong>Off</strong>, <strong>Scenery</strong>, a moving pattern of dots, or an image of your own. <strong>Grid</strong>, <strong>Dot size</strong>, and <strong>Motion</strong> tune a pattern or your image.</td>
+            <td>Off</td>
+          </tr>
+          <tr>
             <td><strong>Font</strong></td>
-            <td>The typeface across the app: <strong>Immaculate Gothic</strong>, <strong>Inter</strong>, <strong>Geist</strong>, or <strong>System</strong>. Code stays monospaced.</td>
-            <td>Immaculate Gothic</td>
+            <td>The typeface across the app: <strong>Immaculate Gothic</strong>, <strong>Inter</strong>, <strong>Geist</strong>, <strong>PP Neue Montreal</strong>, or <strong>System</strong>. Code stays monospaced.</td>
+            <td>System on a Mac, Immaculate Gothic on Windows and Linux</td>
           </tr>
           <tr>
             <td><strong>Code font</strong></td>
@@ -443,9 +463,29 @@ import { docHref } from "../../data/docs";
             <td>10 minutes</td>
           </tr>
           <tr>
-            <td><strong>Your Claude Code MCP servers</strong></td>
-            <td>Lets Claude Code connect the MCP servers from your own Claude Code configuration. They load only in Autonomous; the other modes connect only OpenOrc's tools. A slow server can miss the first message.</td>
+            <td><strong>Agents open the panel</strong></td>
+            <td>Opens the side panel when an agent opens a preview or a device, or writes a plan. With it off, a panel you closed stays closed for agents, and you can still open it yourself.</td>
             <td>On</td>
+          </tr>
+          <tr>
+            <td><strong>Transcribe with</strong>, under <strong>Dictation</strong></td>
+            <td>Who turns your speech into words when you <a href={docHref("threads") + "#dictate"}>dictate a message</a>: <strong>This computer</strong>, or <strong>OpenAI</strong> on your own API key.</td>
+            <td>This computer</td>
+          </tr>
+          <tr>
+            <td><strong>Speech model</strong></td>
+            <td>Shown for <strong>This computer</strong>. <strong>Download</strong> fetches Parakeet, an English model of about 731 MB, and <strong>Remove</strong> deletes it.</td>
+            <td>Not downloaded</td>
+          </tr>
+          <tr>
+            <td><strong>OpenAI API key</strong></td>
+            <td>Shown for <strong>OpenAI</strong>. While you dictate, your voice goes to OpenAI and is billed to this key. The key is kept in your system's protected storage; <strong>Remove</strong> deletes it.</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td><strong>Microphone</strong></td>
+            <td>The input dictation listens to: <strong>System default</strong>, or one your system lists by name.</td>
+            <td>System default</td>
           </tr>
         </tbody>
       </table>
@@ -559,7 +599,15 @@ import { docHref } from "../../data/docs";
             <td><code>apns-key.enc</code>, encrypted</td>
           </tr>
           <tr>
-            <td>Appearance</td>
+            <td>The dictation engine</td>
+            <td><code>dictation.json</code>, beside the downloaded model in <code>speech-models</code></td>
+          </tr>
+          <tr>
+            <td>The OpenAI API key for dictation</td>
+            <td><code>dictation-openai-key</code>, encrypted</td>
+          </tr>
+          <tr>
+            <td>Appearance, <strong>Agents open the panel</strong>, and the dictation microphone</td>
             <td>The app window's local storage, under keys such as <code>openorc.theme</code> and <code>openorc.palette</code>. The palette and colors are also copied to the <code>settings</code> table, so a paired phone uses the same look.</td>
           </tr>
         </tbody>

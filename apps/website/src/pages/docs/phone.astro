@@ -8,13 +8,13 @@ import { iphoneAppUrl } from "../../data/downloads";
 
 <DocsLayout slug="phone">
   <p>
-    OpenOrc for iPhone connects straight to OpenOrc on your computer, with no server in between, and shows the threads there as they change. If you use <a href={docHref("cloud")}>OpenOrc Cloud</a>, it also shows your cloud threads,
+    OpenOrc for iPhone and iPad connects straight to OpenOrc on your computer, with no server in between, and shows the threads there as they change. If you use <a href={docHref("cloud")}>OpenOrc Cloud</a>, it also shows your cloud threads,
     which keep working and answering while your computer sleeps.
   </p>
 
   <section aria-labelledby="pair">
     <h2 id="pair">Pair your phone</h2>
-    <p>Install OpenOrc on your iPhone from the <a href={iphoneAppUrl}>App Store</a>. Then pair it with OpenOrc on your computer:</p>
+    <p>Install OpenOrc on your iPhone or iPad from the <a href={iphoneAppUrl}>App Store</a>. Then pair it with OpenOrc on your computer:</p>
     <ol class="docs-steps">
       <li>On your computer, open Settings → <strong>Phone</strong> and turn on <strong>Allow paired phones</strong>.</li>
       <li>Click <strong>Pair a phone</strong>. A pairing code appears, and expires after five minutes.</li>
@@ -41,23 +41,34 @@ import { iphoneAppUrl } from "../../data/downloads";
   <section aria-labelledby="use">
     <h2 id="use">What you can do from the phone</h2>
     <ul>
-      <li>See your threads as they change, with what each agent is doing and what needs you.</li>
+      <li>See your threads as they change, with what each agent is doing and what needs you. Home lists each project's threads by the day they last worked, and each project ends with its own <strong>Resolved</strong>.</li>
       <li>Switch between <strong>Threads</strong>, <strong>Orclings</strong>, and <strong>Tasks</strong> on the bar at the bottom of Home. The button beside it starts a thread, an Orcling, or a task, to match the list in front.</li>
-      <li>Open a thread and read the agent's work and reply as they stream in, including its steps, images, and visualizations.</li>
+      <li>Open a thread and read the agent's work and reply as they stream in, with images and visualizations. Each thing the agent did is a line that opens in a sheet, and a finished reply carries the same proof pills as on your computer.</li>
       <li>Send a message, say something during the turn, queue a message, or stop the turn. Answer questions and approvals on their cards.</li>
+      <li>Tap the microphone beside send to dictate a message. iOS recognizes your speech on the device, so it needs only the microphone.</li>
+      <li>Select words in a reply and choose <strong>Quote</strong> to put the passage over your message.</li>
+      <li>Tap a commit's id in a reply to open the commit and its files' diffs in the app.</li>
       <li>Start a thread in any project, with the agent and model you choose and, for Claude, the account. It works where new threads on your computer do, as set by <strong>New thread workspace</strong> in Settings → <a href={docHref("settings") + "#general"}>General</a>, or in a cloud project. Attach photos from the camera or your library.</li>
       <li>Choose <strong>New Subthread</strong> in a thread's menu to start a thread under it, in the same folder. <strong>Subthreads</strong> lists the ones it has.</li>
       <li>Pin, snooze, rename, mark as read or unread, and resolve threads, from a thread's menu or by swiping its row.</li>
       <li>Under <strong>Changes</strong> in a thread's menu, read the diff, commit, push, and open a pull request on GitHub.</li>
+      <li>Under <strong>Files</strong>, browse the thread's folder, search its file names, and open a file to read.</li>
       <li>Under <strong>Preview</strong>, watch the page the thread's <a href={docHref("browser")}>Preview</a> shows on your computer, and scroll, tap, and type into it.</li>
       <li>
         Text your <a href={docHref("orclings")}>Orclings</a>. Each chat shows the Orcling typing and takes reactions both ways, and with notifications on, the phone rings when one texts you. Tap an Orcling's name to change its look, name, model, permission,
         instructions, and check-ins, to read what it remembers, or to delete it.
       </li>
-      <li>Open a <a href={docHref("tasks")}>task</a> to read it and change its title, status, priority, labels, and description, or add a new task to a project.</li>
+      <li>Open a <a href={docHref("tasks")}>task</a> to read it and change its title, status, priority, labels, and description, or add a new task to a project. A task lists each of its threads, shows its <a href={docHref("tasks") + "#buttons"}>task buttons</a>, and has <strong>Refine</strong> beside <strong>Edit</strong>.</li>
     </ul>
+    <p>The model button in the composer ends with a disc for the week's share left on that account, and the model sheet shows the account's <strong>5 hours</strong> and <strong>Week</strong> limits.</p>
     <p>The model sheet has an icon tab for each enabled agent. The selected agent's name appears above the tabs. Tabs and search stay visible while you scroll models. Agents with large catalogs start with suggested models and provider groups; search covers the whole selected agent's catalog.</p>
-    <p>To delete or fork a thread, move it between the checkout and a worktree or between your computer and OpenOrc Cloud, start or discuss a task, or open an Orcling group chat, use your computer. The phone's Settings shows your usage, without account details, and lets you pair another computer.</p>
+    <p>To delete or fork a thread, move it between the checkout and a worktree or between your computer and OpenOrc Cloud, start a task's first thread, continue a task in a new thread, discuss a task, or open an Orcling group chat, use your computer. The phone's Settings shows your usage, without account details, and lets you pair another computer.</p>
+  </section>
+
+  <section aria-labelledby="ipad">
+    <h2 id="ipad">On an iPad</h2>
+    <p>The same app runs on an iPad, in any orientation. In a window wide enough, the thread list stands beside the thread it opens. Wider still, as on an iPad held on its side, <strong>Changes</strong>, <strong>Files</strong>, and <strong>Preview</strong> open as a column beside the thread. A narrow window keeps the phone's layout.</p>
+    <p class="docs-source">Source: <code>apps/mobile/src/layout.tsx</code>, <code>apps/mobile/src/panel/pane.ts</code></p>
   </section>
 
   <section aria-labelledby="cloud">
@@ -72,7 +83,7 @@ import { iphoneAppUrl } from "../../data/downloads";
       <li>While your computer sleeps, its threads show what it last said. Cloud threads stay live: read and write in them, write into a running turn, and start a new thread in a cloud project, on the models OpenOrc Cloud runs.</li>
       <li>Organize a cloud thread as you would one of your computer's: pin, snooze, rename, mark as read, resolve, or delete it from its menu. Deleting a cloud thread deletes it for everyone in it.</li>
       <li>Read a cloud thread's notes and mentions, and tag people with <strong>@</strong> in a note of your own.</li>
-      <li>Under <strong>Changes</strong> in a cloud thread's menu, read the diff, <strong>Commit</strong>, <strong>Push</strong>, and open a pull request.</li>
+      <li>Under <strong>Changes</strong> in a cloud thread's menu, read the diff, <strong>Commit</strong>, <strong>Push</strong>, and open a pull request. Under <strong>Files</strong>, read the thread's files from OpenOrc Cloud while your computer is out of reach.</li>
       <li><code>/compact</code> folds a thread's conversation, on your computer or in the cloud.</li>
       <li>Messages to a cloud thread can carry photos. Other files can't be sent to a cloud thread from the phone yet.</li>
       <li>Alerts for cloud threads come from OpenOrc Cloud, and an approval's alert offers <strong>Allow</strong> and <strong>Deny</strong> on the lock screen. Alerts for your computer's threads come from the computer.</li>

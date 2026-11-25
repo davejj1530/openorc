@@ -47,7 +47,7 @@ import { docHref } from "../../data/docs";
           <tr>
             <td>Usage and limits</td>
             <td>Claude Code's and Codex's services, through their CLIs</td>
-            <td>When the usage button at the sidebar's foot needs fresh numbers, at most once a minute for each account; while Settings shows Usage, which it opens on; and when a thread shows a Codex usage limit</td>
+            <td>When the usage disc in the composer's model button needs fresh numbers, at most once a minute for each account; while Settings shows Usage, which it opens on; and when a thread shows a Codex usage limit</td>
             <td>No setting</td>
           </tr>
           <tr>
@@ -55,6 +55,18 @@ import { docHref } from "../../data/docs";
             <td><code>huggingface.co</code> and its download servers on <code>hf.co</code></td>
             <td>Once, the first time memory needs it</td>
             <td>Leave memory off</td>
+          </tr>
+          <tr>
+            <td>Speech model</td>
+            <td><code>huggingface.co</code></td>
+            <td>When you choose <strong>Download</strong> for dictation's speech model</td>
+            <td>Don't download it</td>
+          </tr>
+          <tr>
+            <td>Dictation with OpenAI</td>
+            <td><code>api.openai.com</code>, with your own API key</td>
+            <td>While you dictate, once you chose <strong>OpenAI</strong> under <strong>Transcribe with</strong></td>
+            <td>Leave <strong>Transcribe with</strong>, under General, on <strong>This computer</strong>, the default</td>
           </tr>
           <tr>
             <td>Node for WSL</td>
@@ -162,7 +174,7 @@ import { docHref } from "../../data/docs";
       and skills; whether those go online is up to the CLI.
     </p>
     <ul>
-      <li>Claude Code connects the MCP servers from your Claude Code settings only in Autonomous, and only while <strong>Your Claude Code MCP servers</strong> is on under General. Other modes connect only OpenOrc's tools.</li>
+      <li>Claude Code connects the MCP servers from your Claude Code settings only in Autonomous, and only the ones left on for Claude Code under <strong>Connectors</strong> in Settings. Other modes connect only OpenOrc's tools.</li>
       <li>Codex turns off the MCP servers in your Codex configuration only in Plan mode.</li>
       <li>In a copy of a pull request under review, no agent loads settings or MCP servers from the copied project.</li>
     </ul>
@@ -203,6 +215,12 @@ import { docHref } from "../../data/docs";
       Memory's search by meaning uses a small model that runs on your computer, and it isn't part of the app. The first time memory needs it, OpenOrc downloads the model's files, 91 MB in all, from <code>huggingface.co</code>, which serves the largest through
       its download servers on <code>hf.co</code>. It keeps them only if each one matches a SHA-256 checksum written into OpenOrc's source. While memory is off, it is never downloaded.
     </p>
+    <h3>Dictation</h3>
+    <p>
+      Dictation runs on a speech model on your computer, Parakeet, which isn't part of the app. OpenOrc downloads its one file, about 731 MB, from <code>huggingface.co</code> only when you choose <strong>Download</strong>, and keeps it only if it
+      matches a SHA-256 checksum written into OpenOrc's source. Your voice then stays on your computer. If you choose <strong>OpenAI</strong> under <strong>Transcribe with</strong> in Settings → General, what you say while dictating goes to
+      <code>api.openai.com</code> to be transcribed, signed with the API key you saved, and to nobody else.
+    </p>
     <h3>App updates</h3>
     <p>
       Installed macOS and Windows releases ask GitHub Releases whether a newer version exists, including beta versions. Development builds and Linux releases never check. A check only compares versions: downloading and installing each wait
@@ -220,7 +238,7 @@ import { docHref } from "../../data/docs";
       Turning on device support installs <code>expo-device-hub</code>, and <code>agent-device</code> when agents may use devices. OpenOrc runs your own <code>npm ci</code> with each tool's lockfile, so every package comes from your npm
       registry at a version and checksum fixed in OpenOrc's source, with install scripts turned off.
     </p>
-    <p class="docs-source">Source: <code>packages/memory/src/model-files.ts</code>, <code>apps/desktop/src/main/app-updates.ts</code>, <code>packages/core/src/services/agent-update-installation.ts</code>, <code>packages/core/src/devices/toolchain.ts</code></p>
+    <p class="docs-source">Source: <code>packages/memory/src/model-files.ts</code>, <code>apps/desktop/src/main/speech-models.ts</code>, <code>speech-openai.ts</code>, <code>apps/desktop/src/main/app-updates.ts</code>, <code>packages/core/src/services/agent-update-installation.ts</code>, <code>packages/core/src/devices/toolchain.ts</code></p>
   </section>
 
   <section aria-labelledby="git">

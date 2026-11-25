@@ -7,21 +7,21 @@ import { docHref } from "../../data/docs";
 
 <DocsLayout slug="organizations">
   <p>
-    An organization is a group of people in <a href={docHref("cloud")}>OpenOrc Cloud</a> who share projects, cloud threads, team tasks, and <a href={docHref("chat")}>Team chat</a>. Your own work lives in <strong>Personal</strong>, which
+    An organization is a group of people in <a href={docHref("cloud")}>OpenOrc Cloud</a> who share projects, cloud threads, team tasks, and <a href={docHref("chat")}>Team chat</a>. Your own work lives in <strong>My workspaces</strong>, which
     only you can see.
   </p>
 
   <section aria-labelledby="switch">
     <h2 id="switch">Switch between organizations</h2>
     <p>
-      The switcher at the top of the sidebar lists your organizations and <strong>Personal</strong>, with a tick on the one you are in. The sidebar, tasks, and chat then show that one's work. A dot marks another organization with
-      <strong>Unread chat</strong> or an <strong>Unread mention</strong>.
+      The name above your threads in the sidebar is the switcher. It reads <strong>My workspaces</strong>, or the organization you are in. It lists your organizations and <strong>My workspaces</strong>, with a tick on the one you are in, then your <a href={docHref("orclings")}>Orclings</a>. The sidebar, tasks, and chat then show that one's work. A dot marks another organization with
+      <strong>Unread chat</strong> or an <strong>Unread mention</strong>, and a dot on the switcher itself says something waits behind it.
     </p>
     <p>
       Invitations you received are listed in the switcher too, each with <strong>Join</strong> and <strong>Decline</strong>. You can also open the link in the invitation email. In an organization, the switcher adds
       <strong>People</strong>, and for an admin <strong>Invite people…</strong>.
     </p>
-    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/components/SpaceMenu.tsx</code></p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/components/ListSwitcher.tsx</code>, <code>SpaceMenu.tsx</code>, <code>lib/space-name.ts</code></p>
   </section>
 
   <section aria-labelledby="create">

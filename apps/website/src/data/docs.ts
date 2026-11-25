@@ -19,7 +19,7 @@ export interface DocSection {
 }
 
 /** When these pages were last checked against the source. Update it when a page is revised. */
-export const docsReviewed = { date: "November 18, 2026" };
+export const docsReviewed = { date: "November 25, 2026" };
 
 /** The sidebar, in reading order. Groups are named after parts of the app. */
 export const docGroups: DocGroup[] = [
@@ -393,11 +393,12 @@ export const docGroups: DocGroup[] = [
       {
         slug: "phone",
         title: "Phone app",
-        description: "Pair your iPhone with OpenOrc on your computer, then follow, answer, and start threads from your phone, including cloud threads while your computer sleeps.",
+        description: "Pair your iPhone or iPad with OpenOrc on your computer, then follow, answer, and start threads from your phone, including cloud threads while your computer sleeps.",
         sections: [
           { id: "pair", title: "Pair your phone" },
           { id: "connection", title: "How the phone reaches your computer" },
           { id: "use", title: "What you can do from the phone" },
+          { id: "ipad", title: "On an iPad" },
           { id: "cloud", title: "Cloud threads on the phone" },
           { id: "remove", title: "Remove a phone" },
           { id: "next-steps", title: "Next steps" },
@@ -473,6 +474,7 @@ export const docGroups: DocGroup[] = [
           { id: "slack", title: "Slack" },
           { id: "phone", title: "Phone" },
           { id: "skills", title: "Skills" },
+          { id: "connectors", title: "Connectors" },
           { id: "devices", title: "Devices" },
           { id: "appearance", title: "Appearance" },
           { id: "general", title: "General" },

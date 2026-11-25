@@ -95,12 +95,12 @@
     {
       "group": "readme-product",
       "path": "docs/images/readme/workspace.png",
-      "sha256": "8ee06d35d19d26401e11d3fbf32912a1a93a05b36574b22b06063d9a4bd5f23a"
+      "sha256": "86dc9fead432b626ba185cbc70c3a673c58f3a5913f05488c2f7c296cbd73833"
     },
     {
       "group": "readme-product",
       "path": "docs/images/readme/discussion.png",
-      "sha256": "92039ebed09d1d914bd1432b5bc8e8cb8455488b5274af0b4abf54d47d4e96ab"
+      "sha256": "4b8a17030a48386484fbea90bfa4ff2b35808253db273ef6a0010bfd885e4658"
     },
     {
       "group": "project-stack-logos",

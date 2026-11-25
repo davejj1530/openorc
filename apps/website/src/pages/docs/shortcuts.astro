@@ -87,7 +87,7 @@ import LinkCards from "../../components/docs/LinkCards.astro";
           </tr>
           <tr>
             <td><kbd>⌘</kbd>-click a thread</td>
-            <td>Open it in another pane beside the current one, up to three panes</td>
+            <td>Open it in a tab of its own</td>
           </tr>
           <tr>
             <td><kbd>⌘\</kbd></td>
@@ -130,8 +130,16 @@ import LinkCards from "../../components/docs/LinkCards.astro";
             <td>Send. While the agent is working, the message joins the current turn if the agent can take it; otherwise it waits for the next turn.</td>
           </tr>
           <tr>
+            <td><kbd>⌘↵</kbd></td>
+            <td>While the agent is working, send the other way: queue a message that <kbd>↵</kbd> would put into the turn, or put into the turn one that <kbd>↵</kbd> would queue</td>
+          </tr>
+          <tr>
             <td><kbd>⇧↵</kbd></td>
             <td>Start a new line</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘⇧D</kbd></td>
+            <td>Start dictating into the message, or finish. <kbd>Esc</kbd> takes the dictated words back out.</td>
           </tr>
           <tr>
             <td><kbd>@</kbd></td>

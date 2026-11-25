@@ -58,6 +58,10 @@ import { docHref } from "../../data/docs";
             <td>The model that memory search runs on this computer, downloaded the first time memory needs it</td>
           </tr>
           <tr>
+            <td><code>speech-models/</code></td>
+            <td>The speech model dictation runs on this computer, once you download it</td>
+          </tr>
+          <tr>
             <td><code>project-icons/</code></td>
             <td>Icons OpenOrc found for your projects, and the one you chose</td>
           </tr>
@@ -86,8 +90,12 @@ import { docHref } from "../../data/docs";
             <td>On macOS and Linux, a record of each running agent process: its ID and start time, and OpenOrc's own. The next launch uses it to stop any left behind by a crash. No prompts or credentials.</td>
           </tr>
           <tr>
-            <td><code>slack-secrets.enc</code>, <code>memory-extraction-key.enc</code>, <code>github-reviewer-app.enc</code>, <code>remote-access-key.enc</code>, <code>apns-key.enc</code>, and <code>openorc-account.enc</code></td>
+            <td><code>slack-secrets.enc</code>, <code>memory-extraction-key.enc</code>, <code>github-reviewer-app.enc</code>, <code>remote-access-key.enc</code>, <code>apns-key.enc</code>, <code>openorc-account.enc</code>, and <code>dictation-openai-key</code></td>
             <td>Encrypted secrets; see <a href="#secrets">Settings and secrets</a></td>
+          </tr>
+          <tr>
+            <td><code>dictation.json</code></td>
+            <td>Whether dictation transcribes on this computer or with OpenAI</td>
           </tr>
           <tr>
             <td><code>updates.json</code>, <code>.updaterId</code></td>
@@ -286,6 +294,10 @@ import { docHref } from "../../data/docs";
             <td>The Apple push key for phone notifications, if you added one</td>
           </tr>
           <tr>
+            <td><code>dictation-openai-key</code></td>
+            <td>The optional OpenAI API key for dictation</td>
+          </tr>
+          <tr>
             <td><code>openorc-account.enc</code></td>
             <td>Your OpenOrc Cloud session, while you are signed in. Only the core reads it.</td>
           </tr>
@@ -363,8 +375,8 @@ import { docHref } from "../../data/docs";
     <h2 id="window">Window storage</h2>
     <ul>
       <li>
-        Local storage holds drafts and pending requests (<code>openorc.draft.*</code>), such as composer text, task descriptions and comments, and edits in the Instructions tab. It also holds the layout and Preview addresses
-        (<code>openorc.layout</code>), the side panel's tabs (<code>openorc.panel-sessions</code>), appearance (<code>openorc.theme</code>, <code>openorc.palette</code>, <code>openorc.colors</code>, <code>openorc.font</code>, <code>openorc.code-font</code>, and two window transparency keys), setup progress (<code>openorc.onboarding</code>), and a few small choices: the project for a new thread, word wrap, how you last reviewed a pull request, and which
+        Local storage holds drafts and pending requests (<code>openorc.draft.*</code>), such as composer text and the passages you quoted into it, task descriptions and comments, and edits in the Instructions tab. It also holds the layout and Preview addresses
+        (<code>openorc.layout</code>), the side panel's tabs (<code>openorc.panel-sessions</code>), appearance (<code>openorc.theme</code>, <code>openorc.palette</code>, <code>openorc.colors</code>, <code>openorc.font</code>, <code>openorc.code-font</code>, <code>openorc.backdrop</code> with the image you chose for it, and two window transparency keys), the dictation microphone (<code>openorc.dictation</code>), setup progress (<code>openorc.onboarding</code>), and a few small choices: the project for a new thread, word wrap, how you last reviewed a pull request, and which
         notifications were already shown. A thread's draft is also saved in the database.
       </li>
       <li>IndexedDB holds images pasted into task descriptions (<code>openorc-image-drafts</code>) and unsaved edits to files in the Files tab (<code>openorc-file-drafts</code>).</li>

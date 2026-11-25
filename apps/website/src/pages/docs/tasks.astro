@@ -46,7 +46,15 @@ import { docHref } from "../../data/docs";
       <li>Paste or drop images into the spec.</li>
       <li>Choose <strong>Markdown</strong> to edit the source, and <strong>Rich text</strong> to go back.</li>
     </ul>
-    <p>Changes save shortly after you stop typing, and <kbd>⌘S</kbd> saves at once. The footer says <strong>Saved</strong> when the task is up to date. Below the spec, <strong>Labels</strong> takes a comma-separated list. Further down are the task's comments (see <a href={docHref("discussions")}>Task discussions</a>), its <strong>Execution settings</strong>, a short history and <strong>Delete task</strong>. Deleting a task removes it and its discussion; its thread keeps its messages and changes.</p>
+    <p>Changes save shortly after you stop typing, and <kbd>⌘S</kbd> saves at once. The footer says <strong>Saved</strong> when the task is up to date. Below the spec, <strong>Labels</strong> takes a comma-separated list. Further down are the task's comments (see <a href={docHref("discussions")}>Task discussions</a>), its <strong>Execution settings</strong>, <strong>Activity</strong>, which lists the task's threads and runs, and <strong>Delete task</strong>. Deleting a task removes it and its discussion; its thread keeps its messages and changes.</p>
+    <h3 id="refine">Refine with an agent</h3>
+    <p><strong>Refine</strong>, beside <strong>Markdown</strong> above the spec, asks an agent to improve the task itself.</p>
+    <ol class="docs-steps">
+      <li>Click <strong>Refine</strong>. Say what should change, or leave the field empty, and choose the model or Orcling under <strong>Refine with</strong>. Then click <strong>Refine</strong>.</li>
+      <li>The agent reads the project and the task's comments without changing anything, and hands back a suggested title, spec, and labels. The suggestion shows in place of the spec, with its changes marked.</li>
+      <li>Click <strong>Use suggestion</strong> to change the task. <strong>Edit</strong> opens the suggestion for your corrections first, <strong>Refine again</strong> asks for another try, and <strong>Dismiss</strong> leaves the task as it was.</li>
+    </ol>
+    <p>The task changes only when you use the suggestion. Tasks in OpenOrc Cloud don't offer Refine.</p>
   </section>
 
   <section aria-labelledby="status">
@@ -138,6 +146,56 @@ import { docHref } from "../../data/docs";
     <p>The work runs in that thread's folder: your checkout, or a worktree of the thread's own. When OpenOrc creates a thread for the task, the task's <strong>Execution location</strong> decides where it works: <strong>Local checkout</strong> or <strong>Worktree</strong>, under <strong>Execution settings</strong> on the Overview. A new task takes the location of the thread it came from, or else your <strong>New thread workspace</strong> setting. Once the thread has started, changing the location moves the thread and its uncommitted changes. See <a href={docHref("git")}>Git and worktrees</a>.</p>
     <p>You can also start the work from the task's comments, by asking a model to build it. See <a href={docHref("discussions") + "#work"}>From discussion to work</a>.</p>
     <Callout>Once a task has a thread, its work stays there. An agent in another thread can't start it, so continue in the task's thread, and move that thread if the work belongs somewhere else.</Callout>
+    <h3 id="threads">Several threads for one task</h3>
+    <p>A task can have more than one thread. They are listed under <strong>Activity</strong> on the Overview, the current one first. <strong>Continue in a new thread</strong> there starts a fresh session in the task's folder, from the task and a brief of the last thread. It uses the current thread's model and account unless you choose others. <strong>Open thread</strong> then goes to the new thread, and the earlier one stays listed.</p>
+    <p>Before a task has a thread, the arrow beside <strong>Open thread</strong> chooses the first thread's model and account.</p>
+    <h3 id="buttons">Task buttons</h3>
+    <p>A task button sends a prompt you saved, with the task. A project's buttons show beside <strong>Open thread</strong> on its tasks. To add one, open the project's <strong>Project settings</strong>, find <strong>Task buttons</strong>, and click <strong>Add button</strong>.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Setting</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Label</strong></td>
+            <td>The button's name, such as <strong>Review</strong>.</td>
+          </tr>
+          <tr>
+            <td><strong>Show on</strong></td>
+            <td>The task statuses the button appears on. Archived tasks show no buttons.</td>
+          </tr>
+          <tr>
+            <td><strong>Prompt</strong></td>
+            <td>What the button sends. Type <kbd>/</kbd> to call one of the agent's skills.</td>
+          </tr>
+          <tr>
+            <td><strong>Include the task</strong></td>
+            <td>On, the task goes after the prompt. Off, the prompt goes alone.</td>
+          </tr>
+          <tr>
+            <td><strong>Send right away</strong></td>
+            <td>Off, the button opens its thread with the message waiting in the message box instead of sending it.</td>
+          </tr>
+          <tr>
+            <td><strong>Runs in</strong></td>
+            <td><strong>Current thread</strong> sends in the task's own thread. <strong>New thread</strong> starts a thread of the button's own, listed under the task, that works in the task's folder.</td>
+          </tr>
+          <tr>
+            <td><strong>Mode</strong></td>
+            <td><strong>Default</strong> uses the task thread's mode. Or choose one of the agent's <a href={docHref("permissions")}>modes</a>.</td>
+          </tr>
+          <tr>
+            <td>Model and account</td>
+            <td><strong>Default</strong> uses the task thread's. Or choose others for the button.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>A button sent in the task's thread moves a task that hasn't started to <strong>In progress</strong>, and leaves one in <strong>Review</strong> or <strong>Done</strong> where it is.</p>
   </section>
 
   <section aria-labelledby="list">
@@ -153,7 +211,7 @@ import { docHref } from "../../data/docs";
     <h3>Tasks in OpenOrc Cloud</h3>
     <p>
       In an <a href={docHref("organizations")}>organization</a>, the Tasks list holds the team's tasks, which carry the cloud mark. A task can be assigned to a person, and <strong>Assigned to me</strong> narrows the list to yours. In
-      <strong>Personal</strong>, the list also shows the tasks your agents made in your cloud threads, with the cloud mark, beside this computer's own. Only you see them. <strong>New task</strong> in Personal still makes a task on this
+      <strong>My workspaces</strong>, the list also shows the tasks your agents made in your cloud threads, with the cloud mark, beside this computer's own. Only you see them. <strong>New task</strong> in My workspaces still makes a task on this
       computer.
     </p>
   </section>

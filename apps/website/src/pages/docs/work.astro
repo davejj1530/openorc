@@ -6,30 +6,30 @@ import { docHref } from "../../data/docs";
 ---
 
 <DocsLayout slug="work">
-  <p>Each turn's work sits between your message and the agent's reply. While the agent works, you see the step it's on. When it finishes, the work folds into one row that says what the turn came to, and a card lists the files it changed.</p>
+  <p>Each turn's work sits between your message and the agent's reply. While the agent works, you read what it does, a line at a time. When it finishes, the work folds into one row that says what the turn came to, and a card lists the files it changed.</p>
 
   <section aria-labelledby="while-it-works">
     <h2 id="while-it-works">While the agent works</h2>
-    <p>Under your message, the agent's work reads as steps in one card. Click the row above the steps to fold them away. The step in progress then stays visible as a single line. At the turn's end, a line says where it stands: <strong>Working</strong> with a clock, such as <strong>Working 12s</strong>, then <strong>Writing</strong> once the reply starts, and <strong>Worked for 41s</strong> when it's done, beside <strong>Copy</strong> and <strong>Fork</strong>. A turn names its agent and model only when they changed from the turn before. To end the turn early, click <strong>Stop</strong> in the composer.</p>
-    <p>A step starts when the agent says what it's about to do, and takes its title from those words. With Claude Code, that's the sentence it writes before a batch of tool calls. With Codex, it's usually the title of its reasoning. When the agent says nothing first, the step is named after what it did, such as <strong>Read 3 files, ran 2 commands</strong>.</p>
-    <p>The current step shows a spinner and what it's doing now. A finished step gets a check, and a failed one a cross. A finished step folds to its title and what it came to, such as <strong>Opened #218</strong> or <strong>1 failed</strong>, or a hint of what's inside, such as <strong>6 files · 2 commands</strong>.</p>
-    <p>Inside a step, each thing the agent worked on gets a row, with a verb for what it did:</p>
+    <p>Under your message, the agent's work reads as lines in the conversation. Once the turn has something to report, a row above the work says what it has come to so far. Click the row to fold the work away. What the agent is doing now then stays visible as a single line. At the turn's end, a line says where it stands: <strong>Working</strong> with a clock, such as <strong>Working 12s</strong>, then <strong>Writing</strong> once the reply starts, and <strong>Worked for 41s</strong> when it's done, beside <strong>Copy</strong> and <strong>Fork</strong>. A turn names its agent only when the agent changed from the turn before, and never the model, which the composer shows. To end the turn early, click <strong>Stop</strong> in the composer.</p>
+    <p>The work is told in steps. A step starts when the agent says what it's about to do, and those words head the step. With Claude Code, that's the sentence it writes before a batch of tool calls. With Codex, it's usually the title of its reasoning. When the agent says nothing first, the step is named after what it did, such as <strong>Read 3 files, ran 2 commands</strong>.</p>
+    <p>Under a step's head, each thing the agent did is one line, in the order it happened: an icon, a verb and what it was done to, and at the line's end how it came out, such as the lines an edit added and removed or what a search found. The line the agent is on shows the moving cube and stays open, and the lines before it fold to a line each. Searches made one after another share a line that opens to each of them, and several edits to one file read as one change.</p>
+    <p>Each line starts with a verb for what was done, and opens to the thing itself:</p>
     <div class="docs-table">
       <table>
         <thead>
           <tr>
             <th scope="col">Verb</th>
-            <th scope="col">What the row shows</th>
+            <th scope="col">What the line opens to</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td><strong>Read</strong> or <strong>Listed</strong></td>
-            <td>The files the agent read or the folders it listed, each with its folder. Past six, the rest wait behind a count.</td>
+            <td>The files the agent read or the folders it listed. Past six, the rest wait behind a count. A line for one file is a link to that file, and pointing at it shows the lines the agent read.</td>
           </tr>
           <tr>
             <td><strong>Edited</strong> or <strong>Wrote</strong></td>
-            <td>The file with the lines added and removed, and under it the lines the edit took out and put in. <strong>Wrote</strong> marks a new file.</td>
+            <td>The lines the edit took out and put in. The line ends with the count of lines added and removed. <strong>Wrote</strong> marks a new file.</td>
           </tr>
           <tr>
             <td><strong>Searched</strong></td>
@@ -37,11 +37,15 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td><strong>Ran</strong></td>
-            <td>The command, by the agent's own words for it or its first line. While it runs, or once it fails, its newest output lines show under it.</td>
+            <td>The last lines the command printed, then the command as the steps it ran and the folder it ran in. The line names the command by the agent's own words for it or by the command itself.</td>
           </tr>
           <tr>
             <td><strong>Tested</strong></td>
             <td>A test run as one cell per test, with the count passed and failed, what ran, and how long it took. A failing test is named under it. OpenOrc reads the output of Vitest, Jest, pytest, Go, and Cargo.</td>
+          </tr>
+          <tr>
+            <td><strong>Thought</strong></td>
+            <td>The agent's reasoning for the step, when it shared it. The line gives the first of it and how long it took.</td>
           </tr>
           <tr>
             <td><strong>Committed</strong>, <strong>Pushed</strong>, or <strong>Opened</strong></td>
@@ -50,18 +54,20 @@ import { docHref } from "../../data/docs";
         </tbody>
       </table>
     </div>
-    <p>Other rows appear when the agent does other things, such as <strong>Read</strong> for a web page it fetched, or the name of an MCP server whose tools it used. Subagents get a card of their own. See <a href={docHref("messaging") + "#subagents"}>Subagents</a>.</p>
-    <p>When the agent keeps a to-do list, the card's head reads <strong>Plan</strong> with the step it's on, such as <strong>Step 2 of 5</strong>, over a progress bar, and the items check off as the agent works through them. Before the first step, the live line reads <strong>Thinking</strong> while the agent reasons.</p>
+    <p>Other lines appear when the agent does other things, such as <strong>Read</strong> for a web page it fetched, or the name of an MCP server whose tools it used. Subagents get a card of their own. See <a href={docHref("messaging") + "#subagents"}>Subagents</a>.</p>
+    <p>When the agent keeps a to-do list, the work's head reads <strong>Plan</strong> with the step it's on, such as <strong>Step 2 of 5</strong>, over a progress bar, and the items check off as the agent works through them. Before the first step, the live line reads <strong>Thinking</strong> while the agent reasons.</p>
   </section>
 
   <section aria-labelledby="open-a-step">
     <h2 id="open-a-step">Open a step</h2>
-    <p>Click a step's title to open or fold it. Inside, each row opens what's behind it:</p>
+    <p>Click a line to open what's behind it, and click it again to fold it back to the line:</p>
     <ul>
       <li>A file the agent read opens beside the conversation.</li>
-      <li>A search result opens its file at the line it matched.</li>
-      <li>A verb, such as <strong>Ran</strong> or <strong>Edited</strong>, lists the calls behind the row. A command shows the folder it ran in and its output.</li>
+      <li>A search lists what it found, and each result opens its file at the line it matched.</li>
+      <li>A command shows the last lines it printed. <strong>earlier lines</strong>, with their count, swaps them for the whole call and its output.</li>
+      <li>A tool's line opens the call itself.</li>
     </ul>
+    <p>A step named after what it did, or after the agent's reasoning, folds when you click its name. Folded, it counts what it did, such as <strong>read 3 files, ran 2 commands</strong>. A step headed by the agent's own sentence stays open.</p>
     <p>In an open call, <strong>Raw call</strong> shows the exact input and output. When a tool's output was very large, OpenOrc keeps a short digest of it, so the row can still say what the call came to after the full output is gone from the page.</p>
   </section>
 
@@ -100,7 +106,12 @@ import { docHref } from "../../data/docs";
         </tbody>
       </table>
     </div>
-    <p>An item with nothing to report is left out. A turn with nothing else to report says how many steps it took. The sidebar gives you the same news without opening the thread. A thread's row shows the turning cube while its agent works, an amber question mark while it waits for your approval or your answer, and a dot while a finished turn waits for you to read it.</p>
+    <p>An item with nothing to report is left out. A turn with nothing else to report says how many steps it took. The sidebar gives you the same news without opening the thread. A thread's row leads with a cube of dots that moves while its agent works, turns amber while it waits for your approval or your answer, and shows whole while a finished turn waits for you to read it.</p>
+    <h3 id="timeline">The timeline</h3>
+    <p>A turn that edited files has <strong>Timeline</strong> under its work. It draws what the turn did along one line, in the order it happened, and each file the turn edited has a lane of its own, named at its start. Point at a mark, or press <kbd>←</kbd> and <kbd>→</kbd>, to read that step's line under the drawing, and click to keep it open. Click a file's name to go to its last step. <strong>Summary</strong> goes back to the lines.</p>
+    <h3 id="proof">Proof beside the reply</h3>
+    <p>Once a turn is done, a sentence of its reply that says what the turn did ends in a small pill for what backs it: an edited file with its lines added and removed, such as <strong>WorkActs.tsx +6 −1</strong>, or a check's result, such as <strong>1055 passed</strong>. Click the pill to open that work under the sentence. A check that passed before the turn's last edit says <strong>before the last edit</strong>. When the reply says a check passed that the turn didn't run, the pill says so instead, such as <strong>No test run this turn</strong>.</p>
+    <p>A commit's id in a reply is a link. It opens the commit's page on GitHub once <code>origin</code> has the commit, and otherwise the commit in the thread's <strong>Commits</strong> tab.</p>
     <p>
       A reply can show images, such as a screenshot the agent took, and they open full size when you click them. It can also hold a visualization: a diagram, chart, or small interactive explanation that the agent draws with OpenOrc's <code>visualize</code> tool. A visualization runs in a sandbox of its own with no network access, and stays in the conversation's history.
     </p>
@@ -122,19 +133,21 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="questions-and-approvals">
     <h2 id="questions-and-approvals">Questions and approvals</h2>
-    <p>An agent can stop to ask you something. The question card shows its options, or a text field when there are none.</p>
+    <p>An agent can stop to ask you something. The question docks onto the top of the composer, with its options, or a text field when there are none.</p>
     <ol class="docs-steps">
-      <li>Pick an option, or type your own answer in the <strong>Something else</strong> field.</li>
-      <li>Click <strong>Answer</strong>. <strong>Decline</strong> closes the question without an answer.</li>
+      <li>Click an option. When the agent asked one question with one answer, that sends it. To answer in your own words, type in the <strong>Something else</strong> field and press <kbd>Enter</kbd>.</li>
+      <li>When you can pick several options, or the agent asked several questions at once, pick, then click <strong>Next</strong> for the next question and <strong>Answer</strong> to send them all. Each answer you gave stays above as a line you can click to change.</li>
+      <li><strong>Decline</strong> closes the question without an answer.</li>
     </ol>
-    <p>A question waits for you in every mode, Autonomous included. When it asks for something secret, the field hides what you type, and the card shows <strong>Answer hidden</strong> afterwards.</p>
-    <p>An approval card looks similar. It shows the command or tool the agent wants to run and offers <strong>Allow once</strong>, <strong>Allow for this run</strong> and <strong>Deny</strong>, or only <strong>Allow once</strong> and <strong>Deny</strong> for a request that can't be allowed for longer, such as a password. To deny it and tell the agent what to do instead, type in <strong>Say what to do instead</strong> and click <strong>Deny and send</strong>. Which requests ask first depends on the thread's mode. See <a href={docHref("permissions") + "#approvals"}>Modes and permissions</a>.</p>
-    <p>Both cards dock on the composer, and the turn waits until you answer. When more than one request waits, the card says how many more wait.</p>
+    <p>A question waits for you in every mode, Autonomous included. When it asks for something secret, the field hides what you type, and the conversation shows <strong>Answer hidden</strong> afterwards.</p>
+    <p>An approval docks onto the composer the same way. It shows the command or tool the agent wants to run and offers <strong>Allow once</strong>, <strong>Allow for this run</strong> and <strong>Deny</strong>, or only <strong>Allow once</strong> and <strong>Deny</strong> for a request that can't be allowed for longer, such as a password. For a tool, <strong>Show request</strong> shows the whole request. To deny it and tell the agent what to do instead, type in <strong>Say what to do instead</strong> and click <strong>Deny and send</strong>. Which requests ask first depends on the thread's mode. See <a href={docHref("permissions") + "#approvals"}>Modes and permissions</a>.</p>
+    <p>The turn waits until you answer. When more than one request waits, the composer shows one and says how many more wait.</p>
+    <p>Once answered, a question stays in the conversation as its record: what was asked, the options with yours marked, and a line such as <strong>Sent to Claude</strong> or <strong>Declined</strong>. An approval you allowed shows as its line in the turn's work, and one you denied leaves a <strong>Denied</strong> line.</p>
   </section>
 
   <section aria-labelledby="waiting">
     <h2 id="waiting">What waits on you</h2>
-    <p>What waits on you shows where it lives. A thread waiting for your approval or your answer shows an amber question mark on its row in the sidebar, and its project's name counts it, even while the project is folded. Tasks that wait on you, such as one an agent proposed or one ready for review, count on <strong>Tasks</strong> in the sidebar and lead its list.</p>
+    <p>What waits on you shows where it lives. A thread waiting for your approval or your answer leads its row in the sidebar with an amber cube, and its project's name counts it, even while the project is folded. Tasks that wait on you, such as one an agent proposed or one ready for review, count on <strong>Tasks</strong> in the sidebar and lead its list.</p>
     <Callout>Desktop notifications cover the same moments when you're looking at something else: a finished turn, a question, an approval, or a failure. Turn them off in <a href={docHref("settings") + "#general"}>Settings</a>.</Callout>
   </section>
 

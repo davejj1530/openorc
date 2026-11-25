@@ -62,9 +62,13 @@ export default function RootLayout() {
     // would stay light in dark mode.
     headerUserInterfaceStyle: mode,
   } as const;
-  // What the list opens sits first over Home's place in the stack.
-  const opened: NonNullable<ComponentProps<typeof Stack.Screen>["options"]> = ({ route, navigation }) =>
-    split && navigation.getState().routes[1]?.key === route.key ? { ...pushed, ...beside } : pushed;
+  // What the list opens sits first over Home's place in the stack. A screen on its way in is asked before the stack
+  // holds it, and will stand at its end.
+  const opened: NonNullable<ComponentProps<typeof Stack.Screen>["options"]> = ({ route, navigation }) => {
+    const routes: readonly { key: string }[] = navigation.getState().routes;
+    const held = routes.findIndex((each) => each.key === route.key);
+    return split && (held === -1 ? routes.length : held) === 1 ? { ...pushed, ...beside } : pushed;
+  };
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider>

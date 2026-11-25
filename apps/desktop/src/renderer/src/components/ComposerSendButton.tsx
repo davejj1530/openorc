@@ -52,8 +52,8 @@ function inkTip(cluster: SendCluster, reason: string | undefined, payer: SendPay
  * waits with nothing typed, the ink is the ask's and Stop stands alone as the white key. In a cloud thread others are
  * in, each says on demand whose sign-in and hours it uses (`payer`). A draft that tags a person makes the ink a pill
  * that says Post note, which says on demand where the note goes; Stop stays beside it while something runs. `quiet`,
- * while the message is dictated, the cluster keeps only Stop and the ink button: the other way and the pill's words
- * step aside.
+ * while the message is dictated, the pill's words step aside; every key stays, so a spoken message can still go
+ * either way.
  */
 export function ComposerSendCluster({
   cluster,
@@ -80,7 +80,7 @@ export function ComposerSendCluster({
   return (
     <div className="composer-send-cluster">
       {cluster.kind === "asked" || (cluster.kind !== "stop" && cluster.stop) ? <StopKey stopping={stopping} onStop={onStop} tip={payer?.stop ?? "Stop"} /> : null}
-      {cluster.kind === "turn" && !quiet ? (
+      {cluster.kind === "turn" ? (
         <WayKey
           way={cluster.other.way}
           disabled={!canSend || Boolean(cluster.other.blocked)}

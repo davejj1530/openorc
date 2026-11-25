@@ -165,19 +165,42 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   gap: 2px;
   padding: 2px 8px 0;
 }
-/* Back to app takes New thread's place, on the same line, so the first row holds still as Settings opens. */
+/* Settings' head takes New thread's place: the chevron that leaves in the third ink beside the name in full ink,
+   centred between two of the foot's seams, one under the header and one over the sections, each running the
+   sidebar's width. The sections scroll under it. */
 .settings-destinations {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.settings-head {
+  flex-shrink: 0;
+  padding: 8px;
+  box-shadow:
+    inset 0 var(--seam) 0 var(--seam-line),
+    inset 0 calc(-1 * var(--seam)) 0 var(--seam-line);
+}
+.settings-head > .sidebar-nav-row {
+  color: var(--ink);
+}
+.settings-head .sidebar-nav-icon {
+  color: var(--ink-3);
+  transition: color var(--duration-leave) var(--ease-out);
+}
+.settings-head > .sidebar-nav-row:hover .sidebar-nav-icon {
+  color: var(--ink);
+  transition-duration: 0s;
+}
+.settings-sections {
   display: grid;
   flex: 1;
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
-  gap: 1px;
+  gap: 2px;
   min-height: 0;
   overflow-y: auto;
-  padding: 2px 8px 10px;
-}
-.settings-destinations > .sidebar-nav-row {
-  margin-bottom: 18px;
+  padding: 8px 8px 10px;
 }
 .sidebar-nav-row {
   display: flex;
@@ -312,6 +335,11 @@ button.sidebar-nav-row:active:not([aria-current="page"]) {
   align-items: center;
   gap: 4px;
   margin-right: 4px;
+}
+/* A head's tools are 18px, the size of every other glyph on the sidebar's frame, whatever size each was written at. */
+.sidebar-list-tools svg.openorc-icon {
+  width: 18px;
+  height: 18px;
 }
 
 /* Lists */
@@ -918,9 +946,6 @@ button.browser-empty:hover,
 .sidebar-tool:active {
   background-color: var(--surface-3);
 }
-.sidebar-tool[aria-current="page"] {
-  color: var(--navigation-ink);
-}
 /* OpenOrc's update once one waits: a dot while it waits for the person, a ring while it downloads. */
 .sidebar-update[data-offer] {
   color: var(--ink);
@@ -930,8 +955,8 @@ button.browser-empty:hover,
 }
 .sidebar-update-dot {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 5px;
+  right: 5px;
   width: 7px;
   height: 7px;
   border-radius: var(--radius-pill);

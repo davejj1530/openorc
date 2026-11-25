@@ -508,7 +508,11 @@ it("lists Settings' sections in place of the screens and threads, then goes back
   ).toEqual(["Usage", "Connections", "Account", "Slack", "Phone", "Skills", "Connectors", "Devices", "Appearance", "General", "Memory & models", "Data"]);
   expect(within(sections).getByRole("button", { name: "Slack" }).getAttribute("aria-current")).toBe("page");
   expect(screen.queryByRole("navigation", { name: "Screens" })).toBeNull();
-  expect(screen.getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBe("page");
+  // The head names Settings and leaves it; the foot's gear is the way out too while Settings is open.
+  const [head, foot] = screen.getAllByRole("button", { name: "Close Settings" });
+  expect(head!.textContent).toBe("Settings");
+  expect(within(screen.getByRole("contentinfo")).getByRole("button", { name: "Close Settings" })).toBe(foot);
+  expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
   // The thread list waits underneath, so its loaded pages and scroll survive the visit.
   expect(screen.getByRole("region", { name: "Workspaces", hidden: true })).toBeTruthy();
   expect(screen.queryByRole("region", { name: "Workspaces" })).toBeNull();
@@ -516,17 +520,25 @@ it("lists Settings' sections in place of the screens and threads, then goes back
   fireEvent.click(within(sections).getByRole("button", { name: "Appearance" }));
   expect(useRouter.getState().route).toEqual({ view: "settings", section: "appearance" });
 
-  fireEvent.click(screen.getByRole("button", { name: "Back to app" }));
+  fireEvent.click(head!);
   expect(useRouter.getState().route).toEqual({ view: "tasks" });
   expect(screen.queryByRole("navigation", { name: "Settings" })).toBeNull();
   expect(screen.getByRole("navigation", { name: "Screens" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Close Settings" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
+});
+
+it("leaves Settings from the foot for the screen it was opened from", () => {
+  useRouter.setState({ route: { view: "settings", section: "slack" }, history: [{ view: "tasks" }, { view: "settings" }] });
+  mountSidebar();
+  fireEvent.click(within(screen.getByRole("contentinfo")).getByRole("button", { name: "Close Settings" }));
+  expect(useRouter.getState().route).toEqual({ view: "tasks" });
 });
 
 it("goes back to a new thread when Settings was opened first", () => {
   useRouter.setState({ route: { view: "settings" } });
   mountSidebar();
-  fireEvent.click(screen.getByRole("button", { name: "Back to app" }));
+  fireEvent.click(screen.getAllByRole("button", { name: "Close Settings" })[0]!);
   expect(useRouter.getState().route).toEqual({ view: "newthread" });
 });
 

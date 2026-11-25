@@ -251,3 +251,9 @@ export function newSubthread(parentId: string): void {
 export function newThread(projectId?: string): void {
   useRouter.getState().navigate({ view: "newthread", ...(projectId ? { projectId } : {}) });
 }
+
+/** Leaves Settings for the screen it was opened from, or a new thread when Settings was the first screen. */
+export function closeSettings(): void {
+  const { history, navigate } = useRouter.getState();
+  navigate(history.findLast((entry) => entry.view !== "settings") ?? { view: "newthread" });
+}

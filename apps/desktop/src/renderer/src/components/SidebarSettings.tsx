@@ -1,38 +1,54 @@
-import type { ReactNode } from "react";
 import { ChevronLeft } from "./icons";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { useRouter, type Route } from "../lib/router";
+import { closeSettings, useRouter, type Route } from "../lib/router";
 import { useSettingsSections } from "../lib/settings-sections";
 
-/** A sidebar row: a 16px muted glyph and the label. */
-function NavItem({ route, icon, label, active }: { route: Route; icon: ReactNode; label: string; active: boolean }) {
-  const navigate = useRouter((s) => s.navigate);
+/** Settings' head: the chevron that leaves beside the name, one button back to the screen Settings was opened from. */
+function SettingsHead() {
   return (
-    <button
-      type="button"
-      onClick={() => {
-        navigate(route);
-        dismissCompactNavigation();
-      }}
-      aria-current={active ? "page" : undefined}
-      className="nav-row sidebar-nav-row no-drag"
-    >
-      <span className="sidebar-nav-icon">{icon}</span>
-      <span className="sidebar-nav-label">{label}</span>
-    </button>
+    <div className="settings-head">
+      <button
+        type="button"
+        aria-label="Close Settings"
+        className="sidebar-nav-row no-drag"
+        onClick={() => {
+          closeSettings();
+          dismissCompactNavigation();
+        }}
+      >
+        <span className="sidebar-nav-icon">
+          <ChevronLeft size={18} />
+        </span>
+        <span className="sidebar-nav-label">Settings</span>
+      </button>
+    </div>
   );
 }
 
-/** Settings lists the sections this person has in the sidebar, under a way back to the screen it was opened from. */
+/** Settings lists the sections this person has in the sidebar, under its head, the way back. */
 export function SidebarSettings({ route }: { route: Extract<Route, { view: "settings" }> }) {
   const { sections, current } = useSettingsSections(route);
-  const opener = useRouter((s) => s.history.findLast((entry) => entry.view !== "settings"));
+  const navigate = useRouter((s) => s.navigate);
   return (
     <div className="settings-destinations">
-      <NavItem route={opener ?? { view: "newthread" }} icon={<ChevronLeft size={18} />} label="Back to app" active={false} />
-      <nav className="grid grid-cols-1 gap-0.5 min-w-0" aria-label="Settings">
+      <SettingsHead />
+      <nav className="settings-sections" aria-label="Settings">
         {sections.map(({ id, label, Icon }) => (
-          <NavItem key={id} route={{ view: "settings", section: id }} icon={<Icon size={18} />} label={label} active={id === current.id} />
+          <button
+            key={id}
+            type="button"
+            aria-current={id === current.id ? "page" : undefined}
+            className="sidebar-nav-row no-drag"
+            onClick={() => {
+              navigate({ view: "settings", section: id });
+              dismissCompactNavigation();
+            }}
+          >
+            <span className="sidebar-nav-icon">
+              <Icon size={18} />
+            </span>
+            <span className="sidebar-nav-label">{label}</span>
+          </button>
         ))}
       </nav>
     </div>

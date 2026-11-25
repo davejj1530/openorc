@@ -128,7 +128,7 @@ async function check() {
     }
     await press("Settings");
     assert.equal((await read("sidebarSmoke.route()")).view, "settings");
-    await press("Back to app");
+    await press("Close Settings");
     await read('sidebarSmoke.fail("site")');
     await until('document.querySelector(".browser-threads").textContent.includes("Retry")');
     await read("sidebarSmoke.fail(null)");

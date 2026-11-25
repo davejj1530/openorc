@@ -7,8 +7,8 @@ const initial = { font: useAppFont.getState().font, attribute: root.dataset.font
 
 beforeEach(() => localStorage.clear());
 
-it("starts in Immaculate Gothic when nothing is saved", () => {
-  expect(initial).toEqual({ font: "immaculate-gothic", attribute: "immaculate-gothic" });
+it("starts in the system font on a Mac when nothing is saved", () => {
+  expect(initial).toEqual({ font: "system", attribute: "system" });
 });
 
 it("saves and applies a choice", () => {
@@ -17,9 +17,9 @@ it("saves and applies a choice", () => {
   expect(root.dataset.font).toBe("inter");
 });
 
-it("falls back to Immaculate Gothic for a missing or unknown value", () => {
-  expect(parseFont(null)).toBe("immaculate-gothic");
-  expect(parseFont("comic-sans")).toBe("immaculate-gothic");
+it("falls back to the default for a missing or unknown value", () => {
+  expect(parseFont(null)).toBe("system");
+  expect(parseFont("comic-sans")).toBe("system");
   expect(parseFont("geist")).toBe("geist");
 });
 
@@ -38,4 +38,14 @@ it("keeps the choice for this session when storage is unavailable", () => {
   expect(useAppFont.getState().font).toBe("geist");
   expect(root.dataset.font).toBe("geist");
   save.mockRestore();
+});
+
+it.each(["win32", "linux"])("starts in Immaculate Gothic on %s when nothing is saved", async (platform) => {
+  vi.stubGlobal("openorc", { platform });
+  vi.resetModules();
+  const fresh = await import("./app-font");
+  expect(fresh.useAppFont.getState().font).toBe("immaculate-gothic");
+  expect(root.dataset.font).toBe("immaculate-gothic");
+  expect(fresh.parseFont("comic-sans")).toBe("immaculate-gothic");
+  vi.unstubAllGlobals();
 });

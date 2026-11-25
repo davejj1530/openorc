@@ -2,7 +2,7 @@
 
 Settings → Appearance offers the OpenOrc, Codex, Conductor, Linear, Cursor, Claude, GitHub, Halcyon, Kamakura, ClickUp, Cyberpunk, Notion, and Eliron palettes. The product-named palettes adapt documented or shipped colors from those products. Light, dark, and system appearance are chosen separately from the palette. Your choices are saved in local storage (`openorc.theme` and `openorc.palette`) and apply to every open window. The desktop also copies the palette and changed colors to app settings, so a paired phone uses the same look. An unknown saved palette falls back to OpenOrc. If saving fails, the selected appearance stays active for the session and Settings explains why.
 
-**Font** sets the app's typeface: Immaculate Gothic, Inter, Geist, or the system font. **Code font** sets the monospaced face for code blocks, diffs, and terminals. Both are saved in local storage (`openorc.font` and `openorc.code-font`).
+**Font** sets the app's typeface: Immaculate Gothic, Inter, Geist, or the system font. It starts on the system font on a Mac and on Immaculate Gothic on Windows and Linux. **Code font** sets the monospaced face for code blocks, diffs, and terminals. Both are saved in local storage (`openorc.font` and `openorc.code-font`).
 
 Messages, task reports, and task description previews share one Markdown renderer. It supports syntax highlighting, copying and downloading code, tables with copy, export and full-screen controls, checklists, quotes, KaTeX math, and Mermaid diagrams. Math uses double-dollar delimiters (`$$…$$`), so prices with a dollar sign are not read as math. Mermaid loads only when a message contains a diagram code block and renders in strict mode. If it cannot load, the diagram source stays readable with a short explanation.
 

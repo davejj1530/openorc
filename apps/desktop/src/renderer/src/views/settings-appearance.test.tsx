@@ -9,11 +9,11 @@ it("sets each font choice in its own face and applies the one picked", () => {
   render(<AppearanceSettings />);
   const choices = within(screen.getByRole("group", { name: "Font" })).getAllByRole("button");
   expect(choices.map((choice) => [choice.textContent, choice.dataset.font, choice.getAttribute("aria-pressed")])).toEqual([
-    ["Immaculate Gothic", "immaculate-gothic", "true"],
+    ["Immaculate Gothic", "immaculate-gothic", "false"],
     ["Inter", "inter", "false"],
     ["Geist", "geist", "false"],
     ["PP Neue Montreal", "pp-neue-montreal", "false"],
-    ["System", "system", "false"],
+    ["System", "system", "true"],
   ]);
   fireEvent.click(screen.getByRole("button", { name: "Inter" }));
   expect(document.documentElement.dataset.font).toBe("inter");

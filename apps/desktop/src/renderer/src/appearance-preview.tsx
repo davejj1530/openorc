@@ -35,12 +35,13 @@ Object.defineProperty(window, "openorc", {
 async function main() {
   const { core } = await import("./lib/rpc");
   core.call = createAppearancePreviewRpc();
-  const [{ App }, { queryClient }, { useLayout, limits }, { useRouter }, { useTheme }] = await Promise.all([
+  const [{ App }, { queryClient }, { useLayout, limits }, { useRouter }, { useTheme }, { parseFont }] = await Promise.all([
     import("./App"),
     import("./lib/client"),
     import("./lib/layout"),
     import("./lib/router"),
     import("./lib/theme"),
+    import("./lib/app-font"),
   ]);
   queryClient.setDefaultOptions({ queries: { retry: false, staleTime: Infinity, refetchOnWindowFocus: false } });
   useLayout.setState({ sidebarOpen: true, panelOpen: false });
@@ -53,7 +54,7 @@ async function main() {
     const root = document.documentElement;
     root.dataset.theme = message.mode;
     root.dataset.palette = message.preset;
-    root.dataset.font = message.font ?? "immaculate-gothic";
+    root.dataset.font = parseFont(message.font ?? null);
     root.classList.toggle("dark", message.mode === "dark");
     for (const [token, value] of Object.entries(message.colors ?? {})) if (token.startsWith("--") && typeof value === "string") root.style.setProperty(token, value);
     useTheme.setState({ choice: message.mode, resolved: message.mode, preset: message.preset });

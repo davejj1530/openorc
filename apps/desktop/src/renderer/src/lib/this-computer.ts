@@ -6,7 +6,7 @@ import { computerNames } from "@openorc/protocol";
  */
 // Read off globalThis, since modules that word their messages with these also load where there is no window or
 // bridge (previews, tests in Node). There it reads as a Mac.
-const platform = (globalThis as { openorc?: { platform?: string } }).openorc?.platform ?? "darwin";
+export const platform = (globalThis as { openorc?: { platform?: string } }).openorc?.platform ?? "darwin";
 
 export const { computer, thisComputer, ThisComputer, machine } = computerNames(platform);
 

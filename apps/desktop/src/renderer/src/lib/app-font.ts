@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { platform } from "./this-computer";
 
 /** The interface typefaces. fonts.css maps each id to its family. */
 export const appFonts = [
@@ -13,8 +14,11 @@ export type AppFont = (typeof appFonts)[number]["id"];
 
 const key = "openorc.font";
 
+/** A Mac's own face leads there. Elsewhere the system face changes with the OS and the desktop, so the bundled one leads. */
+const defaultFont: AppFont = platform === "darwin" ? "system" : "immaculate-gothic";
+
 export function parseFont(value: string | null): AppFont {
-  return appFonts.find((font) => font.id === value)?.id ?? "immaculate-gothic";
+  return appFonts.find((font) => font.id === value)?.id ?? defaultFont;
 }
 
 function read(): string | null {

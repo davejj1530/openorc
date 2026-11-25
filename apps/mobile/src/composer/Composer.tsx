@@ -21,9 +21,10 @@ import { useComposer, type ComposerInput } from "./use-composer";
 
 type Settings = ReturnType<ClientState["useConversationSettings"]>;
 
-/** What the thread around the composer asks of it: Reply on a note tags its author, and answers that note. */
+/** What the thread around the composer asks of it: Reply on a note tags its author, and answers that note; Quote on selected words puts the passage over the draft. */
 export interface ComposerHandle {
   tag: (person: DraftTag, reply?: DraftReply) => void;
+  quote: (text: string) => void;
 }
 
 export interface ComposerProps extends Omit<ComposerInput, "threadId" | "notes"> {
@@ -67,7 +68,7 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
   const insets = useSafeAreaInsets();
   const notes = useComposerNotes(thread);
   const composer = useComposer({ ...input, threadId: thread.id, notes });
-  useImperativeHandle(handle, () => ({ tag: composer.tag }), [composer.tag]);
+  useImperativeHandle(handle, () => ({ tag: composer.tag, quote: composer.quote }), [composer.tag, composer.quote]);
   const [typing, setTyping] = useState(false);
   const { controls } = composer;
   const activity = composerActivity({ stopping: composer.stopping, submitting: composer.sending, generatingImage });
@@ -98,6 +99,7 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
             attachDimmed={composer.attachDimmed}
             chips={!to}
             tagging={notes && { threadId: notes.threadId, viewerId: notes.viewerId, onPick: composer.pickTag }}
+            quoting={{ onNote: composer.noteQuote, onRemove: composer.removeQuote, onFocusChange: setTyping }}
           >
             {activity ? <Text className="text-sm text-ink-4">{activity}</Text> : null}
             {controls.stop ? (

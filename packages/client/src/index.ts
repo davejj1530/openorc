@@ -49,6 +49,7 @@ export {
 export { patchStat } from "./diff-stat.js";
 export { editedPaths } from "./edited-paths.js";
 export { citationLinks } from "./file-citations.js";
+export { quotedMessage, quoteRuns, type Quote } from "./quotes.js";
 export {
   compareUrl,
   comparisons,

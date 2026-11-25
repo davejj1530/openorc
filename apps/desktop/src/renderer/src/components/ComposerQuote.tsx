@@ -1,7 +1,7 @@
 import { Popover } from "@base-ui/react/popover";
 import { useState } from "react";
 import { CoversPreview } from "../lib/browser-preview";
-import type { Quote } from "../lib/composer-quotes";
+import type { Quote } from "@openorc/client";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { composing } from "./composer-editor/shared";
 import { Quote as QuoteIcon, X } from "./icons";

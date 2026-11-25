@@ -1,10 +1,11 @@
-import { foldsWords, noticeFrom, oneLine, type NoticeFrom } from "@openorc/client";
+import { foldsWords, noticeFrom, oneLine, quoteRuns, type NoticeFrom } from "@openorc/client";
 import { hostedFileReference } from "@openorc/protocol";
 import { router } from "expo-router";
 import { memo, useMemo } from "react";
 import { Pressable, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { FileText, WorkMessage } from "../generated/icons";
+import { cn } from "../ui/cn";
 import { Text } from "../ui/Text";
 import { attachmentRef, CloudImageTile, ImageTile, isImagePath } from "./images";
 import { client } from "../client";
@@ -13,6 +14,7 @@ import { useOpen } from "./disclosure";
 import { openProof } from "./open-sheet";
 import { messagePieces } from "./markdown-chunks";
 import { Markdown } from "./Markdown";
+import { Passage } from "./quoting";
 import { replySegments } from "./reply-images";
 import type { ReplyProof } from "./reply-proof";
 import type { MessageBlock, PieceSource } from "./rows";
@@ -31,8 +33,12 @@ function AttachedImage({ path }: { path: string }) {
   return <ImageTile asset={attachmentRef(path)} label="Attached image" compact />;
 }
 
+/** A message's passages and the words about them, each trimmed of the blank lines that part them: the bubble spaces them itself. */
+const promptRuns = (text: string) => quoteRuns(text).flatMap((run) => (run.text.trim() ? [{ ...run, text: run.text.replace(/^\n+|\n+$/g, "") }] : []));
+
 /**
- * What a person wrote: an r18 plane bubble on the right, at most 88% wide, its images above it. In a cloud thread a
+ * What a person wrote: an r18 plane bubble on the right, at most 88% wide, its images above it, the passages it quotes
+ * set apart behind a hairline. In a cloud thread a
  * teammate's words carry their first name over the bubble; the reader's own carry none.
  */
 export const Prompt = memo(function Prompt({ block }: { block: MessageBlock }) {
@@ -58,10 +64,23 @@ export const Prompt = memo(function Prompt({ block }: { block: MessageBlock }) {
         </View>
       ) : null}
       {block.text ? (
-        <View className="rounded-2xl bg-bubble px-4 py-3">
-          <Text prose selectable className="text-md text-bubble-ink">
-            {block.text}
-          </Text>
+        <View className="gap-1.5 rounded-2xl bg-bubble px-4 py-3">
+          {promptRuns(block.text).map((run, index) =>
+            run.quote ? (
+              // A passage after the first stands a little off the words before it, which are about the one above.
+              <View key={index} className={cn(index > 0 && "mt-1")}>
+                <Passage>
+                  <Text prose selectable className="text-md text-ink-2">
+                    {run.text}
+                  </Text>
+                </Passage>
+              </View>
+            ) : (
+              <Text key={index} prose selectable className="text-md text-bubble-ink">
+                {run.text}
+              </Text>
+            ),
+          )}
         </View>
       ) : null}
     </View>

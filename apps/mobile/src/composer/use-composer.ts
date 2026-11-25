@@ -1,7 +1,7 @@
-import { NOTE_FILES_HELD, type SubmitRequest } from "@openorc/client";
+import { NOTE_FILES_HELD, quotedMessage, type Quote, type SubmitRequest } from "@openorc/client";
 import type { HostedFileScope } from "@openorc/protocol";
 import { useRef, useState } from "react";
-import { client, useRpcMutation } from "../client";
+import { client, newId, useRpcMutation } from "../client";
 import { failureMessage } from "../failure";
 import { haptic } from "../ui/haptics";
 import { composerControls, unsent } from "./composer-state";
@@ -63,8 +63,18 @@ function draftTagWriters(setDraft: (update: (draft: Draft) => Draft) => void) {
   };
 }
 
+/** The draft's quotes as Quote on selected words, a note written on one and its remove pill change them. */
+function draftQuoteWriters(setDraft: (update: (draft: Draft) => Draft) => void) {
+  const change = (update: (quotes: Quote[]) => Quote[]) => setDraft((current) => ({ ...current, quotes: update(current.quotes ?? []) }));
+  return {
+    quote: (text: string) => change((quotes) => [...quotes, { id: newId(), text, note: "" }]),
+    noteQuote: (id: string, note: string) => change((quotes) => quotes.map((quote) => (quote.id === id ? { ...quote, note } : quote))),
+    removeQuote: (id: string) => change((quotes) => quotes.filter((quote) => quote.id !== id)),
+  };
+}
+
 /**
- * What the composer does: the draft (kept per thread), the images on their way to the Mac, the controls the state
+ * What the composer does: the draft (kept per thread) with the passages it quotes, the images on their way to the Mac, the controls the state
  * machine decides, and the send, stop and attach actions. As in Messages, a send empties the prompt at once and the
  * keyboard stays up, so whatever is written next is the next message. A send that fails puts what it took back, ahead
  * of anything written since, and says why.
@@ -85,12 +95,14 @@ export function useComposer({ threadId, request, live, working, canSteer, disabl
   const interrupt = useRpcMutation("runs.interrupt");
   // A note goes to the people it tags whatever the turn is doing; files ride only with messages.
   const note = notes ? phoneNote(draft.text, draft.tags ?? [], draft.reply) : null;
-  const noteHeld = draft.images.length ? NOTE_FILES_HELD : null;
+  const quotes = draft.quotes ?? [];
+  const noteHeld = draft.images.length || quotes.length ? NOTE_FILES_HELD : null;
   const reason = note ? noteHeld : disabledReason;
   const busy = !note && working;
   const controls = composerControls({
     text: draft.text,
     attachments: draft.images.length,
+    quotes: quotes.length,
     uploading,
     sending,
     disabledReason: reason,
@@ -123,7 +135,8 @@ export function useComposer({ threadId, request, live, working, canSteer, disabl
       setSending(false);
     }
   };
-  const send = (now: boolean) => deliver((taken) => submitter.submit({ ...request, now }, { text: taken.text.trim(), attachments: taken.images.map((image) => image.path) }));
+  const send = (now: boolean) =>
+    deliver((taken) => submitter.submit({ ...request, now }, { text: quotedMessage(taken.quotes ?? [], taken.text.trim()), attachments: taken.images.map((image) => image.path) }));
   const post = (posting: PhoneNote) => deliver(() => notes!.post(posting));
   const stop = () => {
     if (!live || interrupt.isPending) return;
@@ -147,10 +160,11 @@ export function useComposer({ threadId, request, live, working, canSteer, disabl
     /** The main pill: a note to the people it tags; else Stop, or a send into the running turn or the next one. */
     primary: () => {
       if (note) return void post(note);
-      if (compact && !working && draft.text.trim() === COMPACT && !draft.images.length) return void deliver(() => compact());
+      if (compact && !working && draft.text.trim() === COMPACT && !draft.images.length && !quotes.length) return void deliver(() => compact());
       return controls.primary === "stop" ? stop() : void send(controls.sendsNow);
     },
     ...draftTagWriters(setDraft),
+    ...draftQuoteWriters(setDraft),
     isNote: note !== null,
     /** A tap on the dim pill: says why it is dim, and does nothing else. */
     explainDim: dim.ask,

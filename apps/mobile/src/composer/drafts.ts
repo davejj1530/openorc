@@ -1,3 +1,4 @@
+import type { Quote } from "@openorc/client";
 import { useCallback, useState } from "react";
 import { shownMacId, storage } from "../client";
 import type { DraftReply, DraftTag } from "./note-draft";
@@ -15,6 +16,8 @@ export interface Draft {
   tags?: DraftTag[];
   /** The note the draft answers, by Reply on it. */
   reply?: DraftReply;
+  /** Passages picked out of the conversation, each with what the person wrote about it; they go with the message. */
+  quotes?: Quote[];
 }
 
 const EMPTY: Draft = { text: "", images: [] };
@@ -30,8 +33,14 @@ function read(threadId: string): Draft {
 }
 
 function write(threadId: string, draft: Draft): void {
-  if (draft.text || draft.images.length) storage.set(keyOf(threadId), JSON.stringify(draft));
+  if (draft.text || draft.images.length || draft.quotes?.length) storage.set(keyOf(threadId), JSON.stringify(draft));
   else storage.remove(keyOf(threadId));
+}
+
+/** Adds words to a thread's draft from outside its composer, after what is written there, as a task's button set not to send does. */
+export function addToDraft(threadId: string, words: string): void {
+  const draft = read(threadId);
+  write(threadId, { ...draft, text: [draft.text, words].filter((text) => text.trim()).join("\n\n") });
 }
 
 /**

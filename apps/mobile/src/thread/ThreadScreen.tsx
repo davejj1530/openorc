@@ -3,7 +3,7 @@ import type { LegendListRef } from "@legendapp/list/react-native";
 import { conversationActivity, processFit, threadWriteBlock, type SubmitRequest } from "@openorc/client";
 import { isSubagentThread, placeOf, type OrclingChatSummary, type Run, type ThreadCollaboration, type ThreadSummary } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode, type RefObject } from "react";
 import { Pressable, View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
 import { client, useLinkState, useRpc } from "../client";
@@ -24,6 +24,7 @@ import { CloudFileScopeContext, useThreadFiles } from "../cloud/cloud-files";
 import { threadTogetherOf, TogetherContext, turnSeen } from "./cloud-together";
 import { createDisclosure, DisclosureContext } from "./disclosure";
 import { useMarkSeen } from "./mark-seen";
+import { QuoteContext } from "./quoting";
 import { AuthorsContext, useThreadAuthors } from "./thread-authors";
 import { CommitScopeContext } from "./use-commit-links";
 import { holdTranscriptList, perfEnabled, reportThreadOpened } from "./perf-probe";
@@ -190,6 +191,63 @@ function submitRequest(input: {
   };
 }
 
+/** The thread's settings as its composer and its sheets read them, shared with the sheets, and whether it is an OpenOrc Cloud thread. */
+function useThreadSettings(id: string, thread: ThreadSummary | null, activeRun: Run | undefined) {
+  // An OpenOrc Cloud thread: its files go to the cloud through the phone's own session.
+  const cloud = thread !== null && placeOf(thread).elsewhere;
+  const settings = {
+    ...client.useConversationSettings({ thread, activeRun }),
+    claudeAccountId: thread?.claudeAccountId ?? undefined,
+    claudeAccount: useThreadClaudeAccount(thread),
+    cloudAccount: useThreadCloudAccount(thread),
+    cloud,
+  };
+  useShareSettings(id, settings);
+  return { settings, cloud };
+}
+
+/**
+ * What the transcript's rows read from the thread around them: which rows are open, who wrote what, the people it is
+ * shared with, each run's agent, where its files are read, Reply on a note, the thread whose commits an id names, and
+ * Quote on selected words.
+ */
+function useThreadContexts(id: string, thread: ThreadSummary | null, runs: Run[], cloud: boolean) {
+  const together = threadTogetherOf(thread);
+  const [disclosure] = useState(createDisclosure);
+  const voices = useVoices(runs, thread);
+  const authors = useThreadAuthors(thread, together);
+  const noteReply = useNoteReply(together);
+  const files = useThreadFiles(cloud ? id : null);
+  const commits = useMemo(() => ({ threadId: id, cloud }), [id, cloud]);
+  const composer = noteReply.handle;
+  const quote = useCallback((text: string) => composer.current?.quote(text), [composer]);
+  // A sub thread has a status bar where the composer would be, so nothing there takes a quote.
+  const quotes = thread && !isSubagentThread(thread) ? quote : null;
+  return { together, disclosure, voices, authors, noteReply, files, commits, quotes };
+}
+
+type ThreadContexts = ReturnType<typeof useThreadContexts>;
+
+function ThreadProviders({ contexts, children }: { contexts: ThreadContexts; children: ReactNode }) {
+  return (
+    <DisclosureContext.Provider value={contexts.disclosure}>
+      <AuthorsContext.Provider value={contexts.authors}>
+        <TogetherContext.Provider value={contexts.together}>
+          <VoicesContext.Provider value={contexts.voices}>
+            <CloudFileScopeContext.Provider value={contexts.files.readable}>
+              <NoteReplyContext.Provider value={contexts.noteReply.value}>
+                <CommitScopeContext.Provider value={contexts.commits}>
+                  <QuoteContext.Provider value={contexts.quotes}>{children}</QuoteContext.Provider>
+                </CommitScopeContext.Provider>
+              </NoteReplyContext.Provider>
+            </CloudFileScopeContext.Provider>
+          </VoicesContext.Provider>
+        </TogetherContext.Provider>
+      </AuthorsContext.Provider>
+    </DisclosureContext.Provider>
+  );
+}
+
 /**
  * The conversation: a thread of this Mac or of OpenOrc Cloud, its transcript and its composer. Covering Home keeps the
  * list's own reads asleep; the header's More menu organizes a thread of this Mac; marking it unread goes back to Home,
@@ -198,32 +256,18 @@ function submitRequest(input: {
 export function ThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { threadQuery, thread, runsQuery, runs, activeRun } = useOpenThread(id);
-  const settings = {
-    ...client.useConversationSettings({ thread, activeRun }),
-    claudeAccountId: thread?.claudeAccountId ?? undefined,
-    claudeAccount: useThreadClaudeAccount(thread),
-    cloudAccount: useThreadCloudAccount(thread),
-    cloud: thread !== null && placeOf(thread).elsewhere,
-  };
-  useShareSettings(id, settings);
-  // An OpenOrc Cloud thread: its files go to the cloud through the phone's own session.
-  const cloud = thread !== null && placeOf(thread).elsewhere;
-  const commits = useMemo(() => ({ threadId: id, cloud }), [id, cloud]);
-  const together = threadTogetherOf(thread);
+  const { settings, cloud } = useThreadSettings(id, thread, activeRun);
+  const contexts = useThreadContexts(id, thread, runs, cloud);
+  const { together, noteReply, files } = contexts;
   useMarkSeen(thread);
   useCoverHome();
   useFrontOfPane(id);
-  const voices = useVoices(runs, thread);
-  const [disclosure] = useState(createDisclosure);
   const [{ live, working, generatingImage }, setActivity] = useState(IDLE);
   const compact = useCompact(thread);
   const actions = useThreadActions(thread, { onUnread: goBack, onDeleted: goBack, compact });
   const menu = useThreadHeaderMenu(thread, useSnoozeClock(), actions.run, compact !== null);
-  const authors = useThreadAuthors(thread, together);
-  const noteReply = useNoteReply(together);
   const linkState = useLinkState();
   const ownCloud = useOwnCloud();
-  const files = useThreadFiles(cloud ? id : null);
   const chat = chatFor(useOrclingChats().chats, id);
   useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
   const { canSteer } = processFit({ live, activeRun, choice: settings.choice, mode: settings.mode, permission: settings.permission, compacting: false });
@@ -232,37 +276,25 @@ export function ThreadScreen() {
   return (
     <View className="flex-1 bg-bg">
       <ConversationHeader chat={chat} title={thread ? () => <ThreadTitle thread={thread} onRename={actions.rename} /> : null} menu={menu} />
-      <DisclosureContext.Provider value={disclosure}>
-        <AuthorsContext.Provider value={authors}>
-          <TogetherContext.Provider value={together}>
-            <VoicesContext.Provider value={voices}>
-              <CloudFileScopeContext.Provider value={files.readable}>
-                <NoteReplyContext.Provider value={noteReply.value}>
-                  <CommitScopeContext.Provider value={commits}>
-                    {thread ? (
-                      <ConversationPane
-                        chat={chat}
-                        threadId={id}
-                        thread={thread}
-                        runs={runs}
-                        loading={runsQuery.isLoading}
-                        failed={Boolean(runsQuery.error)}
-                        retry={() => void runsQuery.refetch()}
-                        onActivity={setActivity}
-                        composerInset={room.composerInset}
-                        listRef={room.listRef}
-                        followKey={room.sends}
-                      />
-                    ) : (
-                      <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <WorkingMark /> : <Text className="text-ink-4">Thread not found</Text>}</View>
-                    )}
-                  </CommitScopeContext.Provider>
-                </NoteReplyContext.Provider>
-              </CloudFileScopeContext.Provider>
-            </VoicesContext.Provider>
-          </TogetherContext.Provider>
-        </AuthorsContext.Provider>
-      </DisclosureContext.Provider>
+      <ThreadProviders contexts={contexts}>
+        {thread ? (
+          <ConversationPane
+            chat={chat}
+            threadId={id}
+            thread={thread}
+            runs={runs}
+            loading={runsQuery.isLoading}
+            failed={Boolean(runsQuery.error)}
+            retry={() => void runsQuery.refetch()}
+            onActivity={setActivity}
+            composerInset={room.composerInset}
+            listRef={room.listRef}
+            followKey={room.sends}
+          />
+        ) : (
+          <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <WorkingMark /> : <Text className="text-ink-4">Thread not found</Text>}</View>
+        )}
+      </ThreadProviders>
       {perfEnabled() ? <PerfProbe /> : null}
       {thread ? (
         <View className="absolute inset-x-0 bottom-0">

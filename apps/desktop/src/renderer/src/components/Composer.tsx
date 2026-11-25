@@ -3,6 +3,7 @@ import {
   composerSendBlock,
   draftOfNote,
   personTag,
+  quotedMessage,
   sendCluster,
   sendsNow,
   tagsPerson,
@@ -34,7 +35,7 @@ import { cn } from "../lib/cn";
 import { useComposerFiles } from "./useComposerFiles";
 import { type MentionEntry } from "../lib/composer-mentions";
 import { useComposerFit } from "../lib/composer-fit";
-import { quotedMessage, useComposerQuotes } from "../lib/composer-quotes";
+import { useComposerQuotes } from "../lib/composer-quotes";
 import { useComposerSubmission } from "../lib/composer-submission";
 import { ComposerChoice } from "./ComposerChoice";
 import { ComposerReadOnly } from "./composer-read-only";

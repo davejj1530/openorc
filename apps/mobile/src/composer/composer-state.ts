@@ -5,6 +5,8 @@ import type { Draft } from "./drafts";
 export interface ComposerState {
   text: string;
   attachments: number;
+  /** Passages quoted from the conversation; a new thread quotes none. */
+  quotes?: number;
   /** Images still resizing or saving on the Mac. */
   uploading: number;
   /** A send is on its way to the Mac. */
@@ -27,9 +29,10 @@ export interface ComposerState {
  * cannot; beside it, Queue holds the message for after the turn. With nothing written, the main button stops.
  */
 export function composerControls(state: ComposerState) {
-  const hasDraft = Boolean(state.text.trim()) || state.attachments > 0 || state.uploading > 0;
+  const held = state.attachments > 0 || Boolean(state.quotes);
+  const hasDraft = Boolean(state.text.trim()) || held || state.uploading > 0;
   const actions = composerActions({ queueing: state.working, liveByDefault: true, steerable: state.steerable, canStop: state.stoppable, hasDraft });
-  const canSend = Boolean(state.text.trim() || state.attachments > 0) && !state.sending && !state.disabledReason && state.uploading === 0;
+  const canSend = Boolean(state.text.trim() || held) && !state.sending && !state.disabledReason && state.uploading === 0;
   return {
     ...actions,
     canSend,
@@ -40,14 +43,16 @@ export function composerControls(state: ComposerState) {
 
 export type ComposerControls = ReturnType<typeof composerControls>;
 
-/** What a send that failed puts back: the text, images and tags it took, ahead of anything written or attached since. */
+/** What a send that failed puts back: the text, images, quotes and tags it took, ahead of anything written, attached or quoted since. */
 export function unsent(taken: Draft, since: Draft): Draft {
   const tags = [...(taken.tags ?? []), ...(since.tags ?? [])];
   const reply = taken.reply ?? since.reply;
+  const quotes = [...(taken.quotes ?? []), ...(since.quotes ?? [])];
   return {
     text: [taken.text, since.text].filter((text) => text.trim()).join("\n"),
     images: [...taken.images, ...since.images],
     ...(tags.length && { tags }),
     ...(reply && { reply }),
+    ...(quotes.length && { quotes }),
   };
 }

@@ -1,3 +1,4 @@
+import { quoteRuns } from "@openorc/client";
 import { useContext, useRef, type ReactNode } from "react";
 import { isImagePath } from "../../../shared/image-paths";
 import { FileText, GitFork } from "./icons";
@@ -7,7 +8,6 @@ import { ThreadImage } from "./ThreadImages";
 import { IconButton } from "./ui";
 import { HostedMessageAttachments } from "./HostedMessageAttachments";
 import { useHostedConversation } from "./HostedConversationBoundary";
-import { quoteRuns } from "../lib/composer-quotes";
 import { useMessageAuthor } from "../lib/thread-authors";
 import { PromptAuthor } from "./ThreadVoice";
 

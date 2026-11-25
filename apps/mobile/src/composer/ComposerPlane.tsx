@@ -8,6 +8,7 @@ import { cn } from "../ui/cn";
 import { fonts } from "../generated/tokens";
 import { ComposerChips } from "./ComposerChips";
 import { ComposerImages } from "./ComposerImages";
+import { ComposerQuotes, type QuoteWriters } from "./ComposerQuotes";
 import type { Draft } from "./drafts";
 import { tagRuns, tagWordAt, type DraftTag } from "./note-draft";
 import { PeoplePicker } from "./PeoplePicker";
@@ -40,6 +41,8 @@ export interface ComposerPlaneProps {
   children: ReactNode;
   /** In a cloud thread where the reader may post notes: `@` offers its people, and a pick tags one in the draft. */
   tagging?: Tagging | null;
+  /** In a thread: how the passages the draft quotes are noted and removed. */
+  quoting?: QuoteWriters | undefined;
 }
 
 /** Tagging people in a draft: the thread whose people `@` offers, the reader it leaves out, and a pick's tag. */
@@ -74,7 +77,7 @@ function promptRuns(segments: readonly { text: string; skill?: unknown }[], tags
 }
 
 /**
- * The composer's one r20 plane, for a thread and for a new one: the draft's images, the prompt, and a bar with attach,
+ * The composer's one r20 plane, for a thread and for a new one: the draft's quotes and images, the prompt, and a bar with attach,
  * model and mode on the left and the actions on the right. While the prompt has the keyboard, a `/` word opens the
  * skill picker in a piece above it.
  */
@@ -94,6 +97,7 @@ export function ComposerPlane({
   chips = true,
   children,
   tagging = null,
+  quoting,
 }: ComposerPlaneProps) {
   const [focused, setFocused] = useState(Boolean(autoFocus));
   const picker = useSkillPicker({ scope: skillScope, agent: settings.choice?.agent, claudeAccountId: settings.claudeAccount?.chosen ?? settings.claudeAccountId, text: draft.text, onText });
@@ -111,6 +115,7 @@ export function ComposerPlane({
       ) : null}
       {focused && !word ? <SkillPicker matches={picker.matches} notice={picker.notice} onPick={picker.pick} /> : null}
       <View className="gap-3.5 rounded-3xl bg-composer-input pb-3 pl-4 pr-3 pt-3.5">
+        {quoting ? <ComposerQuotes quotes={draft.quotes ?? []} {...quoting} /> : null}
         <ComposerImages images={draft.images} uploading={uploading} onRemove={onRemoveImage} />
         <TextInput
           ref={dictation.input}

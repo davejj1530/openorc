@@ -70,6 +70,8 @@ export const HostedCapabilities = z.object({
     taskRuns: availability,
     /** A task's thread opened on a person's own computer, which the task then names as where its work runs. */
     taskComputer: availability,
+    /** A board column's agent run on OpenOrc Cloud as the task's assignee; off with why when the server runs none there. */
+    taskRunsCloud: availability,
     skills: availability,
     macCode: availability,
     terminal: availability,

@@ -103,6 +103,21 @@ function SettingsFoot({ slots, index, across, onChange }: FootProps) {
   );
 }
 
+/** Where a team column's agent runs: the assignee's computer, or OpenOrc Cloud as them where the server runs agents there, else why not. */
+function RunsOn({ job, cloudRuns, onChange }: { job: NonNullable<BoardSlot["job"]>; cloudRuns: { available: boolean; reason: string | null }; onChange: (where: BoardJobPlace) => void }) {
+  return (
+    <label className="task-board-setting task-board-setting-row">
+      <span className="task-board-setting-label">Runs on</span>
+      <Select value={job.where ?? "computer"} onChange={(event) => onChange(event.currentTarget.value as BoardJobPlace)}>
+        <option value="computer">The assignee’s computer</option>
+        <option value="cloud" disabled={!cloudRuns.available && job.where !== "cloud"}>
+          {cloudRuns.available ? "OpenOrc Cloud" : `OpenOrc Cloud (${cloudRuns.reason ?? "not available yet"})`}
+        </option>
+      </Select>
+    </label>
+  );
+}
+
 /**
  * One column's settings, opened from its head: its name, its stage, the agent a card starts there and where the card
  * goes when that agent is done, its place and its removal. Every change saves the whole board, and `onChange` names the
@@ -115,6 +130,7 @@ export function TaskBoardColumnSettings({
   project,
   jobsStart,
   shared,
+  cloudRuns,
   across,
   open,
   onOpenChange,
@@ -127,6 +143,8 @@ export function TaskBoardColumnSettings({
   jobsStart: boolean;
   /** Whether the board is an organization's, whose agents run on each task's assignee's computer. */
   shared: boolean;
+  /** Whether an organization's column agents can run on OpenOrc Cloud, or why not. */
+  cloudRuns: { available: boolean; reason: string | null };
   across: ColumnAcross | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -175,15 +193,7 @@ export function TaskBoardColumnSettings({
                 ) : null}
               </section>
             ) : null}
-            {jobsStart && shared && slot.job ? (
-              <label className="task-board-setting task-board-setting-row">
-                <span className="task-board-setting-label">Runs on</span>
-                <Select value={slot.job.where ?? "computer"} onChange={(event) => put({ job: { ...slot.job!, where: event.currentTarget.value as BoardJobPlace } })}>
-                  <option value="computer">The assignee’s computer</option>
-                  <option value="cloud">OpenOrc Cloud</option>
-                </Select>
-              </label>
-            ) : null}
+            {jobsStart && shared && slot.job ? <RunsOn job={slot.job} cloudRuns={cloudRuns} onChange={(where) => put({ job: { ...slot.job!, where } })} /> : null}
             {jobsStart && slot.job ? (
               <label className="task-board-setting task-board-setting-row">
                 <span className="task-board-setting-label">When the work is done</span>

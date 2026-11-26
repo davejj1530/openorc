@@ -4,7 +4,7 @@ import { useRpc, useRpcMutation } from "../../lib/client";
 import { pullRequestTone, pullRequestToneLabel } from "../../lib/pull-requests";
 import { openPullRequest } from "../../lib/router";
 import { openTaskRecord } from "../../lib/task-open";
-import { localTaskRecord } from "../../lib/task-records";
+import { localTaskRecord, taskRecordKey, type TaskRecord } from "../../lib/task-records";
 import { useScrollEdges } from "../../lib/use-scroll-edges";
 import { useWindowsControls } from "../../lib/window";
 import { AutomationsMenu } from "../automations/AutomationsMenu";
@@ -13,6 +13,7 @@ import { PullStateGlyph } from "../PullStateGlyph";
 import { StatusIcon, statusLabel, statusOrder } from "../status";
 import { TaskTimeline } from "../TaskTimeline";
 import { IconButton, Select, Tooltip } from "../ui";
+import { OnlineTaskPane } from "./OnlineTaskPane";
 import { TASK_PANE_ID, taskPullRequest, useHeldThroughClose } from "./task-pane";
 import "./task-pane.css";
 
@@ -110,16 +111,20 @@ function TaskPaneContent({ task, project, onClose }: { task: Task; project: Proj
 
 /**
  * The task of the card that is open on the board, beside the board: its status mark and title over the way to its full
- * page and Close, its properties, then its history, where an agent's update is answered as on the task's own page.
- * With no task it is shut, and it keeps the last one in view while it closes.
+ * page and Close, its properties, then its history, where an agent's update is answered as on the task's own page; a
+ * team's task shows its own. With no task it is shut, and it keeps the last one in view while it closes.
  */
-export function TaskPane({ task, project, onClose }: { task: Task | null; project: Project | undefined; onClose: () => void }) {
-  const shown = useHeldThroughClose(task);
+export function TaskPane({ record, project, onClose }: { record: TaskRecord | null; project: Project | undefined; onClose: () => void }) {
+  const shown = useHeldThroughClose(record);
   return (
-    <div className="task-pane-shell" data-open={Boolean(task)}>
+    <div className="task-pane-shell" data-open={Boolean(record)}>
       {shown ? (
-        <aside id={TASK_PANE_ID} className="task-pane" aria-labelledby={`${TASK_PANE_ID}-title`} inert={!task}>
-          <TaskPaneContent key={shown.id} task={shown} project={project} onClose={onClose} />
+        <aside id={TASK_PANE_ID} className="task-pane" aria-labelledby={`${TASK_PANE_ID}-title`} inert={!record}>
+          {shown.kind === "local" ? (
+            <TaskPaneContent key={taskRecordKey(shown)} task={shown.task} project={project} onClose={onClose} />
+          ) : (
+            <OnlineTaskPane key={taskRecordKey(shown)} record={shown} onClose={onClose} />
+          )}
         </aside>
       ) : null}
     </div>

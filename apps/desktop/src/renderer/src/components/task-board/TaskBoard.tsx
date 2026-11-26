@@ -7,7 +7,7 @@ import { useSpaceProjects } from "../../lib/space-queries";
 import { agentSetupSlot, asksForRunner, boardMove, type BoardKeeper, type BoardSlot, type TaskBoardColumn } from "../../lib/task-board";
 import { useTaskOnlineScope } from "../../lib/task-online-query";
 import { columnKey, type UnionColumn } from "../../lib/task-board-union";
-import { boardProjectKey, useBoardColumns, type BoardOwner } from "../../lib/task-board-source";
+import { boardKeeper, boardProjectKey, columnAgents, useBoardColumns, type BoardOwner } from "../../lib/task-board-source";
 import { openTaskRecord } from "../../lib/task-open";
 import { useTaskProperty } from "../../lib/task-property";
 import { taskNeedsAttention, taskNeedsYou, taskRecordKey, type TaskRecord } from "../../lib/task-records";
@@ -52,7 +52,8 @@ function settingsPlace(open: OpenSettings | null, slots: readonly BoardSlot[], b
 export function TaskBoard({ tasks, owner, showProject, pane }: { tasks: TaskRecord[]; owner: BoardOwner | null; showProject: boolean; pane: BoardPane }) {
   const projects = useSpaceProjects(true);
   const board = useBoardColumns(owner);
-  const keeper: BoardKeeper = owner?.place === "online" ? "online" : "local";
+  const keeper: BoardKeeper = boardKeeper(owner);
+  const cloudRuns = useTaskOnlineScope().availability?.runsCloud ?? { available: false, reason: null };
   const { slots, columnsFor } = board;
   const key = owner ? boardProjectKey(owner) : null;
   const project = key ? projects.data?.find((each) => each.id === key) : undefined;
@@ -72,7 +73,7 @@ export function TaskBoard({ tasks, owner, showProject, pane }: { tasks: TaskReco
         board.save(next);
       }
     : null;
-  const names = (ids: readonly string[]) => ids.map((id) => projects.data?.find((each) => each.id === id)?.name ?? "A project");
+  const names = (ids: readonly string[]) => ids.map((id) => (owner?.place === "team-union" ? owner.names.get(id) : projects.data?.find((each) => each.id === id)?.name) ?? "A project");
   return (
     <>
       {board.notice ? <BoardNotice {...board.notice} /> : null}
@@ -94,8 +95,9 @@ export function TaskBoard({ tasks, owner, showProject, pane }: { tasks: TaskReco
                   slots={slots}
                   index={column.slot}
                   project={project}
-                  jobsStart={owner?.place !== "online" || owner.runs}
-                  shared={owner?.place === "online"}
+                  jobsStart={columnAgents(owner)}
+                  shared={keeper === "online"}
+                  cloudRuns={cloudRuns}
                   across={board.union ? unionNote(board.union[column.slot], names, owner) : null}
                   open={settings === column.slot}
                   onOpenChange={(open) => openAt(slots, open ? column.slot : null)}
@@ -119,7 +121,7 @@ export function TaskBoard({ tasks, owner, showProject, pane }: { tasks: TaskReco
                   return to && to.id !== column.id ? to : null;
                 },
               };
-              return record.kind === "local" ? <LocalCard key={key} record={record} pane={pane} {...card} /> : <OnlineCard key={key} record={record} {...card} />;
+              return record.kind === "local" ? <LocalCard key={key} record={record} pane={pane} {...card} /> : <OnlineCard key={key} record={record} pane={pane} {...card} />;
             }}
           </BoardColumn>
         ))}
@@ -150,7 +152,7 @@ function useAgentSetup(owner: BoardOwner | null, ready: boolean, slots: readonly
 
 /** What a column of the board of all projects is across them: the projects that have it, and those whose agent differs. */
 function unionNote(column: UnionColumn | undefined, names: (ids: readonly string[]) => string[], owner: BoardOwner | null): ColumnAcross | null {
-  if (!column || owner?.place !== "union") return null;
+  if (!column || (owner?.place !== "union" && owner?.place !== "team-union")) return null;
   const having = column.members.map((member) => member.projectId);
   return { having: having.length === owner.projectIds.length ? null : names(having), agentDiffers: names(column.jobsDiffer), sole: column.sole };
 }
@@ -259,8 +261,8 @@ function LocalCard({ record, pane, keeper, ...card }: CardProps & { record: Loca
     <BoardCard
       {...card}
       record={record}
-      opens={{ id: pane.id, open: pane.opened === record.task.id }}
-      onOpen={() => pane.onOpen(record.task.id)}
+      opens={{ id: pane.id, open: pane.opened === taskRecordKey(record) }}
+      onOpen={() => pane.onOpen(taskRecordKey(record))}
       movable={!update.isPending}
       error={update.error ? `Couldn’t move: ${update.error.message}` : null}
       move={(column) => update.mutate({ id: record.task.id, patch: boardMove(record, column, keeper) })}
@@ -269,9 +271,11 @@ function LocalCard({ record, pane, keeper, ...card }: CardProps & { record: Loca
   );
 }
 
-/** An organization's task goes into its organization's shared column, or by its status on a board this computer keeps. Its card opens its page. */
-/** An organization task opens its page. Put in a column whose agent nobody could run, it asks the person to run it on their computer. */
-function OnlineCard({ record, keeper, ...card }: CardProps & { record: OnlineRecord }) {
+/**
+ * An organization's task goes into its organization's shared column, or by its status on a board this computer keeps.
+ * Its card opens it beside the board. Put in a column whose agent nobody could run, it asks the person to run it.
+ */
+function OnlineCard({ record, pane, keeper, ...card }: CardProps & { record: OnlineRecord; pane: BoardPane }) {
   const update = useTaskProperty(record.reference, record.task);
   const runs = Boolean(useTaskOnlineScope().availability?.runs);
   const [asking, setAsking] = useState<TaskBoardColumn | null>(null);
@@ -285,13 +289,14 @@ function OnlineCard({ record, keeper, ...card }: CardProps & { record: OnlineRec
       <BoardCard
         {...card}
         record={record}
-        onOpen={() => openTaskRecord(record)}
+        opens={{ id: pane.id, open: pane.opened === taskRecordKey(record) }}
+        onOpen={() => pane.onOpen(taskRecordKey(record))}
         movable={record.task.viewer.mayEdit && !update.pending}
         error={update.state.propertyError}
         move={(column) => (asksForRunner(record, column, runs) ? setAsking(column) : place(column))}
         start={<TaskOnlineOpen task={record.task} reference={record.reference} />}
       />
-      {asking ? <RunHereAsk cloud={asking.kept?.job?.where === "cloud"} onRun={() => answer(true)} onMove={() => answer()} onCancel={() => setAsking(null)} /> : null}
+      {asking ? <RunHereAsk cloud={asking.job?.where === "cloud"} onRun={() => answer(true)} onMove={() => answer()} onCancel={() => setAsking(null)} /> : null}
     </>
   );
 }

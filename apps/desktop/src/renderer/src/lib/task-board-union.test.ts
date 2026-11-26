@@ -104,3 +104,24 @@ it("adds a column to every project before its later stages, and removes one from
   );
   expect(saved(removed)).toEqual({ app: ["Inbox", "Build", "Review"], site: ["Ideas", "build ", "QA"], docs: ["Backlog", "In progress", "Review"] });
 });
+
+it("places and moves a team's cards by their own project's shared columns on the board of all its projects", () => {
+  const online = (id: string, projectId: string, patch: Record<string, unknown> = {}): TaskRecord =>
+    ({ kind: "online", task: { ...(onlineTask() as object), id, projectId, status: "in_progress", columnId: null, ...patch }, reference: { id }, project: undefined }) as unknown as TaskRecord;
+  const team = projectBoards(["app", "site"], kept).map((board, index) => ({ ...board, revision: index + 4 }));
+  const together = boardUnion(team);
+  const columns = unionBoardColumns([online("t1", "site", { columnId: "site-qa" }), online("t2", "app")], together, team, "online");
+  expect(columns.filter((each) => each.tasks.length).map((each) => [each.name, each.tasks.map((record) => record.task.id)])).toEqual([
+    ["Build", ["t2"]],
+    ["QA", ["t1"]],
+  ]);
+  const build = columns.find((each) => each.name === "Build")!;
+  expect(boardMove(online("t1", "site"), build, "online")).toEqual({ columnId: "site-build" });
+  // A change keeps each board's revision, which its save names.
+  const renamed = unionChange(
+    together,
+    unionSlots(together).map((slot) => (slot.id === "qa" ? { ...slot, name: "Checks" } : slot)),
+    team,
+  );
+  expect(renamed).toEqual([expect.objectContaining({ projectId: "site", revision: 5 })]);
+});

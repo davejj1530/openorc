@@ -63,6 +63,20 @@
   gap: 6px;
   padding: 16px 20px 0;
 }
+/* A team task's line on where its work runs, beside its chips, and the way to its thread at the row's end. */
+.task-pane-where {
+  display: inline-flex;
+  min-width: 0;
+  padding-left: 4px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.task-pane-where:empty {
+  display: none;
+}
+.task-pane-open {
+  margin-left: auto;
+}
 .task-pane-pull {
   padding-right: 12px;
   color: var(--ink);

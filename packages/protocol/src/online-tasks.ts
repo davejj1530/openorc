@@ -146,7 +146,19 @@ export type OnlineTaskMutation = ({ state: "saved" } | { state: "conflict" }) & 
  * columns' agents run on the assignee's computer. `computer`: a task's thread can open on a person's own computer.
  */
 export type OnlineTaskAvailability =
-  { state: "unavailable" } | { state: "ready"; accountId: string; spaceId: string; execution: boolean; board: boolean; runs: boolean; computer: boolean; personal: boolean };
+  | { state: "unavailable" }
+  | {
+      state: "ready";
+      accountId: string;
+      spaceId: string;
+      execution: boolean;
+      board: boolean;
+      runs: boolean;
+      /** Whether its columns' agents can run on OpenOrc Cloud, or why not. */
+      runsCloud: { available: boolean; reason: string | null };
+      computer: boolean;
+      personal: boolean;
+    };
 /**
  * A project's shared board: its columns in order, none when it keeps the statuses, and the revision a save names.
  * `mayEdit`: the asking person may change its columns, which only an organization admin may. A server that does not
@@ -172,6 +184,8 @@ export const onlineTaskRpcParams = {
   "tasks.online.activity": z.object({ ...target, cursor: z.string().optional(), limit: z.number().int().min(1).max(200).optional() }).strict(),
   "tasks.online.context": z.object(target).strict(),
   "tasks.online.board": z.object({ ...scope, projectId: id }).strict(),
+  /** Several projects' shared boards at once, for the board of all of an organization's projects. */
+  "tasks.online.boards": z.object({ ...scope, projectIds: z.array(id).max(200) }).strict(),
   "tasks.online.saveBoard": OnlineBoardUpdate.extend({ ...scope, projectId: id }).strict(),
 };
 export type OnlineTaskParams<M extends keyof typeof onlineTaskRpcParams> = z.infer<(typeof onlineTaskRpcParams)[M]>;
@@ -188,5 +202,6 @@ export interface OnlineTaskRpcResults {
   "tasks.online.activity": z.infer<typeof OnlineTaskHistory>;
   "tasks.online.context": z.infer<typeof OnlineTaskContext>;
   "tasks.online.board": OnlineBoard;
+  "tasks.online.boards": (OnlineBoard & { projectId: string })[];
   "tasks.online.saveBoard": OnlineBoardSave;
 }

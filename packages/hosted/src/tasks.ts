@@ -40,8 +40,8 @@ interface Identity {
 const changed = () => new Refused("Your OpenOrc session or project access changed. Try again.");
 const unavailable = () => new Refused("This task isn't available.", 404);
 /** What a space's server does with its tasks beyond keeping them. */
-type Serves = { execution: boolean; board: boolean; runs: boolean; computer: boolean };
-const SERVES_NOTHING: Serves = { execution: false, board: false, runs: false, computer: false };
+type Serves = { execution: boolean; board: boolean; runs: boolean; runsCloud: { available: boolean; reason: string | null }; computer: boolean };
+const SERVES_NOTHING: Serves = { execution: false, board: false, runs: false, runsCloud: { available: false, reason: null }, computer: false };
 
 /** Server tasks have an explicit target and never enter the Mac task dispatcher. */
 export class OnlineTasks {
@@ -117,6 +117,10 @@ export class OnlineTasks {
   async board({ spaceId, projectId }: OnlineTaskParams<"tasks.online.board">): Promise<OnlineBoard> {
     if (!(await this.#served(spaceId)).board) return { revision: 0, columns: [], mayEdit: false };
     return this.#request(spaceId, TASK_ROUTES.board(projectId));
+  }
+  /** Several projects' shared boards, each with its project, read together. */
+  boards({ spaceId, projectIds }: OnlineTaskParams<"tasks.online.boards">): Promise<(OnlineBoard & { projectId: string })[]> {
+    return Promise.all(projectIds.map(async (projectId) => ({ projectId, ...(await this.board({ spaceId, projectId })) })));
   }
   /** Saves the whole board from the revision it was read at; one saved since answers as a conflict, with the board as it now is. */
   async saveBoard({ spaceId, projectId, ...input }: OnlineTaskParams<"tasks.online.saveBoard">): Promise<OnlineBoardSave> {
@@ -216,6 +220,7 @@ export class OnlineTasks {
           execution: features.tasks?.available === true,
           board: features.board?.available === true,
           runs: features.taskRuns?.available === true,
+          runsCloud: features.taskRunsCloud?.available ? { available: true, reason: null } : { available: false, reason: features.taskRunsCloud?.reason ?? null },
           computer: features.taskComputer?.available === true,
         }),
         (error: unknown) => {

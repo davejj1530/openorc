@@ -1,6 +1,6 @@
 import { BOARD_COLUMNS_MAX, type BoardColumn, type BoardColumnJob, type BoardStage, type TaskStatus } from "@openorc/protocol";
 import { statusLabel } from "../components/status";
-import { boardSlots, settleColumns, type BoardSlot, type TaskBoardColumn } from "./task-board";
+import { boardSlots, settleColumns, type BoardKeeper, type BoardSlot, type TaskBoardColumn } from "./task-board";
 import type { TaskRecord } from "./task-records";
 
 /**
@@ -27,8 +27,8 @@ export type UnionColumn = {
   sole: boolean;
 };
 
-/** One project's board as the union reads it: its own columns, or the four statuses while it keeps none. */
-export type ProjectBoard = { projectId: string; slots: BoardSlot[] };
+/** One project's board as the union reads it: its own columns, or the four statuses while it keeps none; a shared one with the revision it was read at. */
+export type ProjectBoard = { projectId: string; slots: BoardSlot[]; revision?: number };
 
 const stageRank: Record<BoardStage, number> = { backlog: 0, in_progress: 1, review: 2, done: 3 };
 const statuses: readonly TaskStatus[] = ["proposed", "backlog", "in_progress", "review", "done"];
@@ -83,10 +83,10 @@ export function unionSlots(union: readonly UnionColumn[]): BoardSlot[] {
   return union.map((column) => ({ id: column.key, name: column.name, stage: column.stage, job: column.job, nextColumnId: column.next, jobEnabled: column.jobEnabled }));
 }
 
-/** The column a project's task sits in: its own column, else its project's first column of its status. */
-function cardColumn(record: TaskRecord, columns: readonly TaskBoardColumn[], boards: ReadonlyMap<string, ProjectBoard>): TaskBoardColumn | undefined {
+/** The column a project's task sits in: its own column, else its project's first column of its status. A task the boards don't keep sits by its status. */
+function cardColumn(record: TaskRecord, columns: readonly TaskBoardColumn[], boards: ReadonlyMap<string, ProjectBoard>, keeper: BoardKeeper): TaskBoardColumn | undefined {
   const task = record.task;
-  if (record.kind === "local") {
+  if (record.kind === keeper) {
     if (task.columnId) {
       const own = columns.find((column) => column.members?.get(task.projectId) === task.columnId);
       if (own) return own;
@@ -98,7 +98,7 @@ function cardColumn(record: TaskRecord, columns: readonly TaskBoardColumn[], boa
 }
 
 /** The board of all projects: the union's columns, a column for a status with tasks and no column, each card in its project's column. */
-export function unionBoardColumns(tasks: readonly TaskRecord[], union: readonly UnionColumn[], boards: readonly ProjectBoard[]): TaskBoardColumn[] {
+export function unionBoardColumns(tasks: readonly TaskRecord[], union: readonly UnionColumn[], boards: readonly ProjectBoard[], keeper: BoardKeeper = "local"): TaskBoardColumn[] {
   const columns: TaskBoardColumn[] = union.map((column, index) => ({
     id: column.key,
     name: column.name,
@@ -115,7 +115,7 @@ export function unionBoardColumns(tasks: readonly TaskRecord[], union: readonly 
     columns.splice(next < 0 ? columns.length : next, 0, { id: stage, name: statusLabel[stage], stage, slot: null, kept: null, tasks: [] });
   }
   const byProject = new Map(boards.map((board) => [board.projectId, board]));
-  for (const record of tasks) cardColumn(record, columns, byProject)?.tasks.push(record);
+  for (const record of tasks) cardColumn(record, columns, byProject, keeper)?.tasks.push(record);
   return settleColumns(columns);
 }
 
@@ -166,6 +166,6 @@ export function unionChange(union: readonly UnionColumn[], next: readonly BoardS
       return fields && Object.keys(fields).length > 0 ? applyFields(slots, index, fields) : slot;
     });
     for (const slot of added) slots = placeNew(slots, { name: slot.name, stage: slot.stage, ...(slot.job ? { job: slot.job } : {}) });
-    return JSON.stringify(slots) === JSON.stringify(board.slots) ? [] : [{ projectId: board.projectId, slots }];
+    return JSON.stringify(slots) === JSON.stringify(board.slots) ? [] : [{ ...board, slots }];
   });
 }

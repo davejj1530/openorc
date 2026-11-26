@@ -12,7 +12,7 @@ import { docHref } from "../../data/docs";
     <p>The Board shows each task as a card in a column. It holds every task that is not archived, so it has no Active, Done and Archived split and no status filter.</p>
     <ul>
       <li>With one project chosen, the board is that project's own. It starts with <strong>Backlog</strong>, <strong>In progress</strong>, <strong>Review</strong> and <strong>Done</strong>, and you can rename, add, reorder and remove columns, up to 12.</li>
-      <li>With <strong>All projects</strong> chosen, the board joins every project's columns. Columns with the same name show as one, and each card sits in its own project's column. In an organization, All projects shows the four statuses instead.</li>
+      <li>With <strong>All projects</strong> chosen, the board joins every project's columns. Columns with the same name show as one, and each card sits in its own project's column. In an organization, it joins its projects' shared boards the same way, and only an admin changes their columns.</li>
     </ul>
     <p>A status that has tasks and no column, such as <strong>Proposed</strong>, shows as a column for as long as it holds a task. No task leaves the board because its column is gone.</p>
   </section>
@@ -26,7 +26,7 @@ import { docHref } from "../../data/docs";
       <li>How long ago the task last changed. A task in review shows a <strong>Review</strong> button there, which opens its changes.</li>
       <li>On a task that has not started, the way to its thread.</li>
     </ul>
-    <p>Press a card to open its task beside the board.</p>
+    <p>Press a card to open its task beside the board. A team task there shows its status, who it's assigned to, where its work runs and its <strong>Open thread</strong>, then its activity.</p>
     <p>In a column, the cards that wait on you come first, then the newest tasks. A finished column reads latest first. A column shows 20 cards, then a row that shows 20 more. The number beside a column's name counts the cards that wait on you.</p>
   </section>
 

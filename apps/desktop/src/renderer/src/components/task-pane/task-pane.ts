@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type RefObject } from "react";
-import type { Task, TaskEvent } from "@openorc/protocol";
+import type { TaskEvent } from "@openorc/protocol";
 import { PANE_MS, swapInPlace } from "../../lib/motion";
-import type { TaskRecord } from "../../lib/task-records";
+import { taskRecordKey, type TaskRecord } from "../../lib/task-records";
 
 /** The pane's id, which the card it belongs to names as what it opens. One pane is open in a window at a time. */
 export const TASK_PANE_ID = "task-pane";
@@ -19,26 +19,27 @@ function focusOpenCard(): void {
 }
 
 /**
- * The task open beside the board: one of the board's own tasks kept on this computer, for as long as the board holds
- * it. Pressing its card again closes it, and pressing another swaps that one in where the pane stands.
+ * The task open beside the board, by its card's key: one kept on this computer or a team's, for as long as the board
+ * holds it. Pressing its card again closes it, and pressing another swaps that one in where the pane stands.
  */
 export function useOpenedTask(tasks: readonly TaskRecord[] | null) {
   const [id, setId] = useState<string | null>(null);
-  const record = id ? tasks?.find((each) => each.kind === "local" && each.task.id === id) : undefined;
-  const task: Task | null = record?.kind === "local" ? record.task : null;
+  const record = (id ? tasks?.find((each) => taskRecordKey(each) === id) : undefined) ?? null;
   useEffect(() => {
-    if (id && !task) setId(null);
-  }, [id, task]);
+    if (id && !record) setId(null);
+  }, [id, record]);
   const close = useCallback(() => {
     focusOpenCard();
     setId(null);
   }, []);
   return {
-    task,
+    record,
+    /** The open task kept on this computer, whose project the screen's own controls follow. */
+    task: record?.kind === "local" ? record.task : null,
     close,
     toggle(next: string) {
       if (next === id) setId(null);
-      else if (task) swapInPlace("task-pane", () => setId(next));
+      else if (record) swapInPlace("task-pane", () => setId(next));
       else setId(next);
     },
   };

@@ -19,7 +19,7 @@ import { useTaskListSource } from "../lib/task-list-source";
 import { useBoardOwner, type BoardOwner } from "../lib/task-board-source";
 import { useTaskOnlineScope } from "../lib/task-online-query";
 import { useTaskListFilters, type TaskShelf } from "../lib/task-list-state";
-import type { TaskRecord } from "../lib/task-records";
+import { taskRecordKey, type TaskRecord } from "../lib/task-records";
 import { TaskContentGate } from "../components/task-online/TaskContentGate";
 import "./pages.css";
 
@@ -125,14 +125,14 @@ function TaskListContent({ onNewTask }: { onNewTask: () => void }) {
   const onBoard = board ? all.filter(({ task }) => task.status !== "archived") : null;
   const opened = useOpenedTask(onBoard);
   const screen = useRef<HTMLDivElement>(null);
-  useEscapeToClose(screen, opened.task ? opened.close : null);
+  useEscapeToClose(screen, opened.record ? opened.close : null);
   const list = all.filter(({ task }) => (shelf === "active" ? task.status !== "done" && task.status !== "archived" : task.status === shelf) && (!stage || task.status === stage));
   return (
     <div ref={screen} className="relative flex min-h-0 min-w-0 flex-1">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <TopBar
           // With a task open beside the board, its pane holds the window's end.
-          rightmost={opened.task ? false : undefined}
+          rightmost={opened.record ? false : undefined}
           actions={<TaskListActions filters={filters} shared={Boolean(shared)} boardProject={boardProject} tasks={all} projectId={projectId} projects={projects.data ?? []} onNewTask={onNewTask} />}
         >
           <ScopedTitle>Tasks</ScopedTitle>
@@ -147,14 +147,14 @@ function TaskListContent({ onNewTask }: { onNewTask: () => void }) {
             stage,
             showProject: !projectId,
             boardOwner,
-            pane: { id: TASK_PANE_ID, opened: opened.task?.id ?? null, onOpen: opened.toggle },
+            pane: { id: TASK_PANE_ID, opened: opened.record ? taskRecordKey(opened.record) : null, onOpen: opened.toggle },
             memoryKey: filters.key,
             rowKey: filters.key ? JSON.stringify([filters.key, projectId, shelf, stage, filters.assigned]) : null,
             retry: () => void tasks.refetch(),
           })}
         </div>
       </div>
-      <TaskPane task={opened.task} project={projects.data?.find((project) => project.id === opened.task?.projectId)} onClose={opened.close} />
+      <TaskPane record={opened.record} project={projects.data?.find((project) => project.id === opened.task?.projectId)} onClose={opened.close} />
     </div>
   );
 }

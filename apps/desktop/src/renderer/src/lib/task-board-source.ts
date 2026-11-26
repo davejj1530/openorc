@@ -5,6 +5,7 @@ import { boardSlots, taskBoardColumns, type BoardKeeper, type BoardSlot, type Ta
 import { boardsFull, boardUnion, projectBoards, unionBoardColumns, unionChange, unionSlots, type UnionColumn } from "./task-board-union";
 import type { TaskRecord } from "./task-records";
 import { useTaskProjects } from "./task-list-source";
+import { useTeamUnionBoard, type TeamUnionOwner } from "./task-board-team-union";
 import { useTaskOnlineMutation, useTaskOnlineQuery, useTaskOnlineScope, type TaskOnlineScope } from "./task-online-query";
 
 /**
@@ -16,7 +17,18 @@ export type BoardOwner =
   /** `runs`: its server runs the columns' agents, on the computer of each task's assignee. */
   | { place: "online"; scope: TaskOnlineScope; projectId: string; key: string; runs: boolean }
   /** Every project with a folder on this computer, whose columns the board of all projects shows as their union. */
-  | { place: "union"; projectIds: readonly string[] };
+  | { place: "union"; projectIds: readonly string[] }
+  /** Every project of an organization whose server keeps boards, whose shared columns its board of all projects shows as their union. */
+  | TeamUnionOwner;
+
+/** Which kind of task the owner's columns hold: an organization's, or this computer's. */
+export const boardKeeper = (owner: BoardOwner | null): BoardKeeper => (owner?.place === "online" || owner?.place === "team-union" ? "online" : "local");
+
+/** Whether the owner's columns can have agents: this computer's always, an organization's where its server runs them. */
+export function columnAgents(owner: BoardOwner | null): boolean {
+  if (owner?.place === "online" || owner?.place === "team-union") return owner.runs;
+  return true;
+}
 
 /** The project a board belongs to, as the app's project list names it; none for the board of all projects. */
 export function boardProjectKey(owner: BoardOwner): string | null {
@@ -24,26 +36,33 @@ export function boardProjectKey(owner: BoardOwner): string | null {
   return owner.place === "online" ? owner.key : null;
 }
 
-/** An organization project's shared board, when its server keeps boards. A Personal space's projects keep none. */
+/**
+ * An organization project's shared board, when its server keeps boards; with no project named, the union of all its
+ * projects' boards. A Personal space's projects keep none.
+ */
 export function useSharedBoard(projectKey: string | null): BoardOwner | null {
   const { scope, availability } = useTaskOnlineScope();
   const keeps = scope && !scope.personal && availability?.board ? scope : null;
   const projects = useTaskProjects(keeps);
-  const hosted = projectKey ? (projects.data?.find((project) => project.key === projectKey)?.hostedProjectId ?? null) : null;
   const accountId = keeps?.accountId,
     spaceId = keeps?.spaceId;
   const runs = Boolean(availability?.runs);
-  return useMemo(
-    () => (accountId && spaceId && hosted && projectKey ? { place: "online", scope: { accountId, spaceId }, projectId: hosted, key: projectKey, runs } : null),
-    [accountId, spaceId, hosted, projectKey, runs],
-  );
+  return useMemo<BoardOwner | null>(() => {
+    if (!accountId || !spaceId || !projects.data) return null;
+    if (!projectKey) {
+      const hosted = projects.data.filter((project) => project.hostedProjectId);
+      const names = new Map(hosted.map((project) => [project.hostedProjectId!, project.name]));
+      return { place: "team-union", scope: { accountId, spaceId }, projectIds: hosted.map((project) => project.hostedProjectId!), names, runs };
+    }
+    const hosted = projects.data.find((project) => project.key === projectKey)?.hostedProjectId;
+    return hosted ? { place: "online", scope: { accountId, spaceId }, projectId: hosted, key: projectKey, runs } : null;
+  }, [accountId, spaceId, projects.data, projectKey, runs]);
 }
 
 /**
  * The board a task list shows: one project's, shared by its organization when the server keeps boards, else kept with
- * its folder on this computer; or, on all projects outside an organization, the union of every project here. An
- * organization's board of all projects is its statuses. `localProject` is the one project kept here, which also keeps
- * its automations.
+ * its folder on this computer; or, on all projects, the union of an organization's shared boards, or outside one of
+ * every project here. `localProject` is the one project kept here, which also keeps its automations.
  */
 export function useBoardOwner(projectId: string | null, projects: readonly Project[] | undefined, organization: boolean): { owner: BoardOwner | null; localProject: string | null } {
   const shared = useSharedBoard(projectId);
@@ -127,7 +146,7 @@ function boardColumnsOf(owner: BoardOwner | null, local: readonly BoardColumn[] 
  * One project's board: this computer's columns, or its organization's, saved whole each time from the revision read.
  * Without an owner the board is its statuses and changes nothing.
  */
-function useProjectBoard(owner: Exclude<BoardOwner, { place: "union" }> | null): BoardSource {
+function useProjectBoard(owner: Extract<BoardOwner, { place: "local" | "online" }> | null): BoardSource {
   const local = owner?.place === "local" ? owner.projectId : null;
   const online = owner?.place === "online" ? owner : null;
   const kept = useRpc("board.columns", { projectId: local ?? "" }, { enabled: Boolean(local) });
@@ -167,6 +186,8 @@ function useProjectBoard(owner: Exclude<BoardOwner, { place: "union" }> | null):
 /** The columns `owner` keeps, as the board draws them, and their save. */
 export function useBoardColumns(owner: BoardOwner | null): BoardSource {
   const union = useUnionBoard(owner?.place === "union" ? owner : null);
-  const project = useProjectBoard(owner?.place === "union" ? null : owner);
-  return owner?.place === "union" ? union : project;
+  const team = useTeamUnionBoard(owner?.place === "team-union" ? owner : null);
+  const project = useProjectBoard(owner?.place === "local" || owner?.place === "online" ? owner : null);
+  if (owner?.place === "union") return union;
+  return owner?.place === "team-union" ? team : project;
 }

@@ -75,7 +75,8 @@ it("asks for someone to run a team column's agent only for an unassigned team ca
   expect(asksForRunner(unassigned, review!, true)).toBe(true);
   expect(asksForRunner(unassigned, review!, false)).toBe(false);
   expect(asksForRunner(online("b", { assignee: { userId: "u", memberId: "m", name: "Dana", image: null, available: true } }), review!, true)).toBe(false);
-  expect(asksForRunner(unassigned, { ...review!, kept: { ...agentColumn, jobEnabled: false } }, true)).toBe(false);
+  const [, , paused] = taskBoardColumns([], [board[0]!, board[1]!, { ...agentColumn, jobEnabled: false }, board[3]!], "online");
+  expect(asksForRunner(unassigned, paused!, true)).toBe(false);
   const [, build] = taskBoardColumns([], board, "online");
   expect(asksForRunner(unassigned, build!, true)).toBe(false);
 });

@@ -26,7 +26,7 @@ const ITS: Record<PullTrigger["on"], string> = { opened: "When its pull request 
  */
 export function triggerWords(trigger: AutomationTrigger, onTask = false): string {
   if (trigger.kind === "task_created") return "When a task is created";
-  if (trigger.kind === "check") return `When: ${trigger.what}`;
+  if (trigger.kind === "check" || trigger.kind === "program") return `When: ${trigger.what}`;
   return onTask ? ITS[trigger.on] : PULL[trigger.on][trigger.scope];
 }
 

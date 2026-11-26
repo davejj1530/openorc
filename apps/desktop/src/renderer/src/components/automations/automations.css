@@ -83,6 +83,74 @@
   justify-content: space-between;
   gap: 12px;
 }
+/* A trigger program: how it runs and its keys on one line, then the values it reads, then what it printed lately. */
+.automation-program {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-2);
+  padding: 10px 12px;
+  --control-fill: var(--key);
+}
+.automation-program-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.automation-program-status {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-18);
+}
+.automation-program-asks {
+  color: var(--warn);
+  font-size: var(--text-sm);
+  line-height: var(--leading-18);
+}
+.automation-program-values {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.automation-program-value {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-sm);
+  --surface-2: var(--surface);
+}
+.automation-program-value-name {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink);
+}
+.automation-program-value-about {
+  color: var(--ink-3);
+  line-height: var(--leading-18);
+}
+.automation-program-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-top: var(--hairline) solid var(--line);
+  padding-top: 8px;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: var(--leading-18);
+}
+.automation-program-recent li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.automation-program-said {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
 .automation-step {
   display: flex;
   flex-direction: column;

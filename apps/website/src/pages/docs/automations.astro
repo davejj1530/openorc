@@ -55,7 +55,7 @@ const issueCheck = String.raw`gh issue list --json number,title \
           </tr>
           <tr>
             <td><strong>Something you describe</strong></td>
-            <td>A check written from your words finds something new. See <a href="#checks">Checks</a>.</td>
+            <td>A program an agent writes for it notices the thing you described. See <a href="#programs">Trigger programs</a>.</td>
           </tr>
         </tbody>
       </table>
@@ -63,11 +63,18 @@ const issueCheck = String.raw`gh issue list --json number,title \
     <p>For pull requests, choose <strong>From your threads</strong> to keep to the ones OpenOrc's own threads opened, or <strong>Any in the repository</strong> for every pull request. OpenOrc reads GitHub through the <code>gh</code> command, every two minutes.</p>
   </section>
 
+  <section aria-labelledby="programs">
+    <h2 id="programs">Trigger programs</h2>
+    <p>Choose <strong>Something you describe</strong>, write what to watch for, such as "someone messages me on Slack", and choose the model that writes it. When you create the automation, an agent writes a small program for it, in a thread of its own.</p>
+    <p>The program runs on this Mac for as long as the automation is on, and watches however its source needs: a live connection, watching files, or checking on a timer when that is all the source allows. Each time the thing happens, the automation does its steps once. OpenOrc starts the program with the app and starts it again if it stops.</p>
+    <p>Open the automation to see how its program runs and what it printed lately. If the program needs a token or a setting, a field for each is there, with where to get it. Values are kept encrypted on this Mac and given to the program as it starts, never written into its files.</p>
+    <p><strong>Open the code</strong> opens the agent's thread with the program's files beside it. Read or change the code there, or ask the agent to change it. While the automation is off, <strong>Try it</strong> runs the program and shows what it prints without acting on any of it.</p>
+    <p>Programs run only while this Mac is on.</p>
+  </section>
+
   <section aria-labelledby="checks">
     <h2 id="checks">Checks</h2>
-    <p>Choose <strong>Something you describe</strong> and write what to watch for, such as "an issue opens with the bug label". Choose the model that writes the check, then <strong>Write the check</strong>. An agent writes the check and it runs once, so you see what it finds now. What it finds now is already there and doesn't set the automation off; only new things do. If the check doesn't run, the agent is told why and writes it once more.</p>
-    <p><strong>Show the command</strong> shows the command the agent wrote. You can change it and run it once with <strong>Try it</strong>, or choose <strong>Write the command yourself</strong> to write your own.</p>
-    <p>A check is a shell command OpenOrc runs in the project folder on a timer, from every minute to once a day. Each line it prints is one thing that happened, and the automation acts on each new line once. A line printed again later is ignored.</p>
+    <p>An agent writing an automation in a thread can give it a check. A check is a shell command OpenOrc runs in the project folder on a timer, from every minute to once a day. Each line it prints is one thing that happened, and the automation acts on each new line once. A line printed again later is ignored.</p>
     <p>To tell things apart by an id, print the id, a tab, then the words. This check sets the automation off once for each new issue, even if the issue's title changes later:</p>
     <pre><code set:text={issueCheck} /></pre>
     <p>If the command fails, the automation's row says why and tries again at the next run.</p>

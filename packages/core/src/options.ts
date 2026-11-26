@@ -18,6 +18,8 @@ export interface OpenOrcOptions {
   preview?: PreviewHost;
   slackSecrets?: SlackSecretStore;
   memorySecrets?: ProtectedSecretStore;
+  /** Where the values trigger programs read are kept, encrypted by the system. Without it none can be added. */
+  automationSecrets?: ProtectedSecretStore;
   /** Keeps the reviewer app's private key. Without it, reviews post only as the user. */
   githubSecrets?: ProtectedSecretStore;
   /** Keeps the Mac's key pair for phone access. Without it, phone access cannot turn on. */

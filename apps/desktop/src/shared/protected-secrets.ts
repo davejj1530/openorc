@@ -10,6 +10,8 @@ export const PROTECTED_SECRET_FILES = {
   "remote.secrets": "remote-access-key.enc",
   /** The Apple push key phone alerts are signed with, as the user added it. */
   "push.secrets": "apns-key.enc",
+  /** The values automations' trigger programs read, such as their tokens, by program. Only the core reads them. */
+  "automation.secrets": "automation-trigger-values.enc",
   /** The signed-in OpenOrc account's session. Only the core reads it; no window is ever sent it. */
   "account.secrets": "openorc-account.enc",
 } as const;

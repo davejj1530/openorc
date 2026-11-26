@@ -11,7 +11,9 @@ export const triggerOptions = [
   { value: "checks_failed", label: "Checks fail on a pull request" },
   { value: "merged", label: "A pull request merges" },
   { value: "task_created", label: "A task is created" },
-  { value: "check", label: "Something you describe" },
+  { value: "program", label: "Something you describe" },
+  /** A command on a timer, as an agent writing an automation in its thread still writes one; offered only to one that has it. */
+  { value: "check", label: "A check on a timer" },
 ] as const;
 export type TriggerKey = (typeof triggerOptions)[number]["value"];
 
@@ -30,6 +32,8 @@ export const triggerKey = (trigger: AutomationTrigger): TriggerKey => (trigger.k
 export function triggerFor(key: TriggerKey, last: AutomationTrigger, taskId: string | null): AutomationTrigger {
   if (key === "task_created") return { kind: "task_created" };
   if (key === "check") return last.kind === "check" ? last : { kind: "check", what: "", command: "", everyMinutes: 5 };
+  // A new program has no id until its agent is set to write it, as the automation is created.
+  if (key === "program") return last.kind === "program" ? last : { kind: "program", id: "", what: last.kind === "check" ? last.what : "" };
   return { kind: "pull_request", on: key, scope: taskId || last.kind !== "pull_request" ? "ours" : last.scope };
 }
 
@@ -51,6 +55,7 @@ export function draftComplete(draft: RuleDraft): boolean {
   const { trigger } = draft;
   if (!draft.name.trim() || !draft.projectId) return false;
   if (trigger.kind === "check" && !(trigger.what.trim() && trigger.command.trim())) return false;
+  if (trigger.kind === "program" && !trigger.what.trim()) return false;
   return draft.actions.every((action) => action.kind !== "agent" || action.prompt.trim());
 }
 

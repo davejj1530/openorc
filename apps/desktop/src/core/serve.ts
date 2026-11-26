@@ -64,6 +64,7 @@ function coreOptions(host: CoreHost, transport: Transport, { secrets, browser, p
     remoteSecrets: secrets.store("remote.secrets"),
     pushSecrets: secrets.store("push.secrets"),
     accountSecrets: secrets.store("account.secrets"),
+    automationSecrets: secrets.store("automation.secrets"),
     presence: presence.inUse,
     chooseDownload: downloads.choose,
     openBrowser: (url) => host.post({ type: "open-browser", url }),

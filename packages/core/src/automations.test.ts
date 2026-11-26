@@ -1,7 +1,8 @@
 import { runs, taskThreads, tasks, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import type { Project } from "@openorc/protocol";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
@@ -86,6 +87,25 @@ afterEach(async () => {
 });
 
 describe("automations", () => {
+  it("acts once on each event its program prints, however many times the program prints it", async () => {
+    core.taskAutomation.rules.start();
+    const { programs } = core.taskAutomation.rules;
+    const id = randomUUID();
+    await mkdir(programs.folder(id), { recursive: true });
+    const event = JSON.stringify({ id: "m1", title: "Dana messaged you", detail: "Lunch at noon?" });
+    await writeFile(path.join(programs.folder(id), "trigger.json"), JSON.stringify({ run: `echo '${event}'; echo '${event}'; sleep 30` }));
+    await call("automations.save", {
+      projectId: project.id,
+      name: "Messages become tasks",
+      trigger: { kind: "program", id, what: "Someone messages me" },
+      actions: [{ kind: "task", stage: "backlog", columnId: null }],
+    });
+    const made = () => tasks.list(core.db, { projectId: project.id }).filter((task) => task.title === "Dana messaged you");
+    await vi.waitFor(() => expect(made()).toHaveLength(1), { timeout: 10_000 });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(made()).toEqual([expect.objectContaining({ spec: "Someone messages me: Lunch at noon?" })]);
+  });
+
   it("notes the pull requests already open when it is switched on, then starts an agent once for each new one", async () => {
     outside.open = [pull(1)];
     const saved = await call("automations.save", {

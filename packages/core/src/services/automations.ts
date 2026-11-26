@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { audit, automationFirings, automations, boardColumns, projects, pullRequestOwners, runs, taskEvents, tasks, threads as threadRows, type Db, type WatchedAutomation } from "@openorc/db";
 import {
   automationProblem,
@@ -7,11 +8,14 @@ import {
   type AutomationProposal,
   type AutomationTrigger,
   type BoardStage,
+  type CheckTry,
   type Project,
   type Task,
 } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { checkFinding, type AutomationSources, type Pull } from "./automation-sources.js";
+import { TriggerPrograms, type ProgramEvent } from "./trigger-programs.js";
+import type { TriggerValues } from "./trigger-values.js";
 import type { BoardJobs } from "./board-jobs.js";
 import type { Notification } from "./run-types.js";
 import { AppSettingsService } from "./settings.js";
@@ -36,6 +40,8 @@ type Dependencies = {
   threads: Pick<ThreadService, "start" | "queue">;
   board: Pick<BoardJobs, "put">;
   sources: AutomationSources;
+  /** Where trigger programs are kept, and the values they read. */
+  programs: { dataDir: string; values: TriggerValues };
   invalidate: (keys: string[]) => void;
   notify: (n: Omit<Notification, "type">) => void;
   log: Logger;
@@ -67,22 +73,85 @@ export class AutomationService {
   /** A look is waiting its turn, so one more asked for now is the same look. */
   private asked = false;
   private closing = false;
+  /** The programs agents wrote to set automations off, run while their automations are on. */
+  readonly programs: TriggerPrograms;
 
   constructor(
     private readonly db: Db,
     private readonly deps: Dependencies,
-  ) {}
+  ) {
+    const { threads, invalidate, log } = deps;
+    this.programs = new TriggerPrograms(db, {
+      ...deps.programs,
+      threads,
+      fire: (automationId, event) => this.receive(automationId, event),
+      report: (automationId, problem) => this.reportProgram(automationId, problem),
+      invalidate,
+      log,
+    });
+  }
 
   start(): void {
     if (this.timer || this.closing) return;
-    this.timer = setInterval(() => this.nudge(), 60_000);
+    this.timer = setInterval(() => {
+      this.nudge();
+      this.syncPrograms();
+    }, 60_000);
     this.timer.unref();
+    this.syncPrograms();
   }
 
   stop(): void {
     this.closing = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    this.programs.stop();
+  }
+
+  /** A check's command run once in the project's folder: what it finds now, or why it did not run. */
+  async tryCheck(projectId: string, command: string): Promise<CheckTry> {
+    const project = projects.get(this.db, projectId);
+    if (!project?.rootPath) throw new Error("This project has no folder on this computer.");
+    try {
+      return { state: "ran", found: (await this.deps.sources.check(project.rootPath, command)).map((line) => checkFinding(line).words) };
+    } catch (error) {
+      return { state: "failed", reason: errorText(error) };
+    }
+  }
+
+  /** Sets one of a trigger program's values, starting it again if it was waiting for one. */
+  setTriggerValue(id: string, name: string, value: string): Promise<void> {
+    return this.programs.setValue(id, name, value, automations.watching(this.db));
+  }
+
+  private syncPrograms(): void {
+    if (this.timer) this.programs.sync(automations.watching(this.db));
+  }
+
+  /** One thing a program printed for an automation still switched on, acted on once by its key, one after another. */
+  private receive(automationId: string, event: ProgramEvent): void {
+    this.looks = this.looks
+      .then(async () => {
+        const automation = automations.watching(this.db).find((each) => each.id === automationId);
+        const project = automation ? projects.get(this.db, automation.projectId) : null;
+        if (!automation || !project?.rootPath) return;
+        if (automationFirings.seen(this.db, automation.id, [event.key]).size > 0) return;
+        await this.fire(automation, project, {
+          ...event,
+          detail: `${automation.trigger.kind === "program" ? automation.trigger.what : automation.name}: ${event.detail}`,
+          taskId: automation.taskId,
+          threadId: null,
+        });
+      })
+      .catch((error: unknown) => this.deps.log.warn(`automations: an event could not be acted on: ${errorText(error)}`));
+  }
+
+  /** Why an automation's program is not running, on its row, or nothing once it is. */
+  private reportProgram(automationId: string, problem: string | null): void {
+    const automation = automations.get(this.db, automationId);
+    if (!automation || automation.problem === problem) return;
+    automations.looked(this.db, automationId, problem);
+    this.deps.invalidate(["automations"]);
   }
 
   list(projectId?: string): Automation[] {
@@ -99,6 +168,7 @@ export class AutomationService {
     this.deps.invalidate(["automations"]);
     // Its first look, which notes what is already there, happens now, so it acts on whatever comes next.
     this.nudge();
+    this.syncPrograms();
     return saved;
   }
 
@@ -125,11 +195,13 @@ export class AutomationService {
     automations.setEnabled(this.db, id, enabled);
     this.deps.invalidate(["automations"]);
     if (enabled) this.nudge();
+    this.syncPrograms();
   }
 
   remove(id: string): void {
     automations.remove(this.db, id);
     this.deps.invalidate(["automations"]);
+    this.syncPrograms();
   }
 
   /** Looks soon, without waiting for the minute: a task was just made, an automation was just switched on, or the timer rang. Asked again before that look starts, it is the same look. */
@@ -177,14 +249,17 @@ export class AutomationService {
     if (!project?.rootPath) throw new Error("Automations run in a project with a folder on this computer.");
     const problem = automationProblem(draft);
     if (problem) throw new Error(problem);
+    if (draft.trigger.kind === "program" && !existsSync(this.programs.folder(draft.trigger.id))) throw new Error("This trigger's program is no longer on this computer.");
     if (draft.taskId && tasks.get(this.db, draft.taskId)?.projectId !== draft.projectId) throw new Error("This task is no longer available.");
     for (const action of draft.actions) {
       if (action.kind !== "agent" && action.columnId && boardColumns.get(this.db, action.columnId)?.projectId !== draft.projectId) throw new Error("This column is no longer on the board.");
     }
   }
 
+  /** Whether it is time to look for it. A program is never looked for: it tells of what happens itself. */
   private due(automation: WatchedAutomation, now: number): boolean {
     const { trigger, lookedAt } = automation;
+    if (trigger.kind === "program") return false;
     if (trigger.kind === "task_created" || lookedAt === null) return true;
     const every = trigger.kind === "check" ? trigger.everyMinutes * 60_000 : PULLS_EVERY;
     return now - lookedAt >= every - EARLY;
@@ -317,6 +392,7 @@ export class AutomationService {
   private async occurrences(automation: WatchedAutomation, project: Project, pulls: Map<string, Promise<Pull[]>>): Promise<Occurrence[]> {
     const { trigger } = automation;
     if (trigger.kind === "task_created") return this.newTasks(automation);
+    if (trigger.kind === "program") return [];
     if (trigger.kind === "check") {
       const lines = await this.deps.sources.check(project.rootPath, trigger.command);
       return lines.map((line) => {

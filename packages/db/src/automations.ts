@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AgentKind, Automation, AutomationAction, AutomationDraft, AutomationTrigger, Task, Thread } from "@openorc/protocol";
+import { WORKSPACE_ID, type AgentKind, type Automation, type AutomationAction, type AutomationDraft, type AutomationTrigger, type Task, type Thread } from "@openorc/protocol";
 import type { Db } from "./database.js";
 import { tasks, threads } from "./repos.js";
 import { retiredTaskIds } from "./retired-teams.js";
@@ -102,6 +102,12 @@ export const pullRequestOwners = {
     return row ? tasks.get(db, row.id) : null;
   },
 };
+
+/** The newest thread working in a trigger program's folder in the personal workspace: the one its agent writes it in. */
+export function triggerThread(db: Db, folder: string): Thread | null {
+  const row = db.stmt(`SELECT id FROM threads WHERE ${VISIBLE} AND project_id = ? AND working_directory = ? ORDER BY created_at DESC LIMIT 1`).get(WORKSPACE_ID, folder) as { id: string } | undefined;
+  return row ? threads.get(db, row.id) : null;
+}
 
 export const automations = {
   list(db: Db, projectId?: string): Automation[] {

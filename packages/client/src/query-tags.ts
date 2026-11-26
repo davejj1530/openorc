@@ -151,6 +151,8 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
 /** Reads tagged by the ids in their parameters. */
 const idReadTags: MethodRules = {
   // Never a conversation's own tag: that changes with each event of a turn, and every read starts the agent's CLI.
+  // A trigger program's own tag changes with each line it prints; its automation's with whether it runs.
+  "automations.trigger": (p) => ["automations", `trigger:${String(p["id"])}`],
   "skills.list": (p) => {
     const scope = p["scope"] as { kind?: unknown; id?: unknown } | undefined;
     return ["skills", ...(scope?.kind === "project" ? [`project:${String(scope.id)}`] : [])];

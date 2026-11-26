@@ -3,6 +3,7 @@ import { triggerHasTask, type Automation, type AutomationAction, type Automation
 import { useState } from "react";
 import { AgentBrief } from "../AgentBrief";
 import { CheckFields } from "./CheckFields";
+import { ProgramFields, useWriterChoice, type WriterChoice } from "./ProgramFields";
 import { Plus, X } from "../icons";
 import { Button, Dialog, Field, IconButton, Input, Select, TextButton } from "../ui";
 import {
@@ -29,16 +30,27 @@ import "./automations.css";
 
 const sentence = (words: string) => words.charAt(0).toUpperCase() + words.slice(1);
 
-type TriggerProps = { trigger: AutomationTrigger; taskId: string | null; projectId: string; project: AccountsProject | undefined; onChange: (trigger: AutomationTrigger) => void };
+type TriggerProps = {
+  trigger: AutomationTrigger;
+  taskId: string | null;
+  projectId: string;
+  project: AccountsProject | undefined;
+  writer: WriterChoice;
+  enabled: boolean;
+  onChange: (trigger: AutomationTrigger) => void;
+};
 
-/** What sets it off: the kind, then what that kind needs. One the person describes is a check an agent writes, and how often it runs. */
-function TriggerFields({ trigger, taskId, projectId, project, onChange }: TriggerProps) {
+/** A choice of what sets it off, as this one may offer it: one kept to a task waits for no new task, and only a check has the timer. */
+const offered = (value: TriggerKey, trigger: AutomationTrigger, taskId: string | null) => !(value === "task_created" && taskId) && (value !== "check" || trigger.kind === "check");
+
+/** What sets it off: the kind, then what that kind needs. One the person describes is a program an agent writes; a check has its timer. */
+function TriggerFields({ trigger, taskId, projectId, project, writer, enabled, onChange }: TriggerProps) {
   return (
     <div className="automation-form-part">
       <div className="automation-form-line">
         <Select aria-label="What sets it off" value={triggerKey(trigger)} onChange={(event) => onChange(triggerFor(event.target.value as TriggerKey, trigger, taskId))}>
           {triggerOptions.map((option) => (
-            <option key={option.value} value={option.value} hidden={Boolean(taskId) && option.value === "task_created"}>
+            <option key={option.value} value={option.value} hidden={!offered(option.value, trigger, taskId)}>
               {option.label}
             </option>
           ))}
@@ -59,7 +71,8 @@ function TriggerFields({ trigger, taskId, projectId, project, onChange }: Trigge
           </Select>
         ) : null}
       </div>
-      {trigger.kind === "check" ? <CheckFields trigger={trigger} projectId={projectId} project={project} onChange={onChange} /> : null}
+      {trigger.kind === "check" ? <CheckFields trigger={trigger} projectId={projectId} onChange={onChange} /> : null}
+      {trigger.kind === "program" ? <ProgramFields trigger={trigger} project={project} writer={writer} enabled={enabled} onChange={onChange} /> : null}
     </div>
   );
 }
@@ -224,23 +237,43 @@ export function AutomationDialog({ automation, projectId, preset, onClose }: { a
   const project = projects.find((each) => each.id === draft.projectId);
   const save = useRpcMutation("automations.save");
   const remove = useRpcMutation("automations.remove");
-  const pending = save.isPending || remove.isPending;
-  const problem = draftProblem(draft) ?? save.error?.message ?? remove.error?.message;
+  const write = useRpcMutation("automations.writeTrigger");
+  const writer = useWriterChoice();
+  const pending = save.isPending || remove.isPending || write.isPending;
+  const problem = draftProblem(draft) ?? write.error?.message ?? save.error?.message ?? remove.error?.message;
   const put = (patch: Partial<RuleDraft>) => setDraft((current) => ({ ...current, ...patch }));
-  const submit = () => save.mutate({ ...draft, name: draft.name.trim(), ...(automation ? { id: automation.id } : {}) }, { onSuccess: onClose });
+  const submit = async () => {
+    let { trigger } = draft;
+    // A new program is set to be written as its automation is created, which then keeps its folder.
+    if (trigger.kind === "program" && !trigger.id) {
+      if (!writer.choice) return;
+      const { id } = await write.mutateAsync({ projectId: draft.projectId, what: trigger.what.trim(), choice: writer.choice });
+      trigger = { ...trigger, id };
+      put({ trigger });
+    }
+    save.mutate({ ...draft, trigger, name: draft.name.trim(), ...(automation ? { id: automation.id } : {}) }, { onSuccess: onClose });
+  };
   return (
     <Dialog open onOpenChange={(open) => (open || pending ? undefined : onClose())} title={automation ? "Edit automation" : "New automation"} width={560}>
       <form
         className="automation-form"
         onSubmit={(event) => {
           event.preventDefault();
-          submit();
+          void submit().catch(() => undefined);
         }}
       >
         <NameAndProject draft={draft} projects={projects} chooseProject={!automation && !draft.taskId} disabled={pending} onChange={put} />
         <section aria-labelledby="automation-when">
           <WhenLabel taskId={draft.taskId} />
-          <TriggerFields trigger={draft.trigger} taskId={draft.taskId} projectId={draft.projectId} project={project} onChange={(trigger) => put({ trigger })} />
+          <TriggerFields
+            trigger={draft.trigger}
+            taskId={draft.taskId}
+            projectId={draft.projectId}
+            project={project}
+            writer={writer}
+            enabled={automation?.enabled ?? false}
+            onChange={(trigger) => put({ trigger })}
+          />
         </section>
         <section aria-labelledby="automation-do">
           <h3 id="automation-do" className="automation-form-label">

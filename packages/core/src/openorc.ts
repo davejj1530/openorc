@@ -110,6 +110,7 @@ import { ReviewerAppService } from "./services/reviewer-app.js";
 import { RunService, type Notification, type RunHooks } from "./services/runs.js";
 import { ScheduleService } from "./services/schedules.js";
 import { createTaskAutomation, type TaskAutomation } from "./services/task-automation.js";
+import { TriggerValues } from "./services/trigger-values.js";
 import { createTaskHandlers } from "./handlers/tasks.js";
 import { OrclingWakeService } from "./services/orcling-wakes.js";
 import { AppSettingsService } from "./services/settings.js";
@@ -297,7 +298,7 @@ export class OpenOrc {
     this.lifecycle = new LifecycleService(db, invalidate, this.log);
     const updating = (agent: string) => this.runs.agentUpdating(agent);
     this.schedules = new ScheduleService(db, this.threads, invalidate, notify, this.log, { updating });
-    this.taskAutomation = createTaskAutomation({ db, options, threads: this.threads, text: this.textGeneration, invalidate, notify, log: this.log });
+    this.taskAutomation = createTaskAutomation({ db, options, threads: this.threads, values: new TriggerValues(options.automationSecrets), invalidate, notify, log: this.log });
     this.orclingWakes = new OrclingWakeService({ db, activity: (id) => this.runs.threadActivity(id), threads: this.threads, log: this.log, updating });
     this.files = createFileService({ options, writers: this.workspaceWriters, invalidate, environment: () => this.environment.current() });
     this.imports = new ImportService(db, this.ledger, invalidate, this.log, this.toolImages);

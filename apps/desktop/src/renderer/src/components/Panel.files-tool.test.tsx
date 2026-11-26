@@ -385,13 +385,15 @@ it("keeps the last lines unmarked under Searching… while the next find runs", 
   fireEvent.change(await search(), { target: { value: "total" } });
   const lines = await inFiles();
   expect(await within(lines).findByText("1 line")).toBeTruthy();
-  let finish: (result: FindResult) => void = () => {};
-  answerFind = () => new Promise((resolve) => (finish = resolve));
+  const pending: { finish?: (result: FindResult) => void } = {};
+  answerFind = () => new Promise((resolve) => (pending.finish = resolve));
   fireEvent.click(within(lines).getByRole("button", { name: "Regex" }));
   expect(await within(lines).findByText("Searching…")).toBeTruthy();
   expect(within(lines).getByText("export const total = 1;")).toBeTruthy();
   expect(lines.querySelectorAll("mark")).toHaveLength(0);
-  act(() => finish({ kind: "matches", truncated: false, groups: [] }));
+  // Searching… shows at once; the find itself is asked once the box settles, later on a slow machine.
+  await waitFor(() => expect(pending.finish).toBeDefined());
+  act(() => pending.finish?.({ kind: "matches", truncated: false, groups: [] }));
   expect(await within(lines).findByText("No lines match.")).toBeTruthy();
 });
 

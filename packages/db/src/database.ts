@@ -93,30 +93,30 @@ export class Db {
   }
 
   /**
-   * Each migration runs in its own transaction with foreign keys off, the
-   * documented way to rebuild a table in SQLite; the check afterwards catches
-   * anything a rebuild left dangling before constraints come back on.
+   * The pending migrations run in one transaction with foreign keys off, the documented way to rebuild a table in
+   * SQLite. One check at the end catches anything a rebuild left dangling before constraints come back on: it reads
+   * the whole database, which takes seconds on a large ledger, so it runs once however many migrations are pending.
+   * An upgrade lands whole or not at all, and a failed one leaves the ledger at the version it had.
    */
   private migrate(): void {
     const applied = this.version;
     if (applied >= migrations.length) return;
     this.raw.exec("PRAGMA foreign_keys = OFF");
     try {
-      for (let i = applied; i < migrations.length; i += 1) {
-        const migration = migrations[i];
-        if (!migration) continue;
-        this.raw.exec("BEGIN");
-        try {
+      this.raw.exec("BEGIN");
+      try {
+        for (let i = applied; i < migrations.length; i += 1) {
+          const migration = migrations[i];
           if (typeof migration === "string") this.raw.exec(migration);
-          else migration(this.raw);
-          const broken = this.raw.prepare("PRAGMA foreign_key_check").all();
-          if (broken.length > 0) throw new Error(`migration ${i + 1} left ${broken.length} dangling foreign key row(s)`);
+          else if (migration) migration(this.raw);
           this.raw.exec(`PRAGMA user_version = ${i + 1}`);
-          this.raw.exec("COMMIT");
-        } catch (e) {
-          this.raw.exec("ROLLBACK");
-          throw e;
         }
+        const broken = this.raw.prepare("PRAGMA foreign_key_check").all();
+        if (broken.length > 0) throw new Error(`migrations ${applied + 1} to ${migrations.length} left ${broken.length} dangling foreign key row(s)`);
+        this.raw.exec("COMMIT");
+      } catch (e) {
+        this.raw.exec("ROLLBACK");
+        throw e;
       }
     } finally {
       this.raw.exec("PRAGMA foreign_keys = ON");

@@ -1,7 +1,11 @@
 import { DatabaseSync } from "node:sqlite";
 import * as sqliteVec from "sqlite-vec";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { Db } from "./database.js";
+import { migrations } from "./schema.js";
 
 vi.mock("sqlite-vec", async (importOriginal) => {
   const original = await importOriginal<typeof import("sqlite-vec")>();
@@ -50,6 +54,28 @@ describe("native vector extension loading", () => {
       expect(db.stmt("SELECT count(*) AS count FROM memories").get()).toEqual({ count: 0 });
     } finally {
       db.close();
+    }
+  });
+});
+
+describe("upgrading a ledger", () => {
+  it("applies the pending migrations whole or not at all, leaving a failed upgrade at the version it had", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "openorc-upgrade-"));
+    const file = path.join(dir, "openorc.sqlite");
+    try {
+      Db.open(file).close();
+      // Back two versions: the first pending migration can run again, and the second fails on a column already there.
+      const raw = new DatabaseSync(file);
+      raw.exec("DROP TABLE automation_firings; DROP TABLE automations;");
+      raw.exec(`PRAGMA user_version = ${migrations.length - 2}`);
+      raw.close();
+      expect(() => Db.open(file)).toThrow(/duplicate column name: choice/);
+      const after = new DatabaseSync(file);
+      expect(after.prepare("PRAGMA user_version").get()).toEqual({ user_version: migrations.length - 2 });
+      expect(after.prepare("SELECT name FROM sqlite_master WHERE name = 'automations'").get()).toBeUndefined();
+      after.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

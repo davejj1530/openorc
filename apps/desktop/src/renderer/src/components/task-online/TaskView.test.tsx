@@ -19,6 +19,8 @@ const navigation = vi.hoisted(() => ({
 }));
 vi.mock("../../lib/space-navigation", () => ({ useSpaceNavigation: <T,>(select: (state: typeof navigation) => T) => select(navigation), spaceNavigation: { getState: () => navigation } }));
 vi.mock("../../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
+// The Tasks page beside the task holds the board's pane, whose head reads the window's controls.
+vi.mock("../../lib/window", () => ({ useTrafficLights: () => false, useWindowsControls: () => false }));
 vi.mock("../TopBar", () => ({
   TopBar: ({ children, actions }: { children?: ReactNode; actions?: ReactNode }) => (
     <header>

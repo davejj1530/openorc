@@ -116,6 +116,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "schedules.list": ["schedules"],
   "board.columns": ["board"],
   "board.jobs": ["board", "projects"],
+  "automations.list": ["automations", "projects"],
   // Ordered by thread activity, so it follows the thread list.
   "projects.list": ["projects", "threads"],
   "projects.checkoutBranch": ["projects", "workspace-diff"],

@@ -4,6 +4,7 @@ import { taskRefineMigration } from "./task-refine-schema.js";
 import { taskThreadsMigration } from "./task-threads-schema.js";
 import { boardColumnJobSwitchMigration, boardColumnJobsMigration, boardColumnOwnJobMigration, boardColumnsMigration } from "./board-schema.js";
 import { taskEventsMigration } from "./task-events.js";
+import { automationsMigration } from "./automations.js";
 import type { DatabaseSync } from "node:sqlite";
 import { teamTaskMigration } from "./team-task-schema.js";
 import { retireTeamSchedulesMigration, scheduleMigration, teamNotificationMigration } from "./schedule-schema.js";
@@ -745,4 +746,5 @@ export const migrations: Migration[] = [
   taskEventsMigration,
   boardColumnJobSwitchMigration,
   boardColumnOwnJobMigration,
+  automationsMigration,
 ];

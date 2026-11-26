@@ -1,4 +1,4 @@
-import type { Run, RunState, Snapshot, Task, TaskActor, TaskStatus, Thread, Usage } from "@openorc/protocol";
+import type { Run, RunState, Task, TaskActor, TaskStatus, Thread, Usage } from "@openorc/protocol";
 import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { claudeAccounts } from "./claude-accounts.js";
@@ -7,6 +7,7 @@ import { redact, redactJson } from "./redact.js";
 import { retiredTaskIds, retiredTeams } from "./retired-teams.js";
 import { VISIBLE } from "./thread-visible.js";
 import { taskActor, taskEvents } from "./task-events.js";
+import { leavingColumn, trackingMove } from "./task-place.js";
 import { jaccard, normalizeTitle, wordSet } from "./task-similarity.js";
 import { reopenThread, resolveThread } from "./thread-family.js";
 import { threadListLimit, threadListOrder } from "./thread-list-order.js";
@@ -16,6 +17,7 @@ const now = () => Date.now();
 
 // Keep the repository exports stable while project persistence and review comments live in their own modules.
 export { projects } from "./projects.js";
+export { snapshots } from "./snapshots.js";
 export { comments, type ReviewCommentInsert, type ReviewCommentScope } from "./review-comments.js";
 
 /* Tasks */
@@ -112,14 +114,6 @@ const taskColumns: Record<keyof TaskPatch, string> = {
   completedAt: "completed_at",
 };
 
-type Place = { status: TaskStatus; column_id: string | null; column: string | null; position: number | null };
-
-/** Where a task sits: its status, and its board column with the name and the place the column has now. */
-function placeOf(db: Db, id: string): Place | null {
-  const row = db.stmt("SELECT t.status, t.column_id, c.name AS column, c.position FROM tasks t LEFT JOIN board_columns c ON c.id = t.column_id WHERE t.id = ?").get(id);
-  return (row as Place | undefined) ?? null;
-}
-
 export const tasks = {
   list(db: Db, filter: { projectId?: string; threadId?: string; statuses?: TaskStatus[] } = {}): Task[] {
     const where: string[] = [`id NOT IN (${retiredTaskIds})`];
@@ -157,6 +151,8 @@ export const tasks = {
       parentTaskId: string | null;
       threadId?: string | null;
       origin?: Task["origin"];
+      /** Who made it, when that is not the person or the agent of `threadId`: the app itself, for an automation's. */
+      by?: TaskActor;
     },
   ): Task {
     const id = randomUUID();
@@ -164,7 +160,8 @@ export const tasks = {
     db.stmt(
       "INSERT INTO tasks (id, project_id, title, spec, status, priority, labels, workspace_mode, base_ref, parent_task_id, thread_id, origin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     ).run(id, t.projectId, t.title, t.spec, t.status ?? "backlog", t.priority, JSON.stringify(t.labels), t.workspaceMode, t.baseRef, t.parentTaskId, t.threadId ?? null, t.origin ?? "user", ts, ts);
-    taskEvents.record(db, id, t.origin === "agent" ? taskActor(t.threadId ? threads.get(db, t.threadId) : null) : { kind: "user" }, { kind: "created" });
+    const agent = () => taskActor(t.threadId ? threads.get(db, t.threadId) : null);
+    taskEvents.record(db, id, t.by ?? (t.origin === "agent" ? agent() : { kind: "user" }), { kind: "created" });
     return tasks.get(db, id) as Task;
   },
   /**
@@ -184,7 +181,7 @@ export const tasks = {
   },
   /** Explicit board moves take precedence over subsequent execution projections. A move is kept in the task's history under whoever `by` says made it. */
   update(db: Db, id: string, patch: TaskPatch, options: { explicitStatus?: boolean; by?: TaskActor } = {}): Task {
-    const before = patch.status !== undefined || patch.columnId !== undefined ? placeOf(db, id) : null;
+    const moved = trackingMove(db, id, patch);
     const sets: string[] = [];
     const args: unknown[] = [];
     const explicitStatus = options.explicitStatus && patch.status !== undefined;
@@ -195,26 +192,17 @@ export const tasks = {
       args.push(key === "labels" ? JSON.stringify(value) : value);
     }
     if (explicitStatus) sets.push("status_is_explicit = 1");
-    // SET reads the row as it was, so this compares the status before the change.
-    if (patch.status !== undefined && patch.columnId === undefined) {
-      sets.push(`column_id = CASE WHEN status = ?${explicitStatus ? "" : " OR status_is_explicit = 1"} THEN column_id ELSE NULL END`);
-      args.push(patch.status);
+    const leaving = leavingColumn(patch, Boolean(explicitStatus));
+    if (leaving) {
+      sets.push(leaving.set);
+      args.push(leaving.arg);
     }
     sets.push("updated_at = ?");
     args.push(now(), id);
     db.stmt(`UPDATE tasks SET ${sets.join(", ")} WHERE id = ?`).run(...(args as (string | number | null)[]));
     const t = tasks.get(db, id);
     if (!t) throw new Error(`task ${id} not found`);
-    const after = before ? placeOf(db, id) : null;
-    if (before && after && (after.status !== before.status || after.column_id !== before.column_id)) {
-      taskEvents.record(db, id, options.by ?? { kind: "app" }, {
-        kind: "moved",
-        status: after.status,
-        column: after.column,
-        columnId: after.column_id,
-        ...(before.position !== null && after.position !== null && after.position < before.position ? { back: true } : {}),
-      });
-    }
+    moved(options.by);
     return t;
   },
   addCost(db: Db, id: string, usd: number): void {
@@ -760,54 +748,6 @@ export const runs = {
       )
       .get(id, agent, orclingId, claudeAccountId) as { external_session_id: string } | undefined;
     return r?.external_session_id ?? null;
-  },
-};
-
-/* Snapshots */
-
-interface SnapshotRow {
-  id: string;
-  task_id: string;
-  run_id: string | null;
-  turn: number;
-  tree_sha: string;
-  diff_stat: string;
-  created_at: number;
-}
-
-export const snapshots = {
-  get(db: Db, id: string): Snapshot | null {
-    const r = db.stmt("SELECT * FROM snapshots WHERE id = ?").get(id) as unknown as SnapshotRow | undefined;
-    return r ? { id: r.id, taskId: r.task_id, runId: r.run_id, turn: r.turn, treeSha: r.tree_sha, diffStat: JSON.parse(r.diff_stat) as Snapshot["diffStat"], createdAt: r.created_at } : null;
-  },
-  latestForTask(db: Db, taskId: string): Snapshot | null {
-    const r = db.stmt("SELECT * FROM snapshots WHERE task_id = ? ORDER BY created_at DESC LIMIT 1").get(taskId) as unknown as SnapshotRow | undefined;
-    return r ? snapshots.get(db, r.id) : null;
-  },
-  listForTask(db: Db, taskId: string): Snapshot[] {
-    return (db.stmt("SELECT * FROM snapshots WHERE task_id = ? ORDER BY created_at").all(taskId) as unknown as SnapshotRow[]).map((r) => ({
-      id: r.id,
-      taskId: r.task_id,
-      runId: r.run_id,
-      turn: r.turn,
-      treeSha: r.tree_sha,
-      diffStat: JSON.parse(r.diff_stat) as Snapshot["diffStat"],
-      createdAt: r.created_at,
-    }));
-  },
-  insert(db: Db, s: { taskId: string; runId: string | null; turn: number; treeSha: string; diffStat: Snapshot["diffStat"] }): Snapshot {
-    const id = randomUUID();
-    const t = now();
-    db.stmt("INSERT INTO snapshots (id, task_id, run_id, turn, tree_sha, diff_stat, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
-      id,
-      s.taskId,
-      s.runId,
-      s.turn,
-      s.treeSha,
-      JSON.stringify(s.diffStat),
-      t,
-    );
-    return { id, taskId: s.taskId, runId: s.runId, turn: s.turn, treeSha: s.treeSha, diffStat: s.diffStat, createdAt: t };
   },
 };
 

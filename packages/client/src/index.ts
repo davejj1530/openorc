@@ -320,6 +320,7 @@ export { hitFiles, hitTerms, hitText, samePath, type HitFile, type HitText } fro
 export { commandWords, outputLines, shortPath, type CommandWords, type OutputLine } from "./command-words.js";
 export { workTimeline, type StepMark, type Timeline, type TimelineLane, type TimelineStep } from "./work-timeline.js";
 export { taskTimeline, type TaskLine, type TaskLineLead, type TaskLineUpdate, type TaskLineWord } from "./task-timeline.js";
+export { actionWords, everyWords, placeWords, stepsWords, triggerWords } from "./automation-words.js";
 export { objectOutcome, objectsTitle, phaseOutcome, type Outcome } from "./work-outcomes.js";
 export {
   chipTitle,

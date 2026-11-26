@@ -154,6 +154,7 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "tasks.threads": NOT_ASKED,
   "tasks.events": NOT_ASKED,
   "tasks.answerUpdate": NOT_ASKED,
+  "automations.save": NOT_ASKED,
   "tasks.newThread": NOT_ASKED,
   "tasks.runButton": NOT_ASKED,
   "runs.listForTask": NOT_ASKED,

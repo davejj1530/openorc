@@ -22,11 +22,13 @@ export type { TaskCard, TaskTools, TaskScope, TaskContextOptions, OnlineTaskScop
 import { fileBoundaryAnswer } from "./file-boundary.js";
 import { orclingToolNames, registerOrclingTools, type OrclingTools } from "./orcling-tools.js";
 import { registerPullReviewTools, type PullReviewTools } from "./pull-review.js";
+import { registerAutomationTools, type AutomationTools } from "./automation-tools.js";
 import { UserInput, type UserInputResult } from "./questions.js";
 import { registerVisualizationTool } from "./visualization.js";
 export type { ExecutionSwitchInput, ExecutionTools } from "./execution-tools.js";
 export type { OrclingMemoryEntry, OrclingStartInput, OrclingTools, OrclingWorker } from "./orcling-tools.js";
 export type { PullReviewComment, PullReviewTools } from "./pull-review.js";
+export type { AutomationTools } from "./automation-tools.js";
 export { UserInput, validateUserAnswers, type UserInputResult } from "./questions.js";
 
 import { registerExecutionTools, type ExecutionTools } from "./execution-tools.js";
@@ -85,6 +87,8 @@ export interface McpHost {
   execution?: ExecutionTools;
   pullReview?: PullReviewTools;
   orcling?: OrclingTools;
+  /** Automations an agent writes for its project. */
+  automations?: AutomationTools;
 }
 
 export interface ThreadCard {
@@ -229,6 +233,7 @@ export const internalToolNames = [
   "task_get",
   "task_update",
   "task_report",
+  "automation_create",
   "thread_list",
   "thread_read",
   "thread_send",
@@ -261,6 +266,7 @@ function registerOptionalTools(mcp: McpServer, host: McpHost, runId: string): vo
   if (host.device) registerDeviceTool(mcp, (input) => host.device!(runId, input));
   if (host.pullReview?.available(runId)) registerPullReviewTools(mcp, host.pullReview, runId);
   if (host.orcling?.available(runId)) registerOrclingTools(mcp, host.orcling, runId);
+  if (host.automations) registerAutomationTools(mcp, host.automations, runId);
 }
 
 function buildServer(host: McpHost, runId: string, scopes: readonly OnlineTaskScopeChoice[]): McpServer {

@@ -8,27 +8,26 @@ import {
   executionModePresentation,
   executionModeSettings,
   harnessName,
+  type Automation,
   type BoardColumn,
   type Schedule,
   type WorkspaceMode,
 } from "@openorc/protocol";
-import { Menu } from "@base-ui/react/menu";
 import { useState, type ReactNode } from "react";
 import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
-import { Plus } from "../components/icons";
-import { menuItem, menuPopup } from "../components/menu";
 import { ComposerModelPicker, ModelPicker } from "../components/ModelPicker";
 import { PageFilters } from "../components/PageFilters";
 import { ScopedTitle } from "../components/ScopedTitle";
 import { TopBar } from "../components/TopBar";
 import { Button, Dialog, Empty, Field, Input, Segmented, Select, Textarea } from "../components/ui";
-import { ClaudeAccountScope } from "../lib/claude-account";
+import type { RulePreset } from "../lib/automation-draft";
 import { useRpc } from "../lib/client";
 import { focusedProject, useLayout } from "../lib/layout";
-import { CoversPreview } from "../lib/browser-preview";
-import { floatingGround } from "../lib/use-anchor-ground";
+import { ClaudeAccountScope } from "../lib/claude-account";
 import { useScheduleEditor, type SchedulePreset } from "../lib/use-schedule-editor";
-import { ColumnJobRow, openBoard, ReadyMadeAutomations } from "./automation-rows";
+import { AutomationDialog } from "../components/automations/AutomationDialog";
+import { AutomationRow, ProposedAutomations } from "./automation-rule-rows";
+import { ColumnJobRow, NewAutomationMenu, openBoard, ReadyMadeAutomations } from "./automation-rows";
 import { intervalLabel, intervals, ScheduleRow } from "./schedule-row";
 import "./pages.css";
 
@@ -43,116 +42,126 @@ const shelfOptions = [
 ] as const;
 
 type ScheduleShelf = (typeof shelfOptions)[number]["value"];
+/** The form that is open: a schedule's or a rule's, each for a kept one or a new one that may start filled in. */
+type Editing = { kind: "schedule"; schedule: Schedule | null; preset?: SchedulePreset | undefined } | { kind: "rule"; automation: Automation | null; preset?: RulePreset | undefined };
 
 /**
- * The list area: loading, the rows in one tile (schedules, then each board's column jobs), and under the active ones the
- * ready-made automations. A tab with nothing on it says so only once there is something on the other. A failed load keeps its rows.
+ * The list area: loading, what agents proposed, the rows in one tile (rules, schedules, then each board's column jobs),
+ * and under the active ones the ready-made automations. A tab with nothing on it says so only once there is something
+ * on the other. A failed load keeps its rows.
  */
-function automationListBody(input: { loading: boolean; total: number; rows: ReactNode[]; shelf: ScheduleShelf; readyMade: ReactNode }): ReactNode {
+function automationListBody(input: { loading: boolean; total: number; rows: ReactNode[]; shelf: ScheduleShelf; proposed: ReactNode; readyMade: ReactNode }): ReactNode {
   if (input.loading) return <p className="px-2 py-3 text-sm text-ink-3">Loading automations…</p>;
   if (input.rows.length === 0 && input.total > 0 && input.shelf === "paused") return <Empty title="No paused automations" />;
   return (
     <div className="schedule-list flex-1 min-h-0 overflow-y-auto pb-6">
+      {input.shelf === "active" ? input.proposed : null}
       {input.rows.length > 0 ? <div className="schedule-tile">{input.rows}</div> : null}
       {input.shelf === "active" ? input.readyMade : null}
     </div>
   );
 }
 
-/** Everything that starts work by itself: prompts on a timer, and the jobs a board's columns start, with ready-made ones to add. */
-export function Scheduled() {
+/** The automations, schedules and column jobs of the project in scope, or of every project of the space. */
+function useAutomations(projectId: string | null) {
   const spaceId = useSpaceNavigation((state) => state.current);
-  const projectId = useLayout(focusedProject);
   const projects = useSpaceProjects(true);
-  const list = useRpc("schedules.list", projectId ? { projectId } : {});
-  const jobList = useRpc("board.jobs", projectId ? { projectId } : {});
-  const [editing, setEditing] = useState<Schedule | "new" | null>(null);
-  const [preset, setPreset] = useState<SchedulePreset | undefined>(undefined);
-  const [shelf, setShelf] = useState<ScheduleShelf>("active");
-  const items = (list.data ?? []).filter((schedule) => !schedule.retiredTeam && (!spaceId || projects.data?.some((project) => project.id === schedule.projectId)));
-  const shown = items.filter((schedule) => schedule.enabled === (shelf === "active"));
-  const jobs: BoardColumn[] = (jobList.data ?? []).filter((column) => !spaceId || projects.data?.some((project) => project.id === column.projectId));
-  const shownJobs = jobs.filter((column) => column.jobEnabled === (shelf === "active"));
-  const canCreate = (projects.data?.length ?? 0) > 0;
-  const nameOf = (id: string) => (projectId ? undefined : projects.data?.find((project) => project.id === id)?.name);
-  const projectName = (schedule: Schedule) => nameOf(schedule.projectId);
-  const close = () => {
-    setEditing(null);
-    setPreset(undefined);
+  const scope = projectId ? { projectId } : {};
+  const schedules = useRpc("schedules.list", scope);
+  const jobs = useRpc("board.jobs", scope);
+  const rules = useRpc("automations.list", scope);
+  const inSpace = (id: string) => !spaceId || Boolean(projects.data?.some((project) => project.id === id));
+  const queries = [schedules, jobs, rules, projects];
+  return {
+    projects: projects.data ?? [],
+    schedules: (schedules.data ?? []).filter((schedule) => !schedule.retiredTeam && inSpace(schedule.projectId)),
+    jobs: (jobs.data ?? []).filter((column) => inSpace(column.projectId)),
+    rules: (rules.data ?? []).filter((automation) => inSpace(automation.projectId)),
+    loading: schedules.isLoading || jobs.isLoading || rules.isLoading,
+    error: queries.find((query) => query.error)?.error?.message ?? null,
+    retry: () => queries.forEach((query) => void query.refetch()),
   };
+}
+
+/** Everything that starts work by itself: rules that wait for something to happen, prompts on a timer, and the agents a board's columns start, with ready-made ones to add. */
+export function Scheduled() {
+  const projectId = useLayout(focusedProject);
+  const { projects, schedules, jobs, rules, loading, error, retry } = useAutomations(projectId);
+  const [editing, setEditing] = useState<Editing | null>(null);
+  const [shelf, setShelf] = useState<ScheduleShelf>("active");
+  const on = shelf === "active";
+  const kept = rules.filter((automation) => !automation.proposed);
+  const jobsShown: BoardColumn[] = jobs.filter((column) => column.jobEnabled === on);
+  const nameOf = (id: string) => (projectId ? undefined : projects.find((project) => project.id === id)?.name);
+  const firstProject = projectId ?? projects[0]?.id ?? "";
   return (
     <>
       <TopBar
         actions={
-          <Menu.Root>
-            <Menu.Trigger render={<Button variant="primary" size="lg" className="pl-2.5" disabled={!canCreate} />}>
-              <Plus size={16} /> New automation
-            </Menu.Trigger>
-            <Menu.Portal>
-              <CoversPreview />
-              <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
-                <Menu.Popup ref={floatingGround} className={menuPopup}>
-                  <Menu.Item className={menuItem} onClick={() => setEditing("new")}>
-                    <span className="flex-1">On a schedule</span>
-                  </Menu.Item>
-                  <Menu.Item className={menuItem} onClick={() => openBoard(projectId)}>
-                    <span className="flex-1">When a card arrives in a column</span>
-                  </Menu.Item>
-                </Menu.Popup>
-              </Menu.Positioner>
-            </Menu.Portal>
-          </Menu.Root>
+          <NewAutomationMenu
+            disabled={projects.length === 0}
+            onRule={() => setEditing({ kind: "rule", automation: null })}
+            onBoard={() => openBoard(projectId)}
+            onSchedule={() => setEditing({ kind: "schedule", schedule: null })}
+          />
         }
       >
         <ScopedTitle>Automations</ScopedTitle>
       </TopBar>
       <div className="page-column list-page schedules-page">
         <PageFilters tabs={<Segmented label="Automation filter" value={shelf} onChange={setShelf} options={shelfOptions} />} />
-        {list.error || jobList.error || projects.error ? (
+        {error ? (
           <div className="px-2 pb-3 text-sm text-bad" role="alert">
-            {list.error?.message ?? jobList.error?.message ?? projects.error?.message}{" "}
-            <Button
-              size="sm"
-              onClick={() => {
-                void list.refetch();
-                void jobList.refetch();
-                void projects.refetch();
-              }}
-            >
+            {error}{" "}
+            <Button size="sm" onClick={retry}>
               Retry
             </Button>
           </div>
         ) : null}
         {automationListBody({
-          loading: list.isLoading || jobList.isLoading,
-          total: items.length + jobs.length,
+          loading,
+          total: schedules.length + jobs.length + kept.length,
           rows: [
-            ...shown.map((schedule) => <ScheduleRow key={schedule.id} schedule={schedule} projectName={projectName(schedule)} onEdit={() => setEditing(schedule)} />),
-            ...shownJobs.map((column) => <ColumnJobRow key={column.id} column={column} projectName={nameOf(column.projectId)} />),
+            ...kept
+              .filter((automation) => automation.enabled === on)
+              .map((automation) => <AutomationRow key={automation.id} automation={automation} projectName={nameOf(automation.projectId)} onEdit={() => setEditing({ kind: "rule", automation })} />),
+            ...schedules
+              .filter((schedule) => schedule.enabled === on)
+              .map((schedule) => <ScheduleRow key={schedule.id} schedule={schedule} projectName={nameOf(schedule.projectId)} onEdit={() => setEditing({ kind: "schedule", schedule })} />),
+            ...jobsShown.map((column) => <ColumnJobRow key={column.id} column={column} projectName={nameOf(column.projectId)} />),
           ],
           shelf,
+          proposed: <ProposedAutomations automations={rules.filter((automation) => automation.proposed)} projectName={nameOf} />,
           readyMade: (
             <ReadyMadeAutomations
               projectId={projectId}
-              projects={(projects.data ?? []).filter((project) => project.rootPath)}
+              projects={projects.filter((project) => project.rootPath)}
               jobs={jobs}
-              onSchedule={(made) => {
-                setPreset(made);
-                setEditing("new");
-              }}
+              rules={kept}
+              onSchedule={(preset) => setEditing({ kind: "schedule", schedule: null, preset })}
+              onRule={(made) => setEditing({ kind: "rule", automation: null, preset: { made } })}
             />
           ),
         })}
       </div>
-      {editing ? (
+      {editing?.kind === "schedule" ? (
         <ScheduleDialog
-          key={editing === "new" ? `new:${preset?.name ?? ""}` : `${editing.id}:${editing.version}`}
-          schedule={editing === "new" ? null : editing}
-          latest={editing === "new" ? undefined : items.find((item) => item.id === editing.id)}
-          projectId={projectId ?? projects.data?.[0]?.id ?? ""}
-          preset={editing === "new" ? preset : undefined}
-          onReload={setEditing}
-          onClose={close}
+          key={editing.schedule ? `${editing.schedule.id}:${editing.schedule.version}` : `new:${editing.preset?.name ?? ""}`}
+          schedule={editing.schedule}
+          latest={editing.schedule ? schedules.find((item) => item.id === editing.schedule!.id) : undefined}
+          projectId={firstProject}
+          preset={editing.schedule ? undefined : editing.preset}
+          onReload={(schedule) => setEditing({ kind: "schedule", schedule })}
+          onClose={() => setEditing(null)}
+        />
+      ) : null}
+      {editing?.kind === "rule" ? (
+        <AutomationDialog
+          key={editing.automation?.id ?? `new:${editing.preset?.made?.id ?? ""}`}
+          automation={editing.automation}
+          projectId={firstProject}
+          preset={editing.preset}
+          onClose={() => setEditing(null)}
         />
       ) : null}
     </>
@@ -173,21 +182,9 @@ function ScheduleWorkspaceField(props: { value: WorkspaceMode; worktreeBlocked: 
   );
 }
 
-function ScheduleDialog({
-  schedule,
-  latest,
-  projectId,
-  preset,
-  onReload,
-  onClose,
-}: {
-  schedule: Schedule | null;
-  latest?: Schedule;
-  projectId: string;
-  preset?: SchedulePreset | undefined;
-  onReload: (schedule: Schedule) => void;
-  onClose: () => void;
-}) {
+type ScheduleDialogProps = { schedule: Schedule | null; latest?: Schedule; projectId: string; preset?: SchedulePreset | undefined; onReload: (schedule: Schedule) => void; onClose: () => void };
+
+function ScheduleDialog({ schedule, latest, projectId, preset, onReload, onClose }: ScheduleDialogProps) {
   const {
     fields: { claudeAccountId, project, title, prompt, minutes, mode, permission, workspace, worktreeBlocked },
     target: { usesClaude, selection: target, choice },

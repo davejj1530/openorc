@@ -1,6 +1,6 @@
-import { Schedule } from "@openorc/protocol";
+import { Schedule, type Automation } from "@openorc/protocol";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { queryClient } from "../lib/client";
 import { useLayout } from "../lib/layout";
@@ -53,9 +53,11 @@ function savedSchedule() {
 let schedule: Schedule | null;
 let paused: Schedule[];
 let saveFailure: boolean;
+let rules: Automation[];
 beforeEach(() => {
   schedule = null;
   paused = [];
+  rules = [];
   saveFailure = false;
   useLayout.setState({ workspace: "all" });
   vi.mocked(core.call).mockImplementation(async (method, _input) => {
@@ -66,7 +68,9 @@ beforeEach(() => {
       ] as never;
     if (method === "spaces.projects") return spaceNavigation.getState().inventory.find((space) => space.id === ("spaceId" in _input ? _input.spaceId : undefined))?.projects as never;
     if (method === "schedules.list") return [...(schedule ? [schedule] : []), ...paused] as never;
-    if (method === "board.jobs") return [];
+    if (method === "board.jobs" || method === "board.columns") return [];
+    if (method === "automations.list") return rules as never;
+    if (method === "automations.switch") return null as never;
     if (method === "agents.models") return [];
     if (method === "system.info") return { harnesses: [{ id: "codex", state: "ready", path: "/bin/codex", version: "1", revision: 1 }] } as never;
     if (method === "app.settings.get") return { defaultPermissionMode: "trusted" } as never;
@@ -236,4 +240,53 @@ it("offers a schedule only the Claude accounts its project uses, moving one save
   expect(picker.value).toBe("personal");
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("schedules.update", expect.objectContaining({ patch: expect.objectContaining({ claudeAccountId: "personal" }) })));
+});
+
+it("lists an automation by what it waits for and does, and holds one an agent wrote under Proposed until it is turned on", async () => {
+  const rule = (more: Partial<Automation>): Automation => ({
+    id: "rule",
+    projectId: "project",
+    taskId: null,
+    name: "Fix failed checks",
+    trigger: { kind: "pull_request", on: "checks_failed", scope: "ours" },
+    actions: [{ kind: "agent", prompt: "Fix them.", choice: null }],
+    enabled: true,
+    proposed: false,
+    madeBy: null,
+    lastFiredAt: null,
+    problem: null,
+    createdAt: 1,
+    ...more,
+  });
+  rules = [
+    rule({ problem: "gh: not signed in" }),
+    rule({
+      id: "proposed",
+      name: "Issues become tasks",
+      trigger: { kind: "check", what: "An issue was opened", command: "gh issue list", everyMinutes: 15 },
+      actions: [
+        { kind: "task", stage: "backlog", columnId: null },
+        { kind: "agent", prompt: "Triage it.", choice: null },
+      ],
+      enabled: false,
+      proposed: true,
+      madeBy: { agent: "codex", threadId: "thread", threadTitle: "Ship 1.3.0" },
+    }),
+  ];
+  render(
+    <QueryClientProvider client={queryClient}>
+      <Scheduled />
+    </QueryClientProvider>,
+  );
+  const row = (await screen.findByRole("button", { name: /Fix failed checks/ })).closest<HTMLElement>("[data-automation]")!;
+  expect(within(row).getByText("When checks fail on a pull request from your threads · Start an agent · Project")).toBeTruthy();
+  expect(within(row).getByRole("alert").textContent).toBe("gh: not signed in");
+  const proposed = screen.getByRole("region", { name: /Proposed/ });
+  expect(within(proposed).getByText("An issue was opened")).toBeTruthy();
+  expect(within(proposed).getByText("Create a task in Backlog")).toBeTruthy();
+  expect(within(proposed).queryByText("gh issue list")).toBeNull();
+  fireEvent.click(within(proposed).getByRole("button", { name: "See the check" }));
+  expect(within(proposed).getByText("gh issue list")).toBeTruthy();
+  fireEvent.click(within(proposed).getByRole("button", { name: "Turn on" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("automations.switch", { id: "proposed", enabled: true }));
 });

@@ -231,29 +231,29 @@ describe("core", () => {
       expect(opened.mock.calls[0]![1]).toMatchObject({ label: "Build", runsIn: "new" });
       expect(opened.mock.calls[0]![1].prompt).toMatch(/^Do the work\.\n\n.*move it to the "Code review" column with task_update/);
       const builder = agents.get("Build")!;
-      core.boardJobs.move(task.id, "code review", builder.run);
+      core.taskAutomation.board.move(task.id, "code review", builder.run);
       await vi.waitFor(() => expect(opened).toHaveBeenCalledTimes(2));
       expect(opened.mock.calls[1]![1].prompt).toMatch(/^Review the work\.\n\nThis task came here from the "Build" column\..*move it to the "Done" column/);
       const reviewer = agents.get("Code review")!;
-      expect(() => core.boardJobs.move(task.id, "Code review", reviewer.run)).toThrow(/already in/);
-      expect(() => core.boardJobs.move(task.id, "Shipped", reviewer.run)).toThrow(/Build, Code review, Done/);
+      expect(() => core.taskAutomation.board.move(task.id, "Code review", reviewer.run)).toThrow(/already in/);
+      expect(() => core.taskAutomation.board.move(task.id, "Shipped", reviewer.run)).toThrow(/Build, Code review, Done/);
       // Sent back with notes, the builder's own thread carries on, told what was said.
-      core.taskReports.post(task.id, reviewer.run, {
+      core.taskAutomation.reports.post(task.id, reviewer.run, {
         message: "Two things to fix.",
         card: { kind: "checklist", title: "Review notes", items: [{ text: "Fix the header", done: false, detail: "Header.tsx:4" }] },
       });
-      core.boardJobs.move(task.id, "Build", reviewer.run);
+      core.taskAutomation.board.move(task.id, "Build", reviewer.run);
       await vi.waitFor(() => expect(told).toHaveBeenCalledTimes(1));
       expect(told.mock.calls[0]![0]).toBe(builder.thread);
       expect(told.mock.calls[0]![1]).toMatch(/is back in the "Build" column\.\n\nThe latest notes on it:\nTwo things to fix\.\n- \[ \] Fix the header \(Header\.tsx:4\)\n\nDo the work\./);
       // The second round runs by itself.
-      core.boardJobs.move(task.id, "Code review", builder.run);
-      core.boardJobs.move(task.id, "Build", reviewer.run);
+      core.taskAutomation.board.move(task.id, "Code review", builder.run);
+      core.taskAutomation.board.move(task.id, "Build", reviewer.run);
       await vi.waitFor(() => expect(told).toHaveBeenCalledTimes(3));
       // The third review sends it back a third time: the fourth time the card reaches Build nothing starts, and the task asks the person.
-      core.boardJobs.move(task.id, "Code review", builder.run);
+      core.taskAutomation.board.move(task.id, "Code review", builder.run);
       await vi.waitFor(() => expect(told).toHaveBeenCalledTimes(4));
-      core.boardJobs.move(task.id, "Build", reviewer.run);
+      core.taskAutomation.board.move(task.id, "Build", reviewer.run);
       await vi.waitFor(async () => expect((await call("tasks.get", { id: task.id }))?.approval).toMatch(/sent to "Build" 4 times/));
       expect(told).toHaveBeenCalledTimes(4);
       const ask = (await call("tasks.events", { taskId: task.id })).findLast((event) => event.kind === "update")!;
@@ -277,10 +277,10 @@ describe("core", () => {
     const other = threads.insert(core.db, { projectId: p.id, title: "Reviewer", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
     for (const thread of [builder, other]) runs.insert(core.db, { id: `run-${thread.id}`, taskId: null, threadId: thread.id, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
     const plan = { kind: "checklist" as const, title: "Plan", items: [{ text: "Draw the board", done: false }] };
-    const id = core.taskReports.post(task.id, `run-${builder.id}`, { message: "Here is the plan.", card: plan, replies: ["Approve the plan"] });
+    const id = core.taskAutomation.reports.post(task.id, `run-${builder.id}`, { message: "Here is the plan.", card: plan, replies: ["Approve the plan"] });
     expect((await call("tasks.get", { id: task.id }))?.approval).toBe("Here is the plan.");
     // An agent changes its own update in place, and nobody else's.
-    expect(() => core.taskReports.post(task.id, `run-${other.id}`, { message: "Mine now." }, id)).toThrow(/of yours/);
+    expect(() => core.taskAutomation.reports.post(task.id, `run-${other.id}`, { message: "Mine now." }, id)).toThrow(/of yours/);
     const queued = vi.spyOn(core.threads, "queue").mockReturnValue([]);
     try {
       await expect(call("tasks.answerUpdate", { taskId: task.id, eventId: id, reply: "Something else" })).rejects.toThrow(/no longer offers/);
@@ -291,7 +291,7 @@ describe("core", () => {
       queued.mockRestore();
     }
     expect((await call("tasks.get", { id: task.id }))?.approval).toBeNull();
-    expect(core.taskReports.post(task.id, `run-${builder.id}`, { message: "The plan is done.", card: { ...plan, items: [{ text: "Draw the board", done: true }] } }, id)).toBe(id);
+    expect(core.taskAutomation.reports.post(task.id, `run-${builder.id}`, { message: "The plan is done.", card: { ...plan, items: [{ text: "Draw the board", done: true }] } }, id)).toBe(id);
     const update = (await call("tasks.events", { taskId: task.id })).find((event) => event.kind === "update");
     expect(update).toMatchObject({
       id,

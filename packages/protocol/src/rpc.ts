@@ -22,15 +22,15 @@ import { SpaceId, spacesRpcParams, type SpacesRpcResults } from "./spaces.js";
 import { ClaudeAccountId, claudeAccountRpcParams, type ClaudeAccountRpcResults } from "./claude-accounts.js";
 import { connectorRpcParams, type ConnectorRpcResults } from "./connectors.js";
 import { skillRpcParams, type SkillRpcResults } from "./skills.js";
+import { automationRpcParams, type AutomationRpcResults } from "./automations.js";
+import { boardRpcParams, type BoardRpcResults } from "./board.js";
+import { taskRpcParams, type TaskRpcResults } from "./task-rpc.js";
 import { cloudRpcParams, type CloudRpcResults } from "./cloud.js";
 import { codeExplanationRpcParams, type CodeExplanationRpcResults } from "./code-explanations.js";
 import { editorRpcParams, type EditorRpcResults } from "./code-intelligence.js";
 import { DevicePanelPush, devicePanelRpcParams, type DevicePanelRpcResults } from "./devices.js";
 import {
   AgentSkill,
-  BoardColumn,
-  BoardColumnJob,
-  BoardStage,
   AppSettings,
   Commit,
   CommitId,
@@ -54,9 +54,6 @@ import {
   SessionSummary,
   Snapshot,
   Task,
-  type TaskEvent,
-  TaskPriority,
-  TaskStatus,
   Thread,
   ThreadCheckpoint,
   ThreadChoice,
@@ -119,6 +116,9 @@ export const rpcParams = {
   ...claudeAccountRpcParams,
   ...connectorRpcParams,
   ...skillRpcParams,
+  ...automationRpcParams,
+  ...boardRpcParams,
+  ...taskRpcParams,
   ...slackRpcParams,
   ...pullRequestRpcParams,
   ...orclingRpcParams,
@@ -238,63 +238,9 @@ export const rpcParams = {
   "threads.import": z.object({ projectId: z.string(), sessions: z.array(z.object({ agent: AgentKind, path: z.string() })).min(1) }),
   /** The other threads of the project, for cross-thread messaging in the UI. */
   "threads.send": z.object({ id: z.string(), text: z.string().min(1), fromThreadId: z.string().optional() }),
-  "tasks.list": z.object({ spaceId: SpaceId.optional(), threadId: z.string().optional(), projectId: z.string().optional(), statuses: z.array(TaskStatus).optional() }),
-  "tasks.get": z.object({ id: z.string() }),
-  "tasks.events": z.object({ taskId: z.string() }),
-  /** The person's reply to an agent's update, one of the replies it offered. It reaches the agent's thread as their message. */
-  "tasks.answerUpdate": z.object({ taskId: z.string(), eventId: z.number().int(), reply: z.string().min(1).max(40) }),
   /** The task's working thread, made when it has none: with the model and account chosen, else the ones it would inherit. */
   "tasks.openThread": z.object({ taskId: z.string(), choice: ThreadChoice.optional() }),
   "tasks.executionThread": z.object({ taskId: z.string() }),
-  "tasks.create": z
-    .object({
-      threadId: z.string().optional(),
-      projectId: z.string(),
-      title: z.string().min(1),
-      spec: z.string().optional(),
-      priority: TaskPriority.optional(),
-      labels: z.array(z.string()).optional(),
-      useWorktree: z.boolean().optional(),
-      workspaceMode: WorkspaceMode.optional(),
-      baseRef: z.string().optional(),
-    })
-    .refine((value) => value.workspaceMode === undefined || value.useWorktree === undefined || (value.workspaceMode === "worktree") === value.useWorktree, "workspaceMode and useWorktree must agree"),
-  "tasks.update": z.object({
-    id: z.string(),
-    patch: z.object({
-      title: z.string().min(1).optional(),
-      spec: z.string().nullable().optional(),
-      status: TaskStatus.optional(),
-      /** A board move: the task takes the column's stage as its status. */
-      columnId: z.string().optional(),
-      priority: TaskPriority.optional(),
-      labels: z.array(z.string()).optional(),
-      workspaceMode: WorkspaceMode.optional(),
-    }),
-  }),
-  "board.columns": z.object({ projectId: z.string() }),
-  /** Every column job, of one project or of all. */
-  "board.jobs": z.object({ projectId: z.string().optional() }),
-  "board.switchJob": z.object({ columnId: z.string(), enabled: z.boolean() }),
-  /** Adds one of the app's ready-made board automations to a project: its task buttons, and its columns in their place. */
-  "board.addReadyMade": z.object({ projectId: z.string(), id: z.string() }),
-  /** The project's whole board, in order. A column without an id is new; a kept column left out is removed and its tasks stay in their stage. */
-  "board.saveColumns": z.object({
-    projectId: z.string(),
-    columns: z
-      .array(
-        z.object({
-          id: z.string().optional(),
-          name: z.string().trim().min(1).max(40),
-          stage: BoardStage,
-          job: BoardColumnJob.nullable().optional(),
-          nextColumnId: z.string().nullable().optional(),
-          jobEnabled: z.boolean().optional(),
-        }),
-      )
-      .min(1)
-      .max(12),
-  }),
   "tasks.prepareWorkspace": z.object({ taskId: z.string() }),
   /** Deleting the branch as well needs `acceptLoss` to cover whatever work exists only there. */
   "tasks.delete": z.object({ id: z.string(), deleteBranch: z.boolean().optional(), acceptLoss: BranchLoss.optional() }),
@@ -615,6 +561,9 @@ export interface RpcResults
     ClaudeAccountRpcResults,
     ConnectorRpcResults,
     SkillRpcResults,
+    AutomationRpcResults,
+    BoardRpcResults,
+    TaskRpcResults,
     RemoteRpcResults,
     DevicePanelRpcResults,
     PreviewRpcResults,
@@ -708,21 +657,8 @@ export interface RpcResults
   "schedules.trigger": ScheduleRunResult;
   "tasks.start": Run;
   "runs.listForThread": Run[];
-  "tasks.list": Task[];
-  "tasks.get": Task | null;
-  /** The task's history, oldest first. */
-  "tasks.events": TaskEvent[];
-  "tasks.answerUpdate": null;
   "tasks.openThread": Thread;
   "tasks.executionThread": ThreadSummary | null;
-  "tasks.create": Task;
-  "tasks.update": Task;
-  /** The columns the project keeps; none when its board is the default one. */
-  "board.columns": BoardColumn[];
-  "board.saveColumns": BoardColumn[];
-  "board.jobs": BoardColumn[];
-  "board.switchJob": null;
-  "board.addReadyMade": BoardColumn[];
   "tasks.prepareWorkspace": Task;
   "tasks.delete": null;
   "workspace.cleanup": Task;

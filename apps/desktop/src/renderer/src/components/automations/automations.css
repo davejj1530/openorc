@@ -1,0 +1,232 @@
+/* An automation's form: a name, then what sets it off and its steps, each part a stack of fields on the sheet. */
+.automation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* The name, with the project beside it while the project can still be chosen. */
+.automation-form-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+.automation-form-top > :only-child {
+  grid-column: 1 / -1;
+}
+.automation-form-label {
+  margin-bottom: 4px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.automation-form-part {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.automation-form-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.automation-form-line select {
+  min-width: 0;
+}
+.automation-form-word {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.automation-form-command {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 19px;
+}
+.automation-form-hint {
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  line-height: 18px;
+}
+.automation-step {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.automation-step + .automation-step {
+  border-top: var(--hairline) solid var(--line);
+  padding-top: 8px;
+}
+.automation-step-remove {
+  margin-left: auto;
+}
+.automation-form-add {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.automation-form-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.automation-form-delete {
+  margin-right: auto;
+  color: var(--bad);
+  font-size: var(--text-sm);
+}
+
+/* What an agent wrote and the person has not turned on yet: a tile of its own, read top to bottom before its two moves. */
+.automation-proposed-list {
+  margin-bottom: 16px;
+}
+.automation-proposed-list .automation-heading {
+  margin-top: 0;
+}
+.automation-proposed {
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  padding: 14px;
+  /* A key on the tile takes the plane's fill, as the wells in the list do. */
+  --control-fill: var(--surface);
+}
+.automation-proposed + .automation-proposed {
+  margin-top: 12px;
+}
+.automation-proposed-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.automation-proposed-facts {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 12px 0 12px 44px;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+.automation-proposed-facts dt {
+  color: var(--ink-3);
+}
+.automation-proposed-facts dd {
+  min-width: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.automation-proposed-thread {
+  border-radius: var(--radius-sm);
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+.automation-proposed-thread:hover {
+  text-decoration-color: currentColor;
+}
+.automation-proposed-check {
+  margin: 0 0 12px 44px;
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 10px 12px;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 19px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.automation-proposed-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 44px;
+}
+
+/* The automations of a board or of one task, as a menu from the top bar: groups of lines split by hairlines. */
+.automations-menu {
+  display: flex;
+  width: 420px;
+  max-height: min(70vh, 640px);
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--radius-2xl);
+}
+.automations-menu-group + .automations-menu-group,
+.automations-menu-group + .automations-menu-new {
+  margin-top: 6px;
+  border-top: var(--hairline) solid var(--line);
+  padding-top: 6px;
+}
+.automations-menu-label {
+  padding: 6px 10px 2px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: 18px;
+}
+.automations-menu-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 4px 10px;
+}
+.automations-menu-mark {
+  display: grid;
+  width: 16px;
+  flex-shrink: 0;
+  place-items: center;
+  color: var(--ink-3);
+}
+.automations-menu-words {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+.automations-menu-name {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: 20px;
+}
+/* What it does reads whole, on two lines when one is not enough. */
+.automations-menu-what {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: 18px;
+}
+button.automations-menu-words:hover .automations-menu-name {
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+.automations-menu-add {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  padding: 0 10px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.automations-menu-add:hover {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .automations-menu-add {
+    transition: none;
+  }
+}

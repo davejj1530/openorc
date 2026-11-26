@@ -19,6 +19,7 @@ export function TaskWorkspace({
   tab,
   panel = false,
   selectTab,
+  actions,
   children,
   unavailableTitle = "Loading task…",
 }: {
@@ -26,12 +27,14 @@ export function TaskWorkspace({
   tab: TaskTab;
   panel?: boolean;
   selectTab(tab: TaskTab): void;
+  /** What the task's top bar offers at its end. */
+  actions?: ReactNode;
   children: ReactNode;
   unavailableTitle?: string;
 }) {
   return (
     <main className="task-workspace workspace-main well flex-1 min-w-0 flex flex-col">
-      <TopBar panel={panel}>
+      <TopBar panel={panel} actions={actions}>
         <PageCrumbs parent="Tasks" onParent={() => useRouter.getState().navigate({ view: "tasks" })}>
           {task ? (
             <>

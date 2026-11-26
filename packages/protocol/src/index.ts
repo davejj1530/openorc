@@ -80,4 +80,8 @@ export * from "./cloud-moves.js";
 export * from "./hosted-models.js";
 export * from "./this-computer.js";
 export * from "./hosted-terminals.js";
+export * from "./board.js";
+export * from "./task-events.js";
+export * from "./task-rpc.js";
 export * from "./ready-made.js";
+export * from "./automations.js";

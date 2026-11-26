@@ -33,6 +33,7 @@ vi.mock("../panels/CommitsPanel", () => ({
 }));
 vi.mock("../components/TopBar", () => ({ TopBar: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
 vi.mock("../components/TaskActivity", () => ({ TaskActivity: () => <div>Saved activity</div> }));
+vi.mock("../components/automations/AutomationsMenu", () => ({ AutomationsMenu: () => null }));
 vi.mock("./TaskDocument", () => ({
   TaskDocument: ({ ref }: { ref: Ref<{ flush: () => Promise<boolean> }> }) => {
     useImperativeHandle(ref, () => ({ flush: mocks.flush }));

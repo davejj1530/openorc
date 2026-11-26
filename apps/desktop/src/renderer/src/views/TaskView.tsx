@@ -1,3 +1,4 @@
+import { AutomationsMenu } from "../components/automations/AutomationsMenu";
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { OnlineTaskRef, type Project, type Task, type ThreadSummary } from "@openorc/protocol";
 import { Panel, type PanelContext } from "../components/Panel";
@@ -71,6 +72,11 @@ export function TaskView({ taskId, tab, taskRef }: { taskId: string; tab: TaskTa
   return <LocalTaskView taskId={taskId} tab={tab} />;
 }
 
+/** The task's automations in its top bar, for a task whose project has a folder on this computer, where automations run. */
+function TaskAutomations({ task, project }: { task: Task | null | undefined; project: Project | null | undefined }) {
+  return task && project?.rootPath ? <AutomationsMenu projectId={project.id} task={task} /> : null;
+}
+
 function LocalTaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
   const task = useRpc("tasks.get", { id: taskId });
   const owner = useRpc("tasks.executionThread", { taskId }, { enabled: Boolean(task.data) });
@@ -107,7 +113,13 @@ function LocalTaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
   ) : null;
   return (
     <TaskDraftProvider key={taskId} taskId={taskId}>
-      <TaskWorkspace task={activityContext?.task} tab={tab} panel={tab === "chat" && Boolean(activityContext)} selectTab={(next) => void selectTab(next)}>
+      <TaskWorkspace
+        task={activityContext?.task}
+        tab={tab}
+        panel={tab === "chat" && Boolean(activityContext)}
+        selectTab={(next) => void selectTab(next)}
+        actions={<TaskAutomations task={t} project={p} />}
+      >
         {activityContext
           ? body
           : taskUnavailableContent({

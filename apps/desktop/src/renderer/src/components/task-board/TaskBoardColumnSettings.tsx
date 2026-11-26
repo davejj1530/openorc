@@ -5,10 +5,9 @@ import type { BoardStage, ThreadChoice } from "@openorc/protocol";
 import { CoversPreview } from "../../lib/browser-preview";
 import type { BoardSlot } from "../../lib/task-board";
 import { floatingGround } from "../../lib/use-anchor-ground";
-import { HarnessLogo } from "../HarnessLogo";
-import { ArrowLeft, ArrowRight, Automation, MoreHorizontal } from "../icons";
+import { AgentBrief } from "../AgentBrief";
+import { ArrowLeft, ArrowRight, MoreHorizontal } from "../icons";
 import { Segmented } from "../Segmented";
-import { ThreadChoiceFields } from "../task-threads/ThreadChoiceFields";
 import { IconButton, Input, Select, TextButton, Tooltip } from "../ui";
 
 /** What a column's cards are to the app, in the person's words. The stage decides what counts as waiting on them and what is finished. */
@@ -31,33 +30,19 @@ function ColumnAgent({ slot, project, onChange }: { slot: BoardSlot; project: Ac
     if (JSON.stringify(job) !== JSON.stringify(slot.job ?? null)) onChange(job ? { job } : { job: null, nextColumnId: null });
   };
   return (
-    <div className="task-board-agent">
-      <textarea
-        className="task-board-agent-words"
-        aria-label="What the agent is told"
-        rows={5}
-        maxLength={8000}
-        value={words}
-        placeholder="Tell an agent what to do with each card"
-        onChange={(event) => setWords(event.target.value)}
-        onBlur={() => save(words, choice)}
-      />
-      <div className="task-board-agent-foot">
-        <span className="task-board-agent-mark" aria-hidden="true">
-          {choice ? <HarnessLogo id={choice.agent} size={16} /> : <Automation size={16} />}
-        </span>
-        <ThreadChoiceFields
-          value={choice ?? undefined}
-          onChange={(next) => {
-            setChoice(next ?? null);
-            save(words, next ?? null);
-          }}
-          project={project}
-          sameLabel="The task's model"
-          layout="bar"
-        />
-      </div>
-    </div>
+    <AgentBrief
+      words={words}
+      onWords={setWords}
+      onLeave={() => save(words, choice)}
+      choice={choice}
+      onChoice={(next) => {
+        setChoice(next);
+        save(words, next);
+      }}
+      project={project}
+      sameLabel="The task's model"
+      placeholder="Tell an agent what to do with each card"
+    />
   );
 }
 
@@ -93,6 +78,7 @@ export function TaskBoardColumnSettings({
     next.splice(place, 0, ...next.splice(index, 1));
     onChange(next, place);
   };
+  const without = slots.filter((_, place) => place !== index);
   const rename = (value: string) => {
     const name = value.trim();
     if (name && name !== slot.name) put({ name });
@@ -148,16 +134,7 @@ export function TaskBoardColumnSettings({
                   <ArrowRight size={15} />
                 </IconButton>
               </Tooltip>
-              <TextButton
-                className="task-board-remove"
-                disabled={slots.length === 1}
-                onClick={() =>
-                  onChange(
-                    slots.filter((_, place) => place !== index),
-                    null,
-                  )
-                }
-              >
+              <TextButton className="task-board-remove" disabled={slots.length === 1} onClick={() => onChange(without, null)}>
                 Remove column
               </TextButton>
             </div>

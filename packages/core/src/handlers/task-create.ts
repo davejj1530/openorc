@@ -10,9 +10,11 @@ type Dependencies = {
   threadService: Pick<ThreadService, "startTaskInThread">;
   invalidate: (keys: string[]) => void;
   dataDir: string;
+  /** Told of each task made, for whatever waits for one. */
+  created: () => void;
 };
 
-export function createTaskCreateHandlers({ db, settings, threadService, invalidate, dataDir }: Dependencies): Pick<Handlers, "tasks.create" | "tasks.start"> {
+export function createTaskCreateHandlers({ db, settings, threadService, invalidate, dataDir, created }: Dependencies): Pick<Handlers, "tasks.create" | "tasks.start"> {
   return {
     "tasks.create": ({ projectId, threadId, title, spec, priority, labels, useWorktree, workspaceMode, baseRef }) => {
       const project = projects.get(db, projectId);
@@ -33,6 +35,7 @@ export function createTaskCreateHandlers({ db, settings, threadService, invalida
         origin: "user",
       });
       invalidate(["tasks", ...(threadId ? ["threads", `thread:${threadId}`] : [])]);
+      created();
       return t;
     },
     "tasks.start": async ({ taskId, workspaceMode }) => {

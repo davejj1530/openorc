@@ -31,7 +31,7 @@ function hosts(online = true) {
     assertRunAvailable: () => {},
     online: online ? tools : null,
   };
-  return { calls, tools, tasks: { ...createTasksHost(deps), create: createTaskCreateHost(deps) } };
+  return { calls, tools, tasks: { ...createTasksHost(deps), create: createTaskCreateHost({ ...deps, created: () => {} }) } };
 }
 
 it("sends a call that names a cloud project to the online tools, and every other to this Mac's tasks", async () => {

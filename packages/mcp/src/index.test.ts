@@ -274,6 +274,45 @@ test("plan_write is offered only where the host accepts a plan document", async 
   assert.ok(!(await (await connect("act-run")).listTools()).tools.some((tool) => tool.name === "plan_write"));
 });
 
+void test("an agent writes an automation with a check of its own, and one that is not well formed never reaches the host", async (t) => {
+  const { host, connect } = await fixture(t);
+  const client = await connect("run-1");
+  assert.ok(!(await client.listTools()).tools.some((tool) => tool.name === "automation_create"));
+  const written: unknown[] = [];
+  host.automations = { create: async (runId, proposal) => (written.push({ runId, proposal }), { id: "a1", message: "Saved, switched off." }) };
+  assert.ok((await client.listTools()).tools.some((tool) => tool.name === "automation_create"));
+  assert.ok(internalToolNames.includes("automation_create"));
+  const when = { kind: "check", what: "An issue was opened", command: "gh issue list --json number,title", everyMinutes: 5 };
+  const saved = await client.callTool({
+    name: "automation_create",
+    arguments: {
+      name: "Issues become tasks",
+      when,
+      do: [
+        { kind: "task", column: "Inbox" },
+        { kind: "agent", prompt: "Triage it." },
+      ],
+    },
+  });
+  assert.match(resultText(saved), /switched off/);
+  assert.deepEqual(written, [
+    {
+      runId: "run-1",
+      proposal: {
+        name: "Issues become tasks",
+        when,
+        do: [
+          { kind: "task", column: "Inbox" },
+          { kind: "agent", prompt: "Triage it." },
+        ],
+      },
+    },
+  ]);
+  assert.equal((await client.callTool({ name: "automation_create", arguments: { name: "No steps", when, do: [] } })).isError, true);
+  assert.equal((await client.callTool({ name: "automation_create", arguments: { name: "Every second", when: { ...when, everyMinutes: 0 }, do: [{ kind: "agent", prompt: "Look." }] } })).isError, true);
+  assert.equal(written.length, 1);
+});
+
 void test("pull request review tools exist only for runs reviewing a pull request", async (t) => {
   const { host, connect } = await fixture(t);
   const received: unknown[] = [];

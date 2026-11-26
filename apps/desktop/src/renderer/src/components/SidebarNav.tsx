@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useRpc } from "../lib/client";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import type { SidebarScreen } from "../lib/layout";
 import { useOrganizationStart } from "../lib/organization-start";
@@ -39,7 +40,9 @@ function NavRow({ icon, label, count = 0, lead, current, onClick }: NavRowProps)
  */
 export function SidebarNav({ route, projectId }: { route: Route; projectId: string | null }) {
   const tasks = useTaskAttentionCount();
-  const counts: Partial<Record<SidebarScreen, number>> = { tasks };
+  // An automation an agent wrote waits on the person until they turn it on or dismiss it.
+  const proposed = useRpc("automations.list", {}).data?.filter((automation) => automation.proposed).length ?? 0;
+  const counts: Partial<Record<SidebarScreen, number>> = { tasks, scheduled: proposed };
   // The organization's own page or its frozen screen stands in for the route's screen, so no row is lit.
   const organizationPage = useOrganizationStart(route.view === "newthread" ? route.projectId : null);
   const frozen = useFrozenWork(route);

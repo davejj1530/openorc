@@ -1,21 +1,23 @@
 import { Menu } from "@base-ui/react/menu";
-import { READY_MADE_AUTOMATIONS, harnessShortName, type BoardColumn, type Project, type ReadyMadeAutomation } from "@openorc/protocol";
+import { READY_MADE_AUTOMATIONS, harnessShortName, type Automation, type BoardColumn, type Project, type ReadyMadeAutomation } from "@openorc/protocol";
 import { HarnessLogo } from "../components/HarnessLogo";
-import { Automation, CalendarClock, Columns2 } from "../components/icons";
+import { Automation as AutomationMark, CalendarClock, Columns2, Plus } from "../components/icons";
 import { menuItem, menuPopup } from "../components/menu";
 import { Button, Switch } from "../components/ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpcMutation } from "../lib/client";
 import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
+import { useTasksView } from "../lib/tasks-view";
 import { floatingGround } from "../lib/use-anchor-ground";
+import { TriggerMark } from "../components/automations/TriggerMark";
 import "./schedules.css";
 
 /** A project's board, where its columns and their jobs are changed. */
 export function openBoard(projectId: string | null): void {
   const layout = useLayout.getState();
   if (projectId) layout.setWorkspace(projectId);
-  layout.setTasksView("board");
+  useTasksView.getState().setView("board");
   useRouter.getState().navigate({ view: "tasks" });
 }
 
@@ -52,8 +54,42 @@ export function ColumnJobRow({ column, projectName }: { column: BoardColumn; pro
   );
 }
 
+/** New automation, as a menu of the three ways one is made: a rule, a column's agent on the board, or a prompt on a timer. */
+export function NewAutomationMenu({ disabled, onRule, onBoard, onSchedule }: { disabled: boolean; onRule: () => void; onBoard: () => void; onSchedule: () => void }) {
+  const ways = [
+    { label: "When something happens", go: onRule },
+    { label: "When a card arrives in a column", go: onBoard },
+    { label: "On a schedule", go: onSchedule },
+  ];
+  return (
+    <Menu.Root>
+      <Menu.Trigger render={<Button variant="primary" size="lg" className="pl-2.5" disabled={disabled} />}>
+        <Plus size={16} /> New automation
+      </Menu.Trigger>
+      <Menu.Portal>
+        <CoversPreview />
+        <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
+          <Menu.Popup ref={floatingGround} className={menuPopup}>
+            {ways.map((way) => (
+              <Menu.Item key={way.label} className={menuItem} onClick={way.go}>
+                <span className="flex-1">{way.label}</span>
+              </Menu.Item>
+            ))}
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}
+
+function ReadyMadeMark({ made }: { made: ReadyMadeAutomation }) {
+  if (made.kind === "rule") return <TriggerMark trigger={made.trigger} />;
+  return made.kind === "schedule" ? <CalendarClock size={16} /> : <AutomationMark size={16} />;
+}
+
 type Board = Extract<ReadyMadeAutomation, { kind: "board" }>;
 type Timed = Extract<ReadyMadeAutomation, { kind: "schedule" }>;
+type Rule = Extract<ReadyMadeAutomation, { kind: "rule" }>;
 
 type BoardActionProps = { made: Board; added: boolean; projectId: string | null; projects: readonly Project[]; onAdd: (projectId: string) => void; disabled: boolean };
 
@@ -87,23 +123,39 @@ function BoardAction({ made, added, projectId, projects, onAdd, disabled }: Boar
 
 /**
  * The automations the app offers ready to add, as cards of one size. One for the board adds its columns to a project's
- * board; one on a timer opens a new schedule already filled in, for its model to be chosen.
+ * board; a rule or one on a timer opens its form already filled in, for its project and model to be chosen.
  */
 export function ReadyMadeAutomations({
   projectId,
   projects,
   jobs,
+  rules,
   onSchedule,
+  onRule,
 }: {
   projectId: string | null;
   /** The projects a board automation can be added to: the ones with a folder on this Mac. */
   projects: readonly Project[];
   /** The columns that start an agent, to say which ready-made ones a board already has. */
   jobs: readonly BoardColumn[];
+  /** The automations already kept, to say which ready-made rules the project in scope has. */
+  rules: readonly Automation[];
   onSchedule: (made: Timed) => void;
+  onRule: (made: Rule) => void;
 }) {
   const add = useRpcMutation("board.addReadyMade");
   const onBoard = (made: Board) => Boolean(projectId) && made.columns.every((column) => jobs.some((job) => job.projectId === projectId && job.name.toLowerCase() === column.name.toLowerCase()));
+  const kept = (made: Rule) => Boolean(projectId) && rules.some((rule) => rule.projectId === projectId && rule.name === made.name);
+  const action = (made: ReadyMadeAutomation) => {
+    if (made.kind === "board")
+      return <BoardAction made={made} added={onBoard(made)} projectId={projectId} projects={projects} disabled={add.isPending} onAdd={(id) => add.mutate({ projectId: id, id: made.id })} />;
+    if (made.kind === "rule" && kept(made)) return <span className="text-xs text-ink-4">Added</span>;
+    return (
+      <Button size="sm" onClick={() => (made.kind === "rule" ? onRule(made) : onSchedule(made))}>
+        Add
+      </Button>
+    );
+  };
   return (
     <section aria-labelledby="automation-ready-heading">
       <h2 id="automation-ready-heading" className="automation-heading">
@@ -114,15 +166,9 @@ export function ReadyMadeAutomations({
           <article key={made.id} className="automation-ready-card">
             <div className="automation-ready-top">
               <span className="schedule-row-well" aria-hidden="true">
-                {made.kind === "schedule" ? <CalendarClock size={16} /> : <Automation size={16} />}
+                <ReadyMadeMark made={made} />
               </span>
-              {made.kind === "schedule" ? (
-                <Button size="sm" onClick={() => onSchedule(made)}>
-                  Add
-                </Button>
-              ) : (
-                <BoardAction made={made} added={onBoard(made)} projectId={projectId} projects={projects} disabled={add.isPending} onAdd={(id) => add.mutate({ projectId: id, id: made.id })} />
-              )}
+              {action(made)}
             </div>
             <h3 className="automation-ready-name">{made.name}</h3>
             <p className="automation-ready-what">{made.what}</p>

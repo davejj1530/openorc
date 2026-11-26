@@ -218,6 +218,34 @@ function OnlineCard({ record, ...card }: CardProps & { record: OnlineRecord }) {
   );
 }
 
+/** What a card says under its title: that it waits on the person, else its first label; its project on a board of several; and an organization task's own facts. */
+function CardFacts({ record, needsYou, showProject, project }: { record: TaskRecord; needsYou: boolean; showProject: boolean; project: Project | undefined }) {
+  const task = record.task;
+  return (
+    <>
+      {needsYou ? (
+        <span className="task-board-card-fact text-attention">
+          <StatusDot tone="attention" />
+          Needs you
+        </span>
+      ) : null}
+      {!needsYou && task.labels[0] ? (
+        <span className="task-board-card-fact">
+          <StatusDot tone="muted" />
+          <span className="truncate">{task.labels[0]}</span>
+        </span>
+      ) : null}
+      {showProject && project ? (
+        <span className="task-board-card-fact">
+          <ProjectLogo project={project} />
+          <span className="truncate">{project.name}</span>
+        </span>
+      ) : null}
+      {record.kind === "online" ? <TaskFacts task={record.task} cloud={!(showProject && project && !project.rootPath && "cloud" in project && project.cloud)} /> : null}
+    </>
+  );
+}
+
 function BoardCard({
   record,
   showProject,
@@ -253,25 +281,7 @@ function BoardCard({
         {task.title}
       </button>
       <div className="task-board-card-meta">
-        {needsYou ? (
-          <span className="task-board-card-fact text-attention">
-            <StatusDot tone="attention" />
-            Needs you
-          </span>
-        ) : null}
-        {!needsYou && task.labels[0] ? (
-          <span className="task-board-card-fact">
-            <StatusDot tone="muted" />
-            <span className="truncate">{task.labels[0]}</span>
-          </span>
-        ) : null}
-        {showProject && project ? (
-          <span className="task-board-card-fact">
-            <ProjectLogo project={project} />
-            <span className="truncate">{project.name}</span>
-          </span>
-        ) : null}
-        {record.kind === "online" ? <TaskFacts task={record.task} cloud={!(showProject && project && !project.rootPath && "cloud" in project && project.cloud)} /> : null}
+        <CardFacts record={record} needsYou={needsYou} showProject={showProject} project={project} />
         <span className="task-board-card-end">
           {task.status === "review" ? (
             <Button size="sm" onClick={() => openTaskRecord(record, "files")}>

@@ -29,7 +29,15 @@ function useScheduleAccount(initial: string | undefined, project: Project | unde
 export type SchedulePreset = { name: string; prompt: string; everyMinutes: number };
 
 /** Owns the editable schedule, selected target and the version used for its save. */
+/** What the form starts with: the schedule being edited, else a ready-made one's contents, else nothing but a day between runs. */
+const startingWords = (schedule: Schedule | null, preset: SchedulePreset | undefined) => ({
+  title: schedule?.title ?? preset?.name ?? "",
+  prompt: schedule?.prompt ?? preset?.prompt ?? "",
+  minutes: schedule?.everyMinutes ?? preset?.everyMinutes ?? 1440,
+});
+
 export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | undefined, projectId: string, onClose: () => void, preset?: SchedulePreset) {
+  const start = startingWords(schedule, preset);
   const projects = useSpaceProjects(true);
   const [project, setProject] = useState(schedule?.projectId ?? projectId);
   const { accounts, setAccount, claudeAccountId } = useScheduleAccount(
@@ -44,9 +52,9 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
     setProject(id);
     setAccount(undefined);
   };
-  const [title, setTitle] = useState(schedule?.title ?? preset?.name ?? "");
-  const [prompt, setPrompt] = useState(schedule?.prompt ?? preset?.prompt ?? "");
-  const [minutes, setMinutes] = useState(schedule?.everyMinutes ?? preset?.everyMinutes ?? 1440);
+  const [title, setTitle] = useState(start.title);
+  const [prompt, setPrompt] = useState(start.prompt);
+  const [minutes, setMinutes] = useState(start.minutes);
   const [mode, setMode] = useState<RunMode>(schedule?.mode ?? "plan");
   const { permission, select: setPermission, error: permissionError, ready: permissionReady } = usePermissionSelection(schedule?.permissionMode);
   const [chosenWorkspace, setWorkspace] = useState<WorkspaceMode>(schedule?.workspaceMode ?? "worktree");

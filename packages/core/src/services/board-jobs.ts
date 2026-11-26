@@ -1,10 +1,9 @@
-import { audit, boardColumns, projects, runs, taskActor, taskEvents, taskThreads, tasks, threads as threadRows, type BoardColumnInput, type Db } from "@openorc/db";
-import { DEFAULT_BOARD_COLUMNS, READY_MADE_AUTOMATIONS, type BoardColumn, type Task, type TaskActor, type TaskButton, type Thread } from "@openorc/protocol";
+import { audit, boardColumns, projects, runs, taskActor, taskEvents, tasks, threads as threadRows, type BoardColumnInput, type Db } from "@openorc/db";
+import { DEFAULT_BOARD_COLUMNS, READY_MADE_AUTOMATIONS, type BoardColumn, type BoardStage, type Task, type TaskActor } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
-import { AttachmentService } from "./attachments.js";
 import type { Notification } from "./run-types.js";
+import type { TaskAgents } from "./task-agents.js";
 import type { TaskReports } from "./task-reports.js";
-import type { ThreadService } from "./threads.js";
 
 /** How often agents may bring a card to a column between themselves. The arrival after that starts nothing and waits for the person. */
 const ROUNDS = 3;
@@ -45,8 +44,7 @@ function standing(from: BoardColumn | null, next: BoardColumn | null): string {
 export class BoardJobs {
   constructor(
     private readonly db: Db,
-    private readonly dataDir: string,
-    private readonly threads: Pick<ThreadService, "runTaskButton" | "queue">,
+    private readonly agents: Pick<TaskAgents, "threadOf" | "open" | "tell">,
     private readonly reports: Pick<TaskReports, "ask">,
     private readonly invalidate: (keys: string[]) => void,
     private readonly notify: (n: Omit<Notification, "type">) => void,
@@ -73,10 +71,22 @@ export class BoardJobs {
     if (column.id === task.columnId) throw new Error(`This task is already in "${column.name}".`);
     const run = runs.get(this.db, runId);
     const by = taskActor(run?.threadId ? threadRows.get(this.db, run.threadId) : null);
-    const moved = tasks.update(this.db, task.id, { columnId: column.id, status: column.stage, completedAt: column.stage === "done" ? Date.now() : null }, { explicitStatus: true, by });
     audit.record(this.db, { actor: "agent", action: "task.update", resourceType: "task", resourceId: task.id, metadata: { runId, patch: { column: column.name } } });
+    return this.put(task, { columnId: column.id, stage: column.stage }, by);
+  }
+
+  /**
+   * A card put somewhere by an agent or by the app itself: in one of the board's columns, whose agent then starts, or
+   * at a stage when the column is gone or the board keeps none. A card already there stays as it is.
+   */
+  put(task: Task, to: { columnId: string | null; stage: BoardStage }, by: TaskActor): Task {
+    const named = to.columnId ? boardColumns.get(this.db, to.columnId) : null;
+    const column = named?.projectId === task.projectId ? named : null;
+    const stage = column?.stage ?? to.stage;
+    if (column ? task.columnId === column.id : task.status === stage) return task;
+    const moved = tasks.update(this.db, task.id, { ...(column ? { columnId: column.id } : {}), status: stage, completedAt: stage === "done" ? Date.now() : null }, { explicitStatus: true, by });
     this.invalidate(["tasks", "inbox", `task:${task.id}`]);
-    this.arrived(task.id, column.id, { from: task.columnId ?? null, by });
+    if (column) this.arrived(task.id, column.id, { from: task.columnId ?? null, by });
     return moved;
   }
 
@@ -135,32 +145,16 @@ export class BoardJobs {
     const from = how.from ? boardColumns.get(this.db, how.from) : null;
     const next = column.nextColumnId ? boardColumns.get(this.db, column.nextColumnId) : null;
     const told = `${column.job.prompt}\n\n${standing(from, next)}`;
-    const earlier = this.threadOf(taskId, column);
+    const earlier = this.agents.threadOf(taskId, column.name);
     // A card that comes back continues the thread that worked on it here, with what was said about it since.
     if (earlier) {
       const notes = this.latestNotes(taskId, earlier.id);
-      this.threads.queue(earlier.id, [`This task is back in the "${column.name}" column.`, notes ? `The latest notes on it:\n${notes}` : null, told].filter(Boolean).join("\n\n"));
+      this.agents.tell(earlier.id, [`This task is back in the "${column.name}" column.`, notes ? `The latest notes on it:\n${notes}` : null, told].filter(Boolean).join("\n\n"));
     }
-    const thread = earlier ?? (await this.open(task, column, told));
+    const thread = earlier ?? (await this.agents.open(task, { id: `column:${column.id}`, name: column.name, choice: column.job.choice }, told));
     if (!thread) return;
     taskEvents.record(this.db, taskId, { kind: "app" }, { kind: "started", label: column.name, agent: thread.agent, threadId: thread.id });
     this.invalidate(["tasks", `task:${taskId}`]);
-  }
-
-  /** The thread the column's agent already works on this task in, while it is there to continue. */
-  private threadOf(taskId: string, column: BoardColumn): Thread | null {
-    const link = taskThreads.list(this.db, taskId).find((each) => each.label === column.name);
-    const thread = link ? threadRows.get(this.db, link.threadId) : null;
-    return thread && !thread.archivedAt ? thread : null;
-  }
-
-  /** A new thread for the column's agent, linked to the task under the column's name and working where the task's work is. */
-  private async open(task: Task, column: BoardColumn, told: string): Promise<Thread | null> {
-    const { choice } = column.job!;
-    const press: TaskButton = { id: `column:${column.id}`, label: column.name, prompt: told, runsIn: "new", mode: "thread", ...(choice ? { choice } : {}) };
-    const images = await new AttachmentService(this.dataDir).forTask(task.spec ?? "");
-    const pressed = await this.threads.runTaskButton(task.id, press, images);
-    return threadRows.get(this.db, pressed.threadId);
   }
 
   /** What another agent last posted on the task, as words: its message and, for a checklist, each item with whether it is done. */

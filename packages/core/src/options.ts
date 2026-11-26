@@ -1,6 +1,7 @@
 import type { TextEmbedder } from "@openorc/memory";
 import type { BrowserHost, PreviewHost } from "@openorc/protocol";
 import type { DeviceSystem } from "./devices/system.js";
+import type { AutomationSources } from "./services/automation-sources.js";
 import type { RemoteNetwork } from "./remote/remote-access.js";
 import type { ProtectedSecretStore } from "./services/extraction-credentials.js";
 import type { BundledFormatter } from "./services/file-format.js";
@@ -68,6 +69,8 @@ export interface OpenOrcOptions {
    * machine with no simulators or emulators: nothing runs and agents have no device tool.
    */
   deviceSystem?: DeviceSystem | null;
+  /** Where automations read pull requests and run their checks. Tests pass a stand-in, so no GitHub call or command runs. */
+  automationSources?: AutomationSources;
   /** Starts a command in a terminal of its own, for CLIs whose sign-in screens need one. Without it they get pipes. */
   terminal?: SpawnTerminal;
 }

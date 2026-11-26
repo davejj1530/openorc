@@ -42,6 +42,36 @@ export function NoAccount({ reason, variant, label }: { reason: string; variant:
   );
 }
 
+/**
+ * The account beside the model: chosen for a Claude model whose project has accounts, named and not offered while it is
+ * kept, else Default. `hideDefault` leaves that last one out, where only a real choice earns the room.
+ */
+function ChoiceAccount({
+  value,
+  accounts,
+  keptAccount,
+  variant,
+  label,
+  hideDefault,
+  disabled,
+  onChange,
+}: {
+  value: ThreadChoice | undefined;
+  accounts: ReturnType<typeof useProjectClaudeAccounts>;
+  keptAccount: string | undefined;
+  variant: Variant;
+  label: string | undefined;
+  hideDefault: boolean;
+  disabled: boolean | undefined;
+  onChange: (id: string | undefined) => void;
+}) {
+  const claude = value?.agent === "claude";
+  if (claude && keptAccount) return <NoAccount reason={keptAccountName(accounts, keptAccount)} variant={variant} {...(label ? { label } : {})} />;
+  if (claude && accounts)
+    return <AccountSelect accounts={accounts} value={value?.claudeAccountId} onChange={onChange} variant={variant} {...(label ? { label } : {})} {...(disabled ? { disabled } : {})} />;
+  return hideDefault ? null : <NoAccount reason="Default" variant={variant} {...(label ? { label } : {})} />;
+}
+
 type FieldsProps = {
   value: ThreadChoice | undefined;
   onChange: (choice: ThreadChoice | undefined) => void;
@@ -84,19 +114,19 @@ export function ThreadChoiceFields({ value, onChange, project, plan = false, sam
       ))}
     </Select>
   );
-  const accountLabel = layout === "card" ? undefined : "Account";
-  let account = <NoAccount reason="Default" variant={variant} label={accountLabel} />;
-  if (value?.agent === "claude" && keptAccount) account = <NoAccount reason={keptAccountName(accounts, keptAccount)} variant={variant} label={accountLabel} />;
-  else if (value?.agent === "claude" && accounts)
-    account = <AccountSelect accounts={accounts} value={value.claudeAccountId} onChange={chooseAccount} variant={variant} label={accountLabel} disabled={disabled} />;
-  if (layout === "bar")
-    return (
-      <>
-        {model}
-        {value?.agent === "claude" && (keptAccount || accounts) ? account : null}
-      </>
-    );
-  if (layout === "sheet")
+  const account = (
+    <ChoiceAccount
+      value={value}
+      accounts={accounts}
+      keptAccount={keptAccount}
+      variant={variant}
+      label={layout === "card" ? undefined : "Account"}
+      hideDefault={layout === "bar"}
+      disabled={disabled}
+      onChange={chooseAccount}
+    />
+  );
+  if (layout !== "card")
     return (
       <>
         {model}

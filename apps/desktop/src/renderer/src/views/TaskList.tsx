@@ -7,9 +7,11 @@ import { statusLabel } from "../components/status";
 import { Segmented } from "../components/Segmented";
 import { TaskBoard } from "../components/task-board/TaskBoard";
 import { TaskRows } from "../components/task-list/TaskRows";
+import { AutomationsMenu } from "../components/automations/AutomationsMenu";
 import { TaskFilterMenu } from "../components/task-list/TaskFilterMenu";
 import { Button, Empty } from "../components/ui";
-import { ALL_WORKSPACES, focusedProject, useLayout, type TasksView } from "../lib/layout";
+import { ALL_WORKSPACES, focusedProject, useLayout } from "../lib/layout";
+import { useTasksView, type TasksView } from "../lib/tasks-view";
 import { useSpaceProjects } from "../lib/space-queries";
 import { useTaskListSource } from "../lib/task-list-source";
 import { useTaskOnlineScope } from "../lib/task-online-query";
@@ -65,12 +67,14 @@ function TaskListContent({ onNewTask }: { onNewTask: () => void }) {
   // An organization's tasks are assigned and filtered by project; Personal ones are nobody else's.
   const shared = scope && !scope.personal ? scope : null;
   const filters = useTaskListFilters(shared);
-  const view = useLayout((state) => state.tasksView);
+  const view = useTasksView((state) => state.view);
   const board = view === "board";
   const tasks = useTaskListSource(projectId, filters.assigned, board ? "active" : filters.shelf);
   const projects = useSpaceProjects();
   const { shelf, stage } = filters;
   const all = tasks.data;
+  // A board with automations of its own is one project's, kept in a folder on this computer.
+  const boardProject = projects.data?.find((project) => project.id === projectId && project.rootPath)?.id;
   const list = all.filter(({ task }) => (shelf === "active" ? task.status !== "done" && task.status !== "archived" : task.status === shelf) && (!stage || task.status === stage));
   return (
     <>
@@ -82,7 +86,8 @@ function TaskListContent({ onNewTask }: { onNewTask: () => void }) {
                 Assigned to me <X size={12} />
               </Button>
             ) : null}
-            <Segmented size="sm" label="Tasks view" value={view} options={views} onChange={useLayout.getState().setTasksView} className="mr-1" />
+            <Segmented size="sm" label="Tasks view" value={view} options={views} onChange={useTasksView.getState().setView} className="mr-1" />
+            {board && boardProject ? <AutomationsMenu projectId={boardProject} /> : null}
             <TaskFilterMenu
               shelves={board ? undefined : { tasks: all, shelf, stage, onShelf: (value) => filters.patch({ shelf: value, stage: null }), onStage: (value) => filters.patch({ stage: value }) }}
               assignment={shared ? { value: filters.assigned, onChange: (value) => filters.patch({ assigned: value }) } : undefined}

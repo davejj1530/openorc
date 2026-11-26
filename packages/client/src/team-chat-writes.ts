@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { PendingTeamMessage, TeamChatOrclingPick, TeamChatReaction, TeamMessage, TeamOrclingCall } from "@openorc/protocol";
+import type { PendingTeamMessage, TeamChatOrclingPick, TeamChatReaction, TeamChatTimeline, TeamMessage, TeamOrclingCall } from "@openorc/protocol";
 import { tagsFor } from "./query-tags.js";
 import type { TeamChatContext, TeamChatLease } from "./team-chat-context.js";
 import type { TeamChatTarget } from "./team-chat-drafts.js";
@@ -29,9 +29,19 @@ export function teamChatWrites(ctx: TeamChatContext) {
       }
     },
 
+    /** Shows the reaction at once, then what the server holds; a refusal puts back the conversation as the server has it. */
     async react(lease: TeamChatLease, target: TeamChatTarget, message: TeamMessage, emoji: TeamChatReaction): Promise<void> {
       ctx.live(lease, "You're offline. Reconnect to react.");
-      ctx.receive(lease, await ctx.connection.call("teamChat.react", { spaceId: target.spaceId, conversationId: target.conversationId, messageId: message.id, emoji }));
+      const key = ctx.keys.timeline(lease, target.conversationId);
+      ctx.queryClient.setQueryData<TeamChatTimeline>(key, (old) =>
+        old ? { ...old, messages: old.messages.map((each) => (each.id === message.id ? { ...each, reactions: toggledReaction(each.reactions, emoji, lease.accountId) } : each)) } : old,
+      );
+      try {
+        ctx.receive(lease, await ctx.connection.call("teamChat.react", { spaceId: target.spaceId, conversationId: target.conversationId, messageId: message.id, emoji }));
+      } catch (error) {
+        void ctx.queryClient.invalidateQueries({ queryKey: key, exact: true });
+        throw error;
+      }
     },
 
     async pin(lease: TeamChatLease, target: TeamChatTarget, message: TeamMessage, pinned: boolean): Promise<void> {
@@ -81,4 +91,12 @@ export function teamChatWrites(ctx: TeamChatContext) {
       await ctx.connection.call("teamChat.retryOrclingCall", { spaceId: target.spaceId, conversationId: target.conversationId, callId: call.id });
     },
   };
+}
+
+/** The person's reaction added, or taken back when it was there, as the server toggles it. */
+export function toggledReaction(reactions: TeamMessage["reactions"], emoji: string, self: string): TeamMessage["reactions"] {
+  const found = reactions.find((reaction) => reaction.emoji === emoji);
+  if (!found) return [...reactions, { emoji, userIds: [self] }];
+  const userIds = found.userIds.includes(self) ? found.userIds.filter((id) => id !== self) : [...found.userIds, self];
+  return userIds.length ? reactions.map((reaction) => (reaction === found ? { emoji, userIds } : reaction)) : reactions.filter((reaction) => reaction !== found);
 }

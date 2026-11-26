@@ -1,9 +1,10 @@
-import { answeredName, answeredOf, stretchTime, teamConversationTitle, type TeamChatLease, type TeamChatTarget } from "@openorc/client";
+import { answeredName, answeredOf, stretchTime, teamConversationTitle, withUnsent, type TeamChatLease, type TeamChatTarget } from "@openorc/client";
 import { TeamChatReaction, type TeamChatAnswered, type TeamConversation, type TeamMessage, type TeamOrclingCall } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActionSheetIOS, Pressable, View, type ScrollViewInstance } from "react-native";
 import { KeyboardChatScrollView } from "react-native-keyboard-controller";
+import Animated, { FadeInDown, LayoutAnimationConfig } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { teamChat } from "../client";
 import { Pin } from "../generated/icons";
@@ -23,6 +24,9 @@ import { Reactions } from "./Reactions";
 
 /** A message the draft began, on its way or kept after it did not go. */
 type PendingTeamMessage = NonNullable<ReturnType<typeof teamChat.drafts.begin>>;
+
+/** The newest row rises in as it lands; earlier pages never move. */
+const ARRIVE = FadeInDown.duration(220).withInitialValues({ transform: [{ translateY: 6 }] });
 
 /** The face beside the last of a run, and the room it keeps at the bubbles' left. */
 const FACE = 28;
@@ -75,6 +79,8 @@ interface MessageMoves {
   self: string;
   retryCall: (call: TeamOrclingCall) => void;
   react: (message: TeamMessage, emoji: TeamChatReaction) => void;
+  /** Tries again a message of the reader's that did not go, with its same id. */
+  resend: (message: PendingTeamMessage) => void;
   reply: ((message: TeamMessage) => void) | null;
   pin: ((message: TeamMessage) => void) | null;
 }
@@ -110,19 +116,29 @@ function Under({ message, moves, mine }: { message: TeamMessage; moves: MessageM
   );
 }
 
-/** The reader's own message on the right, in the phone's prompt bubble. */
-function Mine({ message, moves }: { message: TeamMessage; moves: MessageMoves }) {
+/**
+ * The reader's own message on the right, in the phone's prompt bubble. One on its way is faint, with nothing to do to
+ * it yet; one that did not go has Retry under it, as the desktop draws them.
+ */
+function Mine({ message, moves, sending }: { message: TeamMessage; moves: MessageMoves; sending: PendingTeamMessage | undefined }) {
+  const failed = sending?.state === "failed";
   return (
-    <View className="items-end gap-1 self-end" style={{ maxWidth: "88%" }}>
-      <Pressable onLongPress={() => offer(message, moves)} delayLongPress={350} className="items-end gap-1">
+    <View accessibilityLabel={sending && !failed ? "Sending" : undefined} className="items-end gap-1 self-end" style={{ maxWidth: "88%" }}>
+      <Pressable onLongPress={sending ? undefined : () => offer(message, moves)} delayLongPress={350} className="items-end gap-1">
         {message.replyTo ? <Quote answered={message.replyTo} self={moves.self} mine /> : null}
         <Body body={message.body}>
-          <View className="rounded-2xl bg-bubble px-4 py-3">
+          <View className={cn("rounded-2xl bg-bubble px-4 py-3", sending && !failed && "opacity-60")}>
             <Words body={message.body} className="text-md text-bubble-ink" />
           </View>
         </Body>
       </Pressable>
-      <Under message={message} moves={moves} mine />
+      {sending ? null : <Under message={message} moves={moves} mine />}
+      {failed ? (
+        <Pressable accessibilityRole="button" accessibilityHint={sending.error ?? undefined} onPress={() => moves.resend(sending)} hitSlop={8} className="flex-row gap-1.5 active:opacity-60">
+          <Text className="text-sm text-bad">Message not sent</Text>
+          <Text className="text-sm text-ink-2">Retry</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -149,24 +165,6 @@ function Theirs({ item, moves }: { item: Extract<ChatItem, { kind: "theirs" }>; 
   );
 }
 
-/** A message on its way, faint in the reader's bubble, or one that did not go, with Retry under it, as the desktop draws them. */
-function Pending({ message, onRetry }: { message: PendingTeamMessage; onRetry: () => void }) {
-  const failed = message.state === "failed";
-  return (
-    <View accessibilityLabel={failed ? undefined : "Sending"} className="items-end gap-1 self-end" style={{ maxWidth: "88%" }}>
-      <View className={cn("rounded-2xl bg-bubble px-4 py-3", !failed && "opacity-60")}>
-        <Words body={message.body} className="text-md text-bubble-ink" />
-      </View>
-      {failed ? (
-        <Pressable accessibilityRole="button" accessibilityHint={message.error ?? undefined} onPress={onRetry} hitSlop={8} className="flex-row gap-1.5 active:opacity-60">
-          <Text className="text-sm text-bad">Message not sent</Text>
-          <Text className="text-sm text-ink-2">Retry</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
 /** The New messages line at the reader's place, a hairline either side of its words. */
 function NewLine({ onLayout }: { onLayout: (y: number) => void }) {
   return (
@@ -178,14 +176,14 @@ function NewLine({ onLayout }: { onLayout: (y: number) => void }) {
   );
 }
 
-function Row({ item, moves, onNew }: { item: ChatItem; moves: MessageMoves; onNew: (y: number) => void }) {
+function Row({ item, moves, onNew, unsent }: { item: ChatItem; moves: MessageMoves; onNew: (y: number) => void; unsent: ReadonlyMap<string, PendingTeamMessage> }) {
   switch (item.kind) {
     case "time":
       return <Text className="text-center text-xs text-ink-4">{stretchTime(item.at)}</Text>;
     case "new":
       return <NewLine onLayout={onNew} />;
     case "mine":
-      return <Mine message={item.message} moves={moves} />;
+      return <Mine message={item.message} moves={moves} sending={unsent.get(item.message.id)} />;
     case "theirs":
       return <Theirs item={item} moves={moves} />;
   }
@@ -206,6 +204,7 @@ function useMessageMoves(lease: TeamChatLease, target: TeamChatTarget): { moves:
     self: lease.accountId,
     retryCall: (call) => void teamChat.retryCall(lease, target, call).catch(failed),
     react: (message, emoji) => void teamChat.react(lease, target, message, emoji).catch(failed),
+    resend: (message) => void teamChat.send(lease, target, message).catch(() => undefined),
     reply: chat?.features.includes("replies") ? (message) => teamChat.drafts.reply(target, answeredOf(message)) : null,
     pin: chat?.features.includes("pins") && joined ? (message) => void teamChat.pin(lease, target, message, !message.pinned).catch(failed) : null,
   };
@@ -231,19 +230,18 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
   const onRowLayout = useRevealScroll(list, reveal, () => (atEnd.current = false));
   const files = useMemo(() => chatFileScope(lease.spaceId, conversationId), [lease, conversationId]);
   const messages = useMemo(() => timeline.data?.messages ?? [], [timeline.data]);
-  const sent = new Set(messages.map((message) => message.id));
-  const items = useMemo(() => chatItems(messages, lease.accountId, newFrom), [messages, lease.accountId, newFrom]);
+  const drawn = useMemo(() => withUnsent(messages, draft.pending, conversationId, { id: lease.accountId, name: "You", image: null }), [messages, draft.pending, conversationId, lease.accountId]);
+  const items = useMemo(() => chatItems(drawn.messages, lease.accountId, newFrom), [drawn.messages, lease.accountId, newFrom]);
   const lastId = messages.at(-1)?.id;
   useEffect(() => {
     if (lastId) void teamChat.seen(lease, target, { id: lastId }).catch(() => undefined);
   }, [lease, target, lastId]);
   const { moves, failure, orclings } = useMessageMoves(lease, target);
-  const send = (message: PendingTeamMessage) => void teamChat.send(lease, target, message).catch(() => undefined);
   const write = () => {
     const message = teamChat.drafts.begin(target);
     if (!message) return;
     atEnd.current = true;
-    send(message);
+    moves.resend(message);
   };
   const openAtNew = (y: number) => {
     if (opened.current) return;
@@ -273,19 +271,22 @@ function Conversation({ lease, conversationId, title, newFrom, jump }: { lease: 
           ) : null}
           {!timeline.data && !timeline.error ? <WorkingMark /> : null}
           {timeline.error ? <Text className="px-5 py-10 text-center text-ink-4">{timeline.error.message}</Text> : null}
-          {timeline.data && !messages.length && !draft.pending.length ? <Text className="py-10 text-center text-ink-4">No messages yet</Text> : null}
-          {items.map((item) => (
-            <View key={item.key} style={{ paddingTop: item.gap }} onLayout={"message" in item ? ({ nativeEvent }) => onRowLayout(item.message.id, nativeEvent.layout.y) : undefined}>
-              <Row item={item} moves={moves} onNew={openAtNew} />
-            </View>
-          ))}
-          {draft.pending
-            .filter((message) => !sent.has(message.id))
-            .map((message) => (
-              <View key={message.id} style={{ paddingTop: 14 }}>
-                <Pending message={message} onRetry={() => send(message)} />
-              </View>
-            ))}
+          {timeline.data && !drawn.messages.length ? <Text className="py-10 text-center text-ink-4">No messages yet</Text> : null}
+          {timeline.data ? (
+            // The rows the conversation opens with skip their entrance; only what lands after rises in.
+            <LayoutAnimationConfig skipEntering>
+              {items.map((item, index) => (
+                <Animated.View
+                  key={item.key}
+                  entering={index === items.length - 1 ? ARRIVE : undefined}
+                  style={{ paddingTop: item.gap }}
+                  onLayout={"message" in item ? ({ nativeEvent }) => onRowLayout(item.message.id, nativeEvent.layout.y) : undefined}
+                >
+                  <Row item={item} moves={moves} onNew={openAtNew} unsent={drawn.unsent} />
+                </Animated.View>
+              ))}
+            </LayoutAnimationConfig>
+          ) : null}
         </KeyboardChatScrollView>
         <ChatComposer
           target={target}

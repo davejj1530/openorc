@@ -11,7 +11,7 @@ import { ChevronDown, X } from "./icons";
 import { Button } from "./ui";
 import "../styles/team-chat.css";
 
-export interface TeamChatProps extends TeamChatTranscriptProps {
+export interface TeamChatProps extends Omit<TeamChatTranscriptProps, "conversationId"> {
   conversation: TeamConversation;
   draft: string;
   onDraft(text: string): void;
@@ -120,5 +120,5 @@ function TeamChatBody(props: TeamChatProps) {
         </Button>
       </div>
     );
-  return <TeamChatTranscript {...props} />;
+  return <TeamChatTranscript {...props} conversationId={props.conversation.id} />;
 }

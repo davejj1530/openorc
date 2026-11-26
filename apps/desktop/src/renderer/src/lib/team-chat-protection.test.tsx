@@ -103,12 +103,16 @@ it("closes cached history before rendering at the offline grace deadline and pre
   expect(f.scope.current()).toBe(false);
 });
 
-it("fences a round trip to another space without throwing away either draft", async () => {
+it("keeps a space's chat through a round trip to another space, fencing it while away", async () => {
   const f = await fixture();
   spaceNavigation.setState({ current: "other" });
-  spaceNavigation.setState({ current: "team" });
   expect(f.scope.current()).toBe(false);
-  expect(f.queries.getQueryCache().getAll()).toEqual([]);
+  expect(f.protection.scope(status(), "other")?.generation).not.toBe(f.scope.generation);
+  spaceNavigation.setState({ current: "team" });
+  const back = f.protection.scope(status(), "team")!;
+  expect(back.generation).toBe(f.scope.generation);
+  expect(back.current()).toBe(true);
+  expect(f.queries.getQueryData(["team-chat", "self", "team", back.generation, "timeline"])).toBe("Private history");
   expect(f.drafts.read(target).text).toBe("Keep through a frozen seat");
   expect(f.drafts.read(other).text).toBe("Other team draft");
 });

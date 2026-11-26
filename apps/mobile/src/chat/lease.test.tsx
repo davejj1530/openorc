@@ -19,7 +19,7 @@ const ready = (current: Extract<PhoneSpaces, { state: "ready" }>["current"], off
   userId: "u-riley",
 });
 
-it("leases the shown organization's chat, a new generation for another one, and nothing for Personal", () => {
+it("leases the shown organization's chat, another generation for another one, the same one back, and nothing for Personal", () => {
   spaces.now = ready(org("org-birch", "Birch Studio"));
   const { result, rerender } = renderHook(() => useChatLease());
   const birch = result.current!;
@@ -28,9 +28,13 @@ it("leases the shown organization's chat, a new generation for another one, and 
   spaces.now = ready(org("org-alder", "Alder Works"), true);
   rerender();
   expect(result.current).toMatchObject({ spaceId: "org-alder", reach: "offline" });
-  expect(result.current!.generation).toBeGreaterThan(birch.generation);
+  expect(result.current!.generation).not.toBe(birch.generation);
   // What the Birch lease read no longer counts.
   expect(birch.current()).toBe(false);
+  // Back in Birch, what it read is shown again at once.
+  spaces.now = ready(org("org-birch", "Birch Studio"));
+  rerender();
+  expect(result.current!.generation).toBe(birch.generation);
   spaces.now = ready(personal);
   rerender();
   expect(result.current).toBeNull();

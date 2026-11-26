@@ -76,11 +76,6 @@
   font-size: var(--text-sm);
   color: var(--ink-3);
 }
-.team-chat-pending-files {
-  font-size: var(--text-sm);
-  color: var(--ink-3);
-  text-align: right;
-}
 .composer-file-hint {
   font-size: var(--text-xs);
   line-height: var(--text-xs--line-height);

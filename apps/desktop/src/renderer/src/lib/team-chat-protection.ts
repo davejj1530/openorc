@@ -37,6 +37,7 @@ export class TeamChatProtection {
     const { gate, navigation, queries, drafts } = this.deps;
     const clear = () => {
       this.#leases.enter(null);
+      this.#leases.invalidate();
       this.#scope = null;
       queries.removeQueries({ queryKey: ["team-chat"] });
       ++this.#revision;
@@ -53,8 +54,9 @@ export class TeamChatProtection {
         this.deps.fileDrafts.forgetSpace(accountId, spaceId);
       }
     });
+    // Another space keeps this one's chat to show again at once; another account's never sees it.
     const selected = navigation.subscribe((next, before) => {
-      if (next.current !== before.current || next.key !== before.key) clear();
+      if (next.key !== before.key) clear();
     });
     return () => {
       protectedChange();

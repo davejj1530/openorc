@@ -230,6 +230,40 @@ body:has(.sidebar-shell[data-open="true"]) .work-row[data-chat="true"] > .team-c
   flex-shrink: 0;
   padding-bottom: 24px;
 }
+/* A message that lands at the foot once the conversation has drawn rises out of a blur, as companion chat's do; what
+   it opened with and earlier pages never move. */
+@starting-style {
+  .team-chat-transcript[data-arrivals] > .team-chat-run:last-child .orcling-bubble {
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+    translate: 0 var(--arrive-rise);
+  }
+}
+/* Said only when a send is slow, so a quick one never flickers a word under it; it takes no room, so nothing moves
+   when the send lands, and only the last of several says it. */
+.team-chat-sending {
+  position: absolute;
+  top: 100%;
+  right: 12px;
+  padding-top: 2px;
+  white-space: nowrap;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  animation: team-chat-sending-show var(--duration-arrive) var(--ease-out) 1.2s backwards;
+}
+@keyframes team-chat-sending-show {
+  from {
+    opacity: 0;
+  }
+}
+.team-chat-message[data-sending]:not(:last-child) .team-chat-sending {
+  display: none;
+}
+.team-chat-message[data-sending="failed"] {
+  flex-direction: column;
+  align-items: flex-end;
+}
 .team-chat-send-error {
   display: flex;
   justify-content: flex-end;

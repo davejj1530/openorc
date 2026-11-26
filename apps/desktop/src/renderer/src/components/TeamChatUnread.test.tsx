@@ -77,6 +77,7 @@ it("reports what is displayed only while the window is focused, and draws New me
   const onShown = vi.fn();
   const view = render(
     <TeamChatTranscript
+      conversationId="general"
       messages={[message(1, "First"), message(2, "Second"), message(3, "Third")]}
       pending={[]}
       self="self"

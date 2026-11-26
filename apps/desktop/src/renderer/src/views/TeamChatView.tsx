@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { WorkingMark } from "../components/StateMark";
 import type { TeamChatRoute } from "../lib/team-chat-route";
 import { useTeamChatContext, type TeamChatContextValue } from "../lib/team-chat-context";
-import { chatTimelineKey, teamChatDrafts, useTeamChatState, useTeamChatWatch } from "../lib/team-chat-queries";
+import { chatTimelineKey, teamChatDrafts, useTeamChatState, useTeamChatTimeline, useTeamChatWatch } from "../lib/team-chat-queries";
 import { queryClient } from "../lib/client";
 import { useThreadTabs } from "../lib/thread-tabs";
 import { TopBar } from "../components/TopBar";
@@ -26,6 +26,8 @@ export function TeamChatView({ target }: { target: TeamChatRoute }) {
 
 function AuthorizedChat({ scope, target }: { scope: TeamChatContextValue; target: TeamChatRoute }) {
   const state = useTeamChatState();
+  // The messages are read beside the chat's list, not after it.
+  useTeamChatTimeline(scope, target.conversationId, true);
   const chat = state.data?.state === "ready" ? state.data.chat : undefined;
   const conversation = chat?.conversations.find((conversation) => conversation.id === target.conversationId);
   const lost = Boolean(chat && !conversation);

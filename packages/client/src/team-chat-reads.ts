@@ -9,6 +9,8 @@ import { refreshTeamHistory } from "./team-chat-history.js";
 type PresenceState = TeamChatPresence["people"][number]["state"];
 const NO_PRESENCE: ReadonlyMap<string, PresenceState> = new Map();
 const NO_SPACES: readonly string[] = [];
+/** How long a chat out of view stays to show again at once, refreshed behind it, when the person comes back. */
+const KEPT_MS = 10 * 60_000;
 
 /** What a chat screen reads: each keyed by the lease it was read under, refreshed by the chat's own invalidations. */
 export function teamChatReads(ctx: TeamChatContext) {
@@ -20,7 +22,7 @@ export function teamChatReads(ctx: TeamChatContext) {
           queryKey: lease ? ctx.keys.state(lease) : ["team-chat", "unavailable"],
           enabled: Boolean(lease),
           retry: false,
-          gcTime: 0,
+          gcTime: KEPT_MS,
           meta: { tags: lease ? ctx.tags(lease) : [] },
           queryFn: async ({ signal }): Promise<TeamChatStatus> => {
             ctx.current(lease, signal);
@@ -43,7 +45,7 @@ export function teamChatReads(ctx: TeamChatContext) {
           queryKey: key,
           enabled,
           retry: false,
-          gcTime: 0,
+          gcTime: KEPT_MS,
           meta: { tags: ctx.tags(lease, conversationId) },
           queryFn: ({ signal }) =>
             refreshTeamHistory(ctx.queryClient.getQueryData<TeamChatTimeline>(key), async (afterSeq) => {
@@ -90,7 +92,7 @@ export function teamChatReads(ctx: TeamChatContext) {
           queryKey: ctx.keys.pins(lease, conversationId),
           enabled,
           retry: false,
-          gcTime: 0,
+          gcTime: KEPT_MS,
           meta: { tags: ctx.tags(lease, conversationId) },
           queryFn: async ({ signal }) => {
             ctx.current(lease, signal);

@@ -5,6 +5,20 @@
   min-width: 0;
   max-width: 100%;
 }
+/* The strip between a bubble and its buttons still points at the message, so the buttons hold while the pointer
+   crosses to them instead of blinking out on the way. */
+.team-chat-bubble-line::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 100%;
+  width: 6px;
+}
+.team-chat-message-mine .team-chat-bubble-line::after {
+  right: 100%;
+  left: auto;
+  width: 4px;
+}
 .team-chat-message-actions {
   position: absolute;
   top: 50%;
@@ -133,9 +147,4 @@
 .team-chat-replying button:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
-}
-
-/* A reply still sending or not sent keeps its quote on the person's own side, above the bubble. */
-.team-chat-pending > .team-chat-reply-quote {
-  margin: 0 0 6px auto;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
-import { stretchTime } from "@openorc/client";
+import { stretchTime, withUnsent } from "@openorc/client";
 import { actorPerson, type PendingTeamMessage, type TeamChatAnswered, type TeamChatPerson, type TeamChatReaction, type TeamMessage, type TeamOrclingCall } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { teamChatGroups } from "../lib/team-chat-groups";
@@ -8,11 +8,11 @@ import { lastDisplayed, useWindowAttention } from "../lib/team-chat-seen";
 import { TeamChatActorFace } from "./TeamChatActorFace";
 import { actorName } from "../lib/team-chat-actor";
 import { TeamChatMessage } from "./TeamChatMessage";
-import { TeamChatReplyQuote } from "./TeamChatReplyQuote";
-import { Tooltip } from "./ui";
 import "../styles/team-chat-unread.css";
 
 export interface TeamChatTranscriptProps {
+  /** The conversation the unsent messages are drawn in. */
+  conversationId: string;
   messages: readonly TeamMessage[];
   pending: readonly PendingTeamMessage[];
   self: string;
@@ -43,13 +43,15 @@ export function TeamChatTranscript(props: TeamChatTranscriptProps) {
   const visible = useTeamChatVisible();
   const viewport = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
-  const previous = useRef({ height: 0, first: "" });
+  const previous = useRef({ height: 0, first: "", pending: props.pending.length });
   const attending = useWindowAttention();
   const placed = useRef(false);
   const firstNew = props.newFrom == null ? undefined : props.messages.find((message) => message.seq > props.newFrom! && actorPerson(message.actor)?.id !== props.self);
   useLayoutEffect(() => {
     const element = viewport.current;
     if (!element || !visible) return;
+    // A message the person just sent brings them to it, wherever they had scrolled.
+    if (props.pending.length > previous.current.pending) pinned.current = true;
     const line = !placed.current && firstNew ? element.querySelector<HTMLElement>(".team-chat-new") : null;
     if (line) {
       // An unread conversation opens at its reading place, the line near the top, not at its latest message.
@@ -58,7 +60,7 @@ export function TeamChatTranscript(props: TeamChatTranscriptProps) {
       pinned.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
     } else if (pinned.current) element.scrollTop = element.scrollHeight;
     else if (previous.current.first !== props.messages[0]?.id) element.scrollTop += element.scrollHeight - previous.current.height;
-    previous.current = { height: element.scrollHeight, first: props.messages[0]?.id ?? "" };
+    previous.current = { height: element.scrollHeight, first: props.messages[0]?.id ?? "", pending: props.pending.length };
   }, [visible, props.messages, props.pending, firstNew]);
   useLayoutEffect(() => {
     const element = viewport.current;
@@ -91,8 +93,10 @@ export function TeamChatTranscript(props: TeamChatTranscriptProps) {
     };
   }, [visible, attending, onShown, messages]);
   const found = useRevealed(viewport, visible, props.reveal ?? null, props.onRevealed, pinned);
-  const groups = teamChatGroups(props.messages);
-  const sent = new Set(props.messages.map((message) => message.id));
+  const arrivals = useArrivals();
+  const self = props.people.find((person) => person.id === props.self) ?? { id: props.self, name: "You", image: null };
+  const drawn = withUnsent(props.messages, props.pending, props.conversationId, self);
+  const groups = teamChatGroups(drawn.messages);
   return (
     <div
       ref={viewport}
@@ -103,13 +107,13 @@ export function TeamChatTranscript(props: TeamChatTranscriptProps) {
         pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
       }}
     >
-      <div className="team-chat-transcript orcling-chat">
+      <div className="team-chat-transcript orcling-chat" data-arrivals={arrivals || undefined}>
         {props.older ? (
           <button type="button" className="team-chat-older" disabled={props.loadingOlder} onClick={props.onOlder}>
             {props.loadingOlder ? "Loading…" : "Earlier messages"}
           </button>
         ) : null}
-        {!groups.length && !props.pending.length ? <p className="team-chat-empty">No messages yet</p> : null}
+        {!groups.length ? <p className="team-chat-empty">No messages yet</p> : null}
         {groups.flatMap((group) => {
           if (group.kind === "time")
             return [
@@ -118,20 +122,15 @@ export function TeamChatTranscript(props: TeamChatTranscriptProps) {
               </div>,
             ];
           const split = firstNew ? group.messages.findIndex((message) => message.id === firstNew.id) : -1;
-          if (split < 0) return [<SpeakerGroup key={group.id} {...props} found={found} messages={group.messages} />];
+          if (split < 0) return [<SpeakerGroup key={group.id} {...props} found={found} sending={drawn.unsent} messages={group.messages} />];
           return [
-            ...(split > 0 ? [<SpeakerGroup key={group.id} {...props} found={found} messages={group.messages.slice(0, split)} />] : []),
+            ...(split > 0 ? [<SpeakerGroup key={group.id} {...props} found={found} sending={drawn.unsent} messages={group.messages.slice(0, split)} />] : []),
             <div key="new" className="team-chat-new" role="separator">
               <span>New messages</span>
             </div>,
-            <SpeakerGroup key={`${group.id}:new`} {...props} found={found} messages={group.messages.slice(split)} />,
+            <SpeakerGroup key={`${group.id}:new`} {...props} found={found} sending={drawn.unsent} messages={group.messages.slice(split)} />,
           ];
         })}
-        {props.pending
-          .filter((message) => !sent.has(message.id))
-          .map((message) => (
-            <PendingBubble key={message.id} message={message} self={props.self} people={props.people} reason={props.reason} onRetry={() => props.onRetry(message)} />
-          ))}
       </div>
     </div>
   );
@@ -147,8 +146,14 @@ function SpeakerGroup({
   onOpenAnswered,
   onPin,
   onRetryCall,
+  onRetry,
   found,
-}: Pick<TeamChatTranscriptProps, "messages" | "self" | "people" | "reason" | "names" | "onReact" | "onReply" | "onOpenAnswered" | "onPin" | "onRetryCall"> & { found: string | null }) {
+  sending,
+}: Pick<TeamChatTranscriptProps, "messages" | "self" | "people" | "reason" | "names" | "onReact" | "onReply" | "onOpenAnswered" | "onPin" | "onRetryCall" | "onRetry"> & {
+  found: string | null;
+  /** The person's own messages not yet confirmed, drawn where they will stay. */
+  sending: ReadonlyMap<string, PendingTeamMessage>;
+}) {
   const actor = messages[0]!.actor;
   const mine = actorPerson(actor)?.id === self;
   const orcling = actor.kind === "orcling" ? actor : null;
@@ -161,51 +166,40 @@ function SpeakerGroup({
       {orcling ? <div className="orcling-run-name">{`${orcling.name} · ${orcling.owner.id === self ? "Your" : `${orcling.owner.name}'s`} Orcling`}</div> : null}
       {!mine && !orcling && names ? <div className="orcling-run-name">{actorName(actor)}</div> : null}
       <div className="orcling-run-bubbles">
-        {messages.map((message) => (
-          <TeamChatMessage
-            key={message.id}
-            message={message}
-            self={self}
-            people={people}
-            reason={reason}
-            onReact={(emoji) => onReact(message, emoji)}
-            {...(onReply && { onReply: () => onReply(message) })}
-            {...(onOpenAnswered && message.replyTo && { onOpenAnswered: () => onOpenAnswered(message.replyTo!) })}
-            {...(onPin && { onPin: (pinned: boolean) => onPin(message, pinned) })}
-            onRetryCall={onRetryCall}
-            found={found === message.id || undefined}
-          />
-        ))}
+        {messages.map((message) => {
+          const unsent = sending.get(message.id);
+          if (unsent)
+            return (
+              <TeamChatMessage key={message.id} message={message} self={self} people={people} reason={reason} sending={{ state: unsent.state, error: unsent.error, onRetry: () => onRetry(unsent) }} />
+            );
+          return (
+            <TeamChatMessage
+              key={message.id}
+              message={message}
+              self={self}
+              people={people}
+              reason={reason}
+              onReact={(emoji) => onReact(message, emoji)}
+              {...(onReply && { onReply: () => onReply(message) })}
+              {...(onOpenAnswered && message.replyTo && { onOpenAnswered: () => onOpenAnswered(message.replyTo!) })}
+              {...(onPin && { onPin: (pinned: boolean) => onPin(message, pinned) })}
+              onRetryCall={onRetryCall}
+              found={found === message.id || undefined}
+            />
+          );
+        })}
       </div>
     </div>
   );
 }
-function PendingBubble({ message, self, people, reason, onRetry }: { message: PendingTeamMessage; self: string; people: readonly TeamChatPerson[]; reason: string | null; onRetry(): void }) {
-  return (
-    <div className="team-chat-pending journal-prompt">
-      {message.replyTo ? <TeamChatReplyQuote answered={message.replyTo} self={self} people={people} /> : null}
-      <div className="journal-message-body">
-        {message.body.trim() ? <div className="message-bubble whitespace-pre-wrap">{message.body}</div> : null}
-        {message.files.length ? <div className="team-chat-pending-files">{message.files.map((file) => file.name).join(", ")}</div> : null}
-      </div>
-      {message.state === "failed" ? (
-        <div className="team-chat-send-error" role="status">
-          <Tooltip label={message.error ?? "Delivery couldn't be confirmed."}>
-            <span>Message not sent</span>
-          </Tooltip>
-          <Tooltip label={reason ?? "Retry"}>
-            <button type="button" disabled={Boolean(reason)} onClick={onRetry}>
-              Retry
-            </button>
-          </Tooltip>
-        </div>
-      ) : (
-        <span className="sr-only" role="status">
-          Sending
-        </span>
-      )}
-    </div>
-  );
+/** Messages that land once the conversation has drawn arrive with motion; what it opened with never does. */
+function useArrivals(): boolean {
+  const [arrivals, setArrivals] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setArrivals(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return arrivals;
 }
 
 /** Brings a requested message into view once it is drawn and marks it for a moment; the mark is its id. */

@@ -104,7 +104,25 @@
   border-top: var(--hairline) solid var(--line);
   padding: 10px 16px 10px 12px;
 }
+/* Where a column of the board of all projects is, in the place its moves take on a project's own board. */
+.task-board-settings-where {
+  min-width: 0;
+  overflow: hidden;
+  padding-left: 4px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-board-setting-note {
+  padding-left: 2px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: 18px;
+}
 .task-board-remove {
+  flex-shrink: 0;
   margin-left: auto;
   color: var(--bad);
   font-size: var(--text-sm);

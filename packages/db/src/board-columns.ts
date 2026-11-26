@@ -27,6 +27,10 @@ const fromRow = (row: BoardColumnRow): BoardColumn => ({
 });
 
 export const boardColumns = {
+  /** Every project's columns, each project's in its board's order. */
+  all(db: Db): BoardColumn[] {
+    return (db.stmt(`SELECT ${FIELDS} FROM board_columns ORDER BY project_id, position`).all() as unknown as BoardColumnRow[]).map(fromRow);
+  },
   list(db: Db, projectId: string): BoardColumn[] {
     return (db.stmt(`SELECT ${FIELDS} FROM board_columns WHERE project_id = ? ORDER BY position`).all(projectId) as unknown as BoardColumnRow[]).map(fromRow);
   },

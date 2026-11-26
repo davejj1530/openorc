@@ -47,15 +47,71 @@ function ColumnAgent({ slot, project, onChange }: { slot: BoardSlot; project: Ac
 }
 
 /**
+ * A column of the board of all projects, across them: the projects that have it, none when every one does, and those
+ * whose agent is told other words than the one shown. A change here is made in each of them.
+ */
+export type ColumnAcross = { having: string[] | null; agentDiffers: string[]; sole: boolean };
+
+const listed = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
+
+type FootProps = { slots: readonly BoardSlot[]; index: number; across: ColumnAcross | null; onChange: (slots: BoardSlot[], open: number | null) => void };
+
+/**
+ * The settings' foot: the column's moves, or on the board of all projects the projects that have it, and its removal,
+ * which a board's only column, or some project's, cannot take.
+ */
+function SettingsFoot({ slots, index, across, onChange }: FootProps) {
+  const moveTo = (place: number) => {
+    const next = [...slots];
+    next.splice(place, 0, ...next.splice(index, 1));
+    onChange(next, place);
+  };
+  return (
+    <div className="task-board-settings-foot">
+      {across ? (
+        <p className="task-board-settings-where">{across.having ? `In ${listed.format(across.having)}` : "In every project"}</p>
+      ) : (
+        <>
+          <Tooltip label="Move left">
+            <IconButton size="sm" aria-label="Move left" disabled={index === 0} onClick={() => moveTo(index - 1)}>
+              <ArrowLeft size={15} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip label="Move right">
+            <IconButton size="sm" aria-label="Move right" disabled={index === slots.length - 1} onClick={() => moveTo(index + 1)}>
+              <ArrowRight size={15} />
+            </IconButton>
+          </Tooltip>
+        </>
+      )}
+      <TextButton
+        className="task-board-remove"
+        disabled={slots.length === 1 || Boolean(across?.sole)}
+        onClick={() =>
+          onChange(
+            slots.filter((_, place) => place !== index),
+            null,
+          )
+        }
+      >
+        Remove column
+      </TextButton>
+    </div>
+  );
+}
+
+/**
  * One column's settings, opened from its head: its name, its stage, the agent a card starts there and where the card
  * goes when that agent is done, its place and its removal. Every change saves the whole board, and `onChange` names the
- * place whose settings stay open after it.
+ * place whose settings stay open after it. On the board of all projects, `across` says where the column is, and its
+ * place follows its stage there, so it has no moves.
  */
 export function TaskBoardColumnSettings({
   slots,
   index,
   project,
   jobsStart,
+  across,
   open,
   onOpenChange,
   onChange,
@@ -65,6 +121,7 @@ export function TaskBoardColumnSettings({
   project: AccountsProject | undefined;
   /** Whether a column here can have an agent: a board this computer keeps. An organization's board is its columns alone. */
   jobsStart: boolean;
+  across: ColumnAcross | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onChange: (slots: BoardSlot[], open: number | null) => void;
@@ -76,12 +133,6 @@ export function TaskBoardColumnSettings({
       slots.map((each, place) => (place === index ? { ...each, ...patch } : each)),
       index,
     );
-  const moveTo = (place: number) => {
-    const next = [...slots];
-    next.splice(place, 0, ...next.splice(index, 1));
-    onChange(next, place);
-  };
-  const without = slots.filter((_, place) => place !== index);
   const rename = (value: string) => {
     const name = value.trim();
     if (name && name !== slot.name) put({ name });
@@ -113,6 +164,9 @@ export function TaskBoardColumnSettings({
                   When a card arrives
                 </h3>
                 <ColumnAgent key={slot.id ?? index} slot={slot} project={project} onChange={put} />
+                {across && across.agentDiffers.length > 0 ? (
+                  <p className="task-board-setting-note">Its agent is told something else in {listed.format(across.agentDiffers)}. A change here sets it in every project.</p>
+                ) : null}
               </section>
             ) : null}
             {jobsStart && slot.job ? (
@@ -128,21 +182,7 @@ export function TaskBoardColumnSettings({
                 </Select>
               </label>
             ) : null}
-            <div className="task-board-settings-foot">
-              <Tooltip label="Move left">
-                <IconButton size="sm" aria-label="Move left" disabled={index === 0} onClick={() => moveTo(index - 1)}>
-                  <ArrowLeft size={15} />
-                </IconButton>
-              </Tooltip>
-              <Tooltip label="Move right">
-                <IconButton size="sm" aria-label="Move right" disabled={index === slots.length - 1} onClick={() => moveTo(index + 1)}>
-                  <ArrowRight size={15} />
-                </IconButton>
-              </Tooltip>
-              <TextButton className="task-board-remove" disabled={slots.length === 1} onClick={() => onChange(without, null)}>
-                Remove column
-              </TextButton>
-            </div>
+            <SettingsFoot slots={slots} index={index} across={across} onChange={onChange} />
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>

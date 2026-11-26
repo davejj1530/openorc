@@ -19,6 +19,9 @@ export const BoardColumn = z.object({
 });
 export type BoardColumn = z.infer<typeof BoardColumn>;
 
+/** The most columns a board has. */
+export const BOARD_COLUMNS_MAX = 12;
+
 /** A project's whole board as it is saved, in order. A column without an id is new; a kept column left out is removed and its tasks stay in their stage. */
 export const BoardColumnsSave = z
   .array(
@@ -32,10 +35,12 @@ export const BoardColumnsSave = z
     }),
   )
   .min(1)
-  .max(12);
+  .max(BOARD_COLUMNS_MAX);
 
 export const boardRpcParams = {
   "board.columns": z.object({ projectId: z.string() }),
+  /** Every project's own columns, each project's in its board's order, for a board of all projects. */
+  "board.allColumns": z.object({}),
   /** Every column job, of one project or of all. */
   "board.jobs": z.object({ projectId: z.string().optional() }),
   "board.switchJob": z.object({ columnId: z.string(), enabled: z.boolean() }),
@@ -47,6 +52,7 @@ export const boardRpcParams = {
 export interface BoardRpcResults {
   /** The columns the project keeps; none when its board is the default one. */
   "board.columns": BoardColumn[];
+  "board.allColumns": BoardColumn[];
   "board.saveColumns": BoardColumn[];
   "board.jobs": BoardColumn[];
   "board.switchJob": null;

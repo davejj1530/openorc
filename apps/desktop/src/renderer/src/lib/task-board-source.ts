@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
-import type { BoardColumn } from "@openorc/protocol";
+import { useCallback, useMemo, useState } from "react";
+import { BOARD_COLUMNS_MAX, type BoardColumn, type Project } from "@openorc/protocol";
 import { useRpc, useRpcMutation } from "./client";
-import type { BoardSlot } from "./task-board";
+import { boardSlots, taskBoardColumns, type BoardKeeper, type BoardSlot, type TaskBoardColumn } from "./task-board";
+import { boardsFull, boardUnion, projectBoards, unionBoardColumns, unionChange, unionSlots, type UnionColumn } from "./task-board-union";
+import type { TaskRecord } from "./task-records";
 import { useTaskProjects } from "./task-list-source";
 import { useTaskOnlineMutation, useTaskOnlineQuery, useTaskOnlineScope, type TaskOnlineScope } from "./task-online-query";
 
@@ -9,10 +11,17 @@ import { useTaskOnlineMutation, useTaskOnlineQuery, useTaskOnlineScope, type Tas
  * Whose columns a project's board shows: this computer's, for a project in a folder here, or its organization's, kept on
  * the server and shared by everyone who works on its tasks. A task of the other kind sits in its board by its status.
  */
-export type BoardOwner = { place: "local"; projectId: string } | { place: "online"; scope: TaskOnlineScope; projectId: string; key: string };
+export type BoardOwner =
+  | { place: "local"; projectId: string }
+  | { place: "online"; scope: TaskOnlineScope; projectId: string; key: string }
+  /** Every project with a folder on this computer, whose columns the board of all projects shows as their union. */
+  | { place: "union"; projectIds: readonly string[] };
 
-/** The project a board belongs to, as the app's project list names it. */
-export const boardProjectKey = (owner: BoardOwner): string => (owner.place === "local" ? owner.projectId : owner.key);
+/** The project a board belongs to, as the app's project list names it; none for the board of all projects. */
+export function boardProjectKey(owner: BoardOwner): string | null {
+  if (owner.place === "local") return owner.projectId;
+  return owner.place === "online" ? owner.key : null;
+}
 
 /** An organization project's shared board, when its server keeps boards. A Personal space's projects keep none. */
 export function useSharedBoard(projectKey: string | null): BoardOwner | null {
@@ -28,6 +37,23 @@ export function useSharedBoard(projectKey: string | null): BoardOwner | null {
   );
 }
 
+/**
+ * The board a task list shows: one project's, shared by its organization when the server keeps boards, else kept with
+ * its folder on this computer; or, on all projects outside an organization, the union of every project here. An
+ * organization's board of all projects is its statuses. `localProject` is the one project kept here, which also keeps
+ * its automations.
+ */
+export function useBoardOwner(projectId: string | null, projects: readonly Project[] | undefined, organization: boolean): { owner: BoardOwner | null; localProject: string | null } {
+  const shared = useSharedBoard(projectId);
+  const local = shared ? null : (projects?.find((project) => project.id === projectId && project.rootPath)?.id ?? null);
+  const union = useMemo<BoardOwner | null>(
+    () => (projectId || organization || !projects ? null : { place: "union", projectIds: projects.filter((project) => project.rootPath).map((project) => project.id) }),
+    [projectId, organization, projects],
+  );
+  const owner = useMemo<BoardOwner | null>(() => shared ?? (local ? { place: "local", projectId: local } : union), [shared, local, union]);
+  return { owner, localProject: local };
+}
+
 const CHANGED = "This board changed while you were editing it. It shows the latest columns now, so make your change again.";
 
 /** Why the last save failed, or, after one lost to another person's, that the board now shows theirs. */
@@ -36,14 +62,70 @@ function saveNotice(error: Error | null, lost: boolean): { text: string; failed:
   return lost ? { text: CHANGED, failed: false } : null;
 }
 
+/** A board's columns as the board draws and changes them, whoever keeps them. */
+export type BoardSource = {
+  /** Whether the board's columns are read, so a column's settings can open on them. */
+  ready: boolean;
+  slots: BoardSlot[];
+  columnsFor: (tasks: readonly TaskRecord[]) => TaskBoardColumn[];
+  /** On the board of all projects, each column's union: which projects have it, and where its agent differs. */
+  union: UnionColumn[] | null;
+  /** Whether the person may change the board's columns now: this computer's, or a shared one read with leave to change it. */
+  editable: boolean;
+  /** Whether no column can be added: the board has as many as one can, or on the board of all projects, every project's has. */
+  full: boolean;
+  save: (next: BoardSlot[]) => void;
+  saving: boolean;
+  notice: { text: string; failed: boolean } | null;
+};
+
+/**
+ * The board of all projects: the union of every project's columns, and its save, which changes each project's own
+ * board that the change reaches, one after another.
+ */
+function useUnionBoard(owner: Extract<BoardOwner, { place: "union" }> | null): BoardSource {
+  const all = useRpc("board.allColumns", {}, { enabled: Boolean(owner) });
+  const save = useRpcMutation("board.saveColumns");
+  const [state, setState] = useState<{ saving: boolean; error: Error | null }>({ saving: false, error: null });
+  const boards = useMemo(() => (owner ? projectBoards(owner.projectIds, all.data ?? []) : []), [owner, all.data]);
+  const union = useMemo(() => boardUnion(boards), [boards]);
+  const slots = useMemo(() => unionSlots(union), [union]);
+  const columnsFor = useCallback((tasks: readonly TaskRecord[]) => unionBoardColumns(tasks, union, boards), [union, boards]);
+  const run = async (next: BoardSlot[]) => {
+    setState({ saving: true, error: null });
+    try {
+      for (const board of unionChange(union, next, boards)) await save.mutateAsync({ projectId: board.projectId, columns: board.slots });
+      setState({ saving: false, error: null });
+    } catch (error) {
+      setState({ saving: false, error: error instanceof Error ? error : new Error(String(error)) });
+    }
+  };
+  return {
+    ready: all.data !== undefined,
+    slots,
+    columnsFor,
+    union,
+    editable: true,
+    full: boardsFull(boards),
+    save: (next) => void run(next),
+    saving: state.saving,
+    notice: saveNotice(state.error, false),
+  };
+}
+
+const NO_COLUMNS: readonly BoardColumn[] = [];
+
 /** The columns of the owner's board as read so far; none without an owner, so the board is its statuses. */
 function boardColumnsOf(owner: BoardOwner | null, local: readonly BoardColumn[] | undefined, shared: readonly BoardColumn[] | undefined): readonly BoardColumn[] | undefined {
-  if (!owner) return [];
+  if (!owner) return NO_COLUMNS;
   return owner.place === "local" ? local : shared;
 }
 
-/** The columns `owner` keeps, and their save: the whole board each time, from the revision read when it is shared. */
-export function useBoardColumns(owner: BoardOwner | null) {
+/**
+ * One project's board: this computer's columns, or its organization's, saved whole each time from the revision read.
+ * Without an owner the board is its statuses and changes nothing.
+ */
+function useProjectBoard(owner: Exclude<BoardOwner, { place: "union" }> | null): BoardSource {
   const local = owner?.place === "local" ? owner.projectId : null;
   const online = owner?.place === "online" ? owner : null;
   const kept = useRpc("board.columns", { projectId: local ?? "" }, { enabled: Boolean(local) });
@@ -52,7 +134,10 @@ export function useBoardColumns(owner: BoardOwner | null) {
   const saveShared = useTaskOnlineMutation(online?.scope ?? null, "tasks.online.saveBoard");
   // A save that lost to another one reloads the board, since a conflict refreshes it as a save does, and says so.
   const [lost, setLost] = useState(false);
+  const keeper: BoardKeeper = online ? "online" : "local";
   const columns = boardColumnsOf(owner, kept.data, shared.data?.columns);
+  const slots = useMemo(() => boardSlots(columns ?? []), [columns]);
+  const columnsFor = useCallback((tasks: readonly TaskRecord[]) => taskBoardColumns(tasks, columns, keeper), [columns, keeper]);
   const revision = shared.data?.revision;
   const save = (next: BoardSlot[]) => {
     setLost(false);
@@ -65,11 +150,21 @@ export function useBoardColumns(owner: BoardOwner | null) {
   };
   const saving = local ? saveLocal : saveShared;
   return {
-    columns,
-    /** Whether the person may change the board's columns now: this computer's, or a shared one read with leave to change it. */
+    ready: columns !== undefined,
+    slots,
+    columnsFor,
+    union: null,
     editable: Boolean(local || (online && shared.data?.mayEdit)),
+    full: slots.length >= BOARD_COLUMNS_MAX,
     save,
     saving: saving.isPending,
     notice: saveNotice(saving.error, lost),
   };
+}
+
+/** The columns `owner` keeps, as the board draws them, and their save. */
+export function useBoardColumns(owner: BoardOwner | null): BoardSource {
+  const union = useUnionBoard(owner?.place === "union" ? owner : null);
+  const project = useProjectBoard(owner?.place === "union" ? null : owner);
+  return owner?.place === "union" ? union : project;
 }

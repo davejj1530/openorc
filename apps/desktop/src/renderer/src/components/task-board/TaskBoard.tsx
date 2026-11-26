@@ -4,7 +4,8 @@ import type { BoardColumnJob, Project } from "@openorc/protocol";
 import { relativeTime } from "@openorc/client";
 import { useRpcMutation } from "../../lib/client";
 import { useSpaceProjects } from "../../lib/space-queries";
-import { agentSetupSlot, boardMove, boardSlots, taskBoardColumns, type BoardKeeper, type BoardSlot, type TaskBoardColumn } from "../../lib/task-board";
+import { agentSetupSlot, boardMove, type BoardKeeper, type BoardSlot, type TaskBoardColumn } from "../../lib/task-board";
+import { columnKey, type UnionColumn } from "../../lib/task-board-union";
 import { boardProjectKey, useBoardColumns, type BoardOwner } from "../../lib/task-board-source";
 import { openTaskRecord } from "../../lib/task-open";
 import { useTaskProperty } from "../../lib/task-property";
@@ -19,7 +20,7 @@ import { TaskStart } from "../TaskStart";
 import { TaskFacts } from "../task-online/TaskFacts";
 import { TaskOnlineOpen } from "../task-online/TaskRowControls";
 import { Button, IconButton, StatusDot, Tooltip } from "../ui";
-import { TaskBoardColumnSettings } from "./TaskBoardColumnSettings";
+import { TaskBoardColumnSettings, type ColumnAcross } from "./TaskBoardColumnSettings";
 import "./task-board.css";
 
 const PAGE = 20;
@@ -31,31 +32,45 @@ type Drag = { key: string; from: string; over: string | null };
 /** The card open beside the board, by its task, and what a press on a card kept on this computer does. */
 export type BoardPane = { id: string; opened: string | null; onOpen: (taskId: string) => void };
 
+/** The column whose settings are open: by its place, and on the board of all projects by its name, since a change there can move it. */
+type OpenSettings = { place: number; name: string };
+
+/** Where the open settings' column is now: its name found on the board of all projects, else its place. */
+function settingsPlace(open: OpenSettings | null, slots: readonly BoardSlot[], byName: boolean): number | null {
+  if (!open) return null;
+  const found = byName ? slots.findIndex((slot) => columnKey(slot.name) === columnKey(open.name)) : -1;
+  return found < 0 ? open.place : found;
+}
+
 /**
- * `owner` keeps the one project's columns this board shows and changes: this computer, for a project in a folder here,
- * or the project's organization, which shares them. Without one the board is its tasks by status. `showProject` names
- * each card's project, on a board of several.
+ * `owner` keeps the columns this board shows and changes: this computer, for a project in a folder here, the project's
+ * organization, which shares them, or, on the board of all projects, every project here, whose columns it shows as one
+ * union. Without one the board is its tasks by status. `showProject` names each card's project, on a board of several.
  */
 export function TaskBoard({ tasks, owner, showProject, pane }: { tasks: TaskRecord[]; owner: BoardOwner | null; showProject: boolean; pane: BoardPane }) {
   const projects = useSpaceProjects(true);
   const board = useBoardColumns(owner);
-  const keeper: BoardKeeper = owner?.place ?? "local";
-  const slots = useMemo(() => boardSlots(board.columns ?? []), [board.columns]);
-  const project = owner ? projects.data?.find((each) => each.id === boardProjectKey(owner)) : undefined;
-  const columns = useMemo(() => taskBoardColumns(tasks, board.columns, keeper), [tasks, board.columns, keeper]);
+  const keeper: BoardKeeper = owner?.place === "online" ? "online" : "local";
+  const { slots, columnsFor } = board;
+  const key = owner ? boardProjectKey(owner) : null;
+  const project = key ? projects.data?.find((each) => each.id === key) : undefined;
+  const columns = useMemo(() => columnsFor(tasks), [columnsFor, tasks]);
   const [drag, setDrag] = useState<Drag | null>(null);
   /** Set by the column a card was let go on. The card reads it as its drag ends, since the way to save a task is the card's own. */
   const dropped = useRef<TaskBoardColumn | null>(null);
-  /** The column whose settings are open, by its place, which a save keeps where an unsaved column's id changes. */
-  const [settings, setSettings] = useState<number | null>(null);
+  /** The column whose settings are open, which a save keeps open where an unsaved column's id changes. */
+  const [opened, setOpened] = useState<OpenSettings | null>(null);
+  const settings = settingsPlace(opened, slots, Boolean(board.union));
+  const openAt = (next: readonly BoardSlot[], place: number | null) => setOpened(place === null ? null : { place, name: next[place]?.name ?? "" });
   const edges = useScrollEdges("x");
-  useAgentSetup(owner, board.columns, slots, setSettings);
+  useAgentSetup(owner, board.ready, slots, setOpened);
   const change = board.editable
     ? (next: BoardSlot[], open: number | null) => {
-        setSettings(open);
+        openAt(next, open);
         board.save(next);
       }
     : null;
+  const names = (ids: readonly string[]) => ids.map((id) => projects.data?.find((each) => each.id === id)?.name ?? "A project");
   return (
     <>
       {board.notice ? <BoardNotice {...board.notice} /> : null}
@@ -70,16 +85,17 @@ export function TaskBoard({ tasks, owner, showProject, pane }: { tasks: TaskReco
             onDrop={() => {
               dropped.current = column;
             }}
-            job={column.kept?.jobEnabled ? column.kept.job : null}
+            job={column.job ?? null}
             settings={
               change && column.slot !== null ? (
                 <TaskBoardColumnSettings
                   slots={slots}
                   index={column.slot}
                   project={project}
-                  jobsStart={owner?.place === "local"}
+                  jobsStart={owner?.place !== "online"}
+                  across={board.union ? unionNote(board.union[column.slot], names, owner) : null}
                   open={settings === column.slot}
-                  onOpenChange={(open) => setSettings(open ? column.slot : null)}
+                  onOpenChange={(open) => openAt(slots, open ? column.slot : null)}
                   onChange={change}
                 />
               ) : null
@@ -107,7 +123,7 @@ export function TaskBoard({ tasks, owner, showProject, pane }: { tasks: TaskReco
         {change ? (
           <div className="task-board-add">
             <Tooltip label="Add column">
-              <IconButton aria-label="Add column" disabled={board.saving} onClick={() => change([...slots, { name: "New column", stage: "in_progress" }], slots.length)}>
+              <IconButton aria-label="Add column" disabled={board.saving || board.full} onClick={() => change([...slots, { name: "New column", stage: "in_progress" }], slots.length)}>
                 <Plus size={16} />
               </IconButton>
             </Tooltip>
@@ -119,13 +135,21 @@ export function TaskBoard({ tasks, owner, showProject, pane }: { tasks: TaskReco
 }
 
 /** Opens the settings of the column the Automations page asked for, once this board is that project's and its columns are read. */
-function useAgentSetup(owner: BoardOwner | null, columns: readonly unknown[] | undefined, slots: readonly BoardSlot[], open: (slot: number) => void): void {
+function useAgentSetup(owner: BoardOwner | null, ready: boolean, slots: readonly BoardSlot[], open: (settings: OpenSettings) => void): void {
   const setup = useTasksView((state) => state.agentSetup);
   useEffect(() => {
-    if (!setup || owner?.place !== "local" || owner.projectId !== setup.projectId || columns === undefined) return;
-    open(agentSetupSlot(slots, setup.columnId));
+    if (!setup || owner?.place !== "local" || owner.projectId !== setup.projectId || !ready) return;
+    const place = agentSetupSlot(slots, setup.columnId);
+    open({ place, name: slots[place]?.name ?? "" });
     useTasksView.getState().setUpAgent(null);
-  }, [setup, owner, columns, slots, open]);
+  }, [setup, owner, ready, slots, open]);
+}
+
+/** What a column of the board of all projects is across them: the projects that have it, and those whose agent differs. */
+function unionNote(column: UnionColumn | undefined, names: (ids: readonly string[]) => string[], owner: BoardOwner | null): ColumnAcross | null {
+  if (!column || owner?.place !== "union") return null;
+  const having = column.members.map((member) => member.projectId);
+  return { having: having.length === owner.projectIds.length ? null : names(having), agentDiffers: names(column.jobsDiffer), sole: column.sole };
 }
 
 /**

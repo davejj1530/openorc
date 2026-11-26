@@ -17,6 +17,10 @@ export type TaskBoardColumn = {
   slot: number | null;
   /** The project's own column, which a card is put in by its id. */
   kept: BoardColumn | null;
+  /** On a board of all projects: each project's own column of this name, by project, null while the project keeps the default columns. */
+  members?: ReadonlyMap<string, string | null>;
+  /** On a board of all projects: the agent its cards start, where the column has one switched on. */
+  job?: BoardColumnJob | null;
   /** How far round its mark's arc goes, when several columns hold work under way. */
   share?: number;
   tasks: TaskRecord[];
@@ -61,7 +65,10 @@ export function boardSlots(kept: readonly BoardColumn[]): BoardSlot[] {
  * nothing leaves the board with its column.
  */
 export function taskBoardColumns(tasks: readonly TaskRecord[], kept: readonly BoardColumn[] = [], keeper: BoardKeeper = "local"): TaskBoardColumn[] {
-  const columns: TaskBoardColumn[] = boardSlots(kept).map((slot, index) => ({ id: slot.id ?? slot.stage, name: slot.name, stage: slot.stage, slot: index, kept: kept[index] ?? null, tasks: [] }));
+  const columns: TaskBoardColumn[] = boardSlots(kept).map((slot, index) => {
+    const column = kept[index] ?? null;
+    return { id: slot.id ?? slot.stage, name: slot.name, stage: slot.stage, slot: index, kept: column, job: column?.jobEnabled ? column.job : null, tasks: [] };
+  });
   for (const stage of stages) {
     if (columns.some((column) => column.stage === stage) || !tasks.some((record) => record.task.status === stage)) continue;
     const next = columns.findIndex((column) => stages.indexOf(column.stage) > stages.indexOf(stage));
@@ -71,6 +78,11 @@ export function taskBoardColumns(tasks: readonly TaskRecord[], kept: readonly Bo
     const own = record.kind === keeper && record.task.columnId ? columns.find((column) => column.kept?.id === record.task.columnId) : undefined;
     (own ?? columns.find((column) => column.stage === record.task.status))?.tasks.push(record);
   }
+  return settleColumns(columns);
+}
+
+/** The board's columns made ready to draw: several columns of work under way share their mark's arc, and each column's cards are in board order. */
+export function settleColumns(columns: TaskBoardColumn[]): TaskBoardColumn[] {
   const working = columns.filter((column) => column.stage === "in_progress");
   working.forEach((column, index) => {
     if (working.length > 1) column.share = (index + 1) / (working.length + 1);
@@ -81,5 +93,8 @@ export function taskBoardColumns(tasks: readonly TaskRecord[], kept: readonly Bo
 
 /** What a card dropped on `column` saves: the column, when the board keeps it for the card's kind of task, else its stage. */
 export function boardMove(record: TaskRecord, column: TaskBoardColumn, keeper: BoardKeeper): { columnId: string } | { status: TaskStatus } {
+  // On a board of all projects a card goes to its own project's column of that name, else to its project's first column of that stage.
+  const own = column.members && record.kind === "local" ? column.members.get(record.task.projectId) : null;
+  if (own) return { columnId: own };
   return column.kept && record.kind === keeper ? { columnId: column.kept.id } : { status: column.stage };
 }

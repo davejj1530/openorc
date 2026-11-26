@@ -44,21 +44,53 @@ afterEach(() => {
 it("saves an organization's board from the revision it read, and a lost save reloads the board and says so", async () => {
   const { result } = renderHook(() => useBoardColumns(owner), { wrapper });
   await waitFor(() => expect(result.current.editable).toBe(true));
-  expect(result.current.columns?.map((each) => each.name)).toEqual(["Build"]);
+  expect(result.current.slots.map((each) => each.name)).toEqual(["Build"]);
   act(() => result.current.save([{ id: "build", name: "Building", stage: "in_progress" }]));
   await waitFor(() => expect(result.current.notice?.text).toBe("This board changed while you were editing it. It shows the latest columns now, so make your change again."));
   expect(saves).toEqual([expect.objectContaining({ spaceId: "org:studio", projectId: "project-a", ifRevision: 1, columns: [{ id: "build", name: "Building", stage: "in_progress" }] })]);
-  await waitFor(() => expect(result.current.columns?.map((each) => each.name)).toEqual(["Build", "Ship"]));
+  await waitFor(() => expect(result.current.slots.map((each) => each.name)).toEqual(["Build", "Ship"]));
 });
 
 it("offers no change to a shared board the person may not change", async () => {
   board = { ...board, mayEdit: false };
   const { result } = renderHook(() => useBoardColumns(owner), { wrapper });
-  await waitFor(() => expect(result.current.columns?.map((each) => each.name)).toEqual(["Build"]));
+  await waitFor(() => expect(result.current.slots.map((each) => each.name)).toEqual(["Build"]));
   expect(result.current.editable).toBe(false);
+});
+
+it("saves a change to the board of all projects to each project that has the column, and reads the union again", async () => {
+  let kept: BoardColumn[] = [
+    { ...column("app-build", "Build"), projectId: "app" },
+    { ...column("site-build", "Build"), projectId: "site" },
+    { ...column("site-qa", "QA"), projectId: "site" },
+  ];
+  const projectSaves: unknown[] = [];
+  vi.mocked(core.call).mockImplementation(async (method: string, input: unknown) => {
+    if (method === "board.allColumns") return kept;
+    if (method === "board.saveColumns") {
+      const { projectId, columns } = input as { projectId: string; columns: { id: string; name: string }[] };
+      projectSaves.push([projectId, columns.map((each) => each.name)]);
+      kept = kept.map((each) => ({ ...each, name: columns.find((saved) => saved.id === each.id)?.name ?? each.name }));
+      return kept.filter((each) => each.projectId === projectId);
+    }
+    throw new Error(`Unexpected board RPC: ${method}`);
+  });
+  const union: BoardOwner = { place: "union", projectIds: ["app", "site"] };
+  const { result } = renderHook(() => useBoardColumns(union), { wrapper });
+  await waitFor(() => expect(result.current.slots.map((each) => each.name)).toEqual(["Build", "QA"]));
+  expect(result.current.union?.map((each) => each.members.length)).toEqual([2, 1]);
+  act(() => result.current.save(result.current.slots.map((slot) => (slot.name === "Build" ? { ...slot, name: "Make" } : slot))));
+  await waitFor(() => expect(result.current.saving).toBe(false));
+  expect(projectSaves).toEqual([
+    ["app", ["Make"]],
+    ["site", ["Make", "QA"]],
+  ]);
+  // The core announces the change, and the board reads every project's columns again.
+  await act(() => queryClient.invalidateQueries());
+  await waitFor(() => expect(result.current.slots.map((each) => each.name)).toEqual(["Make", "QA"]));
 });
 
 it("keeps the statuses, and changes nothing, with no board owner", () => {
   const { result } = renderHook(() => useBoardColumns(null), { wrapper });
-  expect(result.current).toMatchObject({ columns: [], editable: false, notice: null });
+  expect(result.current).toMatchObject({ ready: true, union: null, editable: false, notice: null });
 });

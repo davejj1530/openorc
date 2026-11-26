@@ -10,9 +10,10 @@ export function createBoardHandlers({
   invalidate,
   reports,
   jobs,
-}: Dependencies): Pick<Handlers, "board.columns" | "board.saveColumns" | "board.jobs" | "board.switchJob" | "board.addReadyMade" | "tasks.answerUpdate"> {
+}: Dependencies): Pick<Handlers, "board.columns" | "board.allColumns" | "board.saveColumns" | "board.jobs" | "board.switchJob" | "board.addReadyMade" | "tasks.answerUpdate"> {
   return {
     "board.columns": ({ projectId }) => boardColumns.list(db, projectId),
+    "board.allColumns": () => boardColumns.all(db),
     "board.saveColumns": ({ projectId, columns }) => {
       if (!projects.get(db, projectId)) throw new Error("This project is no longer available.");
       const saved = boardColumns.save(db, projectId, columns);

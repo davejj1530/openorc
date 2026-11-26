@@ -153,6 +153,45 @@ function useProviderTabChoice({
   };
 }
 
+/**
+ * A choice of no model of its own, for a picker whose choice may be left to something else, such as an agent that runs
+ * on its task's model: what the trigger reads while it is chosen, its mark, and how it is chosen.
+ */
+export type PickerUnset = { label: string; icon: ReactNode; choose: () => void };
+
+/** The first row of each agent's models where a picker offers no model of its own. */
+function UnsetRow({
+  unset,
+  chosen,
+  disabled,
+  close,
+  moveRowFocus,
+}: {
+  unset: PickerUnset;
+  chosen: boolean;
+  disabled?: boolean | undefined;
+  close: (() => void) | null;
+  moveRowFocus: (event: KeyboardEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-picker-row
+      className="model-picker-row"
+      aria-pressed={chosen}
+      disabled={disabled}
+      onClick={() => {
+        unset.choose();
+        close?.();
+      }}
+      onKeyDown={moveRowFocus}
+    >
+      <span className="model-picker-row-name">{unset.label}</span>
+      {chosen ? <Check size={15} className="model-picker-check" aria-hidden="true" /> : null}
+    </button>
+  );
+}
+
 /** Search and effort stay fixed while the provider's model list scrolls. */
 function ModelBrowser({
   value,
@@ -167,6 +206,7 @@ function ModelBrowser({
   close,
   harnesses,
   cloud,
+  unset,
 }: {
   value: ModelChoice | null;
   onChange: (choice: ModelChoice) => void;
@@ -182,6 +222,7 @@ function ModelBrowser({
   harnesses?: readonly HarnessId[];
   /** The models OpenOrc Cloud runs, in place of this Mac's. */
   cloud?: boolean | undefined;
+  unset?: PickerUnset | undefined;
 }) {
   const models = useModelCatalog(cloud);
   const enabled = useEnabledHarnesses(harnesses);
@@ -326,6 +367,7 @@ function ModelBrowser({
                   {provider && harnessInstalled(provider) ? `Sign in to ${harnessName(harness)} to use its models.` : `Install ${harnessName(harness)} to use its models.`}
                 </p>
               ) : null}
+              {unset && !searching ? <UnsetRow unset={unset} chosen={!value} disabled={disabled} close={closeOnSelect ? close : null} moveRowFocus={moveRowFocus} /> : null}
               <PickerAccountRows section={harness} searching={searching} accounts={accounts} disabled={disabled} moveRowFocus={moveRowFocus} />
               {searching
                 ? visible.map((model) => modelRow(model, true))
@@ -381,6 +423,12 @@ function triggerDetail(orcling: Orcling | null, effort: string | null | undefine
   return effort ? effortLabel(effort) : null;
 }
 
+/** The trigger's mark: a chosen Orcling's face, else the model's agent, else the mark of no model of its own where one is offered. */
+function triggerIcon(orcling: Orcling | null, value: ModelChoice | null, unset: PickerUnset | undefined): ReactNode {
+  if (orcling) return <OrclingAvatar orcling={orcling} size={14} />;
+  return pickerTriggerIcon(value, 14) ?? unset?.icon ?? null;
+}
+
 /** The picker trigger stays compact; the panel contains the complete selection flow. */
 export function ModelPicker({
   value,
@@ -392,6 +440,7 @@ export function ModelPicker({
   placeholder = "Choose a model",
   ariaLabel,
   limits,
+  unset,
 }: {
   value: ModelChoice | null;
   onChange: (choice: ModelChoice) => void;
@@ -403,9 +452,12 @@ export function ModelPicker({
   placeholder?: string;
   ariaLabel?: string;
   limits?: ModelLimits | undefined;
+  /** Offers no model of its own, as the first choice, and the trigger reads it while it is chosen. */
+  unset?: PickerUnset | undefined;
 }) {
   const models = useModelCatalog(limits?.cloud);
   const popup = usePickerPopup();
+  const empty = unset?.label ?? placeholder;
   value = useEnabledChoice(value, limits?.harnesses);
   const current = catalogModel(models.data, value);
   const chosen = chosenOrcling(orclings);
@@ -424,11 +476,11 @@ export function ModelPicker({
         disabled={disabled}
         aria-label={ariaLabel}
         {...warmAccountUsage(accounts)}
-        data-tip={selectedLabel ?? modelTitle(current, value?.model) ?? placeholder}
+        data-tip={selectedLabel ?? modelTitle(current, value?.model) ?? empty}
         className="inline-flex min-w-0 items-center gap-1.5 h-7 pl-2 pr-1.5 rounded-md text-base text-ink-2 hover:bg-surface-2 hover:text-ink disabled:text-ink-4 disabled:pointer-events-none"
       >
-        {chosen ? <OrclingAvatar orcling={chosen} size={14} /> : pickerTriggerIcon(value, 14)}
-        <span className="truncate max-w-40">{selectedLabel ?? current?.label ?? value?.model ?? placeholder}</span>
+        {triggerIcon(chosen, value, unset)}
+        <span className="truncate max-w-40">{selectedLabel ?? current?.label ?? value?.model ?? empty}</span>
         {detail ? <span className="model-effort shrink-0 text-ink-3 text-sm">{detail}</span> : null}
         <ChevronDown size={13} className="text-ink-4" />
       </Popover.Trigger>
@@ -446,6 +498,7 @@ export function ModelPicker({
               disabled={disabled}
               harnesses={limits?.harnesses}
               cloud={limits?.cloud}
+              unset={unset}
               closeOnSelect
               close={() => popup.setOpen(false)}
             />

@@ -25,27 +25,13 @@
 .agent-brief-foot {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   border-top: var(--hairline) solid var(--line);
-  padding: 6px 6px 6px 12px;
-  /* The model's own field sits on the box's fill, a step up from it. */
+  padding: 6px;
+  /* The picker's hover and a key at the foot sit on the box's fill a step off it, as in the composer. */
   --surface-2: var(--surface);
-}
-/* A select is as wide as its longest option; here the model takes two parts of the row and the account one. */
-.agent-brief-foot select {
-  flex: 1 1 0;
-  min-width: 0;
-  font-size: var(--text-sm);
-}
-.agent-brief-foot select:first-of-type {
-  flex-grow: 2;
-}
-.agent-brief-mark {
-  display: grid;
-  width: 16px;
-  flex-shrink: 0;
-  place-items: center;
-  color: var(--ink-3);
+  --control-fill: var(--key);
 }
 @media (prefers-reduced-motion: reduce) {
   .agent-brief {

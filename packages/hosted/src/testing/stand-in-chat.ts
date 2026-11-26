@@ -36,7 +36,11 @@ export class StandInChat {
   readonly records = new Map<string, StandInChatRecord>();
   readonly #watches = new WeakMap<StandInPeer, Map<string, { spaceId: string; conversationId: string }>>();
   readonly #channels: StandInChatChannels;
-  readonly calls = new StandInChatCalls({ deliver: (record, message) => this.#deliver(record, message), readable: (record, who) => this.#readable(record, who) });
+  readonly calls = new StandInChatCalls({
+    deliver: (record, message) => this.#deliver(record, message),
+    readable: (record, who) => this.#readable(record, who),
+    attach: (record, who, messageId, ids) => this.attachFiles?.({ who, space: record.spaceId, ids, messageId, conversationId: record.conversation.id }) ?? null,
+  });
 
   constructor(private readonly deps: { spaces: StandInSpaces; peers(): StandInPeer[]; person(email: string): { name: string; image: string | null } }) {
     this.#channels = new StandInChatChannels(this, deps.spaces);

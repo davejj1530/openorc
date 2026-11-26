@@ -50,6 +50,8 @@ export interface HarnessCatalogEntry {
   distillation: boolean;
   /** Whether the background text runner can generate titles and code explanations with this harness. */
   textGeneration: boolean;
+  /** Whether a one-shot answer on this harness can come with pictures the agent made, as an Orcling's does in a team chat. */
+  pictures: boolean;
   /** Whether Plan mode hands over its plan document itself; otherwise the agent saves it with OpenOrc's plan_write tool. */
   nativePlans: boolean;
   /** Whether a message can reach the agent during a running turn; otherwise it waits in the queue for the next one. */
@@ -72,6 +74,7 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     fastModeHint: "OpenOrc does not expose fx's Fast or Ultra controls yet.",
     distillation: false,
     textGeneration: false,
+    pictures: false,
     nativePlans: false,
     liveInput: true,
     forks: false,
@@ -88,6 +91,7 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     fastModeHint: "Antigravity does not expose a separate Fast mode control.",
     distillation: false,
     textGeneration: false,
+    pictures: false,
     nativePlans: false,
     liveInput: true,
     forks: false,
@@ -104,6 +108,7 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     fastModeHint: "Pi does not expose a separate Fast mode control.",
     distillation: false,
     textGeneration: false,
+    pictures: false,
     nativePlans: false,
     liveInput: true,
     forks: true,
@@ -120,6 +125,7 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     fastModeHint: "Higher credit usage · subject to account availability.",
     distillation: true,
     textGeneration: true,
+    pictures: true,
     nativePlans: true,
     liveInput: true,
     forks: true,
@@ -136,6 +142,7 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     fastModeHint: "Higher cost · requires paid usage credits and account access.",
     distillation: true,
     textGeneration: true,
+    pictures: false,
     nativePlans: true,
     liveInput: true,
     forks: true,
@@ -153,6 +160,7 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     fastModeHint: "OpenOrc does not expose a separate Fast mode control for OpenCode.",
     distillation: false,
     textGeneration: true,
+    pictures: false,
     nativePlans: false,
     liveInput: true,
     forks: true,
@@ -170,6 +178,7 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     fastModeHint: "OpenOrc does not expose a separate Fast mode control for Oh My Pi.",
     distillation: false,
     textGeneration: true,
+    pictures: false,
     nativePlans: true,
     liveInput: true,
     forks: true,
@@ -186,6 +195,7 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     fastModeHint: "Choose a model variant in Cursor's model list. There is no separate Fast mode control.",
     distillation: false,
     textGeneration: false,
+    pictures: false,
     nativePlans: true,
     liveInput: false,
     forks: false,

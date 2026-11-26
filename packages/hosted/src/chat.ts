@@ -154,7 +154,8 @@ export class TeamChat {
     return this.#request(spaceId, CHAT_ROUTES.renewCall(callId), attempt);
   }
 
-  async answerCall(spaceId: string, conversationId: string, callId: string, answer: { attemptId: string; runnerSecret: string; body: string }) {
+  /** The Orcling's one answer: its words, and the files its owner's app uploaded to the conversation for it. */
+  async answerCall(spaceId: string, conversationId: string, callId: string, answer: { attemptId: string; runnerSecret: string; body: string; fileIds: string[] }) {
     try {
       return await this.#request(spaceId, CHAT_ROUTES.answerCall(callId), answer);
     } finally {

@@ -85,6 +85,13 @@ export class Files {
     });
   }
 
+  /** One whole file from its first byte to its last, for a caller that keeps no draft to resume. */
+  async send(scope: CloudFileScope, file: { name: string; requestId: string; source: FileByteSource }, signal: AbortSignal): Promise<TeamChatFile> {
+    const plan = await this.start(scope, { name: file.name, bytes: file.source.bytes, requestId: file.requestId }, signal);
+    for (let part = 1; part <= plan.parts; part++) await this.part(scope, plan, part, file.source, { signal, progress: () => undefined });
+    return this.complete(scope, plan.id, signal);
+  }
+
   async complete(scope: CloudFileScope, uploadId: string, signal?: AbortSignal): Promise<TeamChatFile> {
     return this.#transfer(scope, "upload", signal, (cancel) => this.deps.session.in(scope.spaceId).request(FILE_ROUTES.complete(uploadId), undefined, cancel));
   }

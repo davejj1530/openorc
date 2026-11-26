@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { copyFile, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
+import { extname, join } from "node:path";
 import { agentBinary, launchCommand } from "@openorc/agents";
 import type { HarnessId } from "@openorc/protocol";
 
@@ -26,8 +26,9 @@ export interface TextGeneratorOptions {
   /** Limit reasoning on small background jobs without changing distillation. */
   effort?: "low";
   /**
-   * Claude only: replaces Claude Code's agent prompt for a job whose whole input is the prompt. With no tools and no
-   * extended thinking the answer comes straight back; offered tools, a model reaches for a file it already has.
+   * Who the agent is for a job whose whole input is the prompt. On Claude it replaces Claude Code's agent prompt: with no
+   * tools and no extended thinking the answer comes straight back; offered tools, a model reaches for a file it already
+   * has. Codex takes it as its developer instructions, and OpenCode and Oh My Pi as their agent's prompt.
    */
   system?: string;
 }
@@ -51,16 +52,20 @@ export class TextGenerator {
     return raw ? parseTitle(raw) : null;
   }
 
-  /** A one-shot answer to a prompt that asks for JSON. Codex is held to `schema`; the others follow the prompt. Null when the model cannot be reached. */
-  complete(prompt: string, schema: object): Promise<string | null> {
-    return this.ask(prompt, schema);
+  /**
+   * A one-shot answer to a prompt that asks for JSON. Codex is held to `schema`; the others follow the prompt. Null when
+   * the model cannot be reached. `pictures` is a folder the caller made: what the agent draws while answering lands there,
+   * on a harness whose catalog entry says it makes pictures.
+   */
+  complete(prompt: string, schema: object, pictures?: string): Promise<string | null> {
+    return this.ask(prompt, schema, pictures);
   }
 
   /** Each harness needs its own one-shot invocation; a harness without one cannot generate text. */
-  protected ask(prompt: string, schema: object): Promise<string | null> {
+  protected ask(prompt: string, schema: object, pictures?: string): Promise<string | null> {
     const runners: Record<HarnessId, () => Promise<string | null>> = {
       claude: () => this.runClaude(prompt),
-      codex: () => this.runCodex(prompt, schema),
+      codex: () => this.runCodex(prompt, schema, pictures),
       opencode: () => this.runOpenCode(prompt),
       omp: () => this.runOmp(prompt),
       cursor: () => Promise.resolve(null),
@@ -99,8 +104,10 @@ export class TextGenerator {
    * Codex exec in a read-only sandbox with the user's MCP servers disabled, so
    * generation never touches the repo or third-party tools. The final
    * message lands in a temp file because stdout carries progress output.
+   * A run that may draw prints its events instead, which name the session
+   * whose pictures are then taken.
    */
-  private async runCodex(prompt: string, schema: object): Promise<string | null> {
+  private async runCodex(prompt: string, schema: object, pictures?: string): Promise<string | null> {
     const binary = this.options.binary ?? agentBinary("codex");
     const dir = await mkdtemp(join(tmpdir(), "openorc-distill-"));
     const schemaPath = join(dir, "schema.json");
@@ -108,10 +115,16 @@ export class TextGenerator {
     try {
       await writeFile(schemaPath, JSON.stringify(schema));
       const args = ["exec", "--skip-git-repo-check", "--sandbox", "read-only", "-c", "mcp_servers={}", "--output-schema", schemaPath, "-o", outPath, "-"];
+      if (pictures) args.splice(1, 0, "--json");
+      if (this.options.system !== undefined) args.splice(1, 0, "-c", `developer_instructions=${JSON.stringify(this.options.system)}`);
       if (this.options.effort) args.splice(1, 0, "-c", `model_reasoning_effort="${this.options.effort}"`);
       if (this.options.model) args.splice(1, 0, "--model", this.options.model);
       const env: NodeJS.ProcessEnv = { ...(this.options.env ?? process.env), NO_COLOR: "1" };
-      return await this.spawn({ binary, args, env, read: () => readFile(outPath, "utf8").then((t) => t.trim() || null), stdin: prompt });
+      const read = async (stdout: string) => {
+        if (pictures) await takeCodexPictures(stdout, env, pictures);
+        return (await readFile(outPath, "utf8")).trim() || null;
+      };
+      return await this.spawn({ binary, args, env, read, stdin: prompt });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -129,7 +142,7 @@ export class TextGenerator {
       OPENCODE_CONFIG_CONTENT: JSON.stringify({
         share: "disabled",
         permission: "deny",
-        agent: { [agent]: { mode: "primary", steps: 1, permission: "deny", prompt: "Return only the text requested by the user. Do not use tools." } },
+        agent: { [agent]: { mode: "primary", steps: 1, permission: "deny", prompt: this.options.system ?? "Return only the text requested by the user. Do not use tools." } },
       }),
     };
     return this.spawn({
@@ -211,6 +224,24 @@ export class TextGenerator {
       await rm(cwd, { recursive: true, force: true });
     }
   }
+}
+
+/**
+ * Codex keeps what a session draws in its home, in a folder named after the session, and names the session in the first
+ * event it prints. The pictures move to `into`, numbered in the order drawn, so a one-shot leaves nothing behind in the
+ * person's Codex.
+ */
+async function takeCodexPictures(events: string, env: NodeJS.ProcessEnv, into: string): Promise<void> {
+  const started = events.split("\n", 1)[0] ?? "";
+  const session = started.includes("thread.started") ? str((JSON.parse(started) as Record<string, unknown>)["thread_id"]) : "";
+  // The name becomes a folder under Codex's home: only a plain id is followed there.
+  if (!/^[\w-]+$/.test(session)) return;
+  const drawn = join(env["CODEX_HOME"] || join(env["HOME"] || homedir(), ".codex"), "generated_images", session);
+  const names = await readdir(drawn).catch(() => []);
+  const made = await Promise.all(names.map(async (name) => ({ name, at: (await stat(join(drawn, name))).mtimeMs })));
+  const inOrder = made.sort((a, b) => a.at - b.at);
+  for (const [index, { name }] of inOrder.entries()) await copyFile(join(drawn, name), join(into, `picture-${index + 1}${extname(name)}`));
+  await rm(drawn, { recursive: true, force: true });
 }
 
 export function parseTitle(raw: string): string | null {

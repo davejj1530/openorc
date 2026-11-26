@@ -1,4 +1,4 @@
-import { access, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -20,6 +20,12 @@ if (process.env.CAPTURE_ENV) fs.writeFileSync(process.env.CAPTURE_ENV, JSON.stri
 if (process.env.CAPTURE_CWD) fs.writeFileSync(process.env.CAPTURE_CWD, JSON.stringify({ cwd: process.cwd(), mode: fs.statSync(process.cwd()).mode & 0o777 }));
 if (process.env.STALL_GENERATION) setTimeout(() => {}, 60000);
 else if (args.includes('-o')) {
+  if (args.includes('--json')) {
+    const drawn = require('node:path').join(process.env.CODEX_HOME, 'generated_images', 'session-1');
+    fs.mkdirSync(drawn, { recursive: true });
+    fs.writeFileSync(require('node:path').join(drawn, 'exec-9f.png'), 'drawn');
+    console.log(JSON.stringify({ type: 'thread.started', thread_id: 'session-1' }));
+  }
   process.stdin.resume();
   process.stdin.on('end', () => fs.writeFileSync(args[args.indexOf('-o') + 1], JSON.stringify({title:'CSV export filters'})));
 } else if (args[0] === 'run') {
@@ -53,6 +59,19 @@ describe("shared background CLI runner", () => {
     expect(args[args.indexOf("--model") + 1]).toBe("gpt-5.6-luna");
     expect(args).toContain("mcp_servers={}");
     expect(args[args.indexOf("--sandbox") + 1]).toBe("read-only");
+  });
+
+  it("gives a Codex one-shot its instructions, and takes what it drew out of Codex's home", async () => {
+    const capture = join(dir, "codex-picture-args.json");
+    const home = join(dir, "codex-home");
+    const pictures = await mkdtemp(join(dir, "pictures-"));
+    const generator = new TextGenerator({ provider: "codex", binary, env: { CAPTURE_ARGS: capture, CODEX_HOME: home }, system: 'You are "Rini".', timeoutMs: 1000 });
+    expect(await generator.complete("Draw the plan", {}, pictures)).toBe('{"title":"CSV export filters"}');
+    expect(await readdir(pictures)).toEqual(["picture-1.png"]);
+    await expect(access(join(home, "generated_images", "session-1"))).rejects.toThrow();
+    const args: string[] = JSON.parse(await readFile(capture, "utf8"));
+    expect(args).toContain("--json");
+    expect(args).toContain('developer_instructions="You are \\"Rini\\"."');
   });
 
   it("keeps Claude memory extraction working through the shared runner, with the prompt kept off the command line", async () => {

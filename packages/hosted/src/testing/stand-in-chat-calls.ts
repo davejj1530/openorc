@@ -30,7 +30,14 @@ export class StandInChatCalls {
   leaseMs = 60_000;
   readonly #calls = new Map<string, Call>();
 
-  constructor(private readonly deps: { deliver(record: StandInChatRecord, message: TeamMessage): void; readable(record: StandInChatRecord, who: string): boolean }) {}
+  constructor(
+    private readonly deps: {
+      deliver(record: StandInChatRecord, message: TeamMessage): void;
+      readable(record: StandInChatRecord, who: string): boolean;
+      /** Takes the files an answer carries, as a message's are taken; null refuses them. */
+      attach(record: StandInChatRecord, who: string, messageId: string, ids: string[]): TeamMessage["files"] | null;
+    },
+  ) {}
 
   /** Records the call a message carries, which the message then shows. */
   record(record: StandInChatRecord, message: TeamMessage, who: string, wire: unknown): void {
@@ -75,7 +82,7 @@ export class StandInChatCalls {
     if (step === "claim") return this.#claim(call, attemptId);
     if (call.attemptId !== attemptId) return refused("This answer is no longer the call's attempt.");
     if (step === "heartbeat") return this.#renew(call);
-    if (step === "answer") return this.#answer(call, String(field(body, "body") ?? ""));
+    if (step === "answer") return this.#answer(call, String(field(body, "body") ?? ""), field(body, "fileIds"));
     return this.#fail(call, String(field(body, "reason") ?? ""));
   }
 
@@ -104,17 +111,22 @@ export class StandInChatCalls {
     return { status: 204, body: null };
   }
 
-  #answer(call: Call, text: string): Reply {
+  #answer(call: Call, text: string, chosen: unknown): Reply {
     const prior = call.answerId ? call.record.messages.find((message) => message.id === call.answerId) : undefined;
     if (prior) return { status: 200, body: prior };
     if (call.state !== "running") return refused("This call isn't running.");
+    const id = randomUUID();
+    const fileIds = Array.isArray(chosen) ? chosen.filter((each): each is string => typeof each === "string") : [];
+    const files = fileIds.length ? this.deps.attach(call.record, call.ownerWho, id, fileIds) : [];
+    if (!files) return { status: 400, body: { message: "Attach files you uploaded to this conversation, once each." } };
+    if (!text.trim() && !files.length) return { status: 400, body: { message: "Answer in words or with a file." } };
     const answer: TeamMessage = {
-      id: randomUUID(),
+      id,
       channelId: call.record.conversation.id,
       seq: ++call.record.conversation.lastMessageSeq,
       actor: { kind: "orcling", owner: call.owner, localOrclingId: call.localOrclingId, name: call.name, look: call.look, callId: [...this.#calls].find(([, each]) => each === call)![0] },
       body: text,
-      files: [],
+      files,
       reactions: [],
       replyTo: null,
       pinned: null,

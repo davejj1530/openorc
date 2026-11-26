@@ -1,7 +1,7 @@
 import { standIn, type StandIn } from "@openorc/hosted/testing";
 import { defaultOrclingLook } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -81,7 +81,30 @@ it("sends a message that calls the owner's Orcling and answers once, as the Orcl
   expect(asked).toMatchObject({ agent: "claude", model: "claude-opus-fixture" });
   expect(asked.system).toContain("# You are Rini");
   expect(asked.system).not.toContain("orcling_remember");
+  expect(asked.system).toContain("can't make pictures");
+  expect(asked.pictures).toBeUndefined();
   expect(asked.prompt).toContain("Theo Laurent: @Rini should we ship?");
+});
+
+it("sends the pictures an Orcling drew with its answer, when its agent makes pictures", async () => {
+  const { target } = await setUp();
+  const pix = await call("orclings.create", {
+    draft: { name: "Pix", look: defaultOrclingLook, settings: { agent: "codex", model: "gpt-fixture", effort: null, fastMode: false }, permission: "allow" },
+  });
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  const speak = vi.spyOn(core.textGeneration, "speak").mockImplementation(async (request) => {
+    await writeFile(path.join(request.pictures!, "picture-1.png"), png);
+    return { kind: "answered", text: '{"text":"Here it is."}', model: { provider: "codex", label: "Fixture" } };
+  });
+  await call("teamChat.send", { ...target, id: randomUUID(), body: "@Pix draw the plan", orcling: { callId: randomUUID(), localOrclingId: pix.id } });
+  await vi.waitFor(
+    async () => expect((await timeline(target)).at(-1)).toMatchObject({ actor: { kind: "orcling", name: "Pix" }, body: "Here it is.", files: [{ name: "picture-1.png", kind: "image" }] }),
+    {
+      timeout: 5_000,
+    },
+  );
+  expect(speak.mock.calls[0]![0].system).toContain("you can make a picture");
+  await expect(access(speak.mock.calls[0]![0].pictures!)).rejects.toThrow();
 });
 
 it("tells only the owner why the Orcling couldn't answer, and answers when the owner tries again", async () => {

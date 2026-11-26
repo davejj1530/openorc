@@ -1,4 +1,4 @@
-import type { Task } from "@openorc/protocol";
+import type { Project, Task } from "@openorc/protocol";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
@@ -35,6 +35,7 @@ const task: Task = {
   updatedAt: 1,
   completedAt: null,
 };
+const project = { id: "project", name: "Project", rootPath: "/project", settings: {} } as Project;
 const owner = { id: "owner", importedFrom: null, workspaceMode: "worktree", branch: "openorc/owner", activity: "idle", taskCount: 1 };
 function renderSettings(value = task, beforeChange = vi.fn(async () => true)) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } } });
@@ -43,8 +44,11 @@ function renderSettings(value = task, beforeChange = vi.fn(async () => true)) {
   client.setQueryData(["tasks.executionThread", { taskId: value.id }], value.executionThreadId ? owner : null);
   client.setQueryData(["orchestration.taskState", { taskId: value.id }], null);
   client.setQueryData(["projects.git", { id: value.projectId }], "ready");
+  client.setQueryData(["agents.models", {}], [{ agent: "codex", id: "gpt-test", label: "GPT Test", isDefault: true, efforts: ["high"], defaultEffort: "high" }]);
+  client.setQueryData(["agents.availability", {}], [{ id: "codex", state: "ready" }]);
+  client.setQueryData(["app.settings.get", {}], { claudeAccountsSeparate: false });
   function Fixture() {
-    return <TaskExecutionSettings execution={useTaskExecutionLocation(value, beforeChange)} />;
+    return <TaskExecutionSettings execution={useTaskExecutionLocation(value, beforeChange)} task={value} project={project} />;
   }
   render(
     <QueryClientProvider client={client}>
@@ -127,4 +131,19 @@ it("keeps a worktree out of reach until the project has a first commit, without 
   expect(screen.getByText("This choice is saved for when work starts. Saving it does not start an agent or create a worktree.")).toBeTruthy();
   expect(screen.getByRole("combobox", { name: "Execution location" })).toHaveProperty("disabled", false);
   expect(mocks.call).not.toHaveBeenCalled();
+});
+
+it("saves the model set for the task's work, and clears it when the choice is left to whatever starts the work", async () => {
+  mocks.call.mockImplementation(async (method, params) => (method === "tasks.update" ? { ...task, choice: params.patch.choice } : null));
+  renderSettings();
+  const model = await screen.findByRole<HTMLSelectElement>("combobox", { name: "Model" });
+  expect([...model.options].map((option) => option.textContent)).toEqual(expect.arrayContaining(["Your usual model"]));
+  const offered = [...model.options].find((option) => option.value !== "");
+  if (!offered) throw new Error("No model is offered.");
+  fireEvent.change(model, { target: { value: offered.value } });
+  await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("tasks.update", { id: "task", patch: { choice: expect.objectContaining({ agent: "codex", model: "gpt-test" }) } }));
+  renderSettings({ ...task, id: "set", choice: { agent: "codex", model: "gpt-test", effort: "high" } });
+  const kept = screen.getAllByRole<HTMLSelectElement>("combobox", { name: "Model" }).at(-1)!;
+  fireEvent.change(kept, { target: { value: "" } });
+  await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("tasks.update", { id: "set", patch: { choice: null } }));
 });

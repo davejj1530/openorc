@@ -139,9 +139,12 @@ export class ThreadTaskExecution {
     return this.resolveTaskThread(taskId, true, { selected, ownAccount });
   }
 
-  private resolveTaskThread(taskId: string, starting: boolean, { choice, selected = choice, ownAccount }: ThreadPick): Thread {
+  private resolveTaskThread(taskId: string, starting: boolean, pick: ThreadPick): Thread {
     const task = tasks.get(this.db, taskId);
     if (!task) throw new Error("Task not found.");
+    // With nothing picked for this thread, the model and account the person set on the task.
+    const choice = pick.choice ?? (pick.selected || pick.ownAccount ? undefined : (task.choice ?? undefined));
+    const { selected = choice, ownAccount } = pick;
     if (retiredTeams.hasTask(this.db, taskId)) throw new Error("This item is no longer available.");
     const assigned = this.context.executionThreadFor(taskId);
     if (assigned) return assigned;
@@ -391,8 +394,8 @@ export class ThreadTaskExecution {
     this.context.rejectRetiredThread(task.threadId);
     if (retiredTeams.hasTask(this.db, taskId)) throw new Error("This item is no longer available.");
     if (task.status === "archived") throw new Error("Reopen this task before using its buttons.");
-    const button = buttonOnTaskAccount(this.db, task, pressed);
     const work = this.context.executionThreadFor(taskId);
+    const button = buttonOnTaskAccount(this.db, task, withTaskChoice(pressed, task, work !== null));
     const creator = task.threadId ? threads.get(this.db, task.threadId) : null;
     const inherited = work ?? this.firstThreadSettings(task, runRepo.listForTask(this.db, taskId).at(-1), creator);
     const settings = followingSettings(this.db, task.projectId, inherited, button.choice);
@@ -659,6 +662,15 @@ function inheritedAccount(db: Db, projectId: string, agent: Thread["agent"], acc
 /** The account a person chose for a Claude thread, refused when the project doesn't use it. Choosing none leaves the account the thread inherits. */
 function chosenAccount(db: Db, projectId: string, choice: ThreadChoice): string | undefined {
   return choice.agent === "claude" && choice.claudeAccountId ? startingAccount(db, projectId, choice.claudeAccountId, "chosen") : undefined;
+}
+
+/**
+ * A press that names no model takes the one the person set on the task, where the press makes a thread. Sent in the
+ * task's own thread, it runs on the model that thread has.
+ */
+function withTaskChoice(button: TaskButton, task: Task, hasWorkThread: boolean): TaskButton {
+  if (button.choice || !task.choice || (hasWorkThread && button.runsIn === "task")) return button;
+  return { ...button, choice: task.choice };
 }
 
 /** While accounts are kept separate, a button runs on its task's account, whichever one it names. */

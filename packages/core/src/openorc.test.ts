@@ -181,9 +181,9 @@ describe("core", () => {
     await expect(call("tasks.create", { projectId: p.id, threadId: "missing", title: "Invalid parent", useWorktree: true })).rejects.toThrow(/parent thread/i);
   });
 
-  it("puts a task in a board column with the column's stage as its status, and takes it out when its status leaves that stage", async () => {
+  it("puts a task in a board column with the column's stage as its status, and a status set alone moves it to that stage's first column or out of the columns", async () => {
     const p = await call("projects.import", { rootPath: root });
-    const [, review] = await call("board.saveColumns", {
+    const [, review, done] = await call("board.saveColumns", {
       projectId: p.id,
       columns: [
         { name: "Build", stage: "in_progress" },
@@ -193,7 +193,12 @@ describe("core", () => {
     });
     const task = await call("tasks.create", { projectId: p.id, title: "A card", useWorktree: false });
     expect(await call("tasks.update", { id: task.id, patch: { columnId: review!.id } })).toMatchObject({ status: "in_progress", columnId: review!.id });
-    expect(await call("tasks.update", { id: task.id, patch: { status: "done" } })).toMatchObject({ status: "done", columnId: null });
+    expect(await call("tasks.update", { id: task.id, patch: { status: "done" } })).toMatchObject({ status: "done", columnId: done!.id });
+    // No column of this board stands for Review, and an archived task is on no board.
+    expect(await call("tasks.update", { id: task.id, patch: { status: "review" } })).toMatchObject({ status: "review", columnId: null });
+    expect(await call("tasks.update", { id: task.id, patch: { columnId: review!.id } })).toMatchObject({ columnId: review!.id });
+    expect(await call("tasks.update", { id: task.id, patch: { status: "archived" } })).toMatchObject({ status: "archived", columnId: null });
+    await call("tasks.update", { id: task.id, patch: { status: "backlog" } });
     await expect(call("tasks.update", { id: task.id, patch: { columnId: "missing" } })).rejects.toThrow(/column/i);
   });
 
@@ -264,6 +269,19 @@ describe("core", () => {
       await call("tasks.update", { id: task.id, patch: { columnId: review!.id } });
       await vi.waitFor(() => expect(told).toHaveBeenCalledTimes(6));
       expect(opened).toHaveBeenCalledTimes(2);
+      // The person's move starts the count again: the agents have three rounds between themselves once more.
+      core.taskAutomation.board.move(task.id, "Build", reviewer.run);
+      await vi.waitFor(() => expect(told).toHaveBeenCalledTimes(7));
+      expect((await call("tasks.get", { id: task.id }))?.approval ?? null).toBeNull();
+      // A status a person sets, as a list or a phone does, is a move to the first column of that stage, and starts its agent.
+      await call("tasks.update", { id: task.id, patch: { status: "done" } });
+      expect(await call("tasks.get", { id: task.id })).toMatchObject({ status: "done", columnId: done!.id });
+      const back = await call("tasks.update", { id: task.id, patch: { status: "in_progress" } });
+      expect(back).toMatchObject({ status: "in_progress", columnId: build!.id });
+      await vi.waitFor(() => expect(told).toHaveBeenCalledTimes(8));
+      expect(told).toHaveBeenLastCalledWith(builder.thread, expect.stringMatching(/is back in the "Build" column/));
+      // A status no column stands for leaves the board's columns.
+      expect(await call("tasks.update", { id: task.id, patch: { status: "review" } })).toMatchObject({ status: "review", columnId: null });
     } finally {
       opened.mockRestore();
       told.mockRestore();

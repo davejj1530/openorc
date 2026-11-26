@@ -748,3 +748,28 @@ it("continues in a new thread in the last thread's mode when the new thread's ag
   await finished(same.id);
   expect(await call("tasks.newThread", { taskId, choice: { agent: "claude", model: "test-model", effort: "high" } })).toMatchObject({ agent: "claude", mode: "act", permissionMode: "trusted" });
 });
+
+it("keeps the model and account a person set on a task, and starts the task's threads on them unless what starts one names its own", async () => {
+  const { personal, client, claude } = await accounts();
+  await expect(call("tasks.update", { id: taskId, patch: { choice: claude(client) } })).rejects.toThrow("This project only uses these Claude accounts");
+  expect((await call("tasks.update", { id: taskId, patch: { choice: claude(personal) } })).choice).toEqual(claude(personal));
+  const draftStart: TaskButton = { ...start, id: "draft-start", autoSend: false };
+  const draftReview: TaskButton = { ...review, id: "draft-review", autoSend: false };
+  const codexReview: TaskButton = { ...draftReview, id: "codex-review", label: "Second review", choice: { agent: "codex", model: "test-model", effort: "high" } };
+  await call("projects.updateSettings", { id: projectId, settings: { taskButtons: [draftStart, draftReview, codexReview] } });
+
+  // A press that makes a thread and names no model takes the task's.
+  const side = await unsent(taskId, "draft-review");
+  expect(threads.get(core.db, side.threadId)).toMatchObject({ agent: "claude", model: "test-model", effort: "high", claudeAccountId: personal });
+  expect(threads.get(core.db, (await unsent(taskId, "codex-review")).threadId)).toMatchObject({ agent: "codex" });
+  // So does the task's first thread.
+  const opened = await call("tasks.openThread", { taskId });
+  expect(opened).toMatchObject({ agent: "claude", model: "test-model", effort: "high", claudeAccountId: personal });
+
+  // Changed afterwards, it is for the threads made from then: the task's own thread keeps the model it has.
+  await call("tasks.update", { id: taskId, patch: { choice: { agent: "codex", model: "test-model", effort: "high" } } });
+  expect((await unsent(taskId, "draft-start")).threadId).toBe(opened.id);
+  expect(threads.get(core.db, opened.id)).toMatchObject({ agent: "claude", claudeAccountId: personal });
+  expect((await call("tasks.update", { id: taskId, patch: { choice: null } })).choice).toBeNull();
+  expect(sessions.size).toBe(0);
+});

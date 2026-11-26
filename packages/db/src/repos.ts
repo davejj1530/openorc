@@ -1,4 +1,4 @@
-import type { Run, RunState, Task, TaskActor, TaskStatus, Thread, Usage } from "@openorc/protocol";
+import type { Run, RunState, Task, TaskActor, TaskStatus, Thread, ThreadChoice, Usage } from "@openorc/protocol";
 import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { claudeAccounts } from "./claude-accounts.js";
@@ -29,6 +29,7 @@ interface TaskRow {
   spec: string | null;
   status: TaskStatus;
   column_id: string | null;
+  choice: string | null;
   priority: Task["priority"];
   labels: string;
   workspace_mode: Task["workspaceMode"];
@@ -56,6 +57,7 @@ function taskFromRow(db: Db, r: TaskRow): Task {
     spec: r.spec,
     status: r.status,
     columnId: r.column_id,
+    choice: r.choice ? (JSON.parse(r.choice) as ThreadChoice) : null,
     priority: r.priority,
     labels: JSON.parse(r.labels) as string[],
     workspaceMode: r.workspace_mode,
@@ -84,6 +86,7 @@ export interface TaskPatch {
   status?: TaskStatus;
   /** Set with the column's stage as the status. A status set alone takes the task out of a column of another stage. */
   columnId?: string | null;
+  choice?: ThreadChoice | null;
   priority?: Task["priority"];
   labels?: string[];
   baseRef?: string | null;
@@ -103,6 +106,7 @@ const taskColumns: Record<keyof TaskPatch, string> = {
   spec: "spec",
   status: "status",
   columnId: "column_id",
+  choice: "choice",
   priority: "priority",
   labels: "labels",
   baseRef: "base_ref",
@@ -113,6 +117,9 @@ const taskColumns: Record<keyof TaskPatch, string> = {
   costUsd: "cost_usd",
   completedAt: "completed_at",
 };
+
+/** A patch's value as its column keeps it: labels and a choice as JSON. */
+const stored = (key: keyof TaskPatch, value: unknown): unknown => (key === "labels" || (key === "choice" && value !== null) ? JSON.stringify(value) : value);
 
 export const tasks = {
   list(db: Db, filter: { projectId?: string; threadId?: string; statuses?: TaskStatus[] } = {}): Task[] {
@@ -189,7 +196,7 @@ export const tasks = {
       if (value === undefined) continue;
       const column = taskColumns[key];
       sets.push(!explicitStatus && (key === "status" || key === "completedAt") ? `${column} = CASE WHEN status_is_explicit = 0 THEN ? ELSE ${column} END` : `${column} = ?`);
-      args.push(key === "labels" ? JSON.stringify(value) : value);
+      args.push(stored(key, value));
     }
     if (explicitStatus) sets.push("status_is_explicit = 1");
     const leaving = leavingColumn(patch, Boolean(explicitStatus));

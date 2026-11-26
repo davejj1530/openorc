@@ -157,6 +157,8 @@ export const Task = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
   completedAt: z.number().nullable(),
+  /** The model, effort and account the person set for this task's work. Threads made for the task start on it unless what starts them names its own. */
+  choice: ThreadChoice.nullable().optional(),
   /** What the task's own run waits for the person to approve, or its newest update asks them, while it waits; set when tasks are read, never stored. */
   approval: z.string().nullable().optional(),
 });

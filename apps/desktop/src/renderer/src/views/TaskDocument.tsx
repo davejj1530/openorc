@@ -171,7 +171,7 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
             onPriority={(priority) => properties.mutate({ id: task.id, patch: { priority } })}
           />
           <TaskComments key={task.id} taskId={task.id} description={draft.spec} beforeSend={flushAll} />
-          <TaskExecutionSettings execution={execution} />
+          <TaskExecutionSettings execution={execution} task={task} project={project} />
           <TaskHistory
             task={task}
             history={history}

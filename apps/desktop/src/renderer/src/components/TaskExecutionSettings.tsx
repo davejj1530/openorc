@@ -1,8 +1,10 @@
-import { WORKSPACE_ID, type Task, type WorkspaceMode } from "@openorc/protocol";
+import { WORKSPACE_ID, type Project, type Task, type WorkspaceMode } from "@openorc/protocol";
 import { useRef, useState } from "react";
+import { useKeptTaskAccount } from "../lib/accounts-separate";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useProjectGit } from "../lib/project-git";
 import { taskExecutionDisabledReason } from "../lib/task-execution-availability";
+import { ThreadChoiceFields } from "./task-threads/ThreadChoiceFields";
 import { Select, TextButton } from "./ui";
 
 export function ExecutionLocationSelect({
@@ -103,7 +105,37 @@ export function useTaskExecutionLocation(task: Task, beforeChange: () => Promise
   };
 }
 
-export function TaskExecutionSettings({ execution }: { execution: ReturnType<typeof useTaskExecutionLocation> }) {
+/**
+ * The model and account the task's work runs on, saved on the task. The threads made for it start on them: its first
+ * thread, a column's agent, an automation's. Left at the first choice, they follow the task's thread or the person's default.
+ */
+function TaskModelSetting({ task, project }: { task: Task; project: Project }) {
+  const save = useRpcMutation("tasks.update");
+  const keptAccount = useKeptTaskAccount(task);
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-3 text-sm text-ink-3">
+        Model
+        <ThreadChoiceFields
+          value={task.choice ?? undefined}
+          onChange={(choice) => save.mutate({ id: task.id, patch: { choice: choice ?? null } })}
+          project={project}
+          sameLabel="Your usual model"
+          layout="bar"
+          keptAccount={keptAccount}
+          disabled={save.isPending || Boolean(task.retiredTeam)}
+        />
+      </div>
+      {save.error ? (
+        <p role="alert" className="text-sm text-bad">
+          {save.error.message}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+export function TaskExecutionSettings({ execution, task, project }: { execution: ReturnType<typeof useTaskExecutionLocation>; task: Task; project: Project }) {
   const { cannotBranch } = useProjectGit(execution.projectId);
   return (
     <details className="task-execution-settings" open>
@@ -128,6 +160,7 @@ export function TaskExecutionSettings({ execution }: { execution: ReturnType<typ
             {execution.error} Choose the location again to retry.
           </p>
         ) : null}
+        <TaskModelSetting task={task} project={project} />
       </div>
     </details>
   );

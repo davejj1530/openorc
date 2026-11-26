@@ -2,7 +2,7 @@ import { claudeAccountMigration } from "./claude-account-schema.js";
 import { taskCommentsMigration } from "./task-comments-schema.js";
 import { taskRefineMigration } from "./task-refine-schema.js";
 import { taskThreadsMigration } from "./task-threads-schema.js";
-import { boardColumnJobSwitchMigration, boardColumnJobsMigration, boardColumnOwnJobMigration, boardColumnsMigration } from "./board-schema.js";
+import { boardColumnJobSwitchMigration, boardColumnJobsMigration, boardColumnOwnJobMigration, boardColumnsMigration, taskChoiceMigration } from "./board-schema.js";
 import { taskEventsMigration } from "./task-events.js";
 import { automationsMigration } from "./automations.js";
 import type { DatabaseSync } from "node:sqlite";
@@ -747,4 +747,5 @@ export const migrations: Migration[] = [
   boardColumnJobSwitchMigration,
   boardColumnOwnJobMigration,
   automationsMigration,
+  taskChoiceMigration,
 ];

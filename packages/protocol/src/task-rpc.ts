@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Task, TaskPriority, TaskStatus, WorkspaceMode } from "./domain.js";
+import { Task, TaskPriority, TaskStatus, ThreadChoice, WorkspaceMode } from "./domain.js";
 import { SpaceId } from "./spaces.js";
 import type { TaskEvent } from "./task-events.js";
 
@@ -31,6 +31,8 @@ export const taskRpcParams = {
       priority: TaskPriority.optional(),
       labels: z.array(z.string()).optional(),
       workspaceMode: WorkspaceMode.optional(),
+      /** The model and account the task's work runs on; null leaves them to whatever starts the work. */
+      choice: ThreadChoice.nullable().optional(),
     }),
   }),
   "tasks.events": z.object({ taskId: z.string() }),

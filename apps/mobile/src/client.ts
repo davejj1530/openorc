@@ -201,9 +201,10 @@ export function assetUri(ref: AssetRef): Promise<string> {
 
 /**
  * What phone access allows: the Mac's own methods, and those of a Mac that shares its OpenOrc Cloud threads; and the
- * person's cloud accounts, which only the phone's own session answers (ask them only while it holds one).
+ * person's cloud accounts and a space's repositories to add as projects, which only the phone's own session answers
+ * (ask them only while it holds one).
  */
-type PhoneMethod = RemoteMethod | CloudRemoteMethod | "account.status";
+type PhoneMethod = RemoteMethod | CloudRemoteMethod | "account.status" | "organization.repositories" | "organization.projects.add";
 
 // The phone may call only what phone access allows; these narrow the shared hooks so anything else does not compile.
 export const useRpc = <M extends PhoneMethod>(method: M, params: RpcParams<M>, options?: RpcQueryOptions<M>): UseQueryResult<RpcResults[M]> => client.useRpc(method, params, options);

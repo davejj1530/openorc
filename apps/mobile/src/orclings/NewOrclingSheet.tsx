@@ -15,7 +15,7 @@ import { LookColors, Options, PartTabs } from "./LookPicker";
 import { NAME_MAX, nameProblem } from "./orcling-edit";
 import { OrclingMotion, seedOf } from "./OrclingMotion";
 import { ModelRow, PermissionRow } from "./OrclingRows";
-import { PinnedSheet } from "./PinnedSheet";
+import { PinnedSheet } from "../ui/PinnedSheet";
 
 const COMPOSER_ID = "orcling-new";
 const back = () => router.back();

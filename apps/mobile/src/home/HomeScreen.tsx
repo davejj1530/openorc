@@ -1,3 +1,4 @@
+import { RNHostView } from "@expo/ui/swift-ui";
 import { AnimatedLegendList } from "@legendapp/list/reanimated";
 import { router, useGlobalSearchParams, usePathname } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -23,7 +24,7 @@ import { FootFade } from "../ui/ScrollFade";
 import { swipes } from "../ui/swipe";
 import { Text } from "../ui/Text";
 import { rowMotion, useFoldMotion, type RowMotion } from "./fold-motion";
-import { BOTTOM_BAR_ROOM, BottomBar, homeTabs, type HomeTab } from "./BottomBar";
+import { BOTTOM_BAR_ROOM, BottomBar, homeTabs, NewMenu, type HomeTab } from "./BottomBar";
 import { useNewAction } from "./new-action";
 import { TabLayers } from "./TabLayers";
 import { HOME_BAR_HEIGHT, HomeBar } from "./header/HomeBar";
@@ -134,7 +135,7 @@ function OutOfReachLine({ state }: { state: Paired }) {
   );
 }
 
-/** Home's foot: the tabs with their action, or, for a Mac too old for Orclings and task lists, New thread alone. */
+/** Home's foot: the tabs with their action, or, for a Mac too old for Orclings and task lists, New alone: a thread at a tap, or its menu. */
 function HomeFoot({
   tabs,
   tab,
@@ -151,11 +152,30 @@ function HomeFoot({
   onNew: () => void;
 }) {
   if (tabs.length > 1) return <BottomBar tab={tab} tabs={tabs} onTab={onTab} badge={badge} action={action} />;
+  if (action.kind === "menu")
+    return (
+      <View className="mb-2">
+        <NewMenu action={action}>
+          <RNHostView matchContents>
+            <NewPill label={action.label} />
+          </RNHostView>
+        </NewMenu>
+      </View>
+    );
   return (
-    <Pressable accessibilityRole="button" onPress={onNew} className="mb-2 h-12 flex-row items-center gap-2 rounded-full bg-accent pl-5 pr-6 active:opacity-80">
-      <Plus size={18} className="text-accent-fg" />
-      <Text className="text-lg text-accent-fg">New thread</Text>
+    <Pressable accessibilityRole="button" onPress={onNew} className="mb-2 active:opacity-80">
+      <NewPill label="New thread" />
     </Pressable>
+  );
+}
+
+/** The ink pill a Home with no tabs starts things from. */
+function NewPill({ label }: { label: string }) {
+  return (
+    <View className="h-12 flex-row items-center gap-2 rounded-full bg-accent pl-5 pr-6">
+      <Plus size={18} className="text-accent-fg" />
+      <Text className="text-lg text-accent-fg">{label}</Text>
+    </View>
   );
 }
 

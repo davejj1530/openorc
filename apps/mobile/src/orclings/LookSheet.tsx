@@ -10,7 +10,7 @@ import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
 import { LookColors, Options, PADDING, PartTabs } from "./LookPicker";
 import { OrclingMotion, seedOf } from "./OrclingMotion";
-import { PinnedSheet } from "./PinnedSheet";
+import { PinnedSheet } from "../ui/PinnedSheet";
 import { useOrclingEdit } from "./orcling-edit";
 
 const back = () => router.back();

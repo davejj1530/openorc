@@ -236,6 +236,19 @@ function NewFace({ press }: { press?: { label: string; onPress: () => void } }) 
   );
 }
 
+/** The menu of what New can start, opening from its face (`children`) as iOS opens a button's menu. */
+export function NewMenu({ action, children }: { action: Extract<NewAction, { kind: "menu" }>; children: ReactNode }) {
+  return (
+    <Host matchContents colorScheme={useMode()}>
+      <Menu modifiers={[accessibilityLabel(action.label)]} label={children}>
+        {action.items.map((item) => (
+          <Button key={item.label} label={item.label} systemImage={item.icon} onPress={item.onPress} />
+        ))}
+      </Menu>
+    </Host>
+  );
+}
+
 /**
  * New at the trailing edge, doing what the tab in front starts: one thing at a tap, or a menu that opens from it, as
  * iOS opens a glass button's menu.
@@ -244,24 +257,15 @@ function NewButton({ action }: { action: NewAction }) {
   const mode = useMode();
   if (action.kind === "menu")
     return (
-      <Host matchContents colorScheme={mode}>
-        <Menu
-          modifiers={[accessibilityLabel(action.label)]}
-          label={
-            liquidGlass ? (
-              <NewFace />
-            ) : (
-              <RNHostView matchContents>
-                <NewFace />
-              </RNHostView>
-            )
-          }
-        >
-          {action.items.map((item) => (
-            <Button key={item.label} label={item.label} systemImage={item.icon} onPress={item.onPress} />
-          ))}
-        </Menu>
-      </Host>
+      <NewMenu action={action}>
+        {liquidGlass ? (
+          <NewFace />
+        ) : (
+          <RNHostView matchContents>
+            <NewFace />
+          </RNHostView>
+        )}
+      </NewMenu>
     );
   if (!liquidGlass)
     return (

@@ -107,6 +107,7 @@ export default function RootLayout() {
                   <Stack.Screen name="settings" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
                   <Stack.Screen name="filter" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
                   <Stack.Screen name="space" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
+                  <Stack.Screen name="add-projects" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
                   <Stack.Screen name="connection" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
                   <Stack.Screen name="whats-new" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
                   <Stack.Screen name="chat-pins" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />

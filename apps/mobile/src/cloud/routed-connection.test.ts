@@ -86,6 +86,14 @@ it("lists a space's cloud threads and the Mac's in one list, its project both ha
   expect(JSON.stringify(mac.at.asked)).not.toContain(cloudThread);
 });
 
+it("reads a space's repositories and adds one as a project through the phone's own session, with the Mac asleep", async () => {
+  const { connection, mac } = await routed();
+  mac.at.down = true;
+  expect(await connection.call("organization.repositories", { spaceId: birch })).toMatchObject({ installations: [], repositories: [] });
+  expect(await connection.call("organization.projects.add", { spaceId: birch, repositories: [{ installationId: "one", repoId: 1 }] })).toMatchObject([{ state: "refused" }]);
+  expect(mac.at.asked).toEqual([]);
+});
+
 it("keeps listing, opening and paging the cloud's threads with the Mac asleep, the Mac's last rows beside them", async () => {
   const { connection, mac } = await routed();
   await connection.call("threads.list", { spaceId: birch });

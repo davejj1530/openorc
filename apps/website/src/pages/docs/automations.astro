@@ -54,8 +54,8 @@ const issueCheck = String.raw`gh issue list --json number,title \
             <td>You or an agent creates a task in the project. A task an automation creates does not count.</td>
           </tr>
           <tr>
-            <td><strong>A check of your own finds something</strong></td>
-            <td>A command you write prints a new line. See <a href="#checks">Checks</a>.</td>
+            <td><strong>Something you describe</strong></td>
+            <td>A check written from your words finds something new. See <a href="#checks">Checks</a>.</td>
           </tr>
         </tbody>
       </table>
@@ -65,6 +65,8 @@ const issueCheck = String.raw`gh issue list --json number,title \
 
   <section aria-labelledby="checks">
     <h2 id="checks">Checks</h2>
+    <p>Choose <strong>Something you describe</strong> and write what to watch for, such as "an issue opens with the bug label". Choose the model that writes the check, then <strong>Write the check</strong>. An agent writes the check and it runs once, so you see what it finds now. What it finds now is already there and doesn't set the automation off; only new things do. If the check doesn't run, the agent is told why and writes it once more.</p>
+    <p><strong>Show the command</strong> shows the command the agent wrote. You can change it and run it once with <strong>Try it</strong>, or choose <strong>Write the command yourself</strong> to write your own.</p>
     <p>A check is a shell command OpenOrc runs in the project folder on a timer, from every minute to once a day. Each line it prints is one thing that happened, and the automation acts on each new line once. A line printed again later is ignored.</p>
     <p>To tell things apart by an id, print the id, a tab, then the words. This check sets the automation off once for each new issue, even if the issue's title changes later:</p>
     <pre><code set:text={issueCheck} /></pre>

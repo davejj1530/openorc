@@ -120,6 +120,12 @@ export const AutomationProposal = z.object({
 });
 export type AutomationProposal = z.infer<typeof AutomationProposal>;
 
+/** What a check found when it ran once: each thing it printed, in words, or why it did not run. */
+export type CheckTry = { state: "ran"; found: string[] } | { state: "failed"; reason: string };
+
+/** A check an agent wrote from what a person wants watched, with what it found when it ran once; or why none works. */
+export type CheckWriting = { state: "written"; command: string; everyMinutes: number; found: string[] } | { state: "failed"; reason: string; command: string | null };
+
 export const automationRpcParams = {
   /** The automations of one project, or of all. */
   "automations.list": z.object({ projectId: z.string().optional() }),
@@ -128,6 +134,10 @@ export const automationRpcParams = {
   /** On or off. Turning on one an agent wrote accepts it. One switched on acts on what happens from then. */
   "automations.switch": z.object({ id: z.string(), enabled: z.boolean() }),
   "automations.remove": z.object({ id: z.string() }),
+  /** An agent writes a check's command from what the person wants watched, on the model chosen, and it runs once in the project's folder. */
+  "automations.writeCheck": z.object({ projectId: z.string(), what: z.string().trim().min(1).max(200), choice: ThreadChoice }),
+  /** A check's command runs once in the project's folder, to see what it finds now. */
+  "automations.tryCheck": z.object({ projectId: z.string(), command: z.string().trim().min(1).max(4000) }),
 };
 
 export interface AutomationRpcResults {
@@ -135,4 +145,6 @@ export interface AutomationRpcResults {
   "automations.save": Automation;
   "automations.switch": null;
   "automations.remove": null;
+  "automations.writeCheck": CheckWriting;
+  "automations.tryCheck": CheckTry;
 }

@@ -17,7 +17,7 @@ type Own = { dataDir: string; upkeep: LedgerUpkeep; log: Logger; invalidate: (ke
 /** Every call about a project's tasks: reading them, making, changing and deleting them, their work and its folder, their board and their automations. */
 export function createTaskHandlers(core: Core, { dataDir, upkeep, log, invalidate }: Own) {
   const { db, settings, threads, runs, comments, refines, workspaces, workspaceWriters } = core;
-  const { reports, board, rules } = core.taskAutomation;
+  const { reports, board, rules, checks } = core.taskAutomation;
   return {
     ...createTaskQueriesHandlers({ db, comments, threadService: threads, runService: runs }),
     ...createTaskWorkHandlers({ db, refines, threadService: threads, dataDir }),
@@ -26,6 +26,6 @@ export function createTaskHandlers(core: Core, { dataDir, upkeep, log, invalidat
     ...createTaskDeleteHandlers({ workspaces, comments, refines, runService: runs, db, log, upkeep, invalidate }),
     ...createWorkspaceHandlers({ runService: runs, workspaces, db, invalidate }),
     ...createBoardHandlers({ db, invalidate, reports, jobs: board }),
-    ...createAutomationHandlers({ automations: rules }),
+    ...createAutomationHandlers({ automations: rules, checks }),
   };
 }

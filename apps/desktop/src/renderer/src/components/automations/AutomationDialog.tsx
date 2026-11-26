@@ -2,8 +2,9 @@ import { everyWords, type AccountsProject } from "@openorc/client";
 import { triggerHasTask, type Automation, type AutomationAction, type AutomationTrigger } from "@openorc/protocol";
 import { useState } from "react";
 import { AgentBrief } from "../AgentBrief";
+import { CheckFields } from "./CheckFields";
 import { Plus, X } from "../icons";
-import { Button, Dialog, Field, IconButton, Input, Select, TextButton, Textarea } from "../ui";
+import { Button, Dialog, Field, IconButton, Input, Select, TextButton } from "../ui";
 import {
   checkMinutes,
   draftComplete,
@@ -28,8 +29,10 @@ import "./automations.css";
 
 const sentence = (words: string) => words.charAt(0).toUpperCase() + words.slice(1);
 
-/** What sets it off: the kind, then what that kind needs. A check is a command, what it looks for in plain words, and how often it runs. */
-function TriggerFields({ trigger, taskId, onChange }: { trigger: AutomationTrigger; taskId: string | null; onChange: (trigger: AutomationTrigger) => void }) {
+type TriggerProps = { trigger: AutomationTrigger; taskId: string | null; projectId: string; project: AccountsProject | undefined; onChange: (trigger: AutomationTrigger) => void };
+
+/** What sets it off: the kind, then what that kind needs. One the person describes is a check an agent writes, and how often it runs. */
+function TriggerFields({ trigger, taskId, projectId, project, onChange }: TriggerProps) {
   return (
     <div className="automation-form-part">
       <div className="automation-form-line">
@@ -56,28 +59,7 @@ function TriggerFields({ trigger, taskId, onChange }: { trigger: AutomationTrigg
           </Select>
         ) : null}
       </div>
-      {trigger.kind === "check" ? (
-        <>
-          <Input
-            aria-label="What the check looks for"
-            value={trigger.what}
-            maxLength={200}
-            placeholder="What it looks for, such as: an issue was opened"
-            onChange={(event) => onChange({ ...trigger, what: event.target.value })}
-          />
-          <Textarea
-            className="automation-form-command"
-            aria-label="The check's command"
-            rows={3}
-            spellCheck={false}
-            value={trigger.command}
-            maxLength={4000}
-            placeholder="A command that prints one line for each thing that happened"
-            onChange={(event) => onChange({ ...trigger, command: event.target.value })}
-          />
-          <p className="automation-form-hint">Runs in the project folder. Each new line it prints sets the automation off once.</p>
-        </>
-      ) : null}
+      {trigger.kind === "check" ? <CheckFields trigger={trigger} projectId={projectId} project={project} onChange={onChange} /> : null}
     </div>
   );
 }
@@ -258,7 +240,7 @@ export function AutomationDialog({ automation, projectId, preset, onClose }: { a
         <NameAndProject draft={draft} projects={projects} chooseProject={!automation && !draft.taskId} disabled={pending} onChange={put} />
         <section aria-labelledby="automation-when">
           <WhenLabel taskId={draft.taskId} />
-          <TriggerFields trigger={draft.trigger} taskId={draft.taskId} onChange={(trigger) => put({ trigger })} />
+          <TriggerFields trigger={draft.trigger} taskId={draft.taskId} projectId={draft.projectId} project={project} onChange={(trigger) => put({ trigger })} />
         </section>
         <section aria-labelledby="automation-do">
           <h3 id="automation-do" className="automation-form-label">

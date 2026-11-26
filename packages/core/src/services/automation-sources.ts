@@ -22,6 +22,12 @@ export interface AutomationSources {
   check(cwd: string, command: string): Promise<string[]>;
 }
 
+/** One line a check printed: what comes before a tab tells one thing from another, and the rest describes it. A line without a tab is both. */
+export function checkFinding(line: string): { id: string; words: string } {
+  const tab = line.indexOf("\t");
+  return tab > 0 ? { id: line.slice(0, tab), words: line.slice(tab + 1).trim() } : { id: line, words: line };
+}
+
 const FAILED = new Set(["FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"]);
 const RUNNING = new Set(["PENDING", "EXPECTED"]);
 const text = (value: unknown): string => (typeof value === "string" ? value : "");

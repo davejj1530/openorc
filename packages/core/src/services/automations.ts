@@ -11,7 +11,7 @@ import {
   type Task,
 } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
-import type { AutomationSources, Pull } from "./automation-sources.js";
+import { checkFinding, type AutomationSources, type Pull } from "./automation-sources.js";
 import type { BoardJobs } from "./board-jobs.js";
 import type { Notification } from "./run-types.js";
 import { AppSettingsService } from "./settings.js";
@@ -320,10 +320,8 @@ export class AutomationService {
     if (trigger.kind === "check") {
       const lines = await this.deps.sources.check(project.rootPath, trigger.command);
       return lines.map((line) => {
-        // What comes before a tab tells one thing from another; the rest describes it.
-        const tab = line.indexOf("\t");
-        const words = tab > 0 ? line.slice(tab + 1).trim() : line;
-        return { key: `check:${tab > 0 ? line.slice(0, tab) : line}`, title: words, detail: `${trigger.what}: ${words}`, taskId: automation.taskId, threadId: null };
+        const { id, words } = checkFinding(line);
+        return { key: `check:${id}`, title: words, detail: `${trigger.what}: ${words}`, taskId: automation.taskId, threadId: null };
       });
     }
     return this.pullOccurrences(automation, trigger, project, pulls);

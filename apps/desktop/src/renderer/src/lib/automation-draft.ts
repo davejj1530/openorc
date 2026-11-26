@@ -11,7 +11,7 @@ export const triggerOptions = [
   { value: "checks_failed", label: "Checks fail on a pull request" },
   { value: "merged", label: "A pull request merges" },
   { value: "task_created", label: "A task is created" },
-  { value: "check", label: "A check of your own finds something" },
+  { value: "check", label: "Something you describe" },
 ] as const;
 export type TriggerKey = (typeof triggerOptions)[number]["value"];
 

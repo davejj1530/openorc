@@ -46,6 +46,43 @@
   font-size: var(--text-xs);
   line-height: var(--leading-18);
 }
+/* What a check found when it ran, under the words it was written from. */
+.automation-check-outcome {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 2px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: var(--leading-18);
+}
+.automation-check-found {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--ink-2);
+}
+.automation-check-found li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.automation-check-toggle {
+  align-self: flex-start;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.automation-check-command {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.automation-check-command-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 .automation-step {
   display: flex;
   flex-direction: column;

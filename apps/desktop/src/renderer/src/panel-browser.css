@@ -1,7 +1,7 @@
 /* The panel is one plane from the window's top edge to its bottom: the header row and the open
    tab's page share its surface with nothing between them. The pane carries data-plane, so
    controls anywhere in it take the plane's fill step. Like the thread header beside it, the header
-   has no line under it. */
+   stands on a line (app.css). */
 .panel-header {
   display: flex;
   align-items: center;

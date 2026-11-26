@@ -43,8 +43,9 @@
 :root {
   /* Every structural line's width; one physical pixel on high-density screens, below. */
   --hairline: 1px;
-  /* The two full-height partitions beside the conversation and the line over the sidebar's footer that meets
-     one, the same width on every screen and halfway from the line to the strong line. */
+  /* The two full-height partitions beside the conversation, the same width on every screen and halfway from the
+     line to the strong line. The lines that meet them (under the rails, around Settings' head, under the sidebar's
+     screens and over its footer) keep that width in --line, a step quieter, and a partition runs unbroken over them. */
   --seam: 1px;
   --seam-line: color-mix(in srgb, var(--line), var(--line-strong));
   --bg: #ffffff;
@@ -825,7 +826,13 @@ body[data-resizing] .sidebar-shell {
   background: var(--ink-3);
 }
 
-/* Every title rail sits on its view's canvas with no line under it: the content scrolls under the rail's ground. */
+/* Every title rail stands on a line, and so does the panel's beside it: one line under the chrome band, from the
+   sidebar's seam to the window's edge, a seam wide in the quieter --line. A strip's open tab draws its 2px line
+   over it, and the content scrolls under the rail's ground. */
+.app-topbar,
+.panel-header {
+  box-shadow: inset 0 calc(-1 * var(--seam)) 0 var(--line);
+}
 .app-topbar {
   padding-top: calc(var(--spacing-well) / 2);
 }

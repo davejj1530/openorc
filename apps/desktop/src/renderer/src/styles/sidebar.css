@@ -158,28 +158,32 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
 
 /* New thread, then the screens by name, 34px apart: an 18px glyph, a size over its name, filling the sidebar's 18px lead slot
    16px in and in its name's own ink, so the name starts at 42 as a project's does, and a count at the end only where something waits. New thread keeps full ink at rest. Settings lists its sections the
-   same way in their place. */
+   same way in their place. The screens end on a line that runs the sidebar's width, as the footer's does, 8px under the
+   last of them and 8px over the list's head. */
 .sidebar-nav {
   display: grid;
   flex-shrink: 0;
   gap: 2px;
-  padding: 2px 8px 0;
+  padding: 2px 8px calc(8px + var(--seam));
+  box-shadow: inset 0 calc(-1 * var(--seam)) 0 var(--line);
 }
 /* Settings' head takes New thread's place: the chevron that leaves in the third ink beside the name in full ink,
-   centred between two of the foot's seams, one under the header and one over the sections, each running the
-   sidebar's width. The sections scroll under it. */
+   centred between two of the foot's lines, one under the header and one over the sections, each running the
+   sidebar's width. The upper one lies on the header's last pixel, so it carries on as the line under the work
+   column's rail. The sections scroll under the head. */
 .settings-destinations {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
+  margin-top: calc(-1 * var(--seam));
 }
 .settings-head {
   flex-shrink: 0;
   padding: 8px;
   box-shadow:
-    inset 0 var(--seam) 0 var(--seam-line),
-    inset 0 calc(-1 * var(--seam)) 0 var(--seam-line);
+    inset 0 var(--seam) 0 var(--line),
+    inset 0 calc(-1 * var(--seam)) 0 var(--line);
 }
 .settings-head > .sidebar-nav-row {
   color: var(--ink);
@@ -299,7 +303,7 @@ button.sidebar-nav-row:active:not([aria-current="page"]) {
   align-items: center;
   gap: 2px;
   height: var(--control-lg);
-  margin: 12px 8px 2px;
+  margin: 8px 8px 2px;
   flex-shrink: 0;
 }
 .sidebar-list-fold {
@@ -762,7 +766,7 @@ button.browser-empty:hover,
   margin-top: 2px;
 }
 
-/* The footer, on the sidebar's ground under a seam that runs the sidebar's width to meet the one at its
+/* The footer, on the sidebar's ground under a line that runs the sidebar's width to meet the seam at its
    edge: its tools at the row's end, its start kept for the signed-in person. */
 .sidebar-footer {
   container: account-footer / inline-size;
@@ -770,9 +774,9 @@ button.browser-empty:hover,
   align-items: center;
   justify-content: flex-end;
   gap: 2px;
-  /* Taller than the header, so the person's two lines stand clear of the seam over them. */
+  /* Taller than the header, so the person's two lines stand clear of the line over them. */
   height: 52px;
-  box-shadow: inset 0 var(--seam) 0 var(--seam-line);
+  box-shadow: inset 0 var(--seam) 0 var(--line);
   /* The gear's centre sits on the list's centre line, 24px in from the edge. */
   padding: 0 8px;
 }
@@ -995,15 +999,22 @@ button.browser-empty:hover,
   width: 4px;
 }
 /* The seam between the sidebar and the work column, from the window's top to its foot, through
-   the header. The floating sidebar at 900px and narrower leans on its shadow instead. */
-.app-shell .sidebar-shell {
-  box-shadow: inset calc(-1 * var(--seam)) 0 var(--seam-line);
+   the header. It lies over the sidebar's content, so the quieter lines that meet it never notch it. The floating
+   sidebar at 900px and narrower leans on its shadow instead. */
+.app-shell .sidebar-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: var(--seam);
+  background: var(--seam-line);
+  pointer-events: none;
 }
 
 /* At 900px and narrower the sidebar floats over the work column: an opaque tile with the one
    soft shadow the app keeps, since tile over tile has no fill step to lean on. */
 @media (max-width: 900px) {
-  .app-shell .resize-handle[data-edge="sidebar"] {
+  .app-shell .resize-handle[data-edge="sidebar"],
+  .app-shell .sidebar-shell::after {
     display: none;
   }
   .app-shell .workspace-navigation,

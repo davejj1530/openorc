@@ -50,13 +50,15 @@
 }
 /* A dragged tab rides over the row while the tabs it passes step aside (use-tab-reorder moves them); it follows the
    pointer exactly, so only the others ease. It draws the chrome's colour under itself to hide the names passing under
-   it, and it stacks above the thread header's controls, which sit at 2. */
+   it, with the rail's line at its own foot so that line stays whole, and it stacks above the thread header's controls,
+   which sit at 2. */
 .work-tabs[data-reordering] .work-tab {
   transition: transform var(--duration-arrive) var(--ease-out);
 }
 .work-tabs .work-tab[data-dragged] {
   z-index: 3;
   background-color: var(--bg);
+  box-shadow: inset 0 calc(-1 * var(--seam)) 0 var(--line);
   color: var(--ink-2);
   transition: none;
 }

@@ -159,7 +159,7 @@ function useProviderTabChoice({
  */
 export type PickerUnset = { label: string; icon: ReactNode; choose: () => void };
 
-/** The first row of each agent's models where a picker offers no model of its own. */
+/** The first row of each agent's models where a picker offers no model of its own. Choosing it closes the picker, since no model leaves no effort to set. */
 function UnsetRow({
   unset,
   chosen,
@@ -170,7 +170,7 @@ function UnsetRow({
   unset: PickerUnset;
   chosen: boolean;
   disabled?: boolean | undefined;
-  close: (() => void) | null;
+  close: () => void;
   moveRowFocus: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }) {
   return (
@@ -182,7 +182,7 @@ function UnsetRow({
       disabled={disabled}
       onClick={() => {
         unset.choose();
-        close?.();
+        close();
       }}
       onKeyDown={moveRowFocus}
     >
@@ -367,7 +367,7 @@ function ModelBrowser({
                   {provider && harnessInstalled(provider) ? `Sign in to ${harnessName(harness)} to use its models.` : `Install ${harnessName(harness)} to use its models.`}
                 </p>
               ) : null}
-              {unset && !searching ? <UnsetRow unset={unset} chosen={!value} disabled={disabled} close={closeOnSelect ? close : null} moveRowFocus={moveRowFocus} /> : null}
+              {unset && !searching ? <UnsetRow unset={unset} chosen={!value} disabled={disabled} close={close} moveRowFocus={moveRowFocus} /> : null}
               <PickerAccountRows section={harness} searching={searching} accounts={accounts} disabled={disabled} moveRowFocus={moveRowFocus} />
               {searching
                 ? visible.map((model) => modelRow(model, true))
@@ -518,14 +518,17 @@ function TriggerEffort({ label }: { label: string }) {
   return <span className="composer-model-effort">{label}</span>;
 }
 
-function ComposerTriggerIcon({ orcling, value }: { orcling: Orcling | null; value: ModelChoice | null }) {
+function ComposerTriggerIcon({ orcling, value, unset }: { orcling: Orcling | null; value: ModelChoice | null; unset: PickerUnset | undefined }) {
   if (orcling) return <OrclingAvatar orcling={orcling} size={14} />;
-  return <>{pickerTriggerIcon(value, 14)}</>;
+  return <>{pickerTriggerIcon(value, 14) ?? unset?.icon}</>;
 }
 
-function composerModelName(orclings: OrclingPickerChoices | undefined, current: ModelOption | undefined, value: ModelChoice | null): string {
-  return chosenOrcling(orclings)?.name ?? current?.label ?? value?.model ?? "Choose model";
+function composerModelName(orclings: OrclingPickerChoices | undefined, current: ModelOption | undefined, value: ModelChoice | null, unset: PickerUnset | undefined): string {
+  return chosenOrcling(orclings)?.name ?? current?.label ?? value?.model ?? unset?.label ?? "Choose model";
 }
+
+/** Whether the browser offers Fast mode: beside the effort, where Fast can run here, or where the hosted conversation says why it can't. */
+const fastOffered = (showEffort: boolean, hostedReason: string | null, limits: ModelLimits | undefined): boolean => showEffort && (Boolean(hostedReason) || (limits?.fast ?? true));
 
 /** A compact trigger with one model browser, and beside it in the same pill the usage meter of the account it would spend. */
 interface ComposerModelPickerProps {
@@ -539,12 +542,28 @@ interface ComposerModelPickerProps {
   disabled?: boolean;
   settingsDisabled?: boolean;
   limits?: ModelLimits | undefined;
+  /** Offers no model of its own, as the first choice, and the trigger reads it while it is chosen. */
+  unset?: PickerUnset | undefined;
+  /** Whether it offers the model's effort; off where the model's answer does not use one. */
+  showEffort?: boolean;
 }
 
 /** Where the turn runs takes only these agents, and Fast only when `fast`; on OpenOrc Cloud, its models (`cloud`). */
 export type ModelLimits = { harnesses: readonly HarnessId[]; fast: boolean; cloud?: boolean };
 
-export function ComposerModelPicker({ value, onChange, onSelectModel, orclings, accounts, modelSelector, disabled, settingsDisabled = false, limits }: ComposerModelPickerProps) {
+export function ComposerModelPicker({
+  value,
+  onChange,
+  onSelectModel,
+  orclings,
+  accounts,
+  modelSelector,
+  disabled,
+  settingsDisabled = false,
+  limits,
+  unset,
+  showEffort = true,
+}: ComposerModelPickerProps) {
   const fastReason = useHostedControlReason("speed");
   const models = useModelCatalog(limits?.cloud);
   const popup = usePickerPopup();
@@ -574,12 +593,12 @@ export function ComposerModelPicker({ value, onChange, onSelectModel, orclings, 
         }}
       >
         <Popover.Trigger ref={popup.trigger} disabled={control.disabled} className="composer-model-trigger" aria-label="Model and effort" {...warmAccountUsage(accounts)} data-tip={control.reason}>
-          <ComposerTriggerIcon orcling={chosenOrcling(orclings)} value={value} />
+          <ComposerTriggerIcon orcling={chosenOrcling(orclings)} value={value} unset={unset} />
           {fast ? (
             <Zap size={13} aria-label={fastBlocked ? "Fast mode can't run" : "Fast mode requested"} className="composer-fast-indicator shrink-0" data-blocked={fastBlocked || undefined} />
           ) : null}
-          <span className="composer-model-name">{composerModelName(orclings, current, value)}</span>
-          {value ? <TriggerEffort label={label} /> : null}
+          <span className="composer-model-name">{composerModelName(orclings, current, value, unset)}</span>
+          {value && showEffort ? <TriggerEffort label={label} /> : null}
         </Popover.Trigger>
         <Popover.Portal>
           <CoversPreview />
@@ -616,12 +635,13 @@ export function ComposerModelPicker({ value, onChange, onSelectModel, orclings, 
                   onSelectModel={onSelectModel}
                   orclings={orclings}
                   accounts={accounts}
-                  showEffort
-                  showFast={Boolean(fastReason) || (limits?.fast ?? true)}
+                  showEffort={showEffort}
+                  showFast={fastOffered(showEffort, fastReason, limits)}
                   harnesses={limits?.harnesses}
                   cloud={limits?.cloud}
+                  unset={unset}
                   disabled={settingsDisabled}
-                  closeOnSelect={false}
+                  closeOnSelect={!showEffort}
                   close={() => popup.setOpen(false)}
                 />
               )}

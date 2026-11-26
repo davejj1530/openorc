@@ -9,7 +9,7 @@ import { CheckFields } from "./CheckFields";
 
 vi.mock("../../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("../ModelPicker", () => ({
-  ModelPicker: ({ value }: { value: { model: string } | null }) => <span>{value?.model ?? "No model"}</span>,
+  ComposerModelPicker: ({ value }: { value: { model: string } | null }) => <span>{value?.model ?? "No model"}</span>,
   defaultChoice: () => ({ agent: "codex", model: "gpt-6-astra", effort: "high" }),
 }));
 

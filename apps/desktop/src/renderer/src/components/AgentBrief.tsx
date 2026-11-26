@@ -3,7 +3,7 @@ import { HarnessId, isHarnessId, type ThreadChoice } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { useRpc } from "../lib/client";
 import { Automation } from "./icons";
-import { ModelPicker, type ModelChoice } from "./ModelPicker";
+import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
 import type { PickerAccounts } from "./ModelPickerAccounts";
 import "./agent-brief.css";
 
@@ -29,7 +29,7 @@ function useChoiceAccounts(project: AccountsProject | undefined, choice: ThreadC
 
 /**
  * What an agent is told and the model that reads it, as one field: the words written as a message would be, and the
- * model at the box's foot in the app's model picker, with `action` at the foot's end. `sameLabel`, when given, names the
+ * model at the box's foot in the composer's model picker, with `action` at the foot's end. `sameLabel`, when given, names the
  * choice that leaves the model to wherever the agent runs, the picker's first.
  */
 export function AgentBrief({
@@ -62,7 +62,7 @@ export function AgentBrief({
   rows?: number;
   disabled?: boolean;
   action?: ReactNode;
-  /** Whether the picker offers the model's effort, which a one-shot answer does not use. */
+  /** Whether the picker offers the model's effort, which an answer written in one go does not use. */
   showEffort?: boolean;
 }) {
   const accounts = useChoiceAccounts(project, choice, onChoice);
@@ -81,12 +81,11 @@ export function AgentBrief({
         onBlur={onLeave}
       />
       <div className="agent-brief-foot">
-        <ModelPicker
+        <ComposerModelPicker
           value={value}
           onChange={(next) => onChoice(threadChoice(next, choice))}
           accounts={accounts}
           limits={LIMITS}
-          ariaLabel="Model"
           showEffort={showEffort}
           unset={sameLabel ? { label: sameLabel, icon: <Automation size={14} />, choose: () => onChoice(null) } : undefined}
           {...(disabled ? { disabled } : {})}

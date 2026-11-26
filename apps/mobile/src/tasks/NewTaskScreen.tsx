@@ -1,7 +1,7 @@
 import { projectGitView } from "@openorc/client";
 import type { Project } from "@openorc/protocol";
 import { router, useNavigation } from "expo-router";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ScrollView, TextInput, View, type TextInputInstance } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,10 +14,12 @@ import { Folder } from "../generated/icons";
 import { haptic } from "../ui/haptics";
 import { Measure } from "../ui/pane";
 import { Text } from "../ui/Text";
-import { boardPriority, boardStatus } from "./board";
+import { boardPriority } from "./board";
 import { draftProject, newTaskInput, useTaskDraft } from "./new-task";
 import { PriorityMark, TaskStatusMark } from "./TaskMarks";
+import { taskPlace, taskPlaces } from "./task-places";
 import { Pill, PillMenu, PRIORITY_ORDER } from "./TaskProperties";
+import { useBoardColumns } from "./use-board-columns";
 
 /** Why Create cannot go yet, or null. */
 function blocker(input: { shares: boolean | null; projects: readonly Project[] | undefined; projectId: string | null; title: string }): string | null {
@@ -27,7 +29,10 @@ function blocker(input: { shares: boolean | null; projects: readonly Project[] |
   return input.title.trim() ? null : "Give the task a title.";
 }
 
-/** The new task's properties, as the task screen lays them out: it starts in the backlog, at a priority, in a project. */
+/**
+ * The new task's properties, as the task screen lays them out: it starts in the backlog, at a priority, in a project.
+ * The backlog reads as the task screen will name it: the project's first column of that stage, where it keeps columns.
+ */
 function NewTaskProperties({
   projects,
   projectId,
@@ -40,10 +45,12 @@ function NewTaskProperties({
   onChange: ReturnType<typeof useTaskDraft>[1];
 }) {
   const names = Object.fromEntries(projects.map((project) => [project.id, project.name]));
+  const columns = useBoardColumns(projectId);
+  const start = useMemo(() => taskPlace({ status: "backlog", columnId: null }, taskPlaces(columns)), [columns]);
   return (
     <View className="flex-row flex-wrap gap-1.5">
-      <View accessible accessibilityLabel={`Status ${boardStatus.backlog}`}>
-        <Pill icon={<TaskStatusMark status="backlog" />} label={boardStatus.backlog} />
+      <View accessible accessibilityLabel={`Status ${start.name}`}>
+        <Pill icon={<TaskStatusMark status={start.status} />} label={start.name} />
       </View>
       <PillMenu name="Priority" value={priority} values={PRIORITY_ORDER} words={boardPriority} icon={<PriorityMark priority={priority} />} onChange={(next) => onChange({ priority: next })} />
       <PillMenu

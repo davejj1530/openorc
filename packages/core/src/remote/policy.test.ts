@@ -1,4 +1,4 @@
-import { deviceRpcParams, isRemoteMethod, type AppSettings, type Task, REMOTE_ATTACHMENT_BYTES, REMOTE_METHODS, remoteRpcParams, rpcParams, type FileDiff } from "@openorc/protocol";
+import { deviceRpcParams, isRemoteMethod, type AppSettings, type BoardColumn, type Task, REMOTE_ATTACHMENT_BYTES, REMOTE_METHODS, remoteRpcParams, rpcParams, type FileDiff } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { remoteError, type MacRoots } from "./phone-words.js";
 import { admitRemoteRequest, remotePush, remoteReplies, remoteReply, type GuardContext } from "./policy.js";
@@ -276,11 +276,32 @@ describe("phone policy", () => {
     expect(update("plain", { spec: "## Goal\n- [ ] Ship the badge." })).toEqual({ ok: true });
     expect(update("empty", { spec: "Start here." })).toEqual({ ok: true });
     expect(update("secret", { spec: "Use the token." })).toEqual({ ok: false, message: "This description holds a secret, so edit it on your Mac." });
+    // A board column by its id, as the task screen's Status menu names one.
+    expect(update("plain", { columnId: "col-build" })).toEqual({ ok: true });
     expect(update("plain", { workspaceMode: "current" })).toEqual({ ok: false, message: "Make this change on your Mac." });
     expect(update("plain", { title: "Two\nlines" }).ok).toBe(false);
     expect(update("plain", { labels: ["x".repeat(51)] }).ok).toBe(false);
     expect(update("plain", { labels: Array.from({ length: 21 }, (_, at) => `l${at}`) }).ok).toBe(false);
     expect(update("plain", { spec: "x".repeat(100_001) }).ok).toBe(false);
+  });
+
+  it("lists a project's board columns for a phone by name, stage and order, what each column's agent is told left on the Mac, and keeps changing the board there", () => {
+    expect(admitRemoteRequest("board.columns", { projectId: "p" }, context)).toEqual({ ok: true });
+    for (const method of ["board.saveColumns", "board.jobs", "board.switchJob", "board.addReadyMade"]) expect(admitRemoteRequest(method, {}, context).ok, method).toBe(false);
+    const column = { projectId: "p", nextColumnId: null, jobEnabled: true };
+    const columns: BoardColumn[] = [
+      { ...column, id: "col-plan", name: "Plan", stage: "backlog", job: null },
+      { ...column, id: "col-build", name: "Build", stage: "in_progress", job: { prompt: `Build it. Push with ${TOKEN}`, choice: null }, nextColumnId: "col-review" },
+      { ...column, id: "col-review", name: "Code review", stage: "review", job: { prompt: "Review the work.", choice: null }, jobEnabled: false },
+    ];
+    const shaped = remoteReply("board.columns", columns, { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) });
+    expect(shaped.map(({ id, name, stage }) => ({ id, name, stage }))).toEqual([
+      { id: "col-plan", name: "Plan", stage: "backlog" },
+      { id: "col-build", name: "Build", stage: "in_progress" },
+      { id: "col-review", name: "Code review", stage: "review" },
+    ]);
+    expect(shaped.map((each) => each.job)).toEqual([null, null, null]);
+    expect(JSON.stringify(shaped)).not.toContain(TOKEN);
   });
 
   it("keeps phone access and its push key out of a phone's reach", () => {

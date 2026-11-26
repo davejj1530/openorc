@@ -85,6 +85,7 @@ const ACCESS: { [M in AppMethod]: "reads" | "changes" } = {
   "tasks.get": "reads",
   "tasks.create": "changes",
   "tasks.update": "changes",
+  "board.columns": "reads",
   "tasks.threads": "reads",
   "tasks.runButton": "changes",
   "tasks.refine.get": "reads",

@@ -4,6 +4,7 @@ import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush
 import type { Clock } from "./route-race";
 import {
   PHONE_CAPABILITIES,
+  supportsBoardColumns,
   supportsCloudThreads,
   supportsOrclingEdits,
   supportsOrclings,
@@ -54,6 +55,8 @@ export const CALL_WAIT_MS = 8_000;
 export const DROPPED = "The connection to your Mac dropped before it answered.";
 const NO_ANSWER = "Your Mac did not answer in time.";
 const NO_MAC = "This phone is not connected to a Mac.";
+/** Whether a call failed before it went out, for want of a session with the Mac: the Mac never heard it, so nothing there changed. */
+export const neverSent = (error: Error): boolean => error.message === NO_ANSWER || error.message === NO_MAC;
 export const OLDER_MAC_IMAGE = "Update OpenOrc on your Mac to see this image here.";
 export const OLDER_MAC_SKILLS = "Update OpenOrc on your Mac to pick its skills here.";
 export const OLDER_MAC_ORCLINGS = "Update OpenOrc on your Mac to see its Orclings here.";
@@ -62,6 +65,7 @@ export const OLDER_MAC_TASKS = "Update OpenOrc on your Mac to open its tasks her
 export const OLDER_MAC_TASK_EDITS = "Update OpenOrc on your Mac to edit its tasks here.";
 export const OLDER_MAC_TASK_CREATES = "Update OpenOrc on your Mac to add tasks from your phone.";
 export const OLDER_MAC_TASK_WORK = "Update OpenOrc on your Mac to work on its tasks from your phone.";
+export const OLDER_MAC_BOARD = "Update OpenOrc on your Mac to see its board’s columns here.";
 export const OLDER_MAC_COMMITS = "Update OpenOrc on your Mac to open commits here.";
 export const OLDER_MAC_SUBTHREADS = "Update OpenOrc on your Mac to start subthreads from your phone.";
 export const OLDER_MAC_CLOUD = "Update OpenOrc on your Mac to see OpenOrc Cloud here.";
@@ -81,6 +85,7 @@ const gated: Partial<Record<RpcMethod, Gate>> = {
   "tasks.refine.start": { supports: supportsTaskWork, refusal: OLDER_MAC_TASK_WORK },
   "tasks.refine.stop": { supports: supportsTaskWork, refusal: OLDER_MAC_TASK_WORK },
   "tasks.refine.dismiss": { supports: supportsTaskWork, refusal: OLDER_MAC_TASK_WORK },
+  "board.columns": { supports: supportsBoardColumns, refusal: OLDER_MAC_BOARD },
   "git.threadCommit": { supports: supportsCommitReads, refusal: OLDER_MAC_COMMITS },
   "review.threadCommitChanges": { supports: supportsCommitReads, refusal: OLDER_MAC_COMMITS },
   "review.threadCommitFileDiff": { supports: supportsCommitReads, refusal: OLDER_MAC_COMMITS },

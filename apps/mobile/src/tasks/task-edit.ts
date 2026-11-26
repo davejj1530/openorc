@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { Alert } from "react-native";
 import { useRpcMutation } from "../client";
+import { neverSent } from "../connection/link-connection";
 import { haptic } from "../ui/haptics";
 
 export type TaskPatch = RpcParams<"tasks.update">["patch"];
@@ -21,11 +22,27 @@ export const typedTitle = (current: string, typed: string): string | null => ren
 /** Labels typed comma separated, trimmed, each once, in the order typed. */
 export const typedLabels = (typed: string): string[] => [...new Set(typed.split(",").map((label) => label.trim()))].filter(Boolean);
 
-/** Drops the fields `patch` set from `pending`, unless a newer edit has set them since. */
-function settled(pending: TaskPatch, patch: TaskPatch): TaskPatch {
+/** What a task reads as while a change is on its way to the Mac. */
+type Shown = Partial<Task>;
+
+/** Saves a change to a task; `shows` is how the task reads meanwhile, when that is more than the patch says. */
+export type SaveTask = (patch: TaskPatch, shows?: Shown) => void;
+
+/** Drops the fields `shows` set from `pending`, unless a newer edit has set them since. */
+function settled(pending: Shown, shows: Shown): Shown {
   const left: Record<string, unknown> = { ...pending };
-  for (const [key, value] of Object.entries(patch)) if (left[key] === value) delete left[key];
-  return left as TaskPatch;
+  for (const [key, value] of Object.entries(shows)) if (left[key] === value) delete left[key];
+  return left;
+}
+
+/**
+ * What the alert says of a change that was not saved: the Mac's reason. A move the Mac never heard says so plainly, as
+ * a task put in a column there starts that column's agent.
+ */
+export function saveFailure(patch: TaskPatch, error: Error): { title: string; message: string } {
+  const moves = patch.status !== undefined || patch.columnId !== undefined;
+  if (moves && neverSent(error)) return { title: "Your Mac can’t be reached", message: "The task did not move, so no automation will start." };
+  return { title: "Couldn’t save the task", message: error.message };
 }
 
 /**
@@ -35,21 +52,22 @@ function settled(pending: TaskPatch, patch: TaskPatch): TaskPatch {
 export function useTaskEdit(task: Task | null | undefined) {
   const queryClient = useQueryClient();
   const { mutate } = useRpcMutation("tasks.update");
-  const [pending, setPending] = useState<TaskPatch>({});
+  const [pending, setPending] = useState<Shown>({});
   const id = task?.id;
-  const save = useCallback(
-    (patch: TaskPatch) => {
+  const save = useCallback<SaveTask>(
+    (patch, shows = patch) => {
       if (!id) return;
-      setPending((before) => ({ ...before, ...patch }));
+      setPending((before) => ({ ...before, ...shows }));
       mutate(
         { id, patch },
         {
           onSuccess: (saved) => queryClient.setQueryData(taskKey(id), saved),
           onError: (error) => {
             haptic.warn();
-            Alert.alert("Couldn’t save the task", error.message);
+            const { title, message } = saveFailure(patch, error);
+            Alert.alert(title, message);
           },
-          onSettled: () => setPending((before) => settled(before, patch)),
+          onSettled: () => setPending((before) => settled(before, shows)),
         },
       );
     },

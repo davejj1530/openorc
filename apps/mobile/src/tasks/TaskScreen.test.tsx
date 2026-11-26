@@ -17,11 +17,16 @@ const mac = vi.hoisted(() => ({
   refine: null as unknown,
   buttons: [] as unknown[],
   threads: [] as unknown[],
+  /** The project's board columns, and every method the phone asked for. */
+  columns: [] as unknown[],
+  asked: [] as string[],
 }));
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
   mac.phone = fakeMac(async (method, params) => {
+    mac.asked.push(method);
     if (method === "tasks.get") return mac.task;
+    if (method === "board.columns") return mac.columns;
     if (method === "projects.list") return [{ id: "p", name: "Website", settings: { taskButtons: mac.buttons } }];
     if (method === "tasks.threads") return mac.threads;
     if (method === "tasks.refine.get") return mac.refine;
@@ -87,6 +92,8 @@ beforeEach(() => {
   mac.refine = null;
   mac.buttons = [];
   mac.threads = [];
+  mac.columns = [];
+  mac.asked = [];
   mac.phone!.shared.clear();
   mac.phone!.saved.clear();
   alerts.length = 0;
@@ -139,6 +146,63 @@ it("puts a change the Mac refuses back, and says why", async () => {
   fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitemradio", { name: "Done" }));
   await waitFor(() => expect(alerts).toEqual([expect.objectContaining({ title: "Couldn’t save the task", message: mac.refuse })]));
   expect(screen.getByRole("button", { name: "Status, Backlog" })).toBeTruthy();
+});
+
+const boardColumn = (id: string, name: string, stage: string) => ({ id, projectId: "p", name, stage, job: null, nextColumnId: null, jobEnabled: true });
+const BOARD = [
+  boardColumn("col-plan", "Plan", "backlog"),
+  boardColumn("col-build", "Build", "in_progress"),
+  boardColumn("col-review", "Code review", "review"),
+  boardColumn("col-done", "Done", "done"),
+];
+const menuChoices = () =>
+  within(screen.getAllByRole("menu").at(-1)!)
+    .getAllByRole("menuitemradio")
+    .map((item) => item.textContent);
+
+it("names the board's columns in the Status menu, the task in the first column of its status, and puts it in the one picked", async () => {
+  mac.phone!.shared.add("board-columns");
+  mac.columns = BOARD;
+  mac.task = { ...base, status: "in_progress" };
+  render(<TaskScreen />, { wrapper: mac.phone!.wrapper });
+  fireEvent.click(await screen.findByRole("button", { name: "Status, Build" }));
+  expect(menuChoices()).toEqual(["Proposed", "Plan", "Build", "Code review", "Done", "Archived"]);
+  fireEvent.click(within(screen.getAllByRole("menu").at(-1)!).getByRole("menuitemradio", { name: "Code review" }));
+  expect(await screen.findByRole("button", { name: "Status, Code review" })).toBeTruthy();
+  await waitFor(() => expect(mac.saved).toEqual([{ columnId: "col-review" }]));
+  // A status no column stands for is saved as the status. The stand-in's menu stays open after a choice.
+  fireEvent.click(within(screen.getAllByRole("menu").at(-1)!).getByRole("menuitemradio", { name: "Archived" }));
+  await waitFor(() => expect(mac.saved).toEqual([{ columnId: "col-review" }, { status: "archived" }]));
+});
+
+it("shows a task in the column it was put in, when its stage has more than one", async () => {
+  mac.phone!.shared.add("board-columns");
+  mac.columns = [...BOARD.slice(0, 2), boardColumn("col-polish", "Polish", "in_progress"), ...BOARD.slice(2)];
+  mac.task = { ...base, status: "in_progress", columnId: "col-polish" };
+  render(<TaskScreen />, { wrapper: mac.phone!.wrapper });
+  expect(await screen.findByRole("button", { name: "Status, Polish" })).toBeTruthy();
+});
+
+it("keeps the statuses for a Mac from before board columns, and never asks it for any", async () => {
+  mac.columns = BOARD;
+  mac.task = { ...base, status: "in_progress" };
+  render(<TaskScreen />, { wrapper: mac.phone!.wrapper });
+  fireEvent.click(await screen.findByRole("button", { name: "Status, In progress" }));
+  expect(menuChoices()).toEqual(["Proposed", "Backlog", "In progress", "Review", "Done", "Archived"]);
+  expect(mac.asked).not.toContain("board.columns");
+});
+
+it("says plainly that the Mac can't be reached when a move never got to it, so no automation starts", async () => {
+  mac.refuse = "Your Mac did not answer in time.";
+  render(<TaskScreen />, { wrapper: mac.phone!.wrapper });
+  fireEvent.click(await screen.findByRole("button", { name: "Status, Backlog" }));
+  fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitemradio", { name: "In progress" }));
+  await waitFor(() => expect(alerts).toEqual([{ title: "Your Mac can’t be reached", message: "The task did not move, so no automation will start." }]));
+  expect(screen.getByRole("button", { name: "Status, Backlog" })).toBeTruthy();
+  // Any other change keeps the Mac's own words.
+  fireEvent.click(screen.getByRole("button", { name: "Priority, No priority" }));
+  fireEvent.click(within(screen.getAllByRole("menu").at(-1)!).getByRole("menuitemradio", { name: "Urgent" }));
+  await waitFor(() => expect(alerts.at(-1)).toMatchObject({ title: "Couldn’t save the task", message: "Your Mac did not answer in time." }));
 });
 
 it("opens the description to edit, and leaves one that holds a secret to the Mac", async () => {

@@ -1,19 +1,19 @@
 import { Host, Menu, Picker, RNHostView, Text as MenuText } from "@expo/ui/swift-ui";
 import { accessibilityLabel, accessibilityValue, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
-import type { Task, TaskPriority, TaskStatus } from "@openorc/protocol";
-import type { ReactNode } from "react";
+import type { Task, TaskPriority } from "@openorc/protocol";
+import { useMemo, type ReactNode } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { Folder, Plus } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { useMode } from "../ui/mode";
 import { Text } from "../ui/Text";
-import { boardPriority, boardStatus } from "./board";
-import { typedLabels, type TaskPatch } from "./task-edit";
+import { boardPriority } from "./board";
+import { typedLabels, type SaveTask } from "./task-edit";
+import { placedAt, placePatch, taskPlace, type TaskPlace } from "./task-places";
 import { PriorityMark, TaskStatusMark } from "./TaskMarks";
 
-/** The desktop's menu orders (components/status.tsx). */
-const STATUS_ORDER: readonly TaskStatus[] = ["proposed", "backlog", "in_progress", "review", "done", "archived"];
+/** The desktop's menu order (components/status.tsx). */
 export const PRIORITY_ORDER: readonly TaskPriority[] = ["none", "low", "medium", "high", "urgent"];
 
 /** One of a task's properties as the desktop's task document shows it: a pill with its mark; a mark alone is round. */
@@ -106,14 +106,25 @@ function Labels({ labels, onSave }: { labels: readonly string[]; onSave: (labels
   );
 }
 
+/** Where the task stands, as a menu of its board's columns and the statuses none stands for; the mark is the stage's. */
+function StatusMenu({ task, places, onSave }: { task: Task; places: readonly TaskPlace[]; onSave: SaveTask }) {
+  const menu = useMemo(() => ({ keys: places.map((place) => place.key), names: Object.fromEntries(places.map((place) => [place.key, place.name])) }), [places]);
+  const place = taskPlace(task, places);
+  const move = (key: string) => {
+    const next = places.find((each) => each.key === key);
+    if (next) onSave(placePatch(next), placedAt(next));
+  };
+  return <PillMenu name="Status" value={place.key} values={menu.keys} words={menu.names} icon={<TaskStatusMark status={place.status} />} onChange={move} />;
+}
+
 /**
  * The task's properties under its title, as the desktop's task document lays them out: status and priority as menus,
  * the project it belongs to, and its labels. Moving a task to another project stays on the Mac.
  */
-export function TaskProperties({ task, project, onSave }: { task: Task; project: string | null; onSave: (patch: TaskPatch) => void }) {
+export function TaskProperties({ task, project, places, onSave }: { task: Task; project: string | null; places: readonly TaskPlace[]; onSave: SaveTask }) {
   return (
     <View className="flex-row flex-wrap gap-1.5">
-      <PillMenu name="Status" value={task.status} values={STATUS_ORDER} words={boardStatus} icon={<TaskStatusMark status={task.status} />} onChange={(status) => onSave({ status })} />
+      <StatusMenu task={task} places={places} onSave={onSave} />
       <PillMenu name="Priority" value={task.priority} values={PRIORITY_ORDER} words={boardPriority} icon={<PriorityMark priority={task.priority} />} onChange={(priority) => onSave({ priority })} />
       {project ? (
         <View accessible accessibilityLabel={`Project ${project}`}>

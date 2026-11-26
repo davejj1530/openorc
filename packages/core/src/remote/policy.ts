@@ -7,6 +7,7 @@ import {
   rpcParams,
   supportsLookBackdrop,
   supportsSubagents,
+  type BoardColumn,
   type OrclingDraft,
   type RemoteMethod,
   type RemotePush,
@@ -64,8 +65,8 @@ const PHONE_THREAD_PATCH = new Set(["seen", "agent", "model", "effort", "fastMod
 /** A snooze from the phone wakes within this long. */
 const SNOOZE_HORIZON_MS = 366 * 24 * 60 * 60 * 1000;
 const TITLE_MAX = 200;
-/** What the phone's task screen changes: the title, status, priority, labels and description, never the workspace. */
-const PHONE_TASK_PATCH = new Set(["title", "spec", "status", "priority", "labels"]);
+/** What the phone's task screen changes: the title, status or board column, priority, labels and description, never the workspace. */
+const PHONE_TASK_PATCH = new Set(["title", "spec", "status", "columnId", "priority", "labels"]);
 const TASK_LABELS_MAX = 20;
 const TASK_LABEL_MAX = 50;
 const TASK_SPEC_MAX = 100_000;
@@ -172,6 +173,9 @@ function taskRefine({ instruction, edited }: RpcParams<"tasks.refine.start">): s
 /** A task as a phone reads it: a worktree's path names the Mac's folders, and a description may hold a token. */
 const phoneTask = <T extends RpcResults["tasks.update"] | null>(task: T): T => (task ? { ...task, worktreePath: null, spec: task.spec === null ? null : redact(task.spec).text } : task);
 
+/** A board column as a phone reads it: its name, stage and place. What its agent is told may hold a token and is the Mac's to show. */
+const phoneColumn = (column: BoardColumn): BoardColumn => ({ ...column, job: null });
+
 /** An Orcling's name titles its conversation and its notifications. */
 const orclingName = ({ draft }: { draft: OrclingDraft }): string | null => (TITLE_FORBIDDEN.test(draft.name) ? "A name must be one line." : null);
 
@@ -276,6 +280,8 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "tasks.get": allow,
   "tasks.create": taskCreate,
   "tasks.update": taskUpdate,
+  // A project id and nothing else; the core answers none for a project it does not have.
+  "board.columns": allow,
   "tasks.threads": allow,
   // A press on the task's screen, by ids alone: the core finds the button in the project's settings and runs it as a window's press.
   "tasks.runButton": allow,
@@ -389,6 +395,7 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "tasks.get": phoneTask,
   "tasks.create": phoneTask,
   "tasks.update": phoneTask,
+  "board.columns": (columns) => columns.map(phoneColumn),
   "tasks.threads": same,
   // A button set not to send answers with the message it wrote, which carries the task's description.
   "tasks.runButton": (pressed) => redactValue(pressed).value,

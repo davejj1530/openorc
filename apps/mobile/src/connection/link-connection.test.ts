@@ -56,6 +56,7 @@ describe("calls over the link", () => {
           "commit-reads",
           "task-work",
           "look-backdrop",
+          "board-columns",
         ],
       },
     });

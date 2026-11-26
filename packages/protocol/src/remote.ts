@@ -76,6 +76,9 @@ export const REMOTE_METHODS = [
   "tasks.get",
   "tasks.create",
   "tasks.update",
+  // The columns a project's board keeps, by name, stage and order, so a task's status on a phone is its column. What a
+  // column's agent is told stays on the Mac, as does changing the board.
+  "board.columns",
   // Every thread a task has had, its buttons pressed as the Mac's task page presses them, and Refine: started, stopped
   // and put away, its suggestion read with text redacted. A suggestion is used by an edit of the task, as any other.
   "tasks.threads",

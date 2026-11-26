@@ -1,7 +1,7 @@
 import { relativeTime } from "@openorc/client";
 import type { Task, TaskButton } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,12 +14,13 @@ import { Measure } from "../ui/pane";
 import { useReducedMotion } from "../ui/reduced-motion";
 import { WorkingMark } from "../ui/StateMark";
 import { Text } from "../ui/Text";
-import { boardStatus } from "./board";
-import { holdsSecret, SECRET_SPEC, typedTitle, useTaskEdit, type TaskPatch } from "./task-edit";
+import { holdsSecret, SECRET_SPEC, typedTitle, useTaskEdit, type SaveTask } from "./task-edit";
+import { taskPlace, taskPlaces, type TaskPlace } from "./task-places";
 import { TaskButtons } from "./TaskButtons";
 import { TaskProperties } from "./TaskProperties";
 import { openRefine, showsSuggestion, TaskRefine } from "./TaskRefine";
 import { TaskThreads, ThreadLink } from "./TaskThreads";
+import { useBoardColumns } from "./use-board-columns";
 import { useTaskRefine, useTaskWork, type TaskRefineView } from "./use-task-refine";
 
 const NO_BUTTONS: readonly TaskButton[] = [];
@@ -29,12 +30,12 @@ const NO_BUTTONS: readonly TaskButton[] = [];
  * the bar, and the connection's state while the phone is not connected. Nothing otherwise: the page's title is it. The
  * frame stays the same size throughout, as the bar keeps the size its title first had.
  */
-function TaskBarTitle({ task, project, shown }: { task: Task | null; project: string | null; shown: boolean }) {
+function TaskBarTitle({ task, place, project, shown }: { task: Task | null; place: string | null; project: string | null; shown: boolean }) {
   const link = useLinkWords(useLinkState());
   const still = useReducedMotion();
   const away = link.tone !== "ok" && link.status ? link.status : null;
   const title = shown && task ? task.title : null;
-  const line = away ?? (title && task ? [boardStatus[task.status], project].filter(Boolean).join(" · ") : null);
+  const line = away ?? (title ? [place, project].filter(Boolean).join(" · ") : null);
   const words = [title, line].filter(Boolean).join(", ");
   return (
     <View className="h-9 w-60 items-center justify-center">
@@ -154,22 +155,24 @@ function useTitleUnder() {
 interface PageProps {
   task: Task;
   project: string | null;
+  /** The Status menu's entries: the board's columns for a project that keeps them, else the statuses. */
+  places: readonly TaskPlace[];
   buttons: readonly TaskButton[];
   /** The Mac lists the task's threads, runs its buttons and refines it for a phone. */
   work: boolean;
   refine: TaskRefineView;
-  onSave: (patch: TaskPatch) => void;
+  onSave: SaveTask;
   onTitle: (bottom: number) => void;
 }
 
-function TaskPage({ task, project, buttons, work, refine, onSave, onTitle }: PageProps) {
+function TaskPage({ task, project, places, buttons, work, refine, onSave, onTitle }: PageProps) {
   // One Refine at a time: while one runs or waits to be used, its own card offers what comes next.
   const offerRefine = work && !refine.refine ? () => openRefine(task.id) : null;
   return (
     <>
       <View className="gap-3">
         <TitleField title={task.title} onSave={(title) => onSave({ title })} onLayout={onTitle} />
-        <TaskProperties task={task} project={project} onSave={onSave} />
+        <TaskProperties task={task} project={project} places={places} onSave={onSave} />
         <TaskFacts task={task} />
       </View>
       {work ? <TaskButtons task={task} buttons={buttons} /> : null}
@@ -193,12 +196,14 @@ export function TaskScreen() {
   const { shown, save } = useTaskEdit(task.data);
   const projects = useRpc("projects.list", {});
   const project = projects.data?.find((each) => each.id === shown?.projectId);
+  const columns = useBoardColumns(shown?.projectId);
+  const places = useMemo(() => taskPlaces(columns), [columns]);
   const work = useTaskWork();
   const refine = useTaskRefine(id, work && Boolean(shown));
   const title = useTitleUnder();
   return (
     <Measure className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => <TaskBarTitle task={shown} project={project?.name ?? null} shown={title.under} /> }} />
+      <Stack.Screen options={{ headerTitle: () => <TaskBarTitle task={shown} place={shown ? taskPlace(shown, places).name : null} project={project?.name ?? null} shown={title.under} /> }} />
       {shown ? (
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -208,7 +213,16 @@ export function TaskScreen() {
           contentContainerClassName="gap-6 px-5 pt-3"
           contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         >
-          <TaskPage task={shown} project={project?.name ?? null} buttons={project?.settings.taskButtons ?? NO_BUTTONS} work={work} refine={refine} onSave={save} onTitle={title.setBottom} />
+          <TaskPage
+            task={shown}
+            project={project?.name ?? null}
+            places={places}
+            buttons={project?.settings.taskButtons ?? NO_BUTTONS}
+            work={work}
+            refine={refine}
+            onSave={save}
+            onTitle={title.setBottom}
+          />
         </ScrollView>
       ) : (
         <View className="flex-1 items-center justify-center gap-4 px-8">

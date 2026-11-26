@@ -99,6 +99,8 @@ const answers: Answers = {
   "tasks.update": () => {
     throw new Error("The demo Mac has no saved tasks.");
   },
+  // Nor a board of its own columns.
+  "board.columns": () => [],
   // The demo Mac shares no task work (its negotiate leaves "task-work" out), so the phone never asks for it.
   "tasks.threads": () => {
     throw new Error(NOT_IN_DEMO);

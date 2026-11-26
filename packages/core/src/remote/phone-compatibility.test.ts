@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
-import { projects, runs, threads } from "@openorc/db";
+import { boardColumns, projects, runs, tasks, threads } from "@openorc/db";
 import { linkUrl, toBase64Url } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import { INSTALLED_PHONES, rawMacHello } from "@openorc/link/test-fixtures/installed-phone";
@@ -177,4 +177,28 @@ it("makes an Orcling for a phone, saves its changes and instructions, and delete
   expect(core.orclings.instructions(rex.id)[0]?.body).toBe("Keep it short.");
   await expect(capable.call("orclings.delete", { id: rex.id })).resolves.toBeNull();
   expect(core.orclings.list().map((orcling) => orcling.id)).not.toContain(rex.id);
+});
+
+it("lists a project's board columns to a phone without what their agents are told, and puts its task in the column it names", async () => {
+  const project = projects.insert(core.db, { name: "Board", rootPath: path.join(dataDir, "board"), gitRemote: null, defaultBranch: "main", settings: {} });
+  const [plan, build] = boardColumns.save(core.db, project.id, [
+    { name: "Plan", stage: "backlog" },
+    // Switched off, so the move below starts no agent here.
+    { name: "Build", stage: "in_progress", job: { prompt: "Build it. Token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij12", choice: null }, jobEnabled: false },
+  ]);
+  const capable = await phone();
+  await expect(capable.request("session.negotiate", { capabilities: ["task-details", "board-columns"] })).resolves.toEqual({ capabilities: ["task-details", "board-columns"] });
+  const columns = await capable.call("board.columns", { projectId: project.id });
+  expect(columns.map(({ id, name, stage, job }) => ({ id, name, stage, job }))).toEqual([
+    { id: plan!.id, name: "Plan", stage: "backlog", job: null },
+    { id: build!.id, name: "Build", stage: "in_progress", job: null },
+  ]);
+  const task = await capable.call("tasks.create", { projectId: project.id, title: "Ship the badge" });
+  await expect(capable.call("tasks.update", { id: task.id, patch: { columnId: build!.id } })).resolves.toMatchObject({ status: "in_progress", columnId: build!.id });
+  expect(tasks.get(core.db, task.id)).toMatchObject({ status: "in_progress", columnId: build!.id });
+  // A column of another project's board is no place for this task.
+  const other = projects.insert(core.db, { name: "Other board", rootPath: path.join(dataDir, "other-board"), gitRemote: null, defaultBranch: "main", settings: {} });
+  const [theirs] = boardColumns.save(core.db, other.id, [{ name: "Theirs", stage: "done" }]);
+  await expect(capable.request("tasks.update", { id: task.id, patch: { columnId: theirs!.id } })).rejects.toThrow("This column is no longer on the board.");
+  await expect(capable.request("board.saveColumns", { projectId: project.id, columns: [{ name: "Mine", stage: "done" }] })).rejects.toThrow("This is not available from a phone.");
 });

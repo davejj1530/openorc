@@ -15,6 +15,7 @@ export const PHONE_CAPABILITIES = [
   "commit-reads",
   "task-work",
   "look-backdrop",
+  "board-columns",
 ] as const;
 export const supportsSubagents = (capabilities: readonly string[] = []): boolean => capabilities.includes("subagent-threads");
 /** The Mac answers `session.negotiate` with the capabilities it shares; an older Mac's link refuses a reply image. */
@@ -34,6 +35,9 @@ export const supportsLookBackdrop = (capabilities: readonly string[] = []): bool
 /** A Mac that shares it lists a task's threads, runs its buttons and refines it for a phone; an older Mac refuses `tasks.threads`, `tasks.runButton` and `tasks.refine.*`. */
 export const TASK_WORK = "task-work";
 export const supportsTaskWork = (capabilities: readonly string[] = []): boolean => capabilities.includes(TASK_WORK);
+/** A Mac that shares it lists a project's board columns for a phone and puts a phone's task in one; an older Mac refuses `board.columns`, and `tasks.update` with `columnId`. */
+export const BOARD_COLUMNS = "board-columns";
+export const supportsBoardColumns = (capabilities: readonly string[] = []): boolean => capabilities.includes(BOARD_COLUMNS);
 /** A Mac that shares it finds the commit an id names and reads one commit's changes for a phone; an older Mac refuses `git.threadCommit`, `review.threadCommitChanges` and `review.threadCommitFileDiff`. */
 export const COMMIT_READS = "commit-reads";
 export const supportsCommitReads = (capabilities: readonly string[] = []): boolean => capabilities.includes(COMMIT_READS);

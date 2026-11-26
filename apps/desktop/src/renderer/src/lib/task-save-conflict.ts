@@ -107,13 +107,14 @@ export class TaskSaveController {
     if (result.state === "conflict") this.#set({ propertyError: "This property changed. Choose again to update it." });
     return result.state === "saved";
   }
-  async property(patch: OnlineTaskPatch): Promise<void> {
+  /** One property changed; `ask` carries what the change asks beside it, as its column's agent on the person's own computer. */
+  async property(patch: OnlineTaskPatch, ask: Pick<Input, "runHere"> = {}): Promise<void> {
     this.#set({ propertyError: null });
     try {
       const pending = this.#pendingProperty;
       if (pending && !(await this.#writeProperty(pending))) return;
       if (!pending || JSON.stringify(pending.patch) !== JSON.stringify(patch)) {
-        this.#pendingProperty = this.#input(patch);
+        this.#pendingProperty = { ...this.#input(patch), ...ask };
         await this.#writeProperty(this.#pendingProperty);
       }
     } catch (error) {

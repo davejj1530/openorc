@@ -4,7 +4,8 @@ import type { BoardColumnJob, Project } from "@openorc/protocol";
 import { relativeTime } from "@openorc/client";
 import { useRpcMutation } from "../../lib/client";
 import { useSpaceProjects } from "../../lib/space-queries";
-import { agentSetupSlot, boardMove, type BoardKeeper, type BoardSlot, type TaskBoardColumn } from "../../lib/task-board";
+import { agentSetupSlot, asksForRunner, boardMove, type BoardKeeper, type BoardSlot, type TaskBoardColumn } from "../../lib/task-board";
+import { useTaskOnlineScope } from "../../lib/task-online-query";
 import { columnKey, type UnionColumn } from "../../lib/task-board-union";
 import { boardProjectKey, useBoardColumns, type BoardOwner } from "../../lib/task-board-source";
 import { openTaskRecord } from "../../lib/task-open";
@@ -21,6 +22,7 @@ import { TaskFacts } from "../task-online/TaskFacts";
 import { TaskOnlineOpen } from "../task-online/TaskRowControls";
 import { Button, IconButton, StatusDot, Tooltip } from "../ui";
 import { TaskBoardColumnSettings, type ColumnAcross } from "./TaskBoardColumnSettings";
+import { RunFact, RunHereAsk } from "./TeamRun";
 import "./task-board.css";
 
 const PAGE = 20;
@@ -92,7 +94,8 @@ export function TaskBoard({ tasks, owner, showProject, pane }: { tasks: TaskReco
                   slots={slots}
                   index={column.slot}
                   project={project}
-                  jobsStart={owner?.place !== "online"}
+                  jobsStart={owner?.place !== "online" || owner.runs}
+                  shared={owner?.place === "online"}
                   across={board.union ? unionNote(board.union[column.slot], names, owner) : null}
                   open={settings === column.slot}
                   onOpenChange={(open) => openAt(slots, open ? column.slot : null)}
@@ -267,18 +270,29 @@ function LocalCard({ record, pane, keeper, ...card }: CardProps & { record: Loca
 }
 
 /** An organization's task goes into its organization's shared column, or by its status on a board this computer keeps. Its card opens its page. */
+/** An organization task opens its page. Put in a column whose agent nobody could run, it asks the person to run it on their computer. */
 function OnlineCard({ record, keeper, ...card }: CardProps & { record: OnlineRecord }) {
   const update = useTaskProperty(record.reference, record.task);
+  const runs = Boolean(useTaskOnlineScope().availability?.runs);
+  const [asking, setAsking] = useState<TaskBoardColumn | null>(null);
+  const place = (column: TaskBoardColumn, runHere?: true) => void update.controller.property(boardMove(record, column, keeper), runHere ? { runHere } : {});
+  const answer = (runHere?: true) => {
+    if (asking) place(asking, runHere);
+    setAsking(null);
+  };
   return (
-    <BoardCard
-      {...card}
-      record={record}
-      onOpen={() => openTaskRecord(record)}
-      movable={record.task.viewer.mayEdit && !update.pending}
-      error={update.state.propertyError}
-      move={(column) => void update.controller.property(boardMove(record, column, keeper))}
-      start={<TaskOnlineOpen task={record.task} reference={record.reference} />}
-    />
+    <>
+      <BoardCard
+        {...card}
+        record={record}
+        onOpen={() => openTaskRecord(record)}
+        movable={record.task.viewer.mayEdit && !update.pending}
+        error={update.state.propertyError}
+        move={(column) => (asksForRunner(record, column, runs) ? setAsking(column) : place(column))}
+        start={<TaskOnlineOpen task={record.task} reference={record.reference} />}
+      />
+      {asking ? <RunHereAsk onRun={() => answer(true)} onMove={() => answer()} onCancel={() => setAsking(null)} /> : null}
+    </>
   );
 }
 
@@ -306,6 +320,7 @@ function CardFacts({ record, needsYou, showProject, project }: { record: TaskRec
           <span className="truncate">{project.name}</span>
         </span>
       ) : null}
+      {record.kind === "online" ? <RunFact task={record.task} /> : null}
       {record.kind === "online" ? <TaskFacts task={record.task} cloud={!(showProject && project && !project.rootPath && "cloud" in project && project.cloud)} /> : null}
     </>
   );

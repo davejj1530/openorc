@@ -39,8 +39,8 @@ interface Identity {
 const changed = () => new Refused("Your OpenOrc session or project access changed. Try again.");
 const unavailable = () => new Refused("This task isn't available.", 404);
 /** What a space's server does with its tasks beyond keeping them. */
-type Serves = { execution: boolean; board: boolean };
-const SERVES_NOTHING: Serves = { execution: false, board: false };
+type Serves = { execution: boolean; board: boolean; runs: boolean };
+const SERVES_NOTHING: Serves = { execution: false, board: false, runs: false };
 
 /** Server tasks have an explicit target and never enter the Mac task dispatcher. */
 export class OnlineTasks {
@@ -197,7 +197,7 @@ export class OnlineTasks {
       .in(spaceId)
       .request(PARITY_ROUTES.capabilities)
       .then(
-        ({ features }) => ({ execution: features.tasks?.available === true, board: features.board?.available === true }),
+        ({ features }) => ({ execution: features.tasks?.available === true, board: features.board?.available === true, runs: features.taskRuns?.available === true }),
         (error: unknown) => {
           if (error instanceof Refused && error.status === 404) entry.until = Number.POSITIVE_INFINITY;
           else if (this.#serves.get(spaceId) === entry) this.#serves.delete(spaceId);

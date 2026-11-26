@@ -22,7 +22,7 @@ const stages: readonly { value: BoardStage; label: string }[] = [
  * What the column has an agent do with each card: the words it is told, written as a message would be, with the model
  * that reads them at the box's foot. The words save when the box is left, and a box left empty starts nothing.
  */
-function ColumnAgent({ slot, project, onChange }: { slot: BoardSlot; project: AccountsProject | undefined; onChange: (patch: Partial<BoardSlot>) => void }) {
+function ColumnAgent({ slot, project, shared, onChange }: { slot: BoardSlot; project: AccountsProject | undefined; shared: boolean; onChange: (patch: Partial<BoardSlot>) => void }) {
   const [words, setWords] = useState(slot.job?.prompt ?? "");
   const [choice, setChoice] = useState<ThreadChoice | null>(slot.job?.choice ?? null);
   const save = (prompt: string, model: ThreadChoice | null) => {
@@ -42,6 +42,8 @@ function ColumnAgent({ slot, project, onChange }: { slot: BoardSlot; project: Ac
       project={project}
       sameLabel="The task's model"
       placeholder="Tell an agent what to do with each card"
+      // A shared board's agent runs on each assignee's own account, so no account of this computer's is offered.
+      offerAccounts={!shared}
     />
   );
 }
@@ -111,6 +113,7 @@ export function TaskBoardColumnSettings({
   index,
   project,
   jobsStart,
+  shared,
   across,
   open,
   onOpenChange,
@@ -121,6 +124,8 @@ export function TaskBoardColumnSettings({
   project: AccountsProject | undefined;
   /** Whether a column here can have an agent: a board this computer keeps. An organization's board is its columns alone. */
   jobsStart: boolean;
+  /** Whether the board is an organization's, whose agents run on each task's assignee's computer. */
+  shared: boolean;
   across: ColumnAcross | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -163,7 +168,7 @@ export function TaskBoardColumnSettings({
                 <h3 id={`column-${index}-arrives`} className="task-board-setting-label">
                   When a card arrives
                 </h3>
-                <ColumnAgent key={slot.id ?? index} slot={slot} project={project} onChange={put} />
+                <ColumnAgent key={slot.id ?? index} slot={slot} project={project} shared={shared} onChange={put} />
                 {across && across.agentDiffers.length > 0 ? (
                   <p className="task-board-setting-note">Its agent is told something else in {listed.format(across.agentDiffers)}. A change here sets it in every project.</p>
                 ) : null}

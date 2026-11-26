@@ -83,7 +83,7 @@ import { docHref } from "../../data/docs";
     </div>
     <p>Changing a column's stage changes the status of the tasks in it. <strong>Remove column</strong> takes the column away and leaves its tasks in their status, so they show in the first column of that stage. A board keeps at least one column.</p>
     <p>On the board of all projects, a column's settings say which projects have it. A change there is made in every project that has the column, and <strong>Add column</strong> adds the new column to every project. If the column's agent is told different things in some projects, the settings name those projects, and a change to the agent sets it the same everywhere. A card dropped in a column its project lacks goes to that project's first column of the same stage.</p>
-    <p>A project with a folder on this computer keeps its columns on this computer. An organization's project shares one board with everyone in it: anyone who can edit its tasks moves cards between its columns, and only an organization admin can add, rename, move or remove columns. Column agents work only on projects with a folder on this computer, so an organization's columns have no agent settings. A project with no folder on this computer and in no organization keeps the four statuses as its columns.</p>
+    <p>A project with a folder on this computer keeps its columns on this computer. An organization's project shares one board with everyone in it: anyone who can edit its tasks moves cards between its columns, and only an organization admin can add, rename, move or remove columns. A project with no folder on this computer and in no organization keeps the four statuses as its columns.</p>
   </section>
 
   <section aria-labelledby="agents">
@@ -96,6 +96,15 @@ import { docHref } from "../../data/docs";
       <li>Under <strong>When the work is done</strong>, choose <strong>The card stays here</strong>, or a later column for the card to move to.</li>
     </ol>
     <p>The words save when you leave the field. A field left empty starts nothing. A column with an agent shows that agent's mark at the end of its heading.</p>
+    <h3 id="team-agents">Column agents on a team's board</h3>
+    <p>An organization admin sets a column's agent the same way. Its agent runs on the computer of the task's assignee, in their folder for the project and on their own account, whoever moved the card. A card shows where its agent stands:</p>
+    <ul>
+      <li><strong>Waiting for Dana's computer</strong>: Dana's computer is off or offline. The agent starts as soon as it is back.</li>
+      <li><strong>Running on Dana's computer</strong>: the agent is working, in a thread on Dana's computer.</li>
+      <li><strong>Dana needs to add the project</strong>: Dana's computer has no folder for the project. Moving the card again after Dana adds it starts the agent.</li>
+    </ul>
+    <p>A task with no assignee has no computer to run its agent. When you move such a card into a column with an agent, OpenOrc asks whether to run it on your computer. <strong>Run it on my computer</strong> assigns the task to you and starts the agent. <strong>Just move it</strong> moves the card and starts nothing.</p>
+    <p>Agents pass a team's card between columns as they do on your own board. After agents send a card to the same column three times, nothing more starts there and the card says so, until someone moves it themselves.</p>
     <h3>What happens when a card arrives</h3>
     <ul>
       <li>The agent starts in a thread of its own for that task, named after the column. It works in the task's folder.</li>

@@ -68,7 +68,7 @@ export class OnlineTaskTools {
     const place = input.column ? { columnId: await this.#column(at, input.column) } : status;
     const patch = { ...place, ...(input.spec !== undefined ? { spec: input.spec } : {}) };
     const request = this.#request(at, ["update", id, ifRevision, patch]);
-    const result = await at.tasks.editing({ spaceId: at.spaceId, id, ifRevision, requestId: request.id, patch });
+    const result = await at.tasks.editing({ spaceId: at.spaceId, id, ifRevision, requestId: request.id, patch, by: "agent" });
     request.done();
     if (result.state === "refused") throw new Error(result.message);
     if (result.state === "conflict") {

@@ -16,7 +16,8 @@ export function createOnlineTaskHandlers(tasks: OnlineTasks | null): OnlineTaskH
     "tasks.online.list": (input) => service().list(input),
     "tasks.online.get": (input) => service().get(input),
     "tasks.online.create": (input) => service().creation(input),
-    "tasks.online.update": (input) => service().update(input),
+    // Only the core's own agent tools mark a change as an agent's.
+    "tasks.online.update": ({ by: _by, ...input }) => service().update(input),
     "tasks.online.delete": (input) => service().delete(input),
     "tasks.online.seen": (input) => service().seen(input),
     "tasks.online.attention": (input) => service().attention(input),

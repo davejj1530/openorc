@@ -15,7 +15,7 @@ vi.mock("../../lib/space-navigation", () => ({ useSpaceNavigation: () => null, s
 vi.mock("../../lib/space-queries", () => ({ useSpaceProjects: () => ({ data: [] }) }));
 
 const column = (id: string, name: string, stage: BoardColumn["stage"]): BoardColumn => ({ id, projectId: onlineReference.projectId, name, stage, job: null, nextColumnId: null, jobEnabled: true });
-const owner: BoardOwner = { place: "online", scope: { accountId: onlineReference.accountId, spaceId: onlineReference.spaceId }, projectId: onlineReference.projectId, key: "local-a" };
+const owner: BoardOwner = { place: "online", scope: { accountId: onlineReference.accountId, spaceId: onlineReference.spaceId }, projectId: onlineReference.projectId, key: "local-a", runs: false };
 const card = { kind: "online" as const, task: onlineTask({ status: "in_progress", columnId: "build" }), reference: onlineReference, project: undefined };
 const pane = { id: "pane", opened: null, onOpen: () => {} };
 let mayEdit = false;

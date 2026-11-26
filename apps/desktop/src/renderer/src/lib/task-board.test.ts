@@ -1,6 +1,6 @@
 import type { BoardColumn, Task } from "@openorc/protocol";
 import { expect, it } from "vitest";
-import { agentSetupSlot, boardMove, taskBoardColumns } from "./task-board";
+import { agentSetupSlot, asksForRunner, boardMove, taskBoardColumns } from "./task-board";
 import type { TaskRecord } from "./task-records";
 import { onlineReference, onlineTask } from "./test-fixtures/online-task";
 
@@ -66,4 +66,16 @@ it("sets up a column's agent in the column named, else the first working column 
   expect(agentSetupSlot(slots, "gone")).toBe(2);
   expect(agentSetupSlot([slots[0]!, slots[1]!, slots[3]!], null)).toBe(1);
   expect(agentSetupSlot([slots[0]!, slots[3]!], null)).toBe(0);
+});
+
+it("asks for someone to run a team column's agent only for an unassigned team card, a column with its agent on, and a server that runs them", () => {
+  const agentColumn = { ...column("review", "Review", "in_progress"), job: { prompt: "Review it.", choice: null } };
+  const [, , review] = taskBoardColumns([], [board[0]!, board[1]!, agentColumn, board[3]!], "online");
+  const unassigned = online("a");
+  expect(asksForRunner(unassigned, review!, true)).toBe(true);
+  expect(asksForRunner(unassigned, review!, false)).toBe(false);
+  expect(asksForRunner(online("b", { assignee: { userId: "u", memberId: "m", name: "Dana", image: null, available: true } }), review!, true)).toBe(false);
+  expect(asksForRunner(unassigned, { ...review!, kept: { ...agentColumn, jobEnabled: false } }, true)).toBe(false);
+  const [, build] = taskBoardColumns([], board, "online");
+  expect(asksForRunner(unassigned, build!, true)).toBe(false);
 });

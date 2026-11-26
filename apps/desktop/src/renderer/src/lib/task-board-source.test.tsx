@@ -13,7 +13,7 @@ vi.mock("./rpc", () => ({ core: { call: vi.fn(), onPush: () => () => {}, onReady
 vi.mock("./space-navigation", () => ({ useSpaceNavigation: () => null, spaceNavigation: { getState: () => ({ inventory: [] }) } }));
 
 const column = (id: string, name: string): BoardColumn => ({ id, projectId: "project-a", name, stage: "in_progress", job: null, nextColumnId: null, jobEnabled: true });
-const owner: BoardOwner = { place: "online", scope: { accountId: "account-a", spaceId: "org:studio" }, projectId: "project-a", key: "local-a" };
+const owner: BoardOwner = { place: "online", scope: { accountId: "account-a", spaceId: "org:studio" }, projectId: "project-a", key: "local-a", runs: false };
 const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 let board = { revision: 1, columns: [column("build", "Build")], mayEdit: true };
 const saves: unknown[] = [];

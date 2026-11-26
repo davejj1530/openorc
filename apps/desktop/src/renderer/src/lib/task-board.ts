@@ -91,6 +91,14 @@ export function settleColumns(columns: TaskBoardColumn[]): TaskBoardColumn[] {
   return columns;
 }
 
+/**
+ * Whether a team task put in this column needs someone to run the column's agent: the column has one, the server runs
+ * them, and nobody is assigned to the task, whose agent would run on their computer.
+ */
+export function asksForRunner(record: TaskRecord, column: TaskBoardColumn, runs: boolean): boolean {
+  return runs && record.kind === "online" && !record.task.assignee && Boolean(column.kept?.jobEnabled && column.kept.job);
+}
+
 /** What a card dropped on `column` saves: the column, when the board keeps it for the card's kind of task, else its stage. */
 export function boardMove(record: TaskRecord, column: TaskBoardColumn, keeper: BoardKeeper): { columnId: string } | { status: TaskStatus } {
   // On a board of all projects a card goes to its own project's column of that name, else to its project's first column of that stage.

@@ -47,6 +47,7 @@ export function AgentBrief({
   disabled,
   action,
   showEffort = true,
+  offerAccounts = true,
 }: {
   words: string;
   onWords: (words: string) => void;
@@ -64,6 +65,8 @@ export function AgentBrief({
   action?: ReactNode;
   /** Whether the picker offers the model's effort, which an answer written in one go does not use. */
   showEffort?: boolean;
+  /** Whether the picker offers this computer's Claude accounts; not where the agent runs on someone else's. */
+  offerAccounts?: boolean;
 }) {
   const accounts = useChoiceAccounts(project, choice, onChoice);
   const value = choice ? { agent: choice.agent, model: choice.model, effort: choice.effort } : null;
@@ -84,7 +87,7 @@ export function AgentBrief({
         <ComposerModelPicker
           value={value}
           onChange={(next) => onChoice(threadChoice(next, choice))}
-          accounts={accounts}
+          accounts={offerAccounts ? accounts : undefined}
           limits={LIMITS}
           showEffort={showEffort}
           unset={sameLabel ? { label: sameLabel, icon: <Automation size={14} />, choose: () => onChoice(null) } : undefined}

@@ -66,6 +66,8 @@ export const HostedCapabilities = z.object({
     tasks: availability,
     /** A board of columns for each project, shared by everyone who works on its tasks. */
     board: availability,
+    /** A board column's agent, run on the computer of the task's assignee, which reads and claims what waits for it. */
+    taskRuns: availability,
     skills: availability,
     macCode: availability,
     terminal: availability,

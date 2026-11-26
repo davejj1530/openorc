@@ -13,7 +13,8 @@ import { useTaskOnlineMutation, useTaskOnlineQuery, useTaskOnlineScope, type Tas
  */
 export type BoardOwner =
   | { place: "local"; projectId: string }
-  | { place: "online"; scope: TaskOnlineScope; projectId: string; key: string }
+  /** `runs`: its server runs the columns' agents, on the computer of each task's assignee. */
+  | { place: "online"; scope: TaskOnlineScope; projectId: string; key: string; runs: boolean }
   /** Every project with a folder on this computer, whose columns the board of all projects shows as their union. */
   | { place: "union"; projectIds: readonly string[] };
 
@@ -31,9 +32,10 @@ export function useSharedBoard(projectKey: string | null): BoardOwner | null {
   const hosted = projectKey ? (projects.data?.find((project) => project.key === projectKey)?.hostedProjectId ?? null) : null;
   const accountId = keeps?.accountId,
     spaceId = keeps?.spaceId;
+  const runs = Boolean(availability?.runs);
   return useMemo(
-    () => (accountId && spaceId && hosted && projectKey ? { place: "online", scope: { accountId, spaceId }, projectId: hosted, key: projectKey } : null),
-    [accountId, spaceId, hosted, projectKey],
+    () => (accountId && spaceId && hosted && projectKey ? { place: "online", scope: { accountId, spaceId }, projectId: hosted, key: projectKey, runs } : null),
+    [accountId, spaceId, hosted, projectKey, runs],
   );
 }
 

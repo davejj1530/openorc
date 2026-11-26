@@ -25,6 +25,20 @@ export const OnlineTaskActivity = z.object({
   waitingFor: z.string().nullable(),
   updatedAt: timestamp,
 });
+/**
+ * The agent a team task's column started, asked of the person it runs for: waiting for one of their computers, running
+ * on one, on a computer with no folder for the project, or held after agents sent the card to the column too often,
+ * which a person's own move starts again.
+ */
+export const OnlineTaskRun = z.object({
+  id,
+  columnId: id,
+  state: z.enum(["waiting", "running", "no_folder", "held"]),
+  runner: z.object({ userId: id, name: z.string() }).nullable(),
+  requestedAt: timestamp,
+});
+export type OnlineTaskRun = z.infer<typeof OnlineTaskRun>;
+
 export const OnlineTask = z.object({
   id,
   spaceId: SpaceId,
@@ -46,6 +60,8 @@ export const OnlineTask = z.object({
   completedAt: timestamp.nullable(),
   /** The column of its project's board the task sits in. A server without boards leaves it out. */
   columnId: id.nullable().optional(),
+  /** Its column's agent, while one is asked of someone. A server that runs none leaves it out. */
+  run: OnlineTaskRun.nullable().optional(),
   createdIn: OnlineTaskLink,
   execution: OnlineTaskLink,
   activity: OnlineTaskActivity.nullable(),
@@ -104,7 +120,12 @@ export const OnlineTaskCreate = OnlineTaskPatch.omit({ status: true, columnId: t
     source: z.discriminatedUnion("kind", [z.object({ kind: z.literal("thread"), threadId: id }).strict(), z.object({ kind: z.literal("private") }).strict()]).optional(),
   })
   .strict();
-export const OnlineTaskUpdate = z.object({ requestId: z.uuid(), ifRevision: revision, patch: OnlineTaskPatch }).strict();
+/**
+ * A change. `runHere` asks for the column's agent on the person's own computer when the task has nobody to run it, and
+ * assigns them. `by: "agent"` marks one an agent made on this computer, so the server counts its moves between columns
+ * toward the hold, as it does a cloud agent's.
+ */
+export const OnlineTaskUpdate = z.object({ requestId: z.uuid(), ifRevision: revision, patch: OnlineTaskPatch, runHere: z.literal(true).optional(), by: z.literal("agent").optional() }).strict();
 /** A whole board saved from the revision it was read at. */
 export const OnlineBoardUpdate = z.object({ requestId: z.uuid(), ifRevision: revision, columns: BoardColumnsSave }).strict();
 export const OnlineTaskDelete = z.object({ requestId: z.uuid(), ifRevision: revision }).strict();
@@ -114,8 +135,8 @@ export const OnlineTaskList = z
   .strict();
 export type OnlineTaskCreation = ({ state: "saved" } & OnlineTaskEnvelope) | { state: "refused"; code: string; message: string };
 export type OnlineTaskMutation = ({ state: "saved" } | { state: "conflict" }) & OnlineTaskEnvelope;
-/** `execution`: the server opens task threads. `board`: it keeps a board of columns for each project. */
-export type OnlineTaskAvailability = { state: "unavailable" } | { state: "ready"; accountId: string; spaceId: string; execution: boolean; board: boolean; personal: boolean };
+/** `execution`: the server opens task threads. `board`: it keeps a board of columns for each project. `runs`: its columns' agents run on the assignee's computer. */
+export type OnlineTaskAvailability = { state: "unavailable" } | { state: "ready"; accountId: string; spaceId: string; execution: boolean; board: boolean; runs: boolean; personal: boolean };
 /**
  * A project's shared board: its columns in order, none when it keeps the statuses, and the revision a save names.
  * `mayEdit`: the asking person may change its columns, which only an organization admin may. A server that does not

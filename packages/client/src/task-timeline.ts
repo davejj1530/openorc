@@ -2,8 +2,8 @@ import { harnessShortName, type TaskEvent, type TaskStatus, type TaskUpdateCard 
 
 /** A run of words in a timeline line. A strong word names who or where; one with a thread opens that thread. */
 export type TaskLineWord = { text: string; strong?: boolean; threadId?: string };
-/** What leads a line: the person, a move across the board, or the agent that acted. */
-export type TaskLineLead = { kind: "person" } | { kind: "move" } | { kind: "agent"; agent: string };
+/** What leads a line: the person, a move across the board, the agent that acted, or the app asking the person to step in. */
+export type TaskLineLead = { kind: "person" } | { kind: "move" } | { kind: "agent"; agent: string } | { kind: "asks" };
 /** What an agent's update carries under its words: its card, the replies it offers and the one the person pressed. */
 export type TaskLineUpdate = { card: TaskUpdateCard | null; replies: string[]; answer: { reply: string; at: number } | null; threadId: string | null };
 export type TaskLine = { id: number; at: number; lead: TaskLineLead; words: TaskLineWord[]; update?: TaskLineUpdate };
@@ -19,17 +19,18 @@ function created(event: Extract<TaskEvent, { kind: "created" }>): TaskLine {
 function moved(event: Extract<TaskEvent, { kind: "moved" }>, statusNames: Record<TaskStatus, string>): TaskLine {
   const place: TaskLineWord = { text: event.column ?? statusNames[event.status], strong: true };
   const { actor } = event;
-  const words = actor.kind === "agent" ? [agentWord(actor.agent, actor.threadId), { text: " moved it to " }, place] : [{ text: "Moved to " }, place];
+  const to = event.back ? "back to " : "to ";
+  const words = actor.kind === "agent" ? [agentWord(actor.agent, actor.threadId), { text: ` moved it ${to}` }, place] : [{ text: `Moved ${to}` }, place];
   return { id: event.id, at: event.at, lead: { kind: "move" }, words };
 }
 
 function update(event: Extract<TaskEvent, { kind: "update" }>): TaskLine {
   const { actor } = event;
-  const threadId = actor.kind === "agent" ? actor.threadId : null;
+  const threadId = event.replyThreadId ?? (actor.kind === "agent" ? actor.threadId : null);
   return {
     id: event.id,
     at: event.at,
-    lead: actor.kind === "agent" ? { kind: "agent", agent: actor.agent } : { kind: "person" },
+    lead: actor.kind === "agent" ? { kind: "agent", agent: actor.agent } : { kind: "asks" },
     words: [{ text: event.message, strong: true }],
     update: { card: event.card ?? null, replies: event.replies ?? [], answer: event.answer, threadId },
   };

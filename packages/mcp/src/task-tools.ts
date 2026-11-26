@@ -166,7 +166,7 @@ function registerUpdate(mcp: McpServer, host: McpHost, runId: string, scopes: re
     "task_update",
     {
       description:
-        "Update any task in this project by ID, regardless of its originating thread or assigned agent. Set its board status, move it to a board column by name, or refine its spec. A column sets the status with it, a task moves forward only, and a column's own job starts when the task arrives. A move does not stop an execution or change its recorded outcome.",
+        "Update any task in this project by ID, regardless of its originating thread or assigned agent. Set its board status, move it to a board column by name, or refine its spec. A column sets the status with it, and the column's own agent starts when the task arrives. Move a task on when your work on it is done, or back to an earlier column when the work it came with needs more, saying what with task_report first. A move does not stop an execution or change its recorded outcome.",
       inputSchema: online(
         on,
         { id: z.string(), status: TaskStatus.optional(), column: z.string().min(1).max(40).optional(), spec: z.string().optional() },

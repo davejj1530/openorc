@@ -15,23 +15,6 @@ export type TaskStatus = z.infer<typeof TaskStatus>;
 /** The stage of work a board column stands for: waiting, being worked on, waiting on the person, finished. */
 export const BoardStage = TaskStatus.extract(["backlog", "in_progress", "review", "done"]);
 export type BoardStage = z.infer<typeof BoardStage>;
-/** One column of a project's board, in the order the project keeps them. A project that keeps none has a column for each stage. */
-export const BoardColumn = z.object({
-  id: z.string(),
-  projectId: z.string(),
-  name: z.string(),
-  stage: BoardStage,
-  /** The job a card starts when it is put in the column: the id of one of the project's task buttons. */
-  jobButtonId: z.string().nullable(),
-  /** The column that job hands the card on to when its work is done, always one after this one. */
-  nextColumnId: z.string().nullable(),
-  /** Whether the job starts. Switched off, a card put here starts nothing. */
-  jobEnabled: z.boolean(),
-});
-/** A column's job as the Automations screen lists it: the column, and its task button's name and agent. */
-export const BoardJob = z.object({ column: BoardColumn, label: z.string(), agent: HarnessId.nullable() });
-export type BoardJob = z.infer<typeof BoardJob>;
-export type BoardColumn = z.infer<typeof BoardColumn>;
 
 export const TaskPriority = z.enum(["none", "low", "medium", "high", "urgent"]);
 export type TaskPriority = z.infer<typeof TaskPriority>;
@@ -63,6 +46,24 @@ export type ProjectClaudeAccounts = z.infer<typeof ProjectClaudeAccounts>;
  */
 export const ThreadChoice = z.object({ agent: HarnessId, model: z.string().min(1), effort: z.string().nullable(), claudeAccountId: ClaudeAccountId.optional() }).strict();
 export type ThreadChoice = z.infer<typeof ThreadChoice>;
+
+/** What a board column has an agent do with a card put in it: the instructions, and the model when the person chose one. Without one, the task's thread's. */
+export const BoardColumnJob = z.object({ prompt: z.string().trim().min(1).max(8000), choice: ThreadChoice.nullable() });
+export type BoardColumnJob = z.infer<typeof BoardColumnJob>;
+/** One column of a project's board, in the order the project keeps them. A project that keeps none has a column for each stage. */
+export const BoardColumn = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  name: z.string(),
+  stage: BoardStage,
+  /** The job a card starts when it is put in the column. */
+  job: BoardColumnJob.nullable(),
+  /** The column that job hands the card on to when its work is done, always one after this one. */
+  nextColumnId: z.string().nullable(),
+  /** Whether the job starts. Switched off, a card put here starts nothing. */
+  jobEnabled: z.boolean(),
+});
+export type BoardColumn = z.infer<typeof BoardColumn>;
 
 /**
  * A button on a task's page that runs a saved prompt for it, such as Review in a new thread. It runs in the task's own
@@ -222,12 +223,21 @@ const taskEvent = { id: z.number(), taskId: z.string(), at: z.number(), actor: T
 /** One line of a task's history. Names are kept as they were then, since a column can be renamed or removed later. */
 export const TaskEvent = z.discriminatedUnion("kind", [
   z.object({ ...taskEvent, kind: z.literal("created") }),
-  /** It took a status, and the board column it was put in when it was put in one. */
-  z.object({ ...taskEvent, kind: z.literal("moved"), status: TaskStatus, column: z.string().nullable() }),
+  /** It took a status, and the board column it was put in when it was put in one. `back` marks a move to a column before the one it left. */
+  z.object({ ...taskEvent, kind: z.literal("moved"), status: TaskStatus, column: z.string().nullable(), columnId: z.string().nullable().optional(), back: z.boolean().optional() }),
   /** A column's job started for it: the job's name, its agent and the thread it runs in while that thread exists. */
   z.object({ ...taskEvent, kind: z.literal("started"), label: z.string(), agent: AgentKind, threadId: z.string().nullable() }),
-  /** An agent's update, with the reply the person pressed once they have. */
-  z.object({ ...taskEvent, kind: z.literal("update"), ...TaskUpdate.shape, answer: z.object({ reply: z.string(), at: z.number() }).nullable() }),
+  /**
+   * An agent's update, with the reply the person pressed once they have. One the app posts, as when a card has gone
+   * round too often, names the thread its replies go to.
+   */
+  z.object({
+    ...taskEvent,
+    kind: z.literal("update"),
+    ...TaskUpdate.shape,
+    answer: z.object({ reply: z.string(), at: z.number() }).nullable(),
+    replyThreadId: z.string().nullable().optional(),
+  }),
 ]);
 export type TaskEvent = z.infer<typeof TaskEvent>;
 

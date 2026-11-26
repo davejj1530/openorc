@@ -112,10 +112,12 @@ const taskColumns: Record<keyof TaskPatch, string> = {
   completedAt: "completed_at",
 };
 
-/** Where a task sits: its status, and its board column with the name the column has now. */
-function placeOf(db: Db, id: string): { status: TaskStatus; column_id: string | null; column: string | null } | null {
-  const row = db.stmt("SELECT t.status, t.column_id, c.name AS column FROM tasks t LEFT JOIN board_columns c ON c.id = t.column_id WHERE t.id = ?").get(id);
-  return (row as { status: TaskStatus; column_id: string | null; column: string | null } | undefined) ?? null;
+type Place = { status: TaskStatus; column_id: string | null; column: string | null; position: number | null };
+
+/** Where a task sits: its status, and its board column with the name and the place the column has now. */
+function placeOf(db: Db, id: string): Place | null {
+  const row = db.stmt("SELECT t.status, t.column_id, c.name AS column, c.position FROM tasks t LEFT JOIN board_columns c ON c.id = t.column_id WHERE t.id = ?").get(id);
+  return (row as Place | undefined) ?? null;
 }
 
 export const tasks = {
@@ -205,7 +207,13 @@ export const tasks = {
     if (!t) throw new Error(`task ${id} not found`);
     const after = before ? placeOf(db, id) : null;
     if (before && after && (after.status !== before.status || after.column_id !== before.column_id)) {
-      taskEvents.record(db, id, options.by ?? { kind: "app" }, { kind: "moved", status: after.status, column: after.column });
+      taskEvents.record(db, id, options.by ?? { kind: "app" }, {
+        kind: "moved",
+        status: after.status,
+        column: after.column,
+        columnId: after.column_id,
+        ...(before.position !== null && after.position !== null && after.position < before.position ? { back: true } : {}),
+      });
     }
     return t;
   },

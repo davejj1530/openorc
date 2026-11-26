@@ -7,7 +7,7 @@ import type { RunContext } from "./context.js";
 import { onlineTasks, type OnlineTasksHost } from "./online-tasks.js";
 type Dependencies = {
   threadService: Pick<ThreadService, "toolGet" | "toolStart" | "toolList" | "toolUpdate">;
-  board: Pick<BoardJobs, "moveForward">;
+  board: Pick<BoardJobs, "move">;
   reports: Pick<TaskReports, "post">;
   dataDir: string;
   assertRunAvailable: RunContext["assertRunAvailable"];
@@ -46,7 +46,7 @@ export function createTasksHost({ threadService, board, reports, dataDir, assert
       // The column decides the status, so one sent beside it is left out.
       if (!(await threadService.toolGet(runId, id))) return null;
       if (rest.spec) await threadService.toolUpdate(runId, id, { spec: rest.spec });
-      board.moveForward(id, column, runId);
+      board.move(id, column, runId);
       return threadService.toolGet(runId, id);
     },
     report: async (runId, id, update, replaces) => {

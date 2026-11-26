@@ -1,5 +1,5 @@
 import { CodexAdapter, RunHandle } from "@openorc/agents";
-import { projects, runs, scheduleFirings, schedules, threads } from "@openorc/db";
+import { projects, runs, scheduleFirings, schedules, taskThreads, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import { WORKSPACE_ID, harnessIds, type CorePush, type Project, type Task } from "@openorc/protocol";
 import { access, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
@@ -197,51 +197,76 @@ describe("core", () => {
     await expect(call("tasks.update", { id: task.id, patch: { columnId: "missing" } })).rejects.toThrow(/column/i);
   });
 
-  it("starts a column's job for a card put in the column, and tells the job where the card goes next", async () => {
+  it("starts a column's agent for a card put in it, lets agents send the card back, and asks the person on the fourth round", async () => {
     const p = await call("projects.import", { rootPath: root });
-    const review = { id: "review", label: "Code review", prompt: "Review the work.", runsIn: "new" as const, mode: "thread" as const };
-    await call("projects.updateSettings", { id: p.id, settings: { taskButtons: [review] } });
-    const [build, reviewing] = await call("board.saveColumns", {
+    const made = await call("board.saveColumns", {
       projectId: p.id,
       columns: [
-        { name: "Build", stage: "in_progress" },
-        { name: "Code review", stage: "in_progress", jobButtonId: review.id },
+        { name: "Build", stage: "in_progress", job: { prompt: "Do the work.", choice: null } },
+        { name: "Code review", stage: "in_progress", job: { prompt: "Review the work.", choice: null } },
         { name: "Done", stage: "done" },
       ],
     });
-    const columns = await call("board.saveColumns", {
+    // A column hands finished work on only to a column after it.
+    const [build, review, done] = await call("board.saveColumns", {
       projectId: p.id,
-      columns: (await call("board.columns", { projectId: p.id })).map((column) => (column.id === reviewing!.id ? { ...column, nextColumnId: build!.id } : column)),
+      columns: [{ ...made[0]!, nextColumnId: made[1]!.id }, { ...made[1]!, nextColumnId: made[0]!.id }, made[2]!],
     });
-    // A column hands on only to a column after it.
-    expect(columns[1]!.nextColumnId).toBeNull();
-    const done = columns[2]!;
-    await call("board.saveColumns", { projectId: p.id, columns: columns.map((column) => (column.id === reviewing!.id ? { ...column, nextColumnId: done.id } : column)) });
-    const pressed = vi.spyOn(core.threads, "runTaskButton").mockResolvedValue({ threadId: "job-thread" });
+    expect(review!.nextColumnId).toBeNull();
+    await call("board.saveColumns", { projectId: p.id, columns: [build!, { ...review!, nextColumnId: done!.id }, done!] });
+    // Each column's agent gets a thread of its own for the task, as a pressed button's does.
+    const agents = new Map<string, { thread: string; run: string }>();
+    const opened = vi.spyOn(core.threads, "runTaskButton").mockImplementation(async (taskId, button) => {
+      const thread = threads.insert(core.db, { projectId: p.id, title: button.label, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+      runs.insert(core.db, { id: `run-${thread.id}`, taskId: null, threadId: thread.id, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+      taskThreads.link(core.db, { taskId, threadId: thread.id, label: button.label });
+      agents.set(button.label, { thread: thread.id, run: `run-${thread.id}` });
+      return { threadId: thread.id };
+    });
+    const told = vi.spyOn(core.threads, "queue").mockReturnValue([]);
     try {
       const task = await call("tasks.create", { projectId: p.id, title: "A card", useWorktree: false });
       await call("tasks.update", { id: task.id, patch: { columnId: build!.id } });
-      expect(pressed).not.toHaveBeenCalled();
-      await call("tasks.update", { id: task.id, patch: { columnId: reviewing!.id } });
-      await vi.waitFor(() => expect(pressed).toHaveBeenCalledTimes(1));
-      const [taskId, button] = pressed.mock.calls[0]!;
-      expect(taskId).toBe(task.id);
-      expect(button).toMatchObject({ id: "review", label: "Code review" });
-      expect(button.prompt).toMatch(/^Review the work\.\n\n.*move it to the "Done" column with task_update/);
-      // The agent's own move goes forward, starts nothing in a column with no job, and never goes back.
-      expect(core.boardJobs.moveForward(task.id, "done", "run")).toMatchObject({ status: "done", columnId: done.id });
-      expect(() => core.boardJobs.moveForward(task.id, "Build", "run")).toThrow(/forward only/);
-      expect(() => core.boardJobs.moveForward(task.id, "Shipped", "run")).toThrow(/Build, Code review, Done/);
-      expect(pressed).toHaveBeenCalledTimes(1);
-      // The task's history keeps each move under the name its column had, and who made it.
-      expect((await call("tasks.events", { taskId: task.id })).map((event) => [event.kind, event.actor.kind, event.kind === "moved" ? event.column : null])).toEqual([
-        ["created", "user", null],
-        ["moved", "user", "Build"],
-        ["moved", "user", "Code review"],
-        ["moved", "app", "Done"],
-      ]);
+      await vi.waitFor(() => expect(opened).toHaveBeenCalledTimes(1));
+      expect(opened.mock.calls[0]![1]).toMatchObject({ label: "Build", runsIn: "new" });
+      expect(opened.mock.calls[0]![1].prompt).toMatch(/^Do the work\.\n\n.*move it to the "Code review" column with task_update/);
+      const builder = agents.get("Build")!;
+      core.boardJobs.move(task.id, "code review", builder.run);
+      await vi.waitFor(() => expect(opened).toHaveBeenCalledTimes(2));
+      expect(opened.mock.calls[1]![1].prompt).toMatch(/^Review the work\.\n\nThis task came here from the "Build" column\..*move it to the "Done" column/);
+      const reviewer = agents.get("Code review")!;
+      expect(() => core.boardJobs.move(task.id, "Code review", reviewer.run)).toThrow(/already in/);
+      expect(() => core.boardJobs.move(task.id, "Shipped", reviewer.run)).toThrow(/Build, Code review, Done/);
+      // Sent back with notes, the builder's own thread carries on, told what was said.
+      core.taskReports.post(task.id, reviewer.run, {
+        message: "Two things to fix.",
+        card: { kind: "checklist", title: "Review notes", items: [{ text: "Fix the header", done: false, detail: "Header.tsx:4" }] },
+      });
+      core.boardJobs.move(task.id, "Build", reviewer.run);
+      await vi.waitFor(() => expect(told).toHaveBeenCalledTimes(1));
+      expect(told.mock.calls[0]![0]).toBe(builder.thread);
+      expect(told.mock.calls[0]![1]).toMatch(/is back in the "Build" column\.\n\nThe latest notes on it:\nTwo things to fix\.\n- \[ \] Fix the header \(Header\.tsx:4\)\n\nDo the work\./);
+      // The second round runs by itself.
+      core.boardJobs.move(task.id, "Code review", builder.run);
+      core.boardJobs.move(task.id, "Build", reviewer.run);
+      await vi.waitFor(() => expect(told).toHaveBeenCalledTimes(3));
+      // The third review sends it back a third time: the fourth time the card reaches Build nothing starts, and the task asks the person.
+      core.boardJobs.move(task.id, "Code review", builder.run);
+      await vi.waitFor(() => expect(told).toHaveBeenCalledTimes(4));
+      core.boardJobs.move(task.id, "Build", reviewer.run);
+      await vi.waitFor(async () => expect((await call("tasks.get", { id: task.id }))?.approval).toMatch(/sent to "Build" 4 times/));
+      expect(told).toHaveBeenCalledTimes(4);
+      const ask = (await call("tasks.events", { taskId: task.id })).findLast((event) => event.kind === "update")!;
+      expect(ask).toMatchObject({ actor: { kind: "app" }, replies: ["Be more lenient", "Resolve it yourself"], replyThreadId: reviewer.thread });
+      await call("tasks.answerUpdate", { taskId: task.id, eventId: ask.id, reply: "Resolve it yourself" });
+      expect(told).toHaveBeenLastCalledWith(reviewer.thread, "Resolve it yourself");
+      // A person's own move always starts the column's agent again.
+      await call("tasks.update", { id: task.id, patch: { columnId: review!.id } });
+      await vi.waitFor(() => expect(told).toHaveBeenCalledTimes(6));
+      expect(opened).toHaveBeenCalledTimes(2);
     } finally {
-      pressed.mockRestore();
+      opened.mockRestore();
+      told.mockRestore();
     }
   });
 
@@ -298,11 +323,7 @@ describe("core", () => {
       // Adding one the board already has changes nothing.
       expect(await call("board.addReadyMade", { projectId: p.id, id: order[0]! })).toEqual(board);
     }
-    expect((await call("board.jobs", { projectId: p.id })).map((job) => [job.column.name, job.label])).toEqual([
-      ["Plan", "Plan"],
-      ["Build", "Build"],
-      ["Code review", "Code review"],
-    ]);
+    expect((await call("board.jobs", { projectId: p.id })).map((column) => column.name)).toEqual(["Plan", "Build", "Code review"]);
     const review = (await call("board.columns", { projectId: p.id })).find((column) => column.name === "Code review")!;
     await call("board.switchJob", { columnId: review.id, enabled: false });
     const pressed = vi.spyOn(core.threads, "runTaskButton").mockResolvedValue({ threadId: "job-thread" });

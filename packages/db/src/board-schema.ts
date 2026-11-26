@@ -23,3 +23,13 @@ ALTER TABLE board_columns ADD COLUMN next_column_id TEXT REFERENCES board_column
 
 /** A column's job can be switched off without forgetting it. */
 export const boardColumnJobSwitchMigration = `ALTER TABLE board_columns ADD COLUMN job_enabled INTEGER NOT NULL DEFAULT 1 CHECK (job_enabled IN (0, 1));`;
+
+/**
+ * The agent's instructions and model are the column's own, where they are set, not a task button the column pointed
+ * at. No board kept a job when this changed.
+ */
+export const boardColumnOwnJobMigration = `
+ALTER TABLE board_columns ADD COLUMN job_prompt TEXT;
+ALTER TABLE board_columns ADD COLUMN job_choice TEXT;
+ALTER TABLE board_columns DROP COLUMN job_button_id;
+`;

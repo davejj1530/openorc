@@ -1,9 +1,9 @@
-import type { BoardColumn, BoardStage, TaskStatus } from "@openorc/protocol";
+import type { BoardColumn, BoardColumnJob, BoardStage, TaskStatus } from "@openorc/protocol";
 import { statusLabel } from "../components/status";
 import { taskNeedsYou, type TaskRecord } from "./task-records";
 
 /** A column as the project keeps it. One without an id is not saved yet. */
-export type BoardSlot = { id?: string; name: string; stage: BoardStage; jobButtonId?: string | null; nextColumnId?: string | null };
+export type BoardSlot = { id?: string; name: string; stage: BoardStage; job?: BoardColumnJob | null; nextColumnId?: string | null; jobEnabled?: boolean };
 
 /** One column of the board: the tasks at one stage of the work. A card dropped on it takes its stage. */
 export type TaskBoardColumn = {
@@ -33,7 +33,7 @@ function boardOrder(stage: TaskStatus): (a: TaskRecord, b: TaskRecord) => number
 /** The columns a project can rename, add to, reorder and remove: its own, or one for each stage until it keeps some. */
 export function boardSlots(kept: readonly BoardColumn[]): BoardSlot[] {
   return kept.length > 0
-    ? kept.map(({ id, name, stage, jobButtonId, nextColumnId }) => ({ id, name, stage, jobButtonId, nextColumnId }))
+    ? kept.map(({ id, name, stage, job, nextColumnId, jobEnabled }) => ({ id, name, stage, job, nextColumnId, jobEnabled }))
     : defaults.map((stage) => ({ name: statusLabel[stage], stage }));
 }
 

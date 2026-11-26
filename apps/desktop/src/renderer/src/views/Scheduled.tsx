@@ -8,7 +8,7 @@ import {
   executionModePresentation,
   executionModeSettings,
   harnessName,
-  type BoardJob,
+  type BoardColumn,
   type Schedule,
   type WorkspaceMode,
 } from "@openorc/protocol";
@@ -71,8 +71,8 @@ export function Scheduled() {
   const [shelf, setShelf] = useState<ScheduleShelf>("active");
   const items = (list.data ?? []).filter((schedule) => !schedule.retiredTeam && (!spaceId || projects.data?.some((project) => project.id === schedule.projectId)));
   const shown = items.filter((schedule) => schedule.enabled === (shelf === "active"));
-  const jobs: BoardJob[] = (jobList.data ?? []).filter((job) => !spaceId || projects.data?.some((project) => project.id === job.column.projectId));
-  const shownJobs = jobs.filter((job) => job.column.jobEnabled === (shelf === "active"));
+  const jobs: BoardColumn[] = (jobList.data ?? []).filter((column) => !spaceId || projects.data?.some((project) => project.id === column.projectId));
+  const shownJobs = jobs.filter((column) => column.jobEnabled === (shelf === "active"));
   const canCreate = (projects.data?.length ?? 0) > 0;
   const nameOf = (id: string) => (projectId ? undefined : projects.data?.find((project) => project.id === id)?.name);
   const projectName = (schedule: Schedule) => nameOf(schedule.projectId);
@@ -128,7 +128,7 @@ export function Scheduled() {
           total: items.length + jobs.length,
           rows: [
             ...shown.map((schedule) => <ScheduleRow key={schedule.id} schedule={schedule} projectName={projectName(schedule)} onEdit={() => setEditing(schedule)} />),
-            ...shownJobs.map((job) => <ColumnJobRow key={job.column.id} job={job} projectName={nameOf(job.column.projectId)} />),
+            ...shownJobs.map((column) => <ColumnJobRow key={column.id} column={column} projectName={nameOf(column.projectId)} />),
           ],
           shelf,
           readyMade: (

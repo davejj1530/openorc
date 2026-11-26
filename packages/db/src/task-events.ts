@@ -54,6 +54,11 @@ export const taskEvents = {
   replace(db: Db, id: number, { kind, ...data }: NewTaskEvent): void {
     db.stmt("UPDATE task_events SET data = ? WHERE id = ? AND kind = ?").run(JSON.stringify(data), id, kind);
   },
+  /** How many times a task has been put in a column, the time being counted among them once its move is recorded. */
+  arrivals(db: Db, taskId: string, columnId: string): number {
+    const row = db.stmt("SELECT count(*) AS n FROM task_events WHERE task_id = ? AND kind = 'moved' AND json_extract(data, '$.columnId') = ?").get(taskId, columnId);
+    return (row as { n: number }).n;
+  },
   /** What each task's newest update asks the person, for those that offered replies and have none yet. An update after it withdraws the ask. */
   asking(db: Db): Map<string, string> {
     const rows = db

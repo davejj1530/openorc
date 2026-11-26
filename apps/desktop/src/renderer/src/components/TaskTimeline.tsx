@@ -5,6 +5,7 @@ import { useRpc } from "../lib/client";
 import { openThread } from "../lib/router";
 import { HarnessLogo } from "./HarnessLogo";
 import { ArrowRight, CircleUser, MessageSquare } from "./icons";
+import { WaitMark } from "./StateMarks";
 import { statusLabel } from "./status";
 import { TaskUpdate } from "./TaskUpdate";
 import { TextButton } from "./ui";
@@ -13,6 +14,7 @@ import "./task-timeline.css";
 function Lead({ lead }: { lead: TaskLineLead }) {
   if (lead.kind === "person") return <CircleUser size={15} />;
   if (lead.kind === "move") return <ArrowRight size={15} />;
+  if (lead.kind === "asks") return <WaitMark className="text-attention" />;
   return isHarnessId(lead.agent) ? <HarnessLogo id={lead.agent} size={14} /> : <MessageSquare size={15} />;
 }
 

@@ -1,4 +1,4 @@
-import type { BoardStage, TaskButton } from "./domain.js";
+import type { BoardStage } from "./domain.js";
 
 /** The columns a project's board starts with, until the project keeps its own. */
 export const DEFAULT_BOARD_COLUMNS: readonly { name: string; stage: BoardStage }[] = [
@@ -9,11 +9,12 @@ export const DEFAULT_BOARD_COLUMNS: readonly { name: string; stage: BoardStage }
 ];
 
 /**
- * An automation the app offers ready to add. One for the board adds columns that start a job for each card put in
- * them, before the work begins or as the work itself; one on a timer opens a new schedule already filled in.
+ * An automation the app offers ready to add. One for the board adds columns that start an agent for each card put in
+ * them, before the work begins or as the work itself, with what that agent is told; one on a timer opens a new
+ * schedule already filled in.
  */
 export type ReadyMadeAutomation =
-  | { id: string; kind: "board"; name: string; what: string; place: "before_work" | "work"; columns: readonly { name: string; button: TaskButton }[] }
+  | { id: string; kind: "board"; name: string; what: string; place: "before_work" | "work"; columns: readonly { name: string; prompt: string }[] }
   | { id: string; kind: "schedule"; name: string; what: string; prompt: string; everyMinutes: number };
 
 export const READY_MADE_AUTOMATIONS: readonly ReadyMadeAutomation[] = [
@@ -26,14 +27,8 @@ export const READY_MADE_AUTOMATIONS: readonly ReadyMadeAutomation[] = [
     columns: [
       {
         name: "Plan",
-        button: {
-          id: "ready-plan",
-          label: "Plan",
-          runsIn: "task",
-          mode: "thread",
-          prompt:
-            'Before changing any code, write a plan for this task. Post it with task_report as a checklist card named Plan, one item for each step, and offer the reply "Approve the plan". Then end your turn. Carry on only after the person approves.',
-        },
+        prompt:
+          'Before changing any code, write a plan for this task. Post it with task_report as a checklist card named Plan, one item for each step, and offer the reply "Approve the plan". Then end your turn. Carry on only after the person approves.',
       },
     ],
   },
@@ -41,29 +36,14 @@ export const READY_MADE_AUTOMATIONS: readonly ReadyMadeAutomation[] = [
     id: "build_review",
     kind: "board",
     name: "Build, then review",
-    what: "A second agent reviews the build and they settle the notes together.",
+    what: "A second agent reviews the build, and sends it back until it is right.",
     place: "work",
     columns: [
-      {
-        name: "Build",
-        button: {
-          id: "ready-build",
-          label: "Build",
-          runsIn: "task",
-          mode: "thread",
-          prompt: "Do the work this task describes. If the task has a plan, keep it current with task_report as its steps get done.",
-        },
-      },
+      { name: "Build", prompt: "Do the work this task describes. If the task has a plan, keep it current with task_report as its steps get done." },
       {
         name: "Code review",
-        button: {
-          id: "ready-review",
-          label: "Code review",
-          runsIn: "new",
-          mode: "thread",
-          prompt:
-            "Review the work on this task against what the task asks for. Read the changes and run the checks that apply. Send each problem to the builder's thread with thread_send and settle it there before you finish. Then post what you found with task_report as a checklist card named Review notes.",
-        },
+        prompt:
+          "Review the work on this task against what the task asks for. Read the changes and run the checks that apply. Hold it to the standard the task sets, no higher. Post what you found with task_report as a checklist card named Review notes. If something is wrong or missing, move the task back to the column it came from so it gets fixed. If it does what was asked, move it on.",
       },
     ],
   },

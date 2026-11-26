@@ -37,8 +37,8 @@ export function createTaskUpdateHandlers({ threadService, db, runService, worksp
             })
           : update();
       invalidate(["tasks", `task:${id}`, "inbox"]);
-      // Only a card put in a column starts its job. A status set by itself may be the work already under way.
-      if (patch.columnId !== undefined && patch.columnId !== task.columnId) boardJobs.arrived(id, patch.columnId);
+      // Only a card put in a column starts its agent. A status set by itself may be the work already under way.
+      if (patch.columnId !== undefined && patch.columnId !== task.columnId) boardJobs.arrived(id, patch.columnId, { from: task.columnId ?? null, by: { kind: "user" } });
       return t;
     },
   };

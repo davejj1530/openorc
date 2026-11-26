@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { READY_MADE_AUTOMATIONS, type BoardJob, type Project, type ReadyMadeAutomation } from "@openorc/protocol";
+import { READY_MADE_AUTOMATIONS, harnessShortName, type BoardColumn, type Project, type ReadyMadeAutomation } from "@openorc/protocol";
 import { HarnessLogo } from "../components/HarnessLogo";
 import { Automation, CalendarClock, Columns2 } from "../components/icons";
 import { menuItem, menuPopup } from "../components/menu";
@@ -19,25 +19,25 @@ export function openBoard(projectId: string | null): void {
   useRouter.getState().navigate({ view: "tasks" });
 }
 
-/** A column's job among the automations: what starts, the column a card arrives in, and its switch. It opens the board it belongs to. */
-export function ColumnJobRow({ job, projectName }: { job: BoardJob; projectName?: string | undefined }) {
+/** A column's agent among the automations: the column a card arrives in, the model it runs on, and its switch. It opens the board it belongs to. */
+export function ColumnJobRow({ column, projectName }: { column: BoardColumn; projectName?: string | undefined }) {
   const flip = useRpcMutation("board.switchJob");
-  const { column } = job;
+  const agent = column.job?.choice?.agent;
   return (
     <div data-job={column.id} className="schedule-row">
       <div className="schedule-row-line">
         <button type="button" onClick={() => openBoard(column.projectId)} className="schedule-row-open">
           <span className="schedule-row-well" aria-hidden="true">
-            {job.agent ? <HarnessLogo id={job.agent} size={16} /> : <Columns2 size={16} />}
+            {agent ? <HarnessLogo id={agent} size={16} /> : <Columns2 size={16} />}
           </span>
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="schedule-row-name truncate">{job.label}</span>
-            <span className="schedule-when truncate">{[`When a card arrives in ${column.name}`, projectName].filter(Boolean).join(" · ")}</span>
+            <span className="schedule-row-name truncate">{column.name}</span>
+            <span className="schedule-when truncate">{["When a card arrives", agent ? harnessShortName(agent) : null, projectName].filter(Boolean).join(" · ")}</span>
           </span>
         </button>
         <span className="schedule-row-next tabular text-ink-3">{column.jobEnabled ? "" : "Paused"}</span>
         <Switch
-          aria-label={column.jobEnabled ? `Pause ${job.label}` : `Resume ${job.label}`}
+          aria-label={column.jobEnabled ? `Pause ${column.name}` : `Resume ${column.name}`}
           checked={column.jobEnabled}
           disabled={flip.isPending}
           onChange={() => flip.mutate({ columnId: column.id, enabled: !column.jobEnabled })}
@@ -98,11 +98,12 @@ export function ReadyMadeAutomations({
   projectId: string | null;
   /** The projects a board automation can be added to: the ones with a folder on this Mac. */
   projects: readonly Project[];
-  jobs: readonly BoardJob[];
+  /** The columns that start an agent, to say which ready-made ones a board already has. */
+  jobs: readonly BoardColumn[];
   onSchedule: (made: Timed) => void;
 }) {
   const add = useRpcMutation("board.addReadyMade");
-  const onBoard = (made: Board) => Boolean(projectId) && made.columns.every((column) => jobs.some((job) => job.column.projectId === projectId && job.column.jobButtonId === column.button.id));
+  const onBoard = (made: Board) => Boolean(projectId) && made.columns.every((column) => jobs.some((job) => job.projectId === projectId && job.name.toLowerCase() === column.name.toLowerCase()));
   return (
     <section aria-labelledby="automation-ready-heading">
       <h2 id="automation-ready-heading" className="automation-heading">

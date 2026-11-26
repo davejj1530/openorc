@@ -29,7 +29,7 @@ import { DevicePanelPush, devicePanelRpcParams, type DevicePanelRpcResults } fro
 import {
   AgentSkill,
   BoardColumn,
-  type BoardJob,
+  BoardColumnJob,
   BoardStage,
   AppSettings,
   Commit,
@@ -287,7 +287,7 @@ export const rpcParams = {
           id: z.string().optional(),
           name: z.string().trim().min(1).max(40),
           stage: BoardStage,
-          jobButtonId: z.string().nullable().optional(),
+          job: BoardColumnJob.nullable().optional(),
           nextColumnId: z.string().nullable().optional(),
           jobEnabled: z.boolean().optional(),
         }),
@@ -720,7 +720,7 @@ export interface RpcResults
   /** The columns the project keeps; none when its board is the default one. */
   "board.columns": BoardColumn[];
   "board.saveColumns": BoardColumn[];
-  "board.jobs": BoardJob[];
+  "board.jobs": BoardColumn[];
   "board.switchJob": null;
   "board.addReadyMade": BoardColumn[];
   "tasks.prepareWorkspace": Task;

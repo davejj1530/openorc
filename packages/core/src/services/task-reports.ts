@@ -27,6 +27,15 @@ export class TaskReports {
     return id;
   }
 
+  /** The app's own word on a task, as when its agents have not settled it. The reply the person presses goes to `replyThreadId`. */
+  ask(taskId: string, message: string, replies: string[] | undefined, replyThreadId: string | null): void {
+    const task = tasks.get(this.db, taskId);
+    if (!task) return;
+    taskEvents.record(this.db, taskId, { kind: "app" }, { kind: "update", message, ...(replies ? { replies } : {}), answer: null, replyThreadId });
+    this.invalidate(["tasks", "inbox", `task:${taskId}`]);
+    this.notify({ kind: "question", threadId: replyThreadId, taskId, title: task.title, body: message });
+  }
+
   /** An agent changes only its own update. An answer already given stays unless the change asks again. */
   private change(taskId: string, from: Thread | null, id: number, update: TaskUpdate): number {
     const before = taskEvents.get(this.db, id);
@@ -40,7 +49,7 @@ export class TaskReports {
     const event = taskEvents.get(this.db, eventId);
     if (event?.kind !== "update" || event.taskId !== taskId || !event.replies?.includes(reply)) throw new Error("This update no longer offers that reply.");
     if (event.answer) throw new Error("This update is already answered.");
-    const threadId = event.actor.kind === "agent" ? event.actor.threadId : null;
+    const threadId = event.replyThreadId ?? (event.actor.kind === "agent" ? event.actor.threadId : null);
     if (!threadId) throw new Error("The thread that asked is gone.");
     this.threads.queue(threadId, reply);
     const { id: _id, taskId: _taskId, at: _at, actor: _actor, ...held } = event;

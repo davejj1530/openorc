@@ -50,8 +50,11 @@ type FieldsProps = {
   plan?: boolean;
   /** The first model, which leaves the choice to the task's thread. Without it a model is always chosen. */
   sameLabel?: string;
-  /** "card" labels each field above it, as a dialog does; "sheet" names them for screen readers only. */
-  layout: "card" | "sheet";
+  /**
+   * "card" labels each field above it, as a dialog does; "sheet" names them for screen readers only; "bar" sits in one
+   * row at inline size and shows the account only for a Claude model, where one is chosen or kept.
+   */
+  layout: "card" | "sheet" | "bar";
   disabled?: boolean;
   /** The account a Claude choice stays on, shown but not offered, while accounts are kept separate. */
   keptAccount?: string | undefined;
@@ -70,13 +73,7 @@ export function ThreadChoiceFields({ value, onChange, project, plan = false, sam
   const chooseAccount = (id: string | undefined) => value && onChange({ agent: value.agent, model: value.model, effort: value.effort, ...(id ? { claudeAccountId: id } : {}) });
   const listed = value && !options.some((option) => threadModelKey(option.recipient) === threadModelKey(value));
   const model = (
-    <Select
-      variant={variant}
-      aria-label={layout === "sheet" ? "Model" : undefined}
-      value={value ? threadModelKey(value) : ""}
-      disabled={disabled}
-      onChange={(event) => chooseModel(event.target.value)}
-    >
+    <Select variant={variant} aria-label={layout === "card" ? undefined : "Model"} value={value ? threadModelKey(value) : ""} disabled={disabled} onChange={(event) => chooseModel(event.target.value)}>
       {sameLabel ? <option value="">{sameLabel}</option> : null}
       {/* A model saved earlier that the agents no longer offer stays chosen until another is. */}
       {listed ? <option value={threadModelKey(value)}>{modelEffortLabel(value, models)}</option> : null}
@@ -87,11 +84,18 @@ export function ThreadChoiceFields({ value, onChange, project, plan = false, sam
       ))}
     </Select>
   );
-  const accountLabel = layout === "sheet" ? "Account" : undefined;
+  const accountLabel = layout === "card" ? undefined : "Account";
   let account = <NoAccount reason="Default" variant={variant} label={accountLabel} />;
   if (value?.agent === "claude" && keptAccount) account = <NoAccount reason={keptAccountName(accounts, keptAccount)} variant={variant} label={accountLabel} />;
   else if (value?.agent === "claude" && accounts)
     account = <AccountSelect accounts={accounts} value={value.claudeAccountId} onChange={chooseAccount} variant={variant} label={accountLabel} disabled={disabled} />;
+  if (layout === "bar")
+    return (
+      <>
+        {model}
+        {value?.agent === "claude" && (keptAccount || accounts) ? account : null}
+      </>
+    );
   if (layout === "sheet")
     return (
       <>

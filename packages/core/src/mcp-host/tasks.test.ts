@@ -25,7 +25,7 @@ function hosts(online = true) {
   };
   const deps = {
     threadService: threadService as never,
-    board: { moveForward: vi.fn() },
+    board: { move: vi.fn() },
     reports: { post: vi.fn() },
     dataDir: "/tmp/openorc-tasks-host",
     assertRunAvailable: () => {},

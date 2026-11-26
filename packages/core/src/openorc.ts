@@ -305,8 +305,8 @@ export class OpenOrc {
     this.lifecycle = new LifecycleService(db, invalidate, this.log);
     const updating = (agent: string) => this.runs.agentUpdating(agent);
     this.schedules = new ScheduleService(db, this.threads, invalidate, notify, this.log, { updating });
-    this.boardJobs = new BoardJobs(db, options.dataDir, this.threads, invalidate, notify, this.log);
     this.taskReports = new TaskReports(db, this.threads, invalidate, notify);
+    this.boardJobs = new BoardJobs(db, options.dataDir, this.threads, this.taskReports, invalidate, notify, this.log);
     this.orclingWakes = new OrclingWakeService({ db, activity: (id) => this.runs.threadActivity(id), threads: this.threads, log: this.log, updating });
     this.files = createFileService({ options, writers: this.workspaceWriters, invalidate, environment: () => this.environment.current() });
     this.imports = new ImportService(db, this.ledger, invalidate, this.log, this.toolImages);

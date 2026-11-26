@@ -13,6 +13,7 @@ export { usageHistory } from "./usage-history.js";
 export { projectActivity } from "./project-activity.js";
 export { scheduleFirings, schedules, type SchedulePatch } from "./schedules.js";
 export { boardColumns, type BoardColumnInput } from "./board-columns.js";
+export { taskActor, taskEvents, type NewTaskEvent } from "./task-events.js";
 export { messages } from "./search.js";
 export { subagents, type SubagentRecord } from "./subagents.js";
 export { taskComments } from "./task-comments.js";

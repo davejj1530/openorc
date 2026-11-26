@@ -1,4 +1,4 @@
-import { Db, tasks } from "@openorc/db";
+import { Db, taskEvents, tasks, threads } from "@openorc/db";
 import type { Task } from "@openorc/protocol";
 import type { RunService } from "../services/runs.js";
 import { TaskCommentService } from "../services/task-comments.js";
@@ -11,10 +11,11 @@ type Dependencies = {
   runService: Pick<RunService, "pending">;
 };
 
-/** Each task with what its own run waits for the person to approve, so the Tasks screen holds what needs them. */
-function withApprovals(list: Task[], runService: Dependencies["runService"]): Task[] {
+/** Each task with what its own run waits for the person to approve, or its newest update asks them, so the Tasks screen holds what needs them. */
+function withApprovals(db: Db, list: Task[], runService: Dependencies["runService"]): Task[] {
   const waiting = new Map(runService.pending().flatMap((pending) => (pending.taskId ? [[pending.taskId, pending.detail] as const] : [])));
-  return list.map((task) => ({ ...task, approval: waiting.get(task.id) ?? null }));
+  const asking = taskEvents.asking(db);
+  return list.map((task) => ({ ...task, approval: waiting.get(task.id) ?? asking.get(task.id) ?? null }));
 }
 
 export function createTaskQueriesHandlers({
@@ -26,6 +27,7 @@ export function createTaskQueriesHandlers({
   Handlers,
   | "tasks.list"
   | "tasks.get"
+  | "tasks.events"
   | "tasks.comments.list"
   | "tasks.comments.post"
   | "tasks.comments.retry"
@@ -35,11 +37,18 @@ export function createTaskQueriesHandlers({
   | "tasks.executionThread"
 > {
   return {
+    // A thread that was deleted since is no longer somewhere to go.
+    "tasks.events": ({ taskId }) =>
+      taskEvents.list(db, taskId).map((event) => {
+        const gone = (id: string | null) => (id && !threads.get(db, id) ? null : id);
+        const actor = event.actor.kind === "agent" ? { ...event.actor, threadId: gone(event.actor.threadId) } : event.actor;
+        return event.kind === "started" ? { ...event, actor, threadId: gone(event.threadId) } : { ...event, actor };
+      }),
     "tasks.list": ({ projectId, threadId, statuses }) =>
-      withApprovals(tasks.list(db, { ...(projectId ? { projectId } : {}), ...(threadId ? { threadId } : {}), ...(statuses ? { statuses } : {}) }), runService),
+      withApprovals(db, tasks.list(db, { ...(projectId ? { projectId } : {}), ...(threadId ? { threadId } : {}), ...(statuses ? { statuses } : {}) }), runService),
     "tasks.get": ({ id }) => {
       const task = tasks.get(db, id);
-      return task && !task.retiredTeam ? withApprovals([task], runService)[0]! : null;
+      return task && !task.retiredTeam ? withApprovals(db, [task], runService)[0]! : null;
     },
     "tasks.comments.list": ({ taskId }) => comments.list(taskId),
     "tasks.comments.post": (input) => comments.post(input),

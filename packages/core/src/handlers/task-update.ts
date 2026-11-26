@@ -26,7 +26,7 @@ export function createTaskUpdateHandlers({ threadService, db, runService, worksp
       const update = () =>
         db.transaction(() => {
           if (patch.workspaceMode !== undefined && task.executionThreadId) threads.update(db, task.executionThreadId, { workspaceMode: patch.workspaceMode });
-          return tasks.update(db, id, { ...patch, ...(status ? { status } : {}), ...completionPatch(status) }, { explicitStatus: true });
+          return tasks.update(db, id, { ...patch, ...(status ? { status } : {}), ...completionPatch(status) }, { explicitStatus: true, by: { kind: "user" } });
         });
       // Claim the directory before changing visibility or deleting its files.
       const t =

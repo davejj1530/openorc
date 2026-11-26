@@ -53,6 +53,7 @@ import {
   SessionSummary,
   Snapshot,
   Task,
+  type TaskEvent,
   TaskPriority,
   TaskStatus,
   Thread,
@@ -238,6 +239,9 @@ export const rpcParams = {
   "threads.send": z.object({ id: z.string(), text: z.string().min(1), fromThreadId: z.string().optional() }),
   "tasks.list": z.object({ spaceId: SpaceId.optional(), threadId: z.string().optional(), projectId: z.string().optional(), statuses: z.array(TaskStatus).optional() }),
   "tasks.get": z.object({ id: z.string() }),
+  "tasks.events": z.object({ taskId: z.string() }),
+  /** The person's reply to an agent's update, one of the replies it offered. It reaches the agent's thread as their message. */
+  "tasks.answerUpdate": z.object({ taskId: z.string(), eventId: z.number().int(), reply: z.string().min(1).max(40) }),
   /** The task's working thread, made when it has none: with the model and account chosen, else the ones it would inherit. */
   "tasks.openThread": z.object({ taskId: z.string(), choice: ThreadChoice.optional() }),
   "tasks.executionThread": z.object({ taskId: z.string() }),
@@ -699,6 +703,9 @@ export interface RpcResults
   "runs.listForThread": Run[];
   "tasks.list": Task[];
   "tasks.get": Task | null;
+  /** The task's history, oldest first. */
+  "tasks.events": TaskEvent[];
+  "tasks.answerUpdate": null;
   "tasks.openThread": Thread;
   "tasks.executionThread": ThreadSummary | null;
   "tasks.create": Task;

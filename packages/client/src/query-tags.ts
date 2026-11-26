@@ -193,6 +193,7 @@ const idReadTags: MethodRules = {
   // Main invalidates preview:<id> when the Mac opens, closes or switches the thread's page; a deleted thread closes it.
   "preview.state": (p) => ["preview", `preview:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`],
   "tasks.get": (p) => ["tasks", `task:${String(p["id"])}`],
+  "tasks.events": (p) => ["tasks", `task:${String(p["taskId"])}`],
   "runs.listForTask": (p) => [`runs:${String(p["taskId"])}`],
   "review.checkoutState": (p) => [`checkout:${String(p["taskId"])}`, "tasks", "threads", `runs:${String(p["taskId"])}`],
   "review.diff": (p) => [`diff:${String(p["taskId"])}`],

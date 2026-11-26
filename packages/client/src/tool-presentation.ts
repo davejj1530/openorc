@@ -52,6 +52,7 @@ const namedTools: [RegExp, (str: (key: string) => string, input: unknown) => Too
   [/task_list$/, () => ({ icon: "WorkDelegate", verb: "Listed tasks", object: "", tone: "task" })],
   [/task_get$/, (str) => ({ icon: "WorkDelegate", verb: "Checked task", object: str("id").slice(0, 8), tone: "task" })],
   [/task_update$/, (str) => ({ icon: "WorkDelegate", verb: "Updated task", object: str("id").slice(0, 8), tone: "task" })],
+  [/task_report$/, (str) => ({ icon: "WorkDelegate", verb: "Posted on the task", object: str("message"), tone: "task" })],
   [/memory_search$/, (str) => ({ icon: "Search", verb: "Searched memory for", object: str("query"), tone: "memory" })],
   [/memory_record$/, (str) => ({ icon: "WorkRead", verb: "Remembered", object: str("title"), tone: "memory" })],
   [/memory_feedback$/, () => ({ icon: "WorkRead", verb: "Rated a memory", object: "", tone: "memory" })],

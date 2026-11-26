@@ -51,6 +51,9 @@ async function fixture(t: TestContext) {
       async update() {
         return null;
       },
+      async report() {
+        return { updateId: 1 };
+      },
     },
     execution: {
       available: () => true,
@@ -505,6 +508,7 @@ void test("task tools name a space, a project and a revision only for a run the 
     task_create: ["execution", "labels", "priority", "spec", "title", "workspace_mode"],
     task_get: ["id"],
     task_list: [],
+    task_report: ["card", "id", "message", "replaces", "replies"],
     task_start: ["id", "workspace_mode"],
     task_update: ["column", "id", "spec", "status"],
   };
@@ -515,6 +519,7 @@ void test("task tools name a space, a project and a revision only for a run the 
     task_create: ["execution", "labels", "priority", "scope", "spec", "title", "workspace_mode"],
     task_get: ["id", "scope"],
     task_list: ["scope"],
+    task_report: ["card", "id", "message", "replaces", "replies"],
     task_start: ["id", "ifRevision", "scope", "workspace_mode"],
     task_update: ["column", "id", "ifRevision", "scope", "spec", "status"],
   });

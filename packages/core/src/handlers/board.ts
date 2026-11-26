@@ -1,9 +1,10 @@
 import { boardColumns, projects, type Db } from "@openorc/db";
+import type { TaskReports } from "../services/task-reports.js";
 import type { Handlers } from "./types.js";
 
-type Dependencies = { db: Db; invalidate: (keys: string[]) => void };
+type Dependencies = { db: Db; invalidate: (keys: string[]) => void; reports: Pick<TaskReports, "answer"> };
 
-export function createBoardHandlers({ db, invalidate }: Dependencies): Pick<Handlers, "board.columns" | "board.saveColumns"> {
+export function createBoardHandlers({ db, invalidate, reports }: Dependencies): Pick<Handlers, "board.columns" | "board.saveColumns" | "tasks.answerUpdate"> {
   return {
     "board.columns": ({ projectId }) => boardColumns.list(db, projectId),
     "board.saveColumns": ({ projectId, columns }) => {
@@ -12,6 +13,10 @@ export function createBoardHandlers({ db, invalidate }: Dependencies): Pick<Hand
       // Tasks follow a column that changed stage or left the board.
       invalidate(["board", "tasks", "inbox"]);
       return saved;
+    },
+    "tasks.answerUpdate": ({ taskId, eventId, reply }) => {
+      reports.answer(taskId, eventId, reply);
+      return null;
     },
   };
 }

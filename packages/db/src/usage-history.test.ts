@@ -5,6 +5,7 @@ import { Db } from "./database.js";
 import { LedgerWriter } from "./ledger.js";
 import { projects, runs, tasks, threads } from "./repos.js";
 import { subagents } from "./subagents.js";
+import { taskEventsMigration } from "./task-events.js";
 import { usageHistory } from "./usage-history.js";
 import { migrations } from "./schema.js";
 import { usageHistoryMigration } from "./usage-history-schema.js";
@@ -139,6 +140,8 @@ it("backfills existing inline and artifact accounting when upgrading a ledger", 
     if (typeof migration === "string") raw.exec(migration);
     else migration(raw);
   }
+  // The fixture's task is made by today's code, which also keeps the task's history.
+  raw.exec(taskEventsMigration);
   raw.exec("PRAGMA foreign_keys = ON");
   const f = fixture(new Db(raw));
   f.run("existing", "claude");

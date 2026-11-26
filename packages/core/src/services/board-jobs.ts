@@ -1,13 +1,16 @@
-import { audit, boardColumns, projects, tasks, type Db } from "@openorc/db";
+import { audit, boardColumns, projects, runs, taskActor, taskEvents, tasks, threads as threadRows, type Db } from "@openorc/db";
 import type { BoardColumn, Task } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { AttachmentService } from "./attachments.js";
 import type { Notification } from "./run-types.js";
 import type { ThreadService } from "./threads.js";
 
+/** A job runs with nobody watching its thread, so it says where the work stands on the task, where the person follows it. */
+const REPORT = "Post where the work stands on this task with task_report, which the person reads on the task's page.";
+
 /** The agent moves the card itself, since only it knows when its work is done: a review may take several turns to settle. */
-const handOn = (next: BoardColumn): string =>
-  `When your work on this task is finished, move it to the "${next.name}" column with task_update (column: "${next.name}"). Leave it where it is until then.`;
+const handOn = (next: BoardColumn | null): string =>
+  next ? `${REPORT} When your work on this task is finished, move it to the "${next.name}" column with task_update (column: "${next.name}"). Leave it where it is until then.` : REPORT;
 
 const sameName = (a: string, b: string): boolean => a.trim().toLowerCase() === b.trim().toLowerCase();
 
@@ -48,7 +51,9 @@ export class BoardJobs {
     const from = columns.findIndex((column) => (task.columnId ? column.id === task.columnId : column.stage === task.status));
     if (to <= from) throw new Error(`A task moves forward only, and "${columns[to]!.name}" is not after its column. Tell the other thread what is wrong with thread_send.`);
     const column = columns[to]!;
-    const moved = tasks.update(this.db, task.id, { columnId: column.id, status: column.stage, completedAt: column.stage === "done" ? Date.now() : null }, { explicitStatus: true });
+    const run = runs.get(this.db, runId);
+    const by = taskActor(run?.threadId ? threadRows.get(this.db, run.threadId) : null);
+    const moved = tasks.update(this.db, task.id, { columnId: column.id, status: column.stage, completedAt: column.stage === "done" ? Date.now() : null }, { explicitStatus: true, by });
     audit.record(this.db, { actor: "agent", action: "task.update", resourceType: "task", resourceId: task.id, metadata: { runId, patch: { column: column.name } } });
     this.invalidate(["tasks", "inbox", `task:${task.id}`]);
     this.arrived(task.id, column.id);
@@ -63,6 +68,11 @@ export class BoardJobs {
     if (!button) return;
     const next = column.nextColumnId ? boardColumns.get(this.db, column.nextColumnId) : null;
     const images = await new AttachmentService(this.dataDir).forTask(task.spec ?? "");
-    await this.threads.runTaskButton(taskId, next ? { ...button, prompt: `${button.prompt}\n\n${handOn(next)}` } : button, images);
+    const pressed = await this.threads.runTaskButton(taskId, { ...button, prompt: `${button.prompt}\n\n${handOn(next)}` }, images);
+    // A message left unsent in its thread has started nothing yet.
+    const thread = "draft" in pressed && pressed.draft !== undefined ? null : threadRows.get(this.db, pressed.threadId);
+    if (!thread) return;
+    taskEvents.record(this.db, taskId, { kind: "app" }, { kind: "started", label: button.label, agent: thread.agent, threadId: thread.id });
+    this.invalidate(["tasks", `task:${taskId}`]);
   }
 }

@@ -1,18 +1,20 @@
 import { type McpHost } from "@openorc/mcp";
 import { AttachmentService } from "../services/attachments.js";
 import type { BoardJobs } from "../services/board-jobs.js";
+import type { TaskReports } from "../services/task-reports.js";
 import { ThreadService } from "../services/threads.js";
 import type { RunContext } from "./context.js";
 import { onlineTasks, type OnlineTasksHost } from "./online-tasks.js";
 type Dependencies = {
   threadService: Pick<ThreadService, "toolGet" | "toolStart" | "toolList" | "toolUpdate">;
   board: Pick<BoardJobs, "moveForward">;
+  reports: Pick<TaskReports, "post">;
   dataDir: string;
   assertRunAvailable: RunContext["assertRunAvailable"];
   online?: OnlineTasksHost;
 };
 /** This Mac's tasks for a run's agent; a call that names a cloud project is the online tools'. */
-export function createTasksHost({ threadService, board, dataDir, assertRunAvailable, online = null }: Dependencies): Omit<McpHost["tasks"], "create"> {
+export function createTasksHost({ threadService, board, reports, dataDir, assertRunAvailable, online = null }: Dependencies): Omit<McpHost["tasks"], "create"> {
   return {
     start: async (runId, id, options) => {
       assertRunAvailable(runId);
@@ -46,6 +48,11 @@ export function createTasksHost({ threadService, board, dataDir, assertRunAvaila
       if (rest.spec) await threadService.toolUpdate(runId, id, { spec: rest.spec });
       board.moveForward(id, column, runId);
       return threadService.toolGet(runId, id);
+    },
+    report: async (runId, id, update, replaces) => {
+      assertRunAvailable(runId);
+      if (!(await threadService.toolGet(runId, id))) throw new Error("Task not found in this agent's project.");
+      return { updateId: reports.post(id, runId, update, replaces) };
     },
   };
 }

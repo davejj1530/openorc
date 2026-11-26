@@ -138,6 +138,8 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "tasks.refine.stop": byTask,
   "tasks.refine.dismiss": byTask,
   "tasks.threads": byTask,
+  "tasks.events": byTask,
+  "tasks.answerUpdate": byTask,
   "tasks.newThread": byTask,
   "tasks.runButton": byTask,
   "runs.listForTask": byTask,

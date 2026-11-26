@@ -1,4 +1,4 @@
-import { audit, listEvents, orclingGroups, orclings, projects, retiredTeams, runs as runRepo, tasks, threads, type Db } from "@openorc/db";
+import { audit, listEvents, orclingGroups, orclings, projects, retiredTeams, runs as runRepo, taskActor, tasks, threads, type Db } from "@openorc/db";
 import type { TaskCard, ThreadCard } from "@openorc/mcp";
 import {
   DEFAULT_CLAUDE_ACCOUNT,
@@ -243,7 +243,7 @@ export class ThreadAgentTools {
     this.assertTaskStartAllowed(task, run?.mode);
     const caller = this.scopeOf(runId).thread;
     this.assertTaskStartLocation(task, caller, workspaceMode);
-    const updated = tasks.update(this.db, id, { status: "in_progress", completedAt: null, ...(caller ? { executionThreadId: caller.id } : {}) }, { explicitStatus: true });
+    const updated = tasks.update(this.db, id, { status: "in_progress", completedAt: null, ...(caller ? { executionThreadId: caller.id } : {}) }, { explicitStatus: true, by: taskActor(caller) });
     audit.record(this.db, { actor: "agent", action: "task.start", resourceType: "task", resourceId: id, metadata: { runId, threadId: caller?.id } });
     this.invalidate(["tasks", "inbox", `task:${id}`]);
     return {
@@ -294,7 +294,7 @@ export class ThreadAgentTools {
       if (patch.status === "done") changes.completedAt = Date.now();
       else if (patch.status !== "archived") changes.completedAt = null;
     }
-    const updated = tasks.update(this.db, id, changes, { explicitStatus: true });
+    const updated = tasks.update(this.db, id, changes, { explicitStatus: true, by: taskActor(this.scopeOf(runId).thread) });
     audit.record(this.db, { actor: "agent", action: "task.update", resourceType: "task", resourceId: id, metadata: { runId, patch } });
     this.invalidate(["tasks", "inbox", `task:${id}`, ...(t.threadId ? ["threads", `thread:${t.threadId}`] : [])]);
     return this.card(updated, currentTaskId);

@@ -1,4 +1,4 @@
-import type { Run, RunState, Snapshot, Task, TaskStatus, Thread, Usage } from "@openorc/protocol";
+import type { Run, RunState, Snapshot, Task, TaskActor, TaskStatus, Thread, Usage } from "@openorc/protocol";
 import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { claudeAccounts } from "./claude-accounts.js";
@@ -6,6 +6,7 @@ import type { Db } from "./database.js";
 import { redact, redactJson } from "./redact.js";
 import { retiredTaskIds, retiredTeams } from "./retired-teams.js";
 import { VISIBLE } from "./thread-visible.js";
+import { taskActor, taskEvents } from "./task-events.js";
 import { jaccard, normalizeTitle, wordSet } from "./task-similarity.js";
 import { reopenThread, resolveThread } from "./thread-family.js";
 import { threadListLimit, threadListOrder } from "./thread-list-order.js";
@@ -111,6 +112,12 @@ const taskColumns: Record<keyof TaskPatch, string> = {
   completedAt: "completed_at",
 };
 
+/** Where a task sits: its status, and its board column with the name the column has now. */
+function placeOf(db: Db, id: string): { status: TaskStatus; column_id: string | null; column: string | null } | null {
+  const row = db.stmt("SELECT t.status, t.column_id, c.name AS column FROM tasks t LEFT JOIN board_columns c ON c.id = t.column_id WHERE t.id = ?").get(id);
+  return (row as { status: TaskStatus; column_id: string | null; column: string | null } | undefined) ?? null;
+}
+
 export const tasks = {
   list(db: Db, filter: { projectId?: string; threadId?: string; statuses?: TaskStatus[] } = {}): Task[] {
     const where: string[] = [`id NOT IN (${retiredTaskIds})`];
@@ -155,6 +162,7 @@ export const tasks = {
     db.stmt(
       "INSERT INTO tasks (id, project_id, title, spec, status, priority, labels, workspace_mode, base_ref, parent_task_id, thread_id, origin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     ).run(id, t.projectId, t.title, t.spec, t.status ?? "backlog", t.priority, JSON.stringify(t.labels), t.workspaceMode, t.baseRef, t.parentTaskId, t.threadId ?? null, t.origin ?? "user", ts, ts);
+    taskEvents.record(db, id, t.origin === "agent" ? taskActor(t.threadId ? threads.get(db, t.threadId) : null) : { kind: "user" }, { kind: "created" });
     return tasks.get(db, id) as Task;
   },
   /**
@@ -172,8 +180,9 @@ export const tasks = {
     if (words.size < 6) return null;
     return live.find((t) => jaccard(words, wordSet(`${t.title} ${t.spec ?? ""}`)) >= 0.55) ?? null;
   },
-  /** Explicit board moves take precedence over subsequent execution projections. */
-  update(db: Db, id: string, patch: TaskPatch, options: { explicitStatus?: boolean } = {}): Task {
+  /** Explicit board moves take precedence over subsequent execution projections. A move is kept in the task's history under whoever `by` says made it. */
+  update(db: Db, id: string, patch: TaskPatch, options: { explicitStatus?: boolean; by?: TaskActor } = {}): Task {
+    const before = patch.status !== undefined || patch.columnId !== undefined ? placeOf(db, id) : null;
     const sets: string[] = [];
     const args: unknown[] = [];
     const explicitStatus = options.explicitStatus && patch.status !== undefined;
@@ -194,6 +203,10 @@ export const tasks = {
     db.stmt(`UPDATE tasks SET ${sets.join(", ")} WHERE id = ?`).run(...(args as (string | number | null)[]));
     const t = tasks.get(db, id);
     if (!t) throw new Error(`task ${id} not found`);
+    const after = before ? placeOf(db, id) : null;
+    if (before && after && (after.status !== before.status || after.column_id !== before.column_id)) {
+      taskEvents.record(db, id, options.by ?? { kind: "app" }, { kind: "moved", status: after.status, column: after.column });
+    }
     return t;
   },
   addCost(db: Db, id: string, usd: number): void {

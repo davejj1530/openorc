@@ -152,6 +152,8 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "tasks.refine.stop": NOT_ASKED,
   "tasks.refine.dismiss": NOT_ASKED,
   "tasks.threads": NOT_ASKED,
+  "tasks.events": NOT_ASKED,
+  "tasks.answerUpdate": NOT_ASKED,
   "tasks.newThread": NOT_ASKED,
   "tasks.runButton": NOT_ASKED,
   "runs.listForTask": NOT_ASKED,

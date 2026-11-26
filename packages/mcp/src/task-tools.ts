@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { TaskStatus } from "@openorc/protocol";
+import { TaskStatus, TaskUpdate } from "@openorc/protocol";
 import { z } from "zod";
 import type { McpHost } from "./index.js";
 import type { OnlineTaskScopeChoice } from "./task-types.js";
@@ -42,6 +42,7 @@ export function registerTaskTools(mcp: McpServer, host: McpHost, runId: string, 
   registerList(mcp, host, runId, scopes);
   registerGet(mcp, host, runId, scopes);
   registerUpdate(mcp, host, runId, scopes);
+  registerReport(mcp, host, runId);
 }
 
 function registerCreate(mcp: McpServer, host: McpHost, runId: string, scopes: readonly OnlineTaskScopeChoice[]) {
@@ -144,6 +145,18 @@ function registerGet(mcp: McpServer, host: McpHost, runId: string, scopes: reado
       inputSchema: online(on, { id: z.string() }, { scope: scopeOf(scopes) }),
     },
     async ({ id, scope }) => ({ content: [{ type: "text", text: JSON.stringify(await host.tasks.get(runId, id, scope)) }] }),
+  );
+}
+
+function registerReport(mcp: McpServer, host: McpHost, runId: string) {
+  mcp.registerTool(
+    "task_report",
+    {
+      description:
+        "Post an update on a task in this project for the person to read on the task's page: a sentence or two on where the work stands, with a card when one says it better. A checklist card suits a plan or review notes, each item with whether it is done. A pull_request card takes only the number, and the app draws its title, state and size from GitHub and keeps them current. A visual card is a self-contained HTML fragment, as visualize takes. Offer replies only when the person should answer, such as \"Approve the plan\": the one they press reaches this thread as their message, so end your turn after asking. Pass replaces with an earlier update's id to change that update in place, as when a plan's steps get done.",
+      inputSchema: { id: z.string().min(1), ...TaskUpdate.shape, replaces: z.number().int().optional().describe("The updateId an earlier task_report answered with.") },
+    },
+    async ({ id, replaces, ...update }) => ({ content: [{ type: "text", text: JSON.stringify(await host.tasks.report(runId, id, update, replaces)) }] }),
   );
 }
 

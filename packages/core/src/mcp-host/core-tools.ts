@@ -14,7 +14,7 @@ import { createTasksHost } from "./tasks.js";
 import { createThreadsHost } from "./threads.js";
 
 /** What the core's tools for its agents are made from: its services, and the few things only the core itself holds. */
-export type CoreTools = Pick<OpenOrc, "db" | "threads" | "runs" | "comments" | "refines" | "devices" | "memory" | "slack" | "orclings" | "settings" | "pullRequests" | "boardJobs"> & {
+export type CoreTools = Pick<OpenOrc, "db" | "threads" | "runs" | "comments" | "refines" | "devices" | "memory" | "slack" | "orclings" | "settings" | "pullRequests" | "boardJobs" | "taskReports"> & {
   /** Read each time, since the account comes and goes. */
   account: () => OpenOrc["account"];
   browser: OpenOrcOptions["browser"];
@@ -68,7 +68,7 @@ export function startCoreMcp(core: CoreTools): Promise<OpenOrcMcpServer> {
     }),
     pullReview: core.pullRequests.agentTools(),
     tasks: {
-      ...createTasksHost({ threadService: core.threads, board: core.boardJobs, dataDir: core.dataDir, assertRunAvailable, online }),
+      ...createTasksHost({ threadService: core.threads, board: core.boardJobs, reports: core.taskReports, dataDir: core.dataDir, assertRunAvailable, online }),
       create: createTaskCreateHost({ threadService: core.threads, assertRunAvailable, online }),
     },
   });

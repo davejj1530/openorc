@@ -233,9 +233,48 @@ describe("core", () => {
       expect(() => core.boardJobs.moveForward(task.id, "Build", "run")).toThrow(/forward only/);
       expect(() => core.boardJobs.moveForward(task.id, "Shipped", "run")).toThrow(/Build, Code review, Done/);
       expect(pressed).toHaveBeenCalledTimes(1);
+      // The task's history keeps each move under the name its column had, and who made it.
+      expect((await call("tasks.events", { taskId: task.id })).map((event) => [event.kind, event.actor.kind, event.kind === "moved" ? event.column : null])).toEqual([
+        ["created", "user", null],
+        ["moved", "user", "Build"],
+        ["moved", "user", "Code review"],
+        ["moved", "app", "Done"],
+      ]);
     } finally {
       pressed.mockRestore();
     }
+  });
+
+  it("keeps an agent's update on its task, waits on the person while it asks, and sends their reply to the agent's thread", async () => {
+    const p = await call("projects.import", { rootPath: root });
+    const task = await call("tasks.create", { projectId: p.id, title: "Plan first", useWorktree: false });
+    const builder = threads.insert(core.db, { projectId: p.id, title: "Builder", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    const other = threads.insert(core.db, { projectId: p.id, title: "Reviewer", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    for (const thread of [builder, other]) runs.insert(core.db, { id: `run-${thread.id}`, taskId: null, threadId: thread.id, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    const plan = { kind: "checklist" as const, title: "Plan", items: [{ text: "Draw the board", done: false }] };
+    const id = core.taskReports.post(task.id, `run-${builder.id}`, { message: "Here is the plan.", card: plan, replies: ["Approve the plan"] });
+    expect((await call("tasks.get", { id: task.id }))?.approval).toBe("Here is the plan.");
+    // An agent changes its own update in place, and nobody else's.
+    expect(() => core.taskReports.post(task.id, `run-${other.id}`, { message: "Mine now." }, id)).toThrow(/of yours/);
+    const queued = vi.spyOn(core.threads, "queue").mockReturnValue([]);
+    try {
+      await expect(call("tasks.answerUpdate", { taskId: task.id, eventId: id, reply: "Something else" })).rejects.toThrow(/no longer offers/);
+      await call("tasks.answerUpdate", { taskId: task.id, eventId: id, reply: "Approve the plan" });
+      expect(queued).toHaveBeenCalledWith(builder.id, "Approve the plan");
+      await expect(call("tasks.answerUpdate", { taskId: task.id, eventId: id, reply: "Approve the plan" })).rejects.toThrow(/already answered/);
+    } finally {
+      queued.mockRestore();
+    }
+    expect((await call("tasks.get", { id: task.id }))?.approval).toBeNull();
+    expect(core.taskReports.post(task.id, `run-${builder.id}`, { message: "The plan is done.", card: { ...plan, items: [{ text: "Draw the board", done: true }] } }, id)).toBe(id);
+    const update = (await call("tasks.events", { taskId: task.id })).find((event) => event.kind === "update");
+    expect(update).toMatchObject({
+      id,
+      message: "The plan is done.",
+      actor: { kind: "agent", agent: "codex", threadId: builder.id },
+      answer: { reply: "Approve the plan" },
+      card: { items: [{ done: true }] },
+    });
   });
 
   it("announces readiness with the MCP port", () => {

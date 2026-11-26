@@ -23,7 +23,14 @@ function hosts(online = true) {
     create: vi.fn(async () => (calls.push("online create"), { task: card("new"), duplicate: false, started: false, message: "Saved" })),
     context: vi.fn(async () => (calls.push("online context"), "No task context.")),
   };
-  const deps = { threadService: threadService as never, board: { moveForward: vi.fn() }, dataDir: "/tmp/openorc-tasks-host", assertRunAvailable: () => {}, online: online ? tools : null };
+  const deps = {
+    threadService: threadService as never,
+    board: { moveForward: vi.fn() },
+    reports: { post: vi.fn() },
+    dataDir: "/tmp/openorc-tasks-host",
+    assertRunAvailable: () => {},
+    online: online ? tools : null,
+  };
   return { calls, tools, tasks: { ...createTasksHost(deps), create: createTaskCreateHost(deps) } };
 }
 

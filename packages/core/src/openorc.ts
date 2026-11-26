@@ -117,6 +117,7 @@ import { ReviewerAppService } from "./services/reviewer-app.js";
 import { RunService, type Notification, type RunHooks } from "./services/runs.js";
 import { ScheduleService } from "./services/schedules.js";
 import { BoardJobs } from "./services/board-jobs.js";
+import { TaskReports } from "./services/task-reports.js";
 import { OrclingWakeService } from "./services/orcling-wakes.js";
 import { AppSettingsService } from "./services/settings.js";
 import { ShellEnvironment, inheritedProbe } from "./services/shell-environment.js";
@@ -184,6 +185,7 @@ export class OpenOrc {
   readonly reviewerApp: ReviewerAppService;
   readonly schedules: ScheduleService;
   readonly boardJobs: BoardJobs;
+  readonly taskReports: TaskReports;
   readonly orclingWakes: OrclingWakeService;
   readonly files: FileService;
   readonly hostedFiles: HostedFiles;
@@ -304,6 +306,7 @@ export class OpenOrc {
     const updating = (agent: string) => this.runs.agentUpdating(agent);
     this.schedules = new ScheduleService(db, this.threads, invalidate, notify, this.log, { updating });
     this.boardJobs = new BoardJobs(db, options.dataDir, this.threads, invalidate, notify, this.log);
+    this.taskReports = new TaskReports(db, this.threads, invalidate, notify);
     this.orclingWakes = new OrclingWakeService({ db, activity: (id) => this.runs.threadActivity(id), threads: this.threads, log: this.log, updating });
     this.files = createFileService({ options, writers: this.workspaceWriters, invalidate, environment: () => this.environment.current() });
     this.imports = new ImportService(db, this.ledger, invalidate, this.log, this.toolImages);
@@ -578,6 +581,7 @@ export class OpenOrc {
     this.mcp ??= startCoreMcp({
       db: this.db,
       boardJobs: this.boardJobs,
+      taskReports: this.taskReports,
       threads: this.threads,
       runs: this.runs,
       comments: this.comments,
@@ -797,7 +801,7 @@ export class OpenOrc {
       createInstructionsHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
       createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate, claudeSessions: this.claudeAccounts }),
       createSchedulesHandlers({ schedules: this.schedules }),
-      createBoardHandlers({ db: this.db, invalidate }),
+      createBoardHandlers({ db: this.db, invalidate, reports: this.taskReports }),
       createCatalogHandlers({ runService: this.runs, invalidate }),
       createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files }),
       createOrclingHandlers({ orclings: this.orclings, threads: this.threads, db: this.db, ledger: this.ledger }),

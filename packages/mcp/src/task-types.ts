@@ -1,4 +1,4 @@
-import { OnlineTaskRef, type OnlineTaskToolReference, type TaskStatus } from "@openorc/protocol";
+import { OnlineTaskRef, type OnlineTaskToolReference, type TaskStatus, type TaskUpdate } from "@openorc/protocol";
 import { z } from "zod";
 
 export const TaskScope = OnlineTaskRef.pick({ spaceId: true, projectId: true }).strict();
@@ -52,4 +52,6 @@ export interface TaskTools {
   list(runId: string, scope?: TaskScope): Promise<TaskCard[]>;
   get(runId: string, id: string, scope?: TaskScope): Promise<TaskCard | null>;
   update(runId: string, id: string, patch: { status?: TaskStatus; column?: string; spec?: string; scope?: TaskScope; ifRevision?: number }): Promise<TaskCard | null>;
+  /** Posts an update on a task's history, or changes an earlier one in place. Answers with the update's id. */
+  report(runId: string, id: string, update: TaskUpdate, replaces?: number): Promise<{ updateId: number }>;
 }

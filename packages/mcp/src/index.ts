@@ -228,6 +228,7 @@ export const internalToolNames = [
   "task_list",
   "task_get",
   "task_update",
+  "task_report",
   "thread_list",
   "thread_read",
   "thread_send",

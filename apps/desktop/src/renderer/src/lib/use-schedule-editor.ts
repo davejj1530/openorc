@@ -25,8 +25,11 @@ function useScheduleAccount(initial: string | undefined, project: Project | unde
   return { accounts, setAccount, claudeAccountId: offeredAccount(choice, selected) ?? choice?.defaultId ?? "claude-cli" };
 }
 
+/** What a new schedule starts filled in with, as one of the ready-made automations gives it. */
+export type SchedulePreset = { name: string; prompt: string; everyMinutes: number };
+
 /** Owns the editable schedule, selected target and the version used for its save. */
-export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | undefined, projectId: string, onClose: () => void) {
+export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | undefined, projectId: string, onClose: () => void, preset?: SchedulePreset) {
   const projects = useSpaceProjects(true);
   const [project, setProject] = useState(schedule?.projectId ?? projectId);
   const { accounts, setAccount, claudeAccountId } = useScheduleAccount(
@@ -41,9 +44,9 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
     setProject(id);
     setAccount(undefined);
   };
-  const [title, setTitle] = useState(schedule?.title ?? "");
-  const [prompt, setPrompt] = useState(schedule?.prompt ?? "");
-  const [minutes, setMinutes] = useState(schedule?.everyMinutes ?? 1440);
+  const [title, setTitle] = useState(schedule?.title ?? preset?.name ?? "");
+  const [prompt, setPrompt] = useState(schedule?.prompt ?? preset?.prompt ?? "");
+  const [minutes, setMinutes] = useState(schedule?.everyMinutes ?? preset?.everyMinutes ?? 1440);
   const [mode, setMode] = useState<RunMode>(schedule?.mode ?? "plan");
   const { permission, select: setPermission, error: permissionError, ready: permissionReady } = usePermissionSelection(schedule?.permissionMode);
   const [chosenWorkspace, setWorkspace] = useState<WorkspaceMode>(schedule?.workspaceMode ?? "worktree");

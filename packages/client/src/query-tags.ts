@@ -115,6 +115,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "textGeneration.settings.get": ["text-generation", "system", "models"],
   "schedules.list": ["schedules"],
   "board.columns": ["board"],
+  "board.jobs": ["board", "projects"],
   // Ordered by thread activity, so it follows the thread list.
   "projects.list": ["projects", "threads"],
   "projects.checkoutBranch": ["projects", "workspace-diff"],

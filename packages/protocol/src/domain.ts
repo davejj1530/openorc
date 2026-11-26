@@ -25,7 +25,12 @@ export const BoardColumn = z.object({
   jobButtonId: z.string().nullable(),
   /** The column that job hands the card on to when its work is done, always one after this one. */
   nextColumnId: z.string().nullable(),
+  /** Whether the job starts. Switched off, a card put here starts nothing. */
+  jobEnabled: z.boolean(),
 });
+/** A column's job as the Automations screen lists it: the column, and its task button's name and agent. */
+export const BoardJob = z.object({ column: BoardColumn, label: z.string(), agent: HarnessId.nullable() });
+export type BoardJob = z.infer<typeof BoardJob>;
 export type BoardColumn = z.infer<typeof BoardColumn>;
 
 export const TaskPriority = z.enum(["none", "low", "medium", "high", "urgent"]);

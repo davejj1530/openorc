@@ -328,15 +328,15 @@ it("names the app's screens as rows after New thread, each with its icon, markin
     within(screens())
       .getAllByRole("button")
       .map((button) => button.textContent),
-  ).toEqual(["New thread", "Tasks", "Pull requests", "Schedules"]);
+  ).toEqual(["New thread", "Tasks", "Pull requests", "Automations"]);
   expect(
     within(screens())
       .getAllByRole("button")
       .every((row) => row.querySelector("svg")),
   ).toBe(true);
-  fireEvent.click(within(screens()).getByRole("button", { name: "Schedules" }));
+  fireEvent.click(within(screens()).getByRole("button", { name: "Automations" }));
   expect(useRouter.getState().route).toEqual({ view: "scheduled" });
-  expect(within(screens()).getByRole("button", { name: "Schedules" }).getAttribute("aria-current")).toBe("page");
+  expect(within(screens()).getByRole("button", { name: "Automations" }).getAttribute("aria-current")).toBe("page");
   expect(within(screens()).getByRole("button", { name: "Tasks" }).getAttribute("aria-current")).toBeNull();
 });
 
@@ -345,7 +345,7 @@ it("counts on Tasks only what waits on the person: a run's approval, a proposal 
   mountSidebar();
   const tasks = within(screens()).getByRole("button", { name: "Tasks, 3 waiting" });
   expect(tasks.textContent).toBe("Tasks3");
-  expect(within(screens()).getByRole("button", { name: "Schedules" }).querySelector(".sidebar-count")).toBeNull();
+  expect(within(screens()).getByRole("button", { name: "Automations" }).querySelector(".sidebar-count")).toBeNull();
   expect(screen.queryByRole("button", { name: /^Inbox/ })).toBeNull();
   fireEvent.click(tasks);
   expect(useRouter.getState().route).toEqual({ view: "tasks" });
@@ -553,7 +553,7 @@ it("keeps Settings in the footer, under the list, and no update while none waits
 });
 
 it.each([
-  ["Schedules", "scheduled"],
+  ["Automations", "scheduled"],
   ["Settings", "settings"],
 ])("dismisses compact navigation after choosing %s", (name, destination) => {
   const matchMedia = window.matchMedia;

@@ -1,5 +1,5 @@
-import { audit, boardColumns, projects, runs, taskActor, taskEvents, tasks, threads as threadRows, type Db } from "@openorc/db";
-import type { BoardColumn, Task } from "@openorc/protocol";
+import { audit, boardColumns, projects, runs, taskActor, taskEvents, tasks, threads as threadRows, type BoardColumnInput, type Db } from "@openorc/db";
+import { DEFAULT_BOARD_COLUMNS, MAX_TASK_BUTTONS, READY_MADE_AUTOMATIONS, isHarnessId, type BoardColumn, type BoardJob, type Task } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { AttachmentService } from "./attachments.js";
 import type { Notification } from "./run-types.js";
@@ -60,10 +60,65 @@ export class BoardJobs {
     return moved;
   }
 
+  /** Every column job with its button's name and agent. A job whose button the project no longer has is left out, since nothing would start. */
+  list(projectId?: string): BoardJob[] {
+    return boardColumns.withJobs(this.db, projectId).flatMap((column) => {
+      const button = projects.get(this.db, column.projectId)?.settings.taskButtons?.find((each) => each.id === column.jobButtonId);
+      const agent = button?.choice && isHarnessId(button.choice.agent) ? button.choice.agent : null;
+      return button ? [{ column, label: button.label, agent }] : [];
+    });
+  }
+
+  switch(columnId: string, enabled: boolean): void {
+    boardColumns.setJobEnabled(this.db, columnId, enabled);
+    this.invalidate(["board"]);
+  }
+
+  /**
+   * Adds a ready-made board automation to a project: its task buttons, and its columns where they belong. Columns for
+   * the work itself take the place of the board's untouched In progress column, or go before the first column that
+   * waits on the person; a column for before the work goes ahead of the first working one. Each new column hands its
+   * cards to the column after it. Adding one the board already has changes nothing.
+   */
+  addReadyMade(projectId: string, id: string): BoardColumn[] {
+    const made = READY_MADE_AUTOMATIONS.find((each) => each.id === id);
+    const project = projects.get(this.db, projectId);
+    if (made?.kind !== "board" || !project) throw new Error("This automation is no longer available.");
+    const kept = boardColumns.list(this.db, projectId);
+    const board: BoardColumnInput[] = kept.length > 0 ? kept.map((column) => ({ ...column })) : DEFAULT_BOARD_COLUMNS.map((column) => ({ ...column }));
+    const fresh = made.columns
+      .filter((column) => !board.some((each) => each.jobButtonId === column.button.id))
+      .map((column) => ({ name: column.name, stage: "in_progress" as const, jobButtonId: column.button.id }));
+    if (fresh.length === 0) return kept;
+    const buttons = project.settings.taskButtons ?? [];
+    const added = made.columns.map((column) => column.button).filter((button) => !buttons.some((each) => each.id === button.id));
+    if (buttons.length + added.length > MAX_TASK_BUTTONS) throw new Error(`A project keeps up to ${MAX_TASK_BUTTONS} task buttons. Remove one in the project's settings first.`);
+    projects.updateSettings(this.db, projectId, { taskButtons: [...buttons, ...added] });
+    const untouched = made.place === "work" ? board.findIndex((column) => column.stage === "in_progress" && !column.jobButtonId && column.name === "In progress") : -1;
+    if (untouched >= 0) {
+      const [first, ...rest] = fresh;
+      board.splice(untouched, 1, { ...board[untouched]!, ...first! }, ...rest);
+    } else {
+      const ahead = (stages: readonly string[]) => board.findIndex((column) => stages.includes(column.stage));
+      const at = made.place === "before_work" && ahead(["in_progress"]) >= 0 ? ahead(["in_progress"]) : ahead(["review", "done"]);
+      board.splice(at < 0 ? board.length : at, 0, ...fresh);
+    }
+    // Saved twice: a column can name the one after it only once that one has its id.
+    const placed = boardColumns.save(this.db, projectId, board);
+    const handsOn = (column: BoardColumn, index: number) => fresh.some((each) => each.jobButtonId === column.jobButtonId) && ["in_progress", "review"].includes(placed[index + 1]?.stage ?? "");
+    const saved = boardColumns.save(
+      this.db,
+      projectId,
+      placed.map((column, index) => (handsOn(column, index) ? { ...column, nextColumnId: placed[index + 1]!.id } : column)),
+    );
+    this.invalidate(["board", "projects", "tasks"]);
+    return saved;
+  }
+
   private async start(taskId: string, columnId: string): Promise<void> {
     const column = boardColumns.get(this.db, columnId);
     const task = tasks.get(this.db, taskId);
-    if (!task || !column?.jobButtonId) return;
+    if (!task || !column?.jobButtonId || !column.jobEnabled) return;
     const button = projects.get(this.db, column.projectId)?.settings.taskButtons?.find((each) => each.id === column.jobButtonId);
     if (!button) return;
     const next = column.nextColumnId ? boardColumns.get(this.db, column.nextColumnId) : null;

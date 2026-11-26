@@ -118,3 +118,49 @@
 .schedule-delete:is(:hover, :focus-visible) {
   color: var(--bad);
 }
+
+/* Ready-made automations: cards of one size, set into the ground as the list's tile is. */
+.automation-heading {
+  margin: 24px 0 8px;
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 28px;
+}
+.automation-ready {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.automation-ready-card {
+  display: flex;
+  min-height: 124px;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  padding: 14px;
+  /* A key on the tile takes the plane's fill, as the wells in the list do. */
+  --control-fill: var(--surface);
+}
+.automation-ready-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  margin-bottom: 6px;
+}
+.automation-ready-name {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: 20px;
+}
+.automation-ready-what {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: 19px;
+}
+@media (max-width: 900px) {
+  .automation-ready {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

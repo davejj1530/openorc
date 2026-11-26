@@ -80,3 +80,4 @@ export * from "./cloud-moves.js";
 export * from "./hosted-models.js";
 export * from "./this-computer.js";
 export * from "./hosted-terminals.js";
+export * from "./ready-made.js";

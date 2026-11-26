@@ -66,6 +66,7 @@ beforeEach(() => {
       ] as never;
     if (method === "spaces.projects") return spaceNavigation.getState().inventory.find((space) => space.id === ("spaceId" in _input ? _input.spaceId : undefined))?.projects as never;
     if (method === "schedules.list") return [...(schedule ? [schedule] : []), ...paused] as never;
+    if (method === "board.jobs") return [];
     if (method === "agents.models") return [];
     if (method === "system.info") return { harnesses: [{ id: "codex", state: "ready", path: "/bin/codex", version: "1", revision: 1 }] } as never;
     if (method === "app.settings.get") return { defaultPermissionMode: "trusted" } as never;
@@ -121,7 +122,7 @@ it("keeps active and paused schedules on separate tabs", async () => {
   expect(screen.getAllByText("Paused")).toHaveLength(2);
   paused = [];
   await queryClient.invalidateQueries({ queryKey: ["schedules.list", {}] });
-  await screen.findByText("No paused schedules");
+  await screen.findByText("No paused automations");
 });
 
 it("says the last run as a dot and a word, and opens the thread a failed run left", async () => {

@@ -277,6 +277,45 @@ describe("core", () => {
     });
   });
 
+  it("adds ready-made board automations in their places, whichever comes first", async () => {
+    const p = await call("projects.import", { rootPath: root });
+    const plain = [
+      { name: "Backlog", stage: "backlog" as const },
+      { name: "In progress", stage: "in_progress" as const },
+      { name: "Review", stage: "review" as const },
+      { name: "Done", stage: "done" as const },
+    ];
+    for (const order of [
+      ["plan_first", "build_review"],
+      ["build_review", "plan_first"],
+    ]) {
+      await call("board.saveColumns", { projectId: p.id, columns: plain });
+      for (const id of order) await call("board.addReadyMade", { projectId: p.id, id });
+      const board = await call("board.columns", { projectId: p.id });
+      expect(board.map((column) => column.name)).toEqual(["Backlog", "Plan", "Build", "Code review", "Review", "Done"]);
+      // Each added column hands its cards to the one after it.
+      expect(board.slice(1, 4).map((column) => board.find((next) => next.id === column.nextColumnId)?.name)).toEqual(["Build", "Code review", "Review"]);
+      // Adding one the board already has changes nothing.
+      expect(await call("board.addReadyMade", { projectId: p.id, id: order[0]! })).toEqual(board);
+    }
+    expect((await call("board.jobs", { projectId: p.id })).map((job) => [job.column.name, job.label])).toEqual([
+      ["Plan", "Plan"],
+      ["Build", "Build"],
+      ["Code review", "Code review"],
+    ]);
+    const review = (await call("board.columns", { projectId: p.id })).find((column) => column.name === "Code review")!;
+    await call("board.switchJob", { columnId: review.id, enabled: false });
+    const pressed = vi.spyOn(core.threads, "runTaskButton").mockResolvedValue({ threadId: "job-thread" });
+    try {
+      const task = await call("tasks.create", { projectId: p.id, title: "A quiet card", useWorktree: false });
+      await call("tasks.update", { id: task.id, patch: { columnId: review.id } });
+      await new Promise((done) => setTimeout(done, 30));
+      expect(pressed).not.toHaveBeenCalled();
+    } finally {
+      pressed.mockRestore();
+    }
+  });
+
   it("announces readiness with the MCP port", () => {
     const ready = pushed.find((m) => m.type === "ready");
     expect(ready && ready.type === "ready" && ready.mcpPort).toBeGreaterThan(0);

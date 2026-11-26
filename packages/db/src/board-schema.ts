@@ -20,3 +20,6 @@ export const boardColumnJobsMigration = `
 ALTER TABLE board_columns ADD COLUMN job_button_id TEXT;
 ALTER TABLE board_columns ADD COLUMN next_column_id TEXT REFERENCES board_columns(id) ON DELETE SET NULL;
 `;
+
+/** A column's job can be switched off without forgetting it. */
+export const boardColumnJobSwitchMigration = `ALTER TABLE board_columns ADD COLUMN job_enabled INTEGER NOT NULL DEFAULT 1 CHECK (job_enabled IN (0, 1));`;

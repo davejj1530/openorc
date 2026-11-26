@@ -801,7 +801,7 @@ export class OpenOrc {
       createInstructionsHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
       createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate, claudeSessions: this.claudeAccounts }),
       createSchedulesHandlers({ schedules: this.schedules }),
-      createBoardHandlers({ db: this.db, invalidate, reports: this.taskReports }),
+      createBoardHandlers({ db: this.db, invalidate, reports: this.taskReports, jobs: this.boardJobs }),
       createCatalogHandlers({ runService: this.runs, invalidate }),
       createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files }),
       createOrclingHandlers({ orclings: this.orclings, threads: this.threads, db: this.db, ledger: this.ledger }),

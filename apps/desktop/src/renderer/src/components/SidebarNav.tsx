@@ -33,7 +33,7 @@ function NavRow({ icon, label, count = 0, lead, current, onClick }: NavRowProps)
 }
 
 /**
- * New thread first, lit while its screen is open, then the app's screens by name: Tasks, Pull requests and Schedules.
+ * New thread first, lit while its screen is open, then the app's screens by name: Tasks, Pull requests and Automations.
  * A count shows only where something waits on the person; what a thread waits for shows on its own row and its
  * project's label.
  */

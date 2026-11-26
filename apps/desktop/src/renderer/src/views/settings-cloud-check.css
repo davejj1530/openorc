@@ -10,7 +10,7 @@
   gap: 10px;
   min-height: 30px;
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink-3);
   transition: color var(--duration-arrive) var(--ease-out);
 }
@@ -37,7 +37,7 @@
 }
 .cloud-check-error {
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--bad);
   white-space: pre-wrap;
   overflow-wrap: anywhere;

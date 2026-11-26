@@ -1,5 +1,6 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal as Xterm } from "@xterm/xterm";
+import { terminalFontSize, useTextSize } from "../lib/text-size";
 import { terminalTheme } from "./terminal-theme";
 
 /** The mode the theme store stamped on the document, read the way DiffView reads it. */
@@ -24,7 +25,7 @@ export function openXterm(element: HTMLElement): { term: Xterm; fit: FitAddon } 
     cursorBlink: true,
     // The selected face is applied after loading, so xterm never caches its fallback's metrics.
     fontFamily: "monospace",
-    fontSize: 14,
+    fontSize: terminalFontSize[useTextSize.getState().size],
     lineHeight: 1.35,
     macOptionIsMeta: true,
     // The ring in main is the replay after a re-attach; this is only what the

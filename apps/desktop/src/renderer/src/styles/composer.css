@@ -74,7 +74,7 @@
   padding: 0;
   font: inherit;
   font-size: var(--text-md);
-  line-height: 23px;
+  line-height: var(--leading-23);
   letter-spacing: var(--text-md--letter-spacing);
   white-space: pre-wrap;
   overflow-wrap: break-word;
@@ -119,11 +119,11 @@
 .composer-sent-ghost {
   grid-area: 1 / 1;
   z-index: 2;
-  max-height: 69px;
+  max-height: calc(3 * var(--leading-23));
   overflow: hidden;
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 23px;
+  line-height: var(--leading-23);
   letter-spacing: var(--text-md--letter-spacing);
   white-space: pre-wrap;
   overflow-wrap: break-word;
@@ -369,7 +369,7 @@
   min-width: 28px;
   color: var(--ink-3);
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: var(--leading-18);
   font-variant-numeric: tabular-nums;
 }
 .composer-dictate-key > [data-layer] {
@@ -400,7 +400,7 @@
 }
 .composer-dictate-title {
   font-size: var(--text-base);
-  line-height: 23px;
+  line-height: var(--leading-23);
 }
 .composer-dictate-row {
   display: flex;
@@ -605,14 +605,14 @@
   background: var(--float-fill);
   color: var(--ink);
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
 }
 .composer-context-amount {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 27px;
-  line-height: 37px;
+  font-size: var(--text-display);
+  line-height: var(--leading-37);
   letter-spacing: -0.025em;
 }
 .composer-context-ring-wrap {
@@ -674,7 +674,7 @@
   background-color: var(--accent);
   color: var(--accent-fg);
   font-size: var(--text-md);
-  line-height: 23px;
+  line-height: var(--leading-23);
   letter-spacing: var(--text-md--letter-spacing);
   white-space: nowrap;
   transition:
@@ -866,7 +866,7 @@
   gap: 2px;
   min-width: 0;
   font-size: var(--text-md);
-  line-height: 23px;
+  line-height: var(--leading-23);
 }
 .composer-file-name {
   overflow: hidden;
@@ -876,7 +876,7 @@
 .composer-file-size {
   color: var(--ink-3);
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: var(--leading-18);
 }
 .composer-remove-image {
   position: absolute;
@@ -927,13 +927,13 @@
 }
 /* The whole passage, where the chip cut it short: as much as fits, then it scrolls. */
 .quote-note-passage {
-  max-height: 138px;
+  max-height: calc(6 * var(--leading-23));
   overflow-y: auto;
   padding-left: 10px;
   border-left: var(--hairline) solid var(--line-strong);
   color: var(--ink-2);
   font-size: var(--text-base);
-  line-height: 23px;
+  line-height: var(--leading-23);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -953,7 +953,7 @@
   background: linear-gradient(var(--surface-2), var(--surface-2)), var(--composer-input);
   color: var(--ink);
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   pointer-events: none;
   animation: composer-drop-arrive var(--duration-arrive) var(--ease-out);
 }
@@ -992,7 +992,7 @@
   border-radius: var(--radius-lg);
   color: var(--ink-3);
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   letter-spacing: var(--text-base--letter-spacing);
   text-align: left;
   transition: background-color var(--duration-quick) var(--ease-out);
@@ -1356,7 +1356,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
 }
 .model-picker-row-meta {
   flex: 0 1 auto;
@@ -1751,7 +1751,7 @@
   min-width: 0;
   border-radius: var(--radius-sm);
   font-size: var(--text-md);
-  line-height: 23px;
+  line-height: var(--leading-23);
   letter-spacing: var(--text-md--letter-spacing);
   color: var(--ink);
   overflow-wrap: anywhere;
@@ -1795,7 +1795,7 @@
   padding: 6px 8px;
   border-radius: var(--radius-lg);
   font-size: var(--text-base);
-  line-height: 23px;
+  line-height: var(--leading-23);
   color: var(--ink);
   text-align: left;
   overflow-wrap: anywhere;
@@ -1883,7 +1883,7 @@
   padding: 6px 8px 6px 30px;
   border-radius: var(--radius-lg);
   font-size: var(--text-base);
-  line-height: 23px;
+  line-height: var(--leading-23);
   text-align: left;
   transition: background-color var(--duration-quick) var(--ease-out);
 }
@@ -1915,7 +1915,7 @@
   background-color: var(--control-fill);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  line-height: 21px;
+  line-height: var(--leading-21);
   color: var(--ink);
   white-space: pre-wrap;
   overflow-wrap: anywhere;

@@ -157,7 +157,7 @@
   max-width: 70%;
   color: var(--ink);
   font-size: var(--text-base);
-  line-height: 21px;
+  line-height: var(--leading-21);
 }
 .skill-row-line {
   flex: 1;
@@ -278,7 +278,7 @@
 .skill-head-name h2 {
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 23px;
+  line-height: var(--leading-23);
   letter-spacing: var(--text-md--letter-spacing);
 }
 .skill-call-text {
@@ -292,7 +292,7 @@
   gap: 6px 28px;
   color: var(--ink);
   font-size: var(--text-sm);
-  line-height: 21px;
+  line-height: var(--leading-21);
 }
 .skill-facts > div {
   min-width: 0;
@@ -301,7 +301,7 @@
 .skill-facts dt {
   color: var(--ink-3);
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: var(--leading-18);
 }
 .skill-facts dd {
   overflow: hidden;
@@ -314,7 +314,7 @@
 .skill-description {
   color: var(--ink-2);
   font-size: var(--text-sm);
-  line-height: 21px;
+  line-height: var(--leading-21);
 }
 
 /* The file: the rest of the pane under a hairline, never a card of its own; its editor paints the ground. */

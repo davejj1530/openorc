@@ -8,7 +8,7 @@
   padding: 0 14px;
   container-type: inline-size;
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   letter-spacing: var(--text-base--letter-spacing);
 }
 

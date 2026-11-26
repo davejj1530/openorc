@@ -12,7 +12,7 @@
   display: grid;
   gap: 5px;
   font-size: var(--text-sm);
-  line-height: 16px;
+  line-height: var(--leading-16);
   color: var(--ink-3);
 }
 .composer-file-progress-image {
@@ -20,7 +20,7 @@
   gap: 4px;
   text-align: center;
   font-size: var(--text-xs);
-  line-height: 23px;
+  line-height: var(--leading-23);
 }
 .composer-file-progress-track {
   display: block;
@@ -38,5 +38,5 @@
   margin: 0;
   color: var(--bad);
   font-size: var(--text-sm);
-  line-height: 21px;
+  line-height: var(--leading-21);
 }

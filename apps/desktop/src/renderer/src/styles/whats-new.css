@@ -28,7 +28,7 @@
   padding: 18px 20px 0;
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 23px;
+  line-height: var(--leading-23);
   letter-spacing: var(--text-md--letter-spacing);
 }
 .whats-new-line {
@@ -36,7 +36,7 @@
   padding: 4px 20px 0;
   color: var(--ink-3);
   font-size: var(--text-base);
-  line-height: 23px;
+  line-height: var(--leading-23);
 }
 .whats-new-foot {
   display: flex;

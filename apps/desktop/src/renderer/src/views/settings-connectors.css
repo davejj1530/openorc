@@ -48,7 +48,7 @@
 .connector-card-title {
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 23px;
+  line-height: var(--leading-23);
 }
 .connector-card-origin {
   color: var(--ink-3);

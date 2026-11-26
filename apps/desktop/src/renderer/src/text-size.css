@@ -1,0 +1,50 @@
+/*
+ * Small text, picked in Settings > Appearance. lib/text-size.ts puts the choice on <html> as data-text-size. Small is
+ * the scale the app had before the type grew: each size and leading step from app.css, two to three pixels down.
+ * Spacing and control heights stay as they are.
+ */
+:root[data-text-size="small"] {
+  --text-xs: 12.5px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 16px;
+  --text-base: 14px;
+  --text-base--line-height: 20px;
+  --text-md: 15px;
+  --text-md--line-height: 24px;
+  --text-header: 15px;
+  --text-header--line-height: 20px;
+  --text-prose: 15px;
+  --text-prose--line-height: 24px;
+  --text-lg: 16px;
+  --text-lg--line-height: 22px;
+  --text-xl: 18px;
+  --text-xl--line-height: 24px;
+  --text-title-sm: 22px;
+  --text-title-sm--line-height: 28px;
+  --text-title: 28px;
+  --text-title--line-height: 34px;
+  --text-display: 24px;
+  --text-display--line-height: 30px;
+  --text-stat: 18px;
+  --text-stat--line-height: 22px;
+  --text-stat-sm: 16px;
+  --text-stat-sm--line-height: 20px;
+  --text-2xl: 22px;
+  --text-2xl--line-height: 28px;
+  --text-3xl: 28px;
+  --text-3xl--line-height: 34px;
+  --leading-16: 14px;
+  --leading-18: 16px;
+  --leading-21: 18px;
+  --leading-22: 19px;
+  --leading-23: 20px;
+  --leading-24: 21px;
+  --leading-25: 22px;
+  --leading-27: 24px;
+  --leading-30: 26px;
+  --leading-32: 28px;
+  --leading-34: 30px;
+  --leading-37: 32px;
+  --leading-39: 34px;
+}

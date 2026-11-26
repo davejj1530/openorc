@@ -5,6 +5,7 @@ import { platform } from "./this-computer";
 export const appFonts = [
   { id: "immaculate-gothic", name: "Immaculate Gothic" },
   { id: "inter", name: "Inter" },
+  { id: "inter-display", name: "Inter Display" },
   { id: "geist", name: "Geist" },
   { id: "pp-neue-montreal", name: "PP Neue Montreal" },
   { id: "system", name: "System" },

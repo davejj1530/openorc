@@ -4,6 +4,7 @@
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/geist";
 @import "./fonts.css";
+@import "./text-size.css";
 @import "./code-fonts.css";
 @import "./rich-text.css";
 @import "./appearance.css";
@@ -243,10 +244,10 @@
 @theme static {
   /* Keep font-mono utilities linked to the runtime code-font preference. */
   --font-mono: "JetBrains Mono Variable", "SF Mono", Menlo, Consolas, monospace;
-  /* Type. Quiet lines (times, second lines, meta) and code are 14px; section labels, counts and
-     small controls 15; rows and labels 16; writing, reading text and a column's title in its header 17,
-     writing and reading on a 27px line. Headings are 18, 25 and 32px. Hierarchy comes from size and gray, never weight. Single-line rows
-     set their own 18px leading. */
+  /* Type, at the Default text size; text-size.css holds Small. Quiet lines (times, second lines, meta) and code are
+     14px; section labels, counts and small controls 15; rows and labels 16; writing, reading text and a column's title
+     in its header 17, writing and reading on a 27px line. Headings are 18, 25 and 32px. Hierarchy comes from size and
+     gray, never weight. Single-line rows set their own 18px leading. */
   --text-xs: 14px;
   --text-xs--line-height: 18px;
   --text-xs--letter-spacing: 0em;
@@ -279,6 +280,10 @@
   --text-title: 32px;
   --text-title--line-height: 39px;
   --text-title--letter-spacing: -0.02em;
+  /* A name heading a profile or a person's page, and the context's amount. */
+  --text-display: 27px;
+  --text-display--line-height: 34px;
+  --text-display--letter-spacing: -0.02em;
   /* Numerals for usage and meters. Pair with .tabular. */
   --text-stat: 21px;
   --text-stat--line-height: 25px;
@@ -291,6 +296,21 @@
   --text-2xl--line-height: 32px;
   --text-3xl: 32px;
   --text-3xl--line-height: 39px;
+  /* Leading. A rule that sets its own line height reads one of these steps, named for its size at the Default text
+     size, so Small can move it with the type. */
+  --leading-16: 16px;
+  --leading-18: 18px;
+  --leading-21: 21px;
+  --leading-22: 22px;
+  --leading-23: 23px;
+  --leading-24: 24px;
+  --leading-25: 25px;
+  --leading-27: 27px;
+  --leading-30: 30px;
+  --leading-32: 32px;
+  --leading-34: 34px;
+  --leading-37: 37px;
+  --leading-39: 39px;
 
   /* One weight for the interface, in every font. medium and semibold stay as names so a
      stray utility (Streamdown ships some) cannot reintroduce a heavier face. Bold is for
@@ -1021,7 +1041,7 @@ span.property-chip {
   background: transparent;
   padding: 8px 0;
   font-size: var(--text-prose);
-  line-height: 30px;
+  line-height: var(--leading-30);
   overflow-wrap: anywhere;
 }
 .document-description::placeholder {
@@ -1161,7 +1181,7 @@ span.property-chip {
   margin-bottom: 28px;
   color: var(--ink-4);
   font-size: var(--text-md);
-  line-height: 23px;
+  line-height: var(--leading-23);
   letter-spacing: var(--text-md--letter-spacing);
 }
 /* The section's name in the top bar, set like every screen's title there. */
@@ -1229,7 +1249,7 @@ span.property-chip {
 .settings-section-intro h2 {
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 23px;
+  line-height: var(--leading-23);
   letter-spacing: var(--text-md--letter-spacing);
 }
 .settings-section-intro p {
@@ -1237,7 +1257,7 @@ span.property-chip {
   margin-top: 2px;
   color: var(--ink-4);
   font-size: var(--text-sm);
-  line-height: 21px;
+  line-height: var(--leading-21);
 }
 .settings-section-body {
   min-width: 0;

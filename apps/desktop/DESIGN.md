@@ -45,44 +45,44 @@ colors:
 typography:
   interface:
     fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "14px"
+    fontSize: "16px"
     fontWeight: 400
-    lineHeight: "20px"
+    lineHeight: "23px"
     letterSpacing: "-0.005em"
   label:
     fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "13px"
-    fontWeight: 400
-    lineHeight: "16px"
-  body:
-    fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "15px"
     fontWeight: 400
-    lineHeight: "24px"
+    lineHeight: "18px"
+  body:
+    fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: "17px"
+    fontWeight: 400
+    lineHeight: "27px"
     letterSpacing: "-0.005em"
   heading:
     fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "16px"
+    fontSize: "18px"
     fontWeight: 400
-    lineHeight: "22px"
+    lineHeight: "25px"
     letterSpacing: "-0.01em"
   title-sm:
     fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "22px"
+    fontSize: "25px"
     fontWeight: 400
-    lineHeight: "28px"
+    lineHeight: "32px"
     letterSpacing: "-0.015em"
   title:
     fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "28px"
+    fontSize: "32px"
     fontWeight: 400
-    lineHeight: "34px"
+    lineHeight: "39px"
     letterSpacing: "-0.02em"
   stat:
     fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "18px"
+    fontSize: "21px"
     fontWeight: 400
-    lineHeight: "22px"
+    lineHeight: "25px"
   code:
     fontFamily: '"JetBrains Mono Variable", "SF Mono", Menlo, Consolas, monospace'
 rounded:
@@ -216,15 +216,17 @@ Appearance mode and palette selection stay independent. OpenOrc has the values a
 
 ## Typography
 
-The interface starts in the system font on a Mac and in Immaculate Gothic, in its Text 450 face, on Windows and Linux. Settings > Appearance can switch to Inter, Geist, or the system font; `fonts.css` maps the choice. Code has its own picker: JetBrains Mono Variable by default, Geist Mono Variable, or the system monospace, applied through the runtime `--font-mono` token to code blocks, editors, diffs, and open terminals.
+The interface starts in the system font on a Mac and in Immaculate Gothic, in its Text 450 face, on Windows and Linux. Settings > Appearance picks it from a list: Immaculate Gothic, Inter, Inter Display, Geist, PP Neue Montreal, or the system font; `fonts.css` maps the choice. Code has its own picker: JetBrains Mono Variable by default, Geist Mono Variable, or the system monospace, applied through the runtime `--font-mono` token to code blocks, editors, diffs, and open terminals.
 
-The interface uses one weight: `--font-weight-medium` and `--font-weight-semibold` are both 400. Bold survives only for author emphasis inside content (replies, task documents, comments). UI text is 12.5, 13, 14 or 15px; there is no 11px or 10px text. The scale, with its tracking, lives in `@theme static`:
+The interface uses one weight: `--font-weight-medium` and `--font-weight-semibold` are both 400. Bold survives only for author emphasis inside content (replies, task documents, comments). UI text is 14, 15, 16 or 17px; there is no 12px or smaller reading text. The scale, with its tracking, lives in `@theme static`:
 
-- `xs` 12.5/16 for quiet lines (times, second lines, meta) and code, `sm` 13/16 for section labels, counts and small controls, `base` 14/20 for rows and labels, `md` 15/24 for writing, `header` 15/20 for a column's title in its header, `prose` 15/24 for reading, `lg` 16/22.
-- `title-sm` 22/28 for document and page titles, `title` 28/34 for the New thread question and settings page titles.
-- `stat` 18/22 and `stat-sm` 16/20 for numerals, always tabular.
+- `xs` 14/18 for quiet lines (times, second lines, meta) and code, `sm` 15/18 for section labels, counts and small controls, `base` 16/23 for rows and labels, `md` 17/27 for writing, `header` 17/23 for a column's title in its header, `prose` 17/27 for reading, `lg` 18/25.
+- `title-sm` 25/32 for document and page titles, `title` 32/39 for the New thread question and settings page titles, `display` 27/34 for the name heading a profile or a person's page.
+- `stat` 21/25 and `stat-sm` 18/23 for numerals, always tabular.
 
-Replies and prompts are 15/24; code is 12.5/20. Single-line rows use 16px leading. Long prose wraps; code and tables scroll in their own blocks. A table is no piece: it sits on the ground as hairlines under quiet heads, with no fill.
+Replies and prompts are 17/27; code is 14. Single-line rows use 18px leading. A rule that sets its own line height reads a `--leading-*` step, named for its Default size, never a px value.
+
+Settings > Appearance also sets the text size. Default is the scale above. Small, in `text-size.css`, is the scale before it grew: each size and leading step two to three pixels down (`xs` 12.5/16, `base` 14/20, `prose` 15/24, `title` 28/34), with spacing and control heights unchanged. Terminals follow it at 12px for Small and 14px for Default. Long prose wraps; code and tables scroll in their own blocks. A table is no piece: it sits on the ground as hairlines under quiet heads, with no fill.
 
 ## Layout
 

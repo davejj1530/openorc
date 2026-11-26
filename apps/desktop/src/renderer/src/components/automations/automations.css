@@ -44,7 +44,7 @@
 .automation-form-hint {
   color: var(--ink-4);
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: var(--leading-18);
 }
 .automation-step {
   display: flex;
@@ -165,7 +165,7 @@
   padding: 6px 10px 2px;
   color: var(--ink-3);
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: var(--leading-18);
 }
 .automations-menu-line {
   display: flex;
@@ -202,7 +202,7 @@
   -webkit-line-clamp: 2;
   color: var(--ink-3);
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: var(--leading-18);
 }
 button.automations-menu-words:hover .automations-menu-name {
   text-decoration: underline;

@@ -25,7 +25,7 @@
 .usage-table thead th {
   height: 30px;
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink-4);
 }
 .usage-table-amount {
@@ -65,13 +65,13 @@
   flex-direction: column;
   min-width: 0;
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink);
 }
 .usage-table-plan {
   overflow: hidden;
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink-4);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -95,13 +95,13 @@
 }
 .usage-table-value {
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink);
 }
 .usage-table-reset {
   overflow: hidden;
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink-4);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -111,13 +111,13 @@
 }
 .usage-table-cell[data-empty] {
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink-4);
 }
 .usage-table-note {
   padding: 12px 10px;
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink-4);
 }
 /* Under the table: the way to Usage in Settings and, at the row's end, what the open conversation has cost. */
@@ -132,7 +132,7 @@
   padding: 0 10px;
   border-radius: var(--radius-md);
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink-3);
   transition:
     background-color var(--duration-quick) var(--ease-out),
@@ -147,7 +147,7 @@
   gap: 8px;
   padding: 0 10px;
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink-4);
   white-space: nowrap;
 }

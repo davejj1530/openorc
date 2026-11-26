@@ -34,7 +34,7 @@
 }
 .organization-frozen h1 {
   font-size: var(--text-title);
-  line-height: 39px;
+  line-height: var(--leading-39);
   overflow-wrap: anywhere;
 }
 .organization-frozen p {

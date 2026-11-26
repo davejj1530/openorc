@@ -6,7 +6,7 @@
   align-items: center;
   gap: 5px;
   font-size: var(--text-xs);
-  line-height: 21px;
+  line-height: var(--leading-21);
   letter-spacing: normal;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;

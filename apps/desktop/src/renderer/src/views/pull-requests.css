@@ -178,13 +178,13 @@
 }
 .pull-edited {
   flex-shrink: 0;
-  height: 23px;
+  height: var(--leading-23);
   padding: 0 8px;
   border-radius: var(--radius-pill);
   background: var(--navigation-soft);
   color: var(--navigation-ink);
   font-size: var(--text-xs);
-  line-height: 23px;
+  line-height: var(--leading-23);
 }
 .pull-view-menu {
   min-width: 248px;
@@ -392,7 +392,7 @@
   background: var(--surface-2);
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
-  line-height: 18px;
+  line-height: var(--leading-18);
   text-align: center;
 }
 @media (prefers-reduced-motion: reduce) {

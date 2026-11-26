@@ -1,22 +1,28 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { AppearanceSettings } from "./settings-appearance";
 
 vi.mock("../lib/color", () => ({ toHex: (color: string) => color }));
 afterEach(cleanup);
 
-it("sets each font choice in its own face and applies the one picked", () => {
+it("picks the interface font from a list and applies it", () => {
   render(<AppearanceSettings />);
-  const choices = within(screen.getByRole("group", { name: "Font" })).getAllByRole("button");
-  expect(choices.map((choice) => [choice.textContent, choice.dataset.font, choice.getAttribute("aria-pressed")])).toEqual([
-    ["Immaculate Gothic", "immaculate-gothic", "false"],
-    ["Inter", "inter", "false"],
-    ["Geist", "geist", "false"],
-    ["PP Neue Montreal", "pp-neue-montreal", "false"],
-    ["System", "system", "true"],
-  ]);
-  fireEvent.click(screen.getByRole("button", { name: "Inter" }));
-  expect(document.documentElement.dataset.font).toBe("inter");
-  expect(screen.getByRole("button", { name: "Inter" }).getAttribute("aria-pressed")).toBe("true");
+  const font = screen.getByRole<HTMLSelectElement>("combobox", { name: "Font" });
+  expect([...font.options].map((option) => option.textContent)).toEqual(["Immaculate Gothic", "Inter", "Inter Display", "Geist", "PP Neue Montreal", "System"]);
+  expect(font.value).toBe("system");
+  fireEvent.change(font, { target: { value: "inter-display" } });
+  expect(document.documentElement.dataset.font).toBe("inter-display");
+  expect(font.value).toBe("inter-display");
   expect(screen.getByRole("status").textContent).toBe("Appearance saved");
+});
+
+it("sets the text size, Default unless Small is picked", () => {
+  render(<AppearanceSettings />);
+  const size = screen.getByRole<HTMLSelectElement>("combobox", { name: "Text size" });
+  expect([...size.options].map((option) => option.textContent)).toEqual(["Small", "Default"]);
+  expect(size.value).toBe("default");
+  expect(document.documentElement.dataset.textSize).toBe("default");
+  fireEvent.change(size, { target: { value: "small" } });
+  expect(document.documentElement.dataset.textSize).toBe("small");
+  expect(localStorage.getItem("openorc.text-size")).toBe("small");
 });

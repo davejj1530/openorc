@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Monitor, Moon, Sun } from "../components/icons";
-import { Button } from "../components/ui";
+import { Button, Select } from "../components/ui";
 import { cn } from "../lib/cn";
 import { toHex } from "../lib/color";
 import { useTheme, type ThemeChoice } from "../lib/theme";
@@ -12,7 +12,8 @@ import { MascotStill } from "../components/MascotStill";
 import { ColorRow } from "../components/ColorRow";
 import { AccentSettings } from "./settings-accents";
 import { BackdropSettings } from "./settings-backdrop";
-import { appFonts, useAppFont } from "../lib/app-font";
+import { appFonts, parseFont, useAppFont } from "../lib/app-font";
+import { parseTextSize, textSizes, useTextSize } from "../lib/text-size";
 import { CodeFontSettings } from "./settings-code-font";
 
 const modes = [
@@ -60,15 +61,27 @@ export function AppearanceSettings() {
 
 function FontSettings({ report }: { report: Report }) {
   const { font, setFont } = useAppFont();
+  const { size, setSize } = useTextSize();
   return (
-    <Section flush title="Font" description="The typeface across the app. Code stays monospaced.">
-      <div className="appearance-modes font-choices" role="group" aria-label="Font">
-        {appFonts.map(({ id, name }) => (
-          <button key={id} type="button" data-font={id} aria-pressed={font === id} onClick={() => report(setFont(id))}>
-            <span>{name}</span>
-          </button>
-        ))}
-      </div>
+    <Section title="Font" description="The typeface and text size across the app. Code stays monospaced.">
+      <Field label="Typeface">
+        <Select aria-label="Font" value={font} onChange={(event) => report(setFont(parseFont(event.target.value)))}>
+          {appFonts.map(({ id, name }) => (
+            <option key={id} value={id}>
+              {name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Text size">
+        <Select aria-label="Text size" value={size} onChange={(event) => report(setSize(parseTextSize(event.target.value)))}>
+          {textSizes.map(({ id, name }) => (
+            <option key={id} value={id}>
+              {name}
+            </option>
+          ))}
+        </Select>
+      </Field>
     </Section>
   );
 }

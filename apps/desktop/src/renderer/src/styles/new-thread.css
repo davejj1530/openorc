@@ -124,7 +124,7 @@
 .composer-new-thread .composer-placeholder,
 .composer-new-thread .composer-sent-ghost {
   font-size: var(--text-md);
-  line-height: 27px;
+  line-height: var(--leading-27);
   letter-spacing: -0.01em;
 }
 .composer-new-thread .composer-input {

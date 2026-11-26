@@ -68,7 +68,7 @@
      the facts sit close to the title. */
   margin: 0 -4px 0 -8px;
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   letter-spacing: var(--text-base--letter-spacing);
 }
 .thread-rail-title :is(button, input) {
@@ -99,7 +99,7 @@
   min-width: 0;
   overflow: hidden;
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink-4);
   white-space: nowrap;
 }

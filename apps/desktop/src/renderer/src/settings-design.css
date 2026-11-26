@@ -16,15 +16,15 @@
   overflow-wrap: anywhere;
 }
 .settings-profile-identity h2 {
-  font-size: 27px;
-  line-height: 34px;
-  letter-spacing: -0.02em;
+  font-size: var(--text-display);
+  line-height: var(--text-display--line-height);
+  letter-spacing: var(--text-display--letter-spacing);
 }
 .settings-profile-identity p {
   margin-top: 3px;
   color: var(--ink-4);
   font-size: var(--text-sm);
-  line-height: 22px;
+  line-height: var(--leading-22);
 }
 .profile-dialog-face {
   width: 48px;
@@ -130,7 +130,7 @@
 .usage-account-identity h2 {
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 23px;
+  line-height: var(--leading-23);
   letter-spacing: var(--text-md--letter-spacing);
 }
 .usage-account-identity p {
@@ -173,7 +173,7 @@
   mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
   color: var(--ink-2);
   font-size: var(--text-sm);
-  line-height: 21px;
+  line-height: var(--leading-21);
 }
 .usage-account-details[hidden] {
   display: none;
@@ -253,7 +253,7 @@
 .usage-window-value[data-empty] {
   color: var(--ink-3);
   font-size: var(--text-base);
-  line-height: 25px;
+  line-height: var(--leading-25);
 }
 .usage-credit strong {
   color: var(--ink);
@@ -378,7 +378,7 @@
   overflow: hidden;
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 23px;
+  line-height: var(--leading-23);
   letter-spacing: var(--text-md--letter-spacing);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -453,7 +453,7 @@
   gap: 6px;
   color: var(--ink);
   font-size: var(--text-md);
-  line-height: 23px;
+  line-height: var(--leading-23);
 }
 .settings-agent-chevron {
   flex-shrink: 0;
@@ -670,7 +670,7 @@
   list-style: decimal;
   color: var(--ink);
   font-size: var(--text-base);
-  line-height: 23px;
+  line-height: var(--leading-23);
 }
 .slack-guide li::marker {
   color: var(--ink-4);
@@ -679,7 +679,7 @@
   margin-top: 4px;
   color: var(--ink-3);
   font-size: var(--text-sm);
-  line-height: 21px;
+  line-height: var(--leading-21);
 }
 
 /* Phone access. The addresses open under the switch as a row of the card; a note under the switch

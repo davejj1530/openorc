@@ -9,7 +9,7 @@
   gap: 8px;
   color: var(--ink-2);
   font-size: var(--text-sm);
-  line-height: 21px;
+  line-height: var(--leading-21);
 }
 .organization-mark {
   display: inline-grid;
@@ -39,7 +39,7 @@
 .organization-error {
   color: var(--bad);
   font-size: var(--text-sm);
-  line-height: 22px;
+  line-height: var(--leading-22);
   overflow-wrap: anywhere;
 }
 .organization-connect-row {
@@ -67,7 +67,7 @@
   display: block;
   color: var(--ink-4);
   font-size: var(--text-xs);
-  line-height: 21px;
+  line-height: var(--leading-21);
   margin-top: 2px;
 }
 .organization-person-identity {
@@ -82,12 +82,12 @@
 .organization-person-identity p {
   color: var(--ink-4);
   font-size: var(--text-sm);
-  line-height: 23px;
+  line-height: var(--leading-23);
   margin-top: 3px;
 }
 .organization-membership-detail {
   color: var(--ink-2);
-  line-height: 24px;
+  line-height: var(--leading-24);
 }
 .organization-empty {
   display: flex;

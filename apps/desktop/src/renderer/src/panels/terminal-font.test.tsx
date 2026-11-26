@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useCodeFont } from "../lib/code-font";
+import { useTextSize } from "../lib/text-size";
 import { followTerminalFont } from "./terminal-font";
 
 const root = document.documentElement;
@@ -9,6 +10,7 @@ let stop = (): void => {};
 
 beforeEach(() => {
   useCodeFont.getState().setFont("jetbrains-mono");
+  useTextSize.getState().setSize("default");
   root.style.setProperty("--font-mono", '"JetBrains Mono Variable", monospace');
   load.mockReset().mockResolvedValue([]);
   Object.defineProperty(document, "fonts", { configurable: true, value: { load } });
@@ -23,10 +25,10 @@ afterEach(() => {
 it("loads the selected font before assigning it and measuring terminal cells", async () => {
   let ready = (): void => {};
   load.mockImplementationOnce(() => new Promise((resolve) => (ready = () => resolve([]))));
-  const term = { options: { fontFamily: "monospace", fontSize: 12 } };
+  const term = { options: { fontFamily: "monospace", fontSize: 14 } };
   const fit = vi.fn();
   stop = followTerminalFont(term, fit);
-  expect(load).toHaveBeenCalledWith('12px "JetBrains Mono Variable", monospace');
+  expect(load).toHaveBeenCalledWith('14px "JetBrains Mono Variable", monospace');
   expect(term.options.fontFamily).toBe("monospace");
   expect(fit).not.toHaveBeenCalled();
   ready();
@@ -38,7 +40,7 @@ it("loads the selected font before assigning it and measuring terminal cells", a
 it("ignores slow font loads after a newer choice or terminal disposal", async () => {
   const pending: (() => void)[] = [];
   load.mockImplementation(() => new Promise((resolve) => pending.push(() => resolve([]))));
-  const term = { options: { fontFamily: "monospace", fontSize: 12 } };
+  const term = { options: { fontFamily: "monospace", fontSize: 14 } };
   const fit = vi.fn();
   stop = followTerminalFont(term, fit);
   root.style.setProperty("--font-mono", '"Geist Mono Variable", monospace');
@@ -60,10 +62,22 @@ it("ignores slow font loads after a newer choice or terminal disposal", async ()
 
 it("still fits the fallback when the selected font fails to load", async () => {
   load.mockRejectedValueOnce(new Error("Font unavailable"));
-  const term = { options: { fontFamily: "monospace", fontSize: 12 } };
+  const term = { options: { fontFamily: "monospace", fontSize: 14 } };
   const fit = vi.fn();
   stop = followTerminalFont(term, fit);
   await Promise.resolve();
   expect(term.options.fontFamily).toBe('"JetBrains Mono Variable", monospace');
   expect(fit).toHaveBeenCalledOnce();
+});
+
+it("redraws the terminal at the Small text size's cells", async () => {
+  const term = { options: { fontFamily: "monospace", fontSize: 14 } };
+  const fit = vi.fn();
+  stop = followTerminalFont(term, fit);
+  await Promise.resolve();
+  useTextSize.getState().setSize("small");
+  await Promise.resolve();
+  expect(load).toHaveBeenLastCalledWith('12px "JetBrains Mono Variable", monospace');
+  expect(term.options.fontSize).toBe(12);
+  expect(fit).toHaveBeenCalledTimes(2);
 });

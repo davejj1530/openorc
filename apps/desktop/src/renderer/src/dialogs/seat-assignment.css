@@ -51,6 +51,6 @@
 .seat-person-held {
   flex: none;
   font-size: var(--text-sm);
-  line-height: 22px;
+  line-height: var(--leading-22);
   color: var(--ink-3);
 }

@@ -227,7 +227,7 @@
   margin-top: 6px;
   color: var(--bad);
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: var(--leading-18);
   overflow-wrap: anywhere;
 }
 .task-board-more {

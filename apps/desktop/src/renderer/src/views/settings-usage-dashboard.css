@@ -61,7 +61,7 @@
 .usage-dashboard-coverage {
   color: var(--ink-3);
   font-size: var(--text-xs);
-  line-height: 21px;
+  line-height: var(--leading-21);
   margin-top: 6px;
 }
 .usage-dashboard-coverage {
@@ -108,7 +108,7 @@
   gap: 7px;
   flex-wrap: wrap;
   font-size: var(--text-sm);
-  line-height: 23px;
+  line-height: var(--leading-23);
 }
 .usage-agent-name img {
   flex: none;
@@ -124,7 +124,7 @@
 }
 .usage-agent-value {
   font-size: var(--text-sm);
-  line-height: 23px;
+  line-height: var(--leading-23);
   white-space: nowrap;
 }
 .usage-dashboard :is(h2, th) {
@@ -132,7 +132,7 @@
 }
 .usage-dashboard h2 {
   font-size: var(--text-base);
-  line-height: 23px;
+  line-height: var(--leading-23);
 }
 .usage-chart {
   min-width: 0;
@@ -194,7 +194,7 @@
   border-radius: var(--radius-2xl);
   background: var(--bg);
   font-size: var(--text-xs);
-  line-height: 23px;
+  line-height: var(--leading-23);
 }
 .usage-chart-tooltip p {
   color: var(--ink-3);
@@ -227,12 +227,12 @@
 .usage-token-totals dt {
   color: var(--ink-3);
   font-size: var(--text-xs);
-  line-height: 21px;
+  line-height: var(--leading-21);
 }
 .usage-token-totals dd {
   color: var(--ink);
   font-size: var(--text-title-sm);
-  line-height: 32px;
+  line-height: var(--leading-32);
   margin-top: 4px;
 }
 .usage-token-composition {
@@ -328,7 +328,7 @@
 .usage-dashboard-footnote {
   margin-top: 28px;
   font-size: var(--text-xs);
-  line-height: 21px;
+  line-height: var(--leading-21);
   color: var(--ink-3);
 }
 @container (max-width: 760px) {

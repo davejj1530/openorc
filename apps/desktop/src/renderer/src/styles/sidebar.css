@@ -215,7 +215,7 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   padding: 0 8px;
   border-radius: var(--radius-md);
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink-3);
   text-align: left;
   transition:
@@ -258,7 +258,7 @@ button.sidebar-nav-row:active:not([aria-current="page"]) {
   min-width: 16px;
   margin-left: auto;
   font-size: var(--text-sm);
-  line-height: 18px;
+  line-height: var(--leading-18);
   text-align: center;
   color: var(--warn);
 }
@@ -274,13 +274,13 @@ button.sidebar-nav-row:active:not([aria-current="page"]) {
   align-items: center;
   gap: 18px 7px;
   min-width: 0;
-  height: 18px;
+  height: var(--leading-18);
   overflow: hidden;
   color: var(--ink);
   font-family: "Immaculate Gothic", var(--font-sans);
   font-size: var(--text-md);
   letter-spacing: -0.02em;
-  line-height: 18px;
+  line-height: var(--leading-18);
   white-space: nowrap;
 }
 
@@ -483,7 +483,7 @@ button.sidebar-nav-row:active:not([aria-current="page"]) {
   height: 22px;
   padding: 0 8px 2px;
   font-size: var(--text-xs);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink-4);
 }
 .sidebar-day-label::after {
@@ -623,7 +623,7 @@ button.sidebar-nav-row:active:not([aria-current="page"]) {
   flex: 1;
   min-width: 0;
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -719,7 +719,7 @@ button.sidebar-nav-row:active:not([aria-current="page"]) {
   padding: 0 8px 0 32px;
   border-radius: var(--radius-md);
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink-4);
   text-align: left;
 }
@@ -747,7 +747,7 @@ button.browser-empty:hover,
   border-radius: var(--radius-md);
   text-align: left;
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   transition: background-color var(--duration-leave) var(--ease-out);
 }
 .orcling-contact:hover {
@@ -818,7 +818,7 @@ button.browser-empty:hover,
   display: block;
   overflow: hidden;
   font-size: var(--text-xs);
-  line-height: 16px;
+  line-height: var(--leading-16);
   color: var(--ink-3);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -836,10 +836,10 @@ button.browser-empty:hover,
   display: flex;
   flex-wrap: wrap;
   column-gap: 0.25em;
-  height: 18px;
+  height: var(--leading-18);
   overflow: hidden;
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink);
 }
 .sidebar-account-name > :first-child {
@@ -862,7 +862,7 @@ button.browser-empty:hover,
 .sidebar-account.sidebar-sign-in {
   gap: 8px;
   font-size: var(--text-base);
-  line-height: 18px;
+  line-height: var(--leading-18);
   color: var(--ink-3);
 }
 .sidebar-account.sidebar-sign-in:hover {

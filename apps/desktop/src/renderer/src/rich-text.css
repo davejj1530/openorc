@@ -108,7 +108,7 @@
 }
 .prose-chat pre {
   font-size: var(--text-xs);
-  line-height: 23px;
+  line-height: var(--leading-23);
   tab-size: 2;
   margin: 0;
 }

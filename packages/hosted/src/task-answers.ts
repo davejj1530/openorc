@@ -12,7 +12,8 @@ export type WaitingTaskAnswer = z.infer<typeof WaitingTaskAnswer>;
 
 const ANSWER_ROUTES = {
   waiting: { method: "GET", path: "/task-answers", reply: z.array(WaitingTaskAnswer) } satisfies Route<WaitingTaskAnswer[]>,
-  delivered: (reportId: string): Route<unknown> => ({ method: "POST", path: `/task-answers/${encodeURIComponent(reportId)}/delivered`, reply: z.unknown() }),
+  // The server answers it with no body.
+  delivered: (reportId: string): Route<null> => ({ method: "POST", path: `/task-answers/${encodeURIComponent(reportId)}/delivered`, reply: null }),
 };
 
 type Dependencies = { session: Session; spaces: Pick<HostedSpaces, "status">; tasks: Pick<OnlineTasks, "state"> };

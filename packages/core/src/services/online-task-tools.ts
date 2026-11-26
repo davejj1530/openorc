@@ -12,6 +12,7 @@ const SAVED = "Saved to backlog. To work on it, open this task's cloud thread.";
 const START_IN_CLOUD = "Open this task's cloud thread to start it.";
 const READ_FIRST = "Read this task before changing it.";
 const READ_AGAIN = "This task changed. Read it again before changing it.";
+const NO_COLUMNS = "This project's board has no columns of its own. Set the task's status instead.";
 
 /**
  * The task tools of an agent on this Mac when it names an online task's space and project. Each call captures the run's
@@ -62,7 +63,10 @@ export class OnlineTaskTools {
     const seen = this.#seen.get(at.key);
     const ifRevision = input.ifRevision ?? seen?.get(id);
     if (ifRevision === undefined) throw new Error(READ_FIRST);
-    const patch = { ...(input.status ? { status: input.status } : {}), ...(input.spec !== undefined ? { spec: input.spec } : {}) };
+    // A column decides the status, so one sent beside it is left out.
+    const status = input.status ? { status: input.status } : {};
+    const place = input.column ? { columnId: await this.#column(at, input.column) } : status;
+    const patch = { ...place, ...(input.spec !== undefined ? { spec: input.spec } : {}) };
     const request = this.#request(at, ["update", id, ifRevision, patch]);
     const result = await at.tasks.editing({ spaceId: at.spaceId, id, ifRevision, requestId: request.id, patch });
     request.done();
@@ -85,6 +89,15 @@ export class OnlineTaskTools {
     return result.context ?? NO_CONTEXT;
   }
 
+  /** A column of the project's shared board, by its name with case and outer spaces aside. */
+  async #column(at: CapturedOnlineTaskScope, name: string): Promise<string> {
+    const { columns } = await at.tasks.board({ spaceId: at.spaceId, projectId: at.projectId });
+    at.assert();
+    const wanted = name.trim().toLowerCase();
+    const column = columns.find((each) => each.name.trim().toLowerCase() === wanted);
+    if (column) return column.id;
+    throw new Error(columns.length ? `No column is named "${name.trim()}". This board's columns: ${columns.map((each) => each.name).join(", ")}.` : NO_COLUMNS);
+  }
   #capture(runId: string, scope: TaskScope): Promise<CapturedOnlineTaskScope> {
     return captureOnlineTaskScope(this.deps, runId, scope);
   }

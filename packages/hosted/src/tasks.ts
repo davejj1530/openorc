@@ -1,4 +1,13 @@
-import type { OnlineTaskAvailability, OnlineTaskEnvelope, OnlineTaskExecutionParams, OnlineTaskMutation, OnlineTaskParams, OnlineTaskRpcResults } from "@openorc/protocol";
+import type {
+  OnlineBoard,
+  OnlineBoardSave,
+  OnlineTaskAvailability,
+  OnlineTaskEnvelope,
+  OnlineTaskExecutionParams,
+  OnlineTaskMutation,
+  OnlineTaskParams,
+  OnlineTaskRpcResults,
+} from "@openorc/protocol";
 import type { HostedDeps, HostedSpaces } from "./index.js";
 import { Refused, type Session } from "./session.js";
 import { TaskChanged, taskCreation, taskRefusal, taskRequest, type TaskRefusal } from "./task-requests.js";
@@ -14,8 +23,8 @@ export interface TaskDelivery {
 }
 /** Each delivery opens only after its paired server and compatibility checks pass. Opening task threads is the server's to say. */
 export const taskDelivery: Readonly<TaskDelivery> = { organization: true, personal: true };
-/** How long a space's answer on opening task threads holds before it is asked again. */
-const EXECUTION_HOLDS_MS = 5 * 60_000;
+/** How long a space's answer on what its server does with tasks holds before it is asked again. */
+const SERVES_HOLD_MS = 5 * 60_000;
 interface Dependencies extends Pick<HostedDeps, "push"> {
   session: Session;
   spaces: Pick<HostedSpaces, "status">;
@@ -29,12 +38,15 @@ interface Identity {
 }
 const changed = () => new Refused("Your OpenOrc session or project access changed. Try again.");
 const unavailable = () => new Refused("This task isn't available.", 404);
+/** What a space's server does with its tasks beyond keeping them. */
+type Serves = { execution: boolean; board: boolean };
+const SERVES_NOTHING: Serves = { execution: false, board: false };
 
 /** Server tasks have an explicit target and never enter the Mac task dispatcher. */
 export class OnlineTasks {
   readonly #epochs = new Map<string, number>();
   readonly #revisions = new Map<string, number>();
-  readonly #executions = new Map<string, { generation: number; until: number; opens: Promise<boolean> }>();
+  readonly #serves = new Map<string, { generation: number; until: number; serves: Promise<Serves> }>();
   readonly #delivery: Readonly<TaskDelivery>;
   #generation: number;
   #closed = false;
@@ -46,7 +58,7 @@ export class OnlineTasks {
         this.#generation = deps.session.generation;
         this.#epochs.clear();
         this.#revisions.clear();
-        this.#executions.clear();
+        this.#serves.clear();
       }
       this.#invalidate();
     });
@@ -65,7 +77,7 @@ export class OnlineTasks {
 
   async state({ spaceId }: OnlineTaskParams<"tasks.online.state">): Promise<OnlineTaskAvailability> {
     const delivered = this.#delivered(spaceId);
-    return delivered ? { state: "ready", spaceId, ...delivered, execution: await this.#opens(spaceId) } : { state: "unavailable" };
+    return delivered ? { state: "ready", spaceId, ...delivered, ...(await this.#served(spaceId)) } : { state: "unavailable" };
   }
   /** Core captures this before resolving a local run's project association. It exposes no session secret. */
   capture(spaceId: string): { accountId: string; assert(): void } {
@@ -91,12 +103,25 @@ export class OnlineTasks {
     return this.#request(spaceId, TASK_ROUTES.context(id));
   }
   async openThread({ spaceId, id, ...input }: OnlineTaskExecutionParams) {
-    if (!(await this.#opens(spaceId))) throw new Refused("Opening this task's thread isn't available yet.");
+    if (!(await this.#served(spaceId)).execution) throw new Refused("Opening this task's thread isn't available yet.");
     const identity = this.#identity(spaceId);
     const result = await prepareTaskThread(this.#request(spaceId, taskThreadRoute(id), input));
     if (result.state === "ready") await this.deps.prepared?.(result.threadId);
     this.#assert(spaceId, identity);
     this.#invalidate(spaceId);
+    return result;
+  }
+
+  /** A project's shared board. A server that keeps no boards keeps no columns, so the project's board is its statuses. */
+  async board({ spaceId, projectId }: OnlineTaskParams<"tasks.online.board">): Promise<OnlineBoard> {
+    if (!(await this.#served(spaceId)).board) return { revision: 0, columns: [], mayEdit: false };
+    return this.#request(spaceId, TASK_ROUTES.board(projectId));
+  }
+  /** Saves the whole board from the revision it was read at; one saved since answers as a conflict, with the board as it now is. */
+  async saveBoard({ spaceId, projectId, ...input }: OnlineTaskParams<"tasks.online.saveBoard">): Promise<OnlineBoardSave> {
+    if (!(await this.#served(spaceId)).board) throw new Refused("This organization's boards keep no columns yet.");
+    const result = await this.#request(spaceId, TASK_ROUTES.saveBoard(projectId), input);
+    if (result.state === "saved") this.#invalidate(spaceId);
     return result;
   }
 
@@ -147,7 +172,7 @@ export class OnlineTasks {
     this.#closed = true;
     this.#epochs.clear();
     this.#revisions.clear();
-    this.#executions.clear();
+    this.#serves.clear();
   }
 
   /** The signed-in account and the space's kind, while this space's tasks are delivered to this app. */
@@ -159,28 +184,28 @@ export class OnlineTasks {
     return { accountId: spaces.userId, personal: space.kind === "personal" };
   }
   /**
-   * Whether the space's server opens task threads: its `tasks` capability, held a few minutes, so a server that turns it
-   * on is heard without a restart. A server without capabilities says no, and is not asked again this session; a read
-   * that fails says no for now and is asked again next time.
+   * What the space's server does with tasks, from its capabilities (`tasks` opens task threads, `board` keeps columns),
+   * held a few minutes, so a server that turns one on is heard without a restart. A server without capabilities does
+   * neither, and is not asked again this session; a read that fails says neither for now and is asked again next time.
    */
-  #opens(spaceId: string): Promise<boolean> {
+  #served(spaceId: string): Promise<Serves> {
     const generation = this.deps.session.generation;
-    const held = this.#executions.get(spaceId);
-    if (held && held.generation === generation && Date.now() < held.until) return held.opens;
-    const entry = { generation, until: Date.now() + EXECUTION_HOLDS_MS, opens: Promise.resolve(false) };
-    entry.opens = this.deps.session
+    const held = this.#serves.get(spaceId);
+    if (held && held.generation === generation && Date.now() < held.until) return held.serves;
+    const entry = { generation, until: Date.now() + SERVES_HOLD_MS, serves: Promise.resolve(SERVES_NOTHING) };
+    entry.serves = this.deps.session
       .in(spaceId)
       .request(PARITY_ROUTES.capabilities)
       .then(
-        (reply) => reply.features.tasks?.available === true,
+        ({ features }) => ({ execution: features.tasks?.available === true, board: features.board?.available === true }),
         (error: unknown) => {
           if (error instanceof Refused && error.status === 404) entry.until = Number.POSITIVE_INFINITY;
-          else if (this.#executions.get(spaceId) === entry) this.#executions.delete(spaceId);
-          return false;
+          else if (this.#serves.get(spaceId) === entry) this.#serves.delete(spaceId);
+          return SERVES_NOTHING;
         },
       );
-    this.#executions.set(spaceId, entry);
-    return entry.opens;
+    this.#serves.set(spaceId, entry);
+    return entry.serves;
   }
   #identity(spaceId: string): Identity {
     const delivered = this.#delivered(spaceId);

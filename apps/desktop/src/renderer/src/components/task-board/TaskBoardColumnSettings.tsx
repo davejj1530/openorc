@@ -55,6 +55,7 @@ export function TaskBoardColumnSettings({
   slots,
   index,
   project,
+  jobsStart,
   open,
   onOpenChange,
   onChange,
@@ -62,6 +63,8 @@ export function TaskBoardColumnSettings({
   slots: readonly BoardSlot[];
   index: number;
   project: AccountsProject | undefined;
+  /** Whether the board's agents start: a board this computer keeps. An organization's keeps its words for later. */
+  jobsStart: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onChange: (slots: BoardSlot[], open: number | null) => void;
@@ -109,6 +112,7 @@ export function TaskBoardColumnSettings({
                 When a card arrives
               </h3>
               <ColumnAgent key={slot.id ?? index} slot={slot} project={project} onChange={put} />
+              {jobsStart ? null : <p className="task-board-setting-note">Agents for organization tasks don’t start yet.</p>}
             </section>
             {slot.job ? (
               <label className="task-board-setting task-board-setting-row">

@@ -5,6 +5,9 @@ import { taskNeedsYou, type TaskRecord } from "./task-records";
 /** A column as the project keeps it. One without an id is not saved yet. */
 export type BoardSlot = { id?: string; name: string; stage: BoardStage; job?: BoardColumnJob | null; nextColumnId?: string | null; jobEnabled?: boolean };
 
+/** Which kind of task a board's own columns hold: this computer's, or an organization's. A task of the other kind sits by its status. */
+export type BoardKeeper = TaskRecord["kind"];
+
 /** One column of the board: the tasks at one stage of the work. A card dropped on it takes its stage. */
 export type TaskBoardColumn = {
   id: string;
@@ -42,7 +45,7 @@ export function boardSlots(kept: readonly BoardColumn[]): BoardSlot[] {
  * status. A status with tasks and no column, a proposal among them, gets a column for as long as it holds one, so
  * nothing leaves the board with its column.
  */
-export function taskBoardColumns(tasks: readonly TaskRecord[], kept: readonly BoardColumn[] = []): TaskBoardColumn[] {
+export function taskBoardColumns(tasks: readonly TaskRecord[], kept: readonly BoardColumn[] = [], keeper: BoardKeeper = "local"): TaskBoardColumn[] {
   const columns: TaskBoardColumn[] = boardSlots(kept).map((slot, index) => ({ id: slot.id ?? slot.stage, name: slot.name, stage: slot.stage, slot: index, kept: kept[index] ?? null, tasks: [] }));
   for (const stage of stages) {
     if (columns.some((column) => column.stage === stage) || !tasks.some((record) => record.task.status === stage)) continue;
@@ -50,7 +53,7 @@ export function taskBoardColumns(tasks: readonly TaskRecord[], kept: readonly Bo
     columns.splice(next < 0 ? columns.length : next, 0, { id: stage, name: statusLabel[stage], stage, slot: null, kept: null, tasks: [] });
   }
   for (const record of tasks) {
-    const own = record.kind === "local" && record.task.columnId ? columns.find((column) => column.kept?.id === record.task.columnId) : undefined;
+    const own = record.kind === keeper && record.task.columnId ? columns.find((column) => column.kept?.id === record.task.columnId) : undefined;
     (own ?? columns.find((column) => column.stage === record.task.status))?.tasks.push(record);
   }
   const working = columns.filter((column) => column.stage === "in_progress");
@@ -59,4 +62,9 @@ export function taskBoardColumns(tasks: readonly TaskRecord[], kept: readonly Bo
   });
   for (const column of columns) column.tasks.sort(boardOrder(column.stage));
   return columns;
+}
+
+/** What a card dropped on `column` saves: the column, when the board keeps it for the card's kind of task, else its stage. */
+export function boardMove(record: TaskRecord, column: TaskBoardColumn, keeper: BoardKeeper): { columnId: string } | { status: TaskStatus } {
+  return column.kept && record.kind === keeper ? { columnId: column.kept.id } : { status: column.stage };
 }

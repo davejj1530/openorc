@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BoardColumn, BoardColumnsSave } from "./board.js";
 import { TaskPriority, TaskStatus } from "./domain.js";
 import { SpaceId } from "./spaces.js";
 
@@ -43,6 +44,8 @@ export const OnlineTask = z.object({
   createdAt: timestamp,
   updatedAt: timestamp,
   completedAt: timestamp.nullable(),
+  /** The column of its project's board the task sits in. A server without boards leaves it out. */
+  columnId: id.nullable().optional(),
   createdIn: OnlineTaskLink,
   execution: OnlineTaskLink,
   activity: OnlineTaskActivity.nullable(),
@@ -72,6 +75,8 @@ export const OnlineTaskHistoryEntry = z.object({
     z.enum(["title", "spec", "status", "priority", "labels", "assignee", "thread"]),
     z.object({ before: z.union([z.string(), z.array(z.string()), z.null()]), after: z.union([z.string(), z.array(z.string()), z.null()]) }),
   ),
+  /** A move between board columns, by their names as they were then, beside `changes` so an app that knows no columns reads the entry still. */
+  column: z.object({ before: z.string().nullable(), after: z.string().nullable() }).optional(),
 });
 export type OnlineTaskHistoryEntry = z.infer<typeof OnlineTaskHistoryEntry>;
 export const OnlineTaskHistory = z.object({ accessRevision: revision, entries: z.array(OnlineTaskHistoryEntry), cursor: z.string().nullable() });
@@ -85,10 +90,12 @@ export const OnlineTaskPatch = z
     priority: TaskPriority.optional(),
     labels: z.array(z.string().max(80)).max(32).optional(),
     assigneeMemberId: id.nullable().optional(),
+    /** A column of the task's project board: the task takes it, and its stage as its status. */
+    columnId: id.optional(),
   })
   .strict();
 export type OnlineTaskPatch = z.infer<typeof OnlineTaskPatch>;
-export const OnlineTaskCreate = OnlineTaskPatch.omit({ status: true })
+export const OnlineTaskCreate = OnlineTaskPatch.omit({ status: true, columnId: true })
   .extend({
     requestId: z.uuid(),
     projectId: id,
@@ -98,6 +105,8 @@ export const OnlineTaskCreate = OnlineTaskPatch.omit({ status: true })
   })
   .strict();
 export const OnlineTaskUpdate = z.object({ requestId: z.uuid(), ifRevision: revision, patch: OnlineTaskPatch }).strict();
+/** A whole board saved from the revision it was read at. */
+export const OnlineBoardUpdate = z.object({ requestId: z.uuid(), ifRevision: revision, columns: BoardColumnsSave }).strict();
 export const OnlineTaskDelete = z.object({ requestId: z.uuid(), ifRevision: revision }).strict();
 export const OnlineTaskSeen = z.object({ requestId: z.uuid(), assignmentRevision: revision }).strict();
 export const OnlineTaskList = z
@@ -105,7 +114,18 @@ export const OnlineTaskList = z
   .strict();
 export type OnlineTaskCreation = ({ state: "saved" } & OnlineTaskEnvelope) | { state: "refused"; code: string; message: string };
 export type OnlineTaskMutation = ({ state: "saved" } | { state: "conflict" }) & OnlineTaskEnvelope;
-export type OnlineTaskAvailability = { state: "unavailable" } | { state: "ready"; accountId: string; spaceId: string; execution: boolean; personal: boolean };
+/** `execution`: the server opens task threads. `board`: it keeps a board of columns for each project. */
+export type OnlineTaskAvailability = { state: "unavailable" } | { state: "ready"; accountId: string; spaceId: string; execution: boolean; board: boolean; personal: boolean };
+/**
+ * A project's shared board: its columns in order, none when it keeps the statuses, and the revision a save names.
+ * `mayEdit`: the asking person may change its columns, which only an organization admin may. A server that does not
+ * say lets nobody, so the app never offers a change it would refuse.
+ */
+export const OnlineBoard = z.object({ revision, columns: z.array(BoardColumn), mayEdit: z.boolean().default(false) });
+export type OnlineBoard = z.infer<typeof OnlineBoard>;
+/** A save from an older revision changes nothing and answers the board as it now is. */
+export const OnlineBoardSave = OnlineBoard.extend({ state: z.enum(["saved", "conflict"]) });
+export type OnlineBoardSave = z.infer<typeof OnlineBoardSave>;
 const scope = { spaceId: SpaceId };
 const target = { ...scope, id };
 export const onlineTaskRpcParams = {
@@ -120,6 +140,8 @@ export const onlineTaskRpcParams = {
   "tasks.online.assignees": z.object({ ...scope, projectId: id, query: z.string().optional(), cursor: z.string().optional() }).strict(),
   "tasks.online.activity": z.object({ ...target, cursor: z.string().optional(), limit: z.number().int().min(1).max(200).optional() }).strict(),
   "tasks.online.context": z.object(target).strict(),
+  "tasks.online.board": z.object({ ...scope, projectId: id }).strict(),
+  "tasks.online.saveBoard": OnlineBoardUpdate.extend({ ...scope, projectId: id }).strict(),
 };
 export type OnlineTaskParams<M extends keyof typeof onlineTaskRpcParams> = z.infer<(typeof onlineTaskRpcParams)[M]>;
 export interface OnlineTaskRpcResults {
@@ -134,4 +156,6 @@ export interface OnlineTaskRpcResults {
   "tasks.online.assignees": z.infer<typeof OnlineTaskRoster>;
   "tasks.online.activity": z.infer<typeof OnlineTaskHistory>;
   "tasks.online.context": z.infer<typeof OnlineTaskContext>;
+  "tasks.online.board": OnlineBoard;
+  "tasks.online.saveBoard": OnlineBoardSave;
 }

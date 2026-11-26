@@ -3,6 +3,7 @@ import { OnlineTaskCreate, OnlineTaskDelete, OnlineTaskSeen, OnlineTaskUpdate, t
 import { taskFixture, taskFixtureView, taskFixtureWire, fixturePerson, type TaskFixtureDeps, type TaskFixtureRecord } from "./stand-in-task-data.js";
 import { userOf } from "./stand-in-spaces.js";
 import { StandInTaskThreads } from "./stand-in-task-threads.js";
+import { StandInBoards } from "./stand-in-boards.js";
 
 type Reply = { status: number; body: unknown };
 type Request = { method: string; path: string; query: URLSearchParams; space: string | null };
@@ -16,6 +17,7 @@ export class StandInTasks {
   accessRevision = 1;
   readonly frozen = new Set<string>();
   readonly records = new Map<string, TaskFixtureRecord>();
+  readonly boards = new StandInBoards();
   readonly #receipts = new Map<string, { digest: string; reply: Reply }>();
   readonly #threads: StandInTaskThreads;
   constructor(private readonly deps: TaskFixtureDeps) {
@@ -39,6 +41,8 @@ export class StandInTasks {
     for (const who of this.deps.spaces.readers(spaceId)) this.deps.tell(who, ["projects"], spaceId);
   }
   route(request: Request, who: string, body: unknown): Reply | null {
+    const board = /^\/projects\/([^/]+)\/board$/.exec(request.path);
+    if (board) return this.#board(request, who, decodeURIComponent(board[1]!), body);
     if (!/^\/tasks(?:\/|$)/.test(request.path)) return null;
     if (!this.enabled) return absent();
     const spaceId = request.space;
@@ -50,6 +54,41 @@ export class StandInTasks {
       return ok({ accessRevision: this.accessRevision, count: this.#visible(spaceId, who).filter((record) => taskFixtureView(this.deps, record, who).viewer.attention.length).length });
     if (request.path === "/tasks/assignees") return this.#roster(spaceId, who, request.query);
     return this.#target(request, spaceId, who, body);
+  }
+  #board(request: Request, who: string, projectId: string, body: unknown): Reply {
+    const spaceId = request.space;
+    if (!this.enabled || !spaceId || !this.deps.spaces.project(spaceId, projectId) || !this.deps.spaces.canRead(spaceId, projectId, who)) return absent();
+    if (this.frozen.has(who) && this.deps.spaces.teams.has(spaceId)) return refused(403, "Organization access is frozen.", "organization_frozen");
+    // Only an organization's admins change its boards; a person's own space is theirs.
+    const mayEdit = !this.deps.spaces.teams.has(spaceId) || this.deps.spaces.member(spaceId, who)?.role === "admin";
+    if (request.method === "GET") return ok({ ...this.boards.board(spaceId, projectId), mayEdit });
+    if (request.method !== "PUT") return absent();
+    if (!mayEdit) return refused(403, "Only an organization admin can change this board's columns.");
+    const tasks = [...this.records.values()].filter((record) => record.task.spaceId === spaceId && record.task.projectId === projectId);
+    return this.#receipt(request, spaceId, who, body, () =>
+      this.boards.save(
+        spaceId,
+        projectId,
+        body,
+        tasks,
+        (record, change, kind, changes, column) => {
+          this.#settle(record, who, change.status);
+          record.task.columnId = change.columnId;
+          this.#history(record, who, kind, changes, column);
+        },
+        mayEdit,
+      ),
+    );
+  }
+  /** A new revision of the task, by `who`, and its finish time when it takes a status. */
+  #settle(record: TaskFixtureRecord, who: string, status?: OnlineTask["status"]): void {
+    const task = record.task;
+    task.revision++;
+    task.updatedAt = Date.now();
+    task.updatedBy = fixturePerson(this.deps, who);
+    if (status === undefined) return;
+    task.status = status;
+    task.completedAt = status === "done" ? task.updatedAt : null;
   }
   #target(request: Request, spaceId: string, who: string, body: unknown): Reply {
     if (request.path === "/tasks" && request.method === "POST") return this.#receipt(request, spaceId, who, body, () => this.#create(spaceId, who, body));
@@ -157,24 +196,26 @@ export class StandInTasks {
     const parsed = OnlineTaskUpdate.safeParse(body);
     if (!parsed.success) return refused(400, "Check the task's fields.");
     if (parsed.data.ifRevision !== record.task.revision) return this.#conflict(record, who);
-    const { assigneeMemberId, ...fields } = parsed.data.patch;
+    const { assigneeMemberId, columnId: _column, status: _status, ...fields } = parsed.data.patch;
     const task = record.task;
+    const place = this.boards.place(task, parsed.data.patch);
+    if (!place) return refused(400, "This column is no longer on the board.");
     const changes: OnlineTaskHistoryEntry["changes"] = {};
     const assignment = this.#assign(record, who, assigneeMemberId, changes);
     if (assignment) return assignment;
-    for (const key of ["title", "spec", "status", "priority", "labels"] as const) {
+    for (const key of ["title", "spec", "priority", "labels"] as const) {
       const value = fields[key];
       if (value !== undefined && JSON.stringify(task[key]) !== JSON.stringify(value)) changes[key] = { before: task[key], after: value };
     }
-    if (Object.keys(changes).length) {
+    if (place.status !== task.status) changes.status = { before: task.status, after: place.status };
+    const column = this.boards.change(task, task.columnId ?? null, place.columnId);
+    if (Object.keys(changes).length || column) {
       Object.assign(task, fields);
-      task.revision++;
-      task.updatedAt = Date.now();
-      task.updatedBy = fixturePerson(this.deps, who);
-      task.completedAt = task.status === "done" ? task.updatedAt : null;
-      let kind: OnlineTaskHistoryEntry["kind"] = fields.status ? "status_changed" : "edited";
+      this.#settle(record, who, place.status);
+      task.columnId = place.columnId;
+      let kind: OnlineTaskHistoryEntry["kind"] = changes.status ? "status_changed" : "edited";
       if (changes.assignee) kind = task.assignee ? "assigned" : "unassigned";
-      this.#history(record, who, kind, changes);
+      this.#history(record, who, kind, changes, column);
     }
     return ok(this.#envelope(record, who));
   }
@@ -189,7 +230,7 @@ export class StandInTasks {
     record.seen = assignee?.userId === userOf(who) ? task.assignmentRevision : 0;
     return null;
   }
-  #history(record: TaskFixtureRecord, who: string, kind: OnlineTaskHistoryEntry["kind"], changes: OnlineTaskHistoryEntry["changes"]): void {
-    record.history.push({ id: randomUUID(), actor: fixturePerson(this.deps, who), kind, at: Date.now(), revision: record.task.revision, changes });
+  #history(record: TaskFixtureRecord, who: string, kind: OnlineTaskHistoryEntry["kind"], changes: OnlineTaskHistoryEntry["changes"], column?: OnlineTaskHistoryEntry["column"]): void {
+    record.history.push({ id: randomUUID(), actor: fixturePerson(this.deps, who), kind, at: Date.now(), revision: record.task.revision, changes, ...(column ? { column } : {}) });
   }
 }

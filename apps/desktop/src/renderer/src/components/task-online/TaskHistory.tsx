@@ -1,18 +1,10 @@
 import { relativeTime } from "@openorc/client";
-import type { OnlineTask, OnlineTaskHistoryEntry, OnlineTaskRef } from "@openorc/protocol";
+import type { OnlineTask, OnlineTaskRef } from "@openorc/protocol";
 import { useShownTaskActivity } from "../../lib/task-activity-shown";
-import { useTaskHistory } from "../../lib/task-history";
+import { activityWords, useTaskHistory } from "../../lib/task-history";
 import { AccountFace } from "../AccountFace";
 import { Button } from "../ui";
 
-function activityWords(entry: OnlineTaskHistoryEntry): string {
-  if (entry.kind === "edited") {
-    const fields = Object.keys(entry.changes).map((field) => (field === "spec" ? "description" : field));
-    return fields.length ? `Updated ${fields.join(", ")}` : "Updated task";
-  }
-  const words = { created: "Created task", assigned: "Changed assignee", unassigned: "Removed assignee", status_changed: "Changed status", thread_linked: "Linked thread" };
-  return words[entry.kind];
-}
 export function TaskOnlineHistory({ reference, task }: { reference: OnlineTaskRef; task: OnlineTask }) {
   const history = useTaskHistory(reference);
   const activity = useShownTaskActivity(task.activity);

@@ -1,4 +1,6 @@
 import {
+  OnlineBoard,
+  OnlineBoardSave,
   OnlineTask,
   OnlineTaskActivity,
   OnlineTaskAttention,
@@ -20,6 +22,7 @@ const page = OnlineTaskPage.extend({ tasks: z.array(wireOnlineTask) });
 const history = OnlineTaskHistory.extend({ entries: z.array(OnlineTaskHistoryEntry.extend({ at: date })) });
 const context = OnlineTaskContext.extend({ task: wireOnlineTask });
 const path = (id: string) => `/tasks/${encodeURIComponent(id)}`;
+const board = (projectId: string) => `/projects/${encodeURIComponent(projectId)}/board`;
 const query = (values: object): string => {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) if (value !== undefined) params.set(key, String(value));
@@ -37,4 +40,6 @@ export const TASK_ROUTES = {
   assignees: (input: Omit<OnlineTaskParams<"tasks.online.assignees">, "spaceId">) => get(`/tasks/assignees${query(input)}`, OnlineTaskRoster),
   activity: (id: string, input: { cursor?: string; limit?: number }) => get(`${path(id)}/activity${query(input)}`, history),
   context: (id: string) => get(`${path(id)}/context`, context),
+  board: (projectId: string) => get(board(projectId), OnlineBoard),
+  saveBoard: (projectId: string): Route<OnlineBoardSave> => ({ method: "PUT", path: board(projectId), reply: OnlineBoardSave }),
 };

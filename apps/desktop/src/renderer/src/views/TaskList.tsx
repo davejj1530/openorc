@@ -16,6 +16,7 @@ import { ALL_WORKSPACES, focusedProject, useLayout } from "../lib/layout";
 import { useTasksView, type TasksView } from "../lib/tasks-view";
 import { useSpaceProjects } from "../lib/space-queries";
 import { useTaskListSource } from "../lib/task-list-source";
+import { useSharedBoard, type BoardOwner } from "../lib/task-board-source";
 import { useTaskOnlineScope } from "../lib/task-online-query";
 import { useTaskListFilters, type TaskShelf } from "../lib/task-list-state";
 import type { TaskRecord } from "../lib/task-records";
@@ -36,8 +37,8 @@ function taskListBody(input: {
   shelf: TaskShelf;
   stage: TaskStatus | null;
   showProject: boolean;
-  /** The project whose own columns the board shows: the one in scope when it has a folder on this computer. */
-  boardProject: string | null;
+  /** Who keeps the columns the board shows: the project in scope's organization, or this computer for one in a folder here. */
+  boardOwner: BoardOwner | null;
   pane: BoardPane;
   memoryKey: string | null;
   rowKey: string | null;
@@ -50,7 +51,7 @@ function taskListBody(input: {
       </Empty>
     );
   if (input.loading) return <div className="document-skeleton" aria-label="Loading tasks" />;
-  if (input.board) return <TaskBoard tasks={input.board} projectId={input.boardProject} showProject={input.showProject} pane={input.pane} />;
+  if (input.board) return <TaskBoard tasks={input.board} owner={input.boardOwner} showProject={input.showProject} pane={input.pane} />;
   if (input.list.length > 0) return <TaskRows key={input.rowKey ?? "local"} tasks={input.list} showProject={input.showProject} memoryKey={input.memoryKey} />;
   if (input.stage) return <Empty title={`No ${statusLabel[input.stage].toLowerCase()} tasks`} />;
   return <Empty title={input.shelf === "active" ? "No tasks yet" : `No ${input.shelf} tasks`} />;
@@ -120,8 +121,12 @@ function TaskListContent({ onNewTask }: { onNewTask: () => void }) {
   const projects = useSpaceProjects();
   const { shelf, stage } = filters;
   const all = tasks.data;
-  // A board with columns and automations of its own is one project's, kept in a folder on this computer.
-  const boardProject = projects.data?.find((project) => project.id === projectId && project.rootPath)?.id ?? null;
+  // A board with columns of its own is one project's: shared by its organization when the server keeps boards, else kept
+  // with its folder on this computer, which also keeps its automations.
+  const sharedBoard = useSharedBoard(projectId);
+  const localProject = projects.data?.find((project) => project.id === projectId && project.rootPath)?.id ?? null;
+  const boardProject = sharedBoard ? null : localProject;
+  const boardOwner: BoardOwner | null = sharedBoard ?? (boardProject ? { place: "local", projectId: boardProject } : null);
   const onBoard = board ? all.filter(({ task }) => task.status !== "archived") : null;
   const opened = useOpenedTask(onBoard);
   const screen = useRef<HTMLDivElement>(null);
@@ -146,7 +151,7 @@ function TaskListContent({ onNewTask }: { onNewTask: () => void }) {
             shelf,
             stage,
             showProject: !projectId,
-            boardProject,
+            boardOwner,
             pane: { id: TASK_PANE_ID, opened: opened.task?.id ?? null, onOpen: opened.toggle },
             memoryKey: filters.key,
             rowKey: filters.key ? JSON.stringify([filters.key, projectId, shelf, stage, filters.assigned]) : null,

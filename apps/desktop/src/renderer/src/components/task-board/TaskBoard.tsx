@@ -1,9 +1,11 @@
 import { useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { cn } from "../../lib/cn";
 import type { BoardColumnJob, Project } from "@openorc/protocol";
 import { relativeTime } from "@openorc/client";
-import { useRpc, useRpcMutation } from "../../lib/client";
+import { useRpcMutation } from "../../lib/client";
 import { useSpaceProjects } from "../../lib/space-queries";
-import { boardSlots, taskBoardColumns, type BoardSlot, type TaskBoardColumn } from "../../lib/task-board";
+import { boardMove, boardSlots, taskBoardColumns, type BoardKeeper, type BoardSlot, type TaskBoardColumn } from "../../lib/task-board";
+import { boardProjectKey, useBoardColumns, type BoardOwner } from "../../lib/task-board-source";
 import { openTaskRecord } from "../../lib/task-open";
 import { useTaskProperty } from "../../lib/task-property";
 import { taskNeedsAttention, taskNeedsYou, taskRecordKey, type TaskRecord } from "../../lib/task-records";
@@ -29,88 +31,100 @@ type Drag = { key: string; from: string; over: string | null };
 export type BoardPane = { id: string; opened: string | null; onOpen: (taskId: string) => void };
 
 /**
- * `projectId` is the one project whose board this is, with its own columns to change: a project with a folder on this
- * computer, where its columns are kept. Without one the board is its tasks by status. `showProject` names each card's
- * project, on a board of several.
+ * `owner` keeps the one project's columns this board shows and changes: this computer, for a project in a folder here,
+ * or the project's organization, which shares them. Without one the board is its tasks by status. `showProject` names
+ * each card's project, on a board of several.
  */
-export function TaskBoard({ tasks, projectId, showProject, pane }: { tasks: TaskRecord[]; projectId: string | null; showProject: boolean; pane: BoardPane }) {
+export function TaskBoard({ tasks, owner, showProject, pane }: { tasks: TaskRecord[]; owner: BoardOwner | null; showProject: boolean; pane: BoardPane }) {
   const projects = useSpaceProjects(true);
-  const kept = useRpc("board.columns", { projectId: projectId ?? "" }, { enabled: Boolean(projectId) });
-  const save = useRpcMutation("board.saveColumns");
-  const slots = useMemo(() => boardSlots(projectId ? (kept.data ?? []) : []), [projectId, kept.data]);
-  const project = projectId ? projects.data?.find((each) => each.id === projectId) : undefined;
-  const columns = useMemo(() => taskBoardColumns(tasks, projectId ? kept.data : []), [tasks, projectId, kept.data]);
+  const board = useBoardColumns(owner);
+  const keeper: BoardKeeper = owner?.place ?? "local";
+  const slots = useMemo(() => boardSlots(board.columns ?? []), [board.columns]);
+  const project = owner ? projects.data?.find((each) => each.id === boardProjectKey(owner)) : undefined;
+  const columns = useMemo(() => taskBoardColumns(tasks, board.columns, keeper), [tasks, board.columns, keeper]);
   const [drag, setDrag] = useState<Drag | null>(null);
   /** Set by the column a card was let go on. The card reads it as its drag ends, since the way to save a task is the card's own. */
   const dropped = useRef<TaskBoardColumn | null>(null);
   /** The column whose settings are open, by its place, which a save keeps where an unsaved column's id changes. */
   const [settings, setSettings] = useState<number | null>(null);
   const edges = useScrollEdges("x");
-  const change = projectId
+  const change = board.editable
     ? (next: BoardSlot[], open: number | null) => {
         setSettings(open);
-        save.mutate({ projectId, columns: next });
+        board.save(next);
       }
     : null;
   return (
-    <div {...edges} className="task-board scroll-edges-x" data-dragging={drag ? "" : undefined}>
-      {columns.map((column) => (
-        <BoardColumn
-          key={column.id}
-          column={column}
-          accepts={Boolean(drag && drag.from !== column.id)}
-          over={drag?.over === column.id}
-          onOver={(over) => setDrag((current) => (current && current.over !== over ? { ...current, over } : current))}
-          onDrop={() => {
-            dropped.current = column;
-          }}
-          job={column.kept?.jobEnabled ? column.kept.job : null}
-          settings={
-            change && projectId && column.slot !== null ? (
-              <TaskBoardColumnSettings
-                slots={slots}
-                index={column.slot}
-                project={project}
-                open={settings === column.slot}
-                onOpenChange={(open) => setSettings(open ? column.slot : null)}
-                onChange={change}
-              />
-            ) : null
-          }
-        >
-          {(record) => {
-            const key = taskRecordKey(record);
-            const card = {
-              showProject,
-              project: record.kind === "online" ? record.project : projects.data?.find((project) => project.id === record.task.projectId),
-              dragging: drag?.key === key,
-              onTake: () => setDrag({ key, from: column.id, over: null }),
-              onLetGo: () => {
-                const to = dropped.current;
-                dropped.current = null;
-                setDrag(null);
-                return to && to.id !== column.id ? to : null;
-              },
-            };
-            return record.kind === "local" ? <LocalCard key={key} record={record} pane={pane} {...card} /> : <OnlineCard key={key} record={record} {...card} />;
-          }}
-        </BoardColumn>
-      ))}
-      {change ? (
-        <div className="task-board-add">
-          <Tooltip label="Add column">
-            <IconButton aria-label="Add column" disabled={save.isPending} onClick={() => change([...slots, { name: "New column", stage: "in_progress" }], slots.length)}>
-              <Plus size={16} />
-            </IconButton>
-          </Tooltip>
-          {save.error ? (
-            <p role="alert" className="task-board-add-error">
-              Couldn’t save the board: {save.error.message}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
+    <>
+      {board.notice ? <BoardNotice {...board.notice} /> : null}
+      <div {...edges} className="task-board scroll-edges-x" data-dragging={drag ? "" : undefined}>
+        {columns.map((column) => (
+          <BoardColumn
+            key={column.id}
+            column={column}
+            accepts={Boolean(drag && drag.from !== column.id)}
+            over={drag?.over === column.id}
+            onOver={(over) => setDrag((current) => (current && current.over !== over ? { ...current, over } : current))}
+            onDrop={() => {
+              dropped.current = column;
+            }}
+            job={column.kept?.jobEnabled ? column.kept.job : null}
+            settings={
+              change && column.slot !== null ? (
+                <TaskBoardColumnSettings
+                  slots={slots}
+                  index={column.slot}
+                  project={project}
+                  jobsStart={owner?.place === "local"}
+                  open={settings === column.slot}
+                  onOpenChange={(open) => setSettings(open ? column.slot : null)}
+                  onChange={change}
+                />
+              ) : null
+            }
+          >
+            {(record) => {
+              const key = taskRecordKey(record);
+              const card = {
+                showProject,
+                project: record.kind === "online" ? record.project : projects.data?.find((project) => project.id === record.task.projectId),
+                keeper,
+                dragging: drag?.key === key,
+                onTake: () => setDrag({ key, from: column.id, over: null }),
+                onLetGo: () => {
+                  const to = dropped.current;
+                  dropped.current = null;
+                  setDrag(null);
+                  return to && to.id !== column.id ? to : null;
+                },
+              };
+              return record.kind === "local" ? <LocalCard key={key} record={record} pane={pane} {...card} /> : <OnlineCard key={key} record={record} {...card} />;
+            }}
+          </BoardColumn>
+        ))}
+        {change ? (
+          <div className="task-board-add">
+            <Tooltip label="Add column">
+              <IconButton aria-label="Add column" disabled={board.saving} onClick={() => change([...slots, { name: "New column", stage: "in_progress" }], slots.length)}>
+                <Plus size={16} />
+              </IconButton>
+            </Tooltip>
+          </div>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+/**
+ * What became of a save, over the board where it is in view however far the board is scrolled: why it failed, in the
+ * bad ink, or that another person's save came first and the board shows theirs.
+ */
+function BoardNotice({ text, failed }: { text: string; failed: boolean }) {
+  return (
+    <p role={failed ? "alert" : "status"} className={cn("task-board-notice", failed && "text-bad")}>
+      {text}
+    </p>
   );
 }
 
@@ -190,6 +204,8 @@ function BoardColumn({
 
 type CardProps = {
   showProject: boolean;
+  /** Which kind of task the board's own columns hold; a card of the other kind moves by its status. */
+  keeper: BoardKeeper;
   project: Project | undefined;
   dragging: boolean;
   onTake: () => void;
@@ -198,7 +214,7 @@ type CardProps = {
 };
 
 /** A task kept on this computer opens beside the board. */
-function LocalCard({ record, pane, ...card }: CardProps & { record: LocalRecord; pane: BoardPane }) {
+function LocalCard({ record, pane, keeper, ...card }: CardProps & { record: LocalRecord; pane: BoardPane }) {
   const update = useRpcMutation("tasks.update");
   return (
     <BoardCard
@@ -208,17 +224,14 @@ function LocalCard({ record, pane, ...card }: CardProps & { record: LocalRecord;
       onOpen={() => pane.onOpen(record.task.id)}
       movable={!update.isPending}
       error={update.error ? `Couldn’t move: ${update.error.message}` : null}
-      move={(column) => update.mutate({ id: record.task.id, patch: column.kept ? { columnId: column.kept.id } : { status: column.stage } })}
+      move={(column) => update.mutate({ id: record.task.id, patch: boardMove(record, column, keeper) })}
       start={<TaskStart task={record.task} />}
     />
   );
 }
 
-/**
- * An organization's task knows its status and no column yet, so it lands in the first column of the stage it was
- * dropped on. Its card opens its page.
- */
-function OnlineCard({ record, ...card }: CardProps & { record: OnlineRecord }) {
+/** An organization's task goes into its organization's shared column, or by its status on a board this computer keeps. Its card opens its page. */
+function OnlineCard({ record, keeper, ...card }: CardProps & { record: OnlineRecord }) {
   const update = useTaskProperty(record.reference, record.task);
   return (
     <BoardCard
@@ -227,7 +240,7 @@ function OnlineCard({ record, ...card }: CardProps & { record: OnlineRecord }) {
       onOpen={() => openTaskRecord(record)}
       movable={record.task.viewer.mayEdit && !update.pending}
       error={update.state.propertyError}
-      move={(column) => void update.controller.property({ status: column.stage })}
+      move={(column) => void update.controller.property(boardMove(record, column, keeper))}
       start={<TaskOnlineOpen task={record.task} reference={record.reference} />}
     />
   );
@@ -275,7 +288,7 @@ function BoardCard({
   start,
   opens,
   onOpen,
-}: CardProps & {
+}: Omit<CardProps, "keeper"> & {
   record: TaskRecord;
   movable: boolean;
   error: string | null;

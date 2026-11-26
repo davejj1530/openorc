@@ -19,6 +19,21 @@ export const BoardColumn = z.object({
 });
 export type BoardColumn = z.infer<typeof BoardColumn>;
 
+/** A project's whole board as it is saved, in order. A column without an id is new; a kept column left out is removed and its tasks stay in their stage. */
+export const BoardColumnsSave = z
+  .array(
+    z.object({
+      id: z.string().optional(),
+      name: z.string().trim().min(1).max(40),
+      stage: BoardStage,
+      job: BoardColumnJob.nullable().optional(),
+      nextColumnId: z.string().nullable().optional(),
+      jobEnabled: z.boolean().optional(),
+    }),
+  )
+  .min(1)
+  .max(12);
+
 export const boardRpcParams = {
   "board.columns": z.object({ projectId: z.string() }),
   /** Every column job, of one project or of all. */
@@ -26,23 +41,7 @@ export const boardRpcParams = {
   "board.switchJob": z.object({ columnId: z.string(), enabled: z.boolean() }),
   /** Adds one of the app's ready-made board automations to a project: its task buttons, and its columns in their place. */
   "board.addReadyMade": z.object({ projectId: z.string(), id: z.string() }),
-  /** The project's whole board, in order. A column without an id is new; a kept column left out is removed and its tasks stay in their stage. */
-  "board.saveColumns": z.object({
-    projectId: z.string(),
-    columns: z
-      .array(
-        z.object({
-          id: z.string().optional(),
-          name: z.string().trim().min(1).max(40),
-          stage: BoardStage,
-          job: BoardColumnJob.nullable().optional(),
-          nextColumnId: z.string().nullable().optional(),
-          jobEnabled: z.boolean().optional(),
-        }),
-      )
-      .min(1)
-      .max(12),
-  }),
+  "board.saveColumns": z.object({ projectId: z.string(), columns: BoardColumnsSave }),
 };
 
 export interface BoardRpcResults {

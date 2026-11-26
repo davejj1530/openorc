@@ -101,6 +101,12 @@
   font-size: var(--text-sm);
   line-height: 18px;
 }
+.task-board-setting-note {
+  padding-left: 2px;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  line-height: 16px;
+}
 .task-board-settings-foot {
   display: flex;
   align-items: center;
@@ -125,11 +131,12 @@
   width: 30px;
   padding-top: 9px;
 }
-.task-board-add-error {
-  width: 200px;
-  color: var(--bad);
-  font-size: var(--text-xs);
-  line-height: 18px;
+.task-board-notice {
+  flex-shrink: 0;
+  padding: 12px 24px 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
 }
 .task-board-cards {
   display: flex;

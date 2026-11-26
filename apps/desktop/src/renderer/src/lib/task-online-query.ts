@@ -23,9 +23,10 @@ export function useTaskOnlineQuery<M extends keyof OnlineTaskRpcResults>(scope: 
     refetchInterval: (query) => taskRefreshInterval(query.state.data),
   });
 }
-export function useTaskOnlineMutation<M extends Method>(scope: TaskOnlineScope, method: M) {
+/** A write held to `scope`'s account and access; one made with no scope is refused as access that changed. */
+export function useTaskOnlineMutation<M extends Method>(scope: TaskOnlineScope | null, method: M) {
   return useMutation<RpcResults[M], Error, RpcParams<M>>({
-    mutationKey: ["online-tasks", scope.accountId, scope.spaceId, method],
+    mutationKey: ["online-tasks", scope?.accountId, scope?.spaceId, method],
     mutationFn: (input) => readTaskContent(organizationContentGate, scope, () => core.call(method, input)),
     onSuccess: (_result, input) => invalidateTags(taskOnlineTags(input.spaceId), { immediate: true }),
   });

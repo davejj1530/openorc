@@ -64,6 +64,8 @@ export const HostedCapabilities = z.object({
     /** A thread moving to or from this Mac with the threads started under it; a server without the key takes none. */
     subthreadMoves: availability,
     tasks: availability,
+    /** A board of columns for each project, shared by everyone who works on its tasks. */
+    board: availability,
     skills: availability,
     macCode: availability,
     terminal: availability,

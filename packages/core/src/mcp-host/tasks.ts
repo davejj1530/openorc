@@ -37,11 +37,8 @@ export function createTasksHost({ threadService, board, reports, dataDir, assert
     },
     update: async (runId, id, patch) => {
       assertRunAvailable(runId);
+      if (patch.scope) return onlineTasks(online).update(runId, id, { ...patch, scope: patch.scope });
       const { column, ...rest } = patch;
-      if (rest.scope) {
-        if (column !== undefined) throw new Error("A cloud project's tasks have no board columns yet. Set the status instead.");
-        return onlineTasks(online).update(runId, id, { ...rest, scope: rest.scope });
-      }
       if (column === undefined) return threadService.toolUpdate(runId, id, rest);
       // The column decides the status, so one sent beside it is left out.
       if (!(await threadService.toolGet(runId, id))) return null;

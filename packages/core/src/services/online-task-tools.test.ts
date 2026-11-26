@@ -99,3 +99,18 @@ it("offers the run's own cloud project as its scope, by name, and none while the
   const closed = await fixture({}, false);
   expect(await closed.tools.scopes("run-one")).toEqual([]);
 });
+it("moves an online task to a shared board column by its name, and names the columns when none matches", async () => {
+  const { tools, scope, seed, stand, client } = await fixture();
+  const task = seed();
+  await tools.get("run-one", task.id, scope);
+  await expect(tools.update("run-one", task.id, { scope, column: "Review" })).rejects.toThrow("no columns of its own");
+  const columns = [
+    { name: "Backlog", stage: "backlog" as const },
+    { name: "Code review", stage: "review" as const },
+  ];
+  const board = await client.tasks.saveBoard({ spaceId: scope.spaceId, projectId: scope.projectId, requestId: randomUUID(), ifRevision: 0, columns });
+  const review = board.columns[1]!;
+  await expect(tools.update("run-one", task.id, { scope, column: "Review" })).rejects.toThrow('No column is named "Review". This board\'s columns: Backlog, Code review.');
+  expect(await tools.update("run-one", task.id, { scope, column: " code REVIEW ", status: "done" })).toMatchObject({ status: "review" });
+  expect(stand.tasks.records.get(task.id)!.task.columnId).toBe(review.id);
+});

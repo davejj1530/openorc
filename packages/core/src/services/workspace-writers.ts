@@ -13,6 +13,7 @@ export interface WorkspaceLease {
 interface Reservation {
   id: string;
   owner: string;
+  threadId?: string;
   paths: readonly string[];
   holders: number;
   shared: boolean;
@@ -67,6 +68,8 @@ async function canonical(input: string): Promise<string> {
 export interface AcquireOptions {
   /** Agent sessions may work in the same directory concurrently; exclusive operations still conflict with them. */
   shared?: boolean;
+  /** Reserve this thread for the operation and its inherited holders, even when other threads share the folder. */
+  threadId?: string;
   /** Exclusive work on a shared workspace waits for active turns to end instead of failing. The callback aborts the wait. */
   waitForShared?: () => void;
   /**
@@ -113,7 +116,7 @@ export class WorkspaceWriters {
     if (!inputs.length) throw new Error("A workspace reservation needs at least one path.");
     const resolved = [...new Set(await Promise.all(inputs.map(canonical)))].sort();
     // No awaits after identity resolution: checking and claiming all paths is atomic.
-    if (inherited) return this.inherit(inherited, resolved);
+    if (inherited) return this.inherit(inherited, resolved, options.threadId);
     const waitedFrom = Date.now();
     let yielded = false;
     let announced = false;
@@ -145,8 +148,7 @@ export class WorkspaceWriters {
     // Independent sessions need independent identities: one idle session must not
     // make a busy session's reservation appear yieldable. Only inheritance shares holders.
     const reservation: Reservation = { id: randomUUID(), owner, paths: Object.freeze(resolved), holders: 0, shared: Boolean(options.shared) };
-    this.reservations.set(reservation.id, reservation);
-    return this.hold(reservation, resolved);
+    return this.hold(reservation, resolved, options.threadId);
   }
 
   async withLease<T>(paths: string | readonly string[], owner: string, operation: (lease: WorkspaceLease) => Promise<T>, inherited?: WorkspaceLease, options: AcquireOptions = {}): Promise<T> {
@@ -158,14 +160,21 @@ export class WorkspaceWriters {
     }
   }
 
-  private inherit(inherited: WorkspaceLease, paths: readonly string[]): WorkspaceLease {
+  private inherit(inherited: WorkspaceLease, paths: readonly string[], threadId?: string): WorkspaceLease {
     const held = this.leases.get(inherited);
     if (!held || held.released || !this.reservations.has(held.reservation.id)) throw new Error("The workspace reservation has already been released or belongs to another host.");
     if (paths.some((target) => !held.reservation.paths.some((root) => contains(root, target)))) throw new Error("The inherited workspace reservation does not cover this operation's paths.");
-    return this.hold(held.reservation, paths);
+    return this.hold(held.reservation, paths, threadId);
   }
 
-  private hold(reservation: Reservation, paths: readonly string[]): WorkspaceLease {
+  private hold(reservation: Reservation, paths: readonly string[], threadId?: string): WorkspaceLease {
+    if (threadId && threadId !== reservation.threadId) {
+      if (reservation.threadId) throw new Error("The inherited workspace reservation belongs to another thread.");
+      const current = [...this.reservations.values()].find((held) => held.threadId === threadId);
+      if (current) throw new Error(`This thread is in use by ${current.owner}. Try again when that operation finishes.`);
+      reservation.threadId = threadId;
+    }
+    this.reservations.set(reservation.id, reservation);
     reservation.holders++;
     const state = { reservation, released: false };
     const lease: WorkspaceLease = Object.freeze({

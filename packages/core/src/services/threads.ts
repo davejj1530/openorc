@@ -212,7 +212,7 @@ export class ThreadService {
         }
       },
       undefined,
-      { shared: true },
+      { shared: true, threadId: id },
     );
     // Delivery takes its own lease on the worktree, so it starts once this one is released.
     if (!started.run) void this.messageQueue.drainQueue(started.thread.id);
@@ -377,7 +377,7 @@ export class ThreadService {
         return run;
       },
       undefined,
-      { shared: true },
+      { shared: true, threadId: id },
     );
   }
 
@@ -470,18 +470,25 @@ export class ThreadService {
     const live = this.runs.liveRunForThread(id);
     if (live) await this.runs.closeAndWait(live.id);
     const project = executionProject(this.db, thread);
-    await this.writers.withLease(this.workspaces.threadPath(thread, project), `deleting thread ${id}`, async (lease) => {
-      if (thread.worktreePath && !worktreeShared(this.db, thread)) {
-        // A pull request's copy under review is someone else's code, so any changes in it go with it.
-        await this.workspaces.cleanupThread(thread, project, { save: !inUnvettedCopy(this.db, thread) }, lease);
-      }
+    await this.writers.withLease(
+      this.workspaces.threadPath(thread, project),
+      `deleting thread ${id}`,
+      async (lease) => {
+        if (thread.worktreePath && !worktreeShared(this.db, thread)) {
+          // A pull request's copy under review is someone else's code, so any changes in it go with it.
+          await this.workspaces.cleanupThread(thread, project, { save: !inUnvettedCopy(this.db, thread) }, lease);
+        }
 
-      threads.delete(this.db, id);
-      // Its checkpoints go with it; nothing else keeps their trees.
-      await unpinProjectRefs(project, checkpointRefs(id)).catch((e: unknown) => this.log.warn(`checkpoint refs of thread ${id} were kept: ${e instanceof Error ? e.message : String(e)}`));
-      this.invalidate(["threads", "tasks", "inbox"]);
-      this.onDeleted?.(id);
-    });
+        threads.delete(this.db, id);
+        // Its checkpoints go with it; nothing else keeps their trees.
+        await unpinProjectRefs(project, checkpointRefs(id)).catch((e: unknown) => this.log.warn(`checkpoint refs of thread ${id} were kept: ${e instanceof Error ? e.message : String(e)}`));
+        this.invalidate(["threads", "tasks", "inbox"]);
+        this.onDeleted?.(id);
+      },
+      undefined,
+      // Deleting a conversation in the main checkout only removes its records and its own checkpoint refs.
+      { shared: thread.workspaceMode === "current" && !thread.worktreePath, threadId: id },
+    );
   }
 
   /**

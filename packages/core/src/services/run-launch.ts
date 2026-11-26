@@ -143,6 +143,7 @@ export class RunLaunch {
     assertAdmission();
     const lease = await this.deps.writers.acquire(prepared.cwd, `run ${prepared.runId}`, admitted.workspaceLease, {
       shared: true,
+      threadId: admitted.scope.thread?.id,
     });
     phase("lease");
     const run = this.recordRun(prepared, lease, assertAdmission);

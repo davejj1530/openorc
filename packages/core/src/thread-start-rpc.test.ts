@@ -1,4 +1,4 @@
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -137,6 +137,58 @@ it("starts a thread under the id its owner chose, and refuses that id once it is
   expect(thread.id).toBe(named.id);
   await expect(call("threads.start", { ...named, prompt: "Again" })).rejects.toThrow(THREAD_EXISTS);
   expect(threads.list(core.db, { projectId: project.id }).filter((each) => each.id === named.id)).toHaveLength(1);
+});
+
+it("deletes a finished thread while another thread is running in the main checkout", async () => {
+  const working = await parent();
+  const question = await parent({ prompt: "What does this project do?" });
+  endTurn(question.runId);
+  await vi.waitFor(() => expect(core.runs.threadActivity(question.thread.id)).toBe("idle"));
+  const draft = path.join(project.rootPath, "draft.txt");
+  await writeFile(draft, "Work in progress\n");
+
+  await call("threads.delete", { id: question.thread.id });
+  expect(threads.get(core.db, question.thread.id)).toBeNull();
+  expect(core.runs.isLive(question.runId)).toBe(false);
+  expect(core.runs.threadActivity(working.thread.id)).toBe("running");
+  expect(await readFile(draft, "utf8")).toBe("Work in progress\n");
+  endTurn(working.runId);
+  await vi.waitFor(async () => expect(await call("threads.checkpoints", { id: working.thread.id })).toHaveLength(1));
+});
+
+it("keeps a thread while its own provider is starting in the main checkout", async () => {
+  const server = await core.mcpServer();
+  let connect!: () => void;
+  const connecting = vi.spyOn(core, "mcpServer").mockReturnValueOnce(
+    new Promise((resolve) => {
+      connect = () => resolve(server);
+    }),
+  );
+  const id = "82c5d658-aaf0-4393-85cf-a1199655b720";
+  const starting = parent({ id });
+  try {
+    await vi.waitFor(() => expect(connecting).toHaveBeenCalled());
+    await expect(call("threads.delete", { id })).rejects.toThrow(/starting/);
+  } finally {
+    connect();
+    await starting;
+  }
+  expect(core.runs.threadActivity(id)).toBe("running");
+});
+
+it("keeps a dedicated worktree until another writer releases it", async () => {
+  const { thread } = await parent({ workspaceMode: "worktree" });
+  const worktree = thread.worktreePath!;
+  const writer = await core.workspaceWriters.acquire(worktree, "saving a file", undefined, { shared: true });
+  try {
+    await expect(call("threads.delete", { id: thread.id })).rejects.toThrow(/saving a file/);
+    expect(threads.get(core.db, thread.id)?.worktreePath).toBe(worktree);
+    await access(worktree);
+  } finally {
+    writer.release();
+  }
+  await call("threads.delete", { id: thread.id });
+  await expect(access(worktree)).rejects.toMatchObject({ code: "ENOENT" });
 });
 
 it("starts a thread beside its parent, in its checkout with its settings, and tells it who to talk to", async () => {

@@ -1,17 +1,14 @@
 /*
- * State marks: a thread's cube, drawn as dots (packages/client state-marks.ts). Each dot scales
- * from its own centre and wears its mark's colour, from faded into the ground to whole, as its animation says. The
- * colour is the theme's own for what the mark says, so a mark changes with the palette and with light and dark.
+ * State marks: a thread's cube, drawn as dots (packages/client state-marks.ts). Each dot is the mark's whole circle,
+ * moved to its place and scaled to its size, and fades into what is behind it, as its animation says. Transform and
+ * opacity are all that change, so the compositor plays a mark without the interface doing any work. The colour is the
+ * theme's own for what the mark says, so a mark changes with the palette and with light and dark.
  */
-@property --mark-wear {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 1;
-}
 /* An agent at work, in the theme's working ink. */
 .state-mark {
+  position: relative;
+  display: block;
   flex-shrink: 0;
-  overflow: visible;
   --mark-color: var(--working-ink);
 }
 .state-mark[data-tone="think"] {
@@ -32,10 +29,11 @@
 .state-mark[data-tone="quiet"] {
   --mark-color: var(--ink-3);
 }
-.state-mark circle {
-  transform-box: fill-box;
-  transform-origin: center;
-  fill: color-mix(in oklab, var(--mark-color) calc(45% + var(--mark-wear) * 55%), var(--bg));
+.state-mark > span {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-color: var(--mark-color);
 }
 
 /*

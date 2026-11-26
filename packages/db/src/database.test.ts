@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Db } from "./database.js";
+import { automationsMigration } from "./automations.js";
 import { migrations } from "./schema.js";
 
 vi.mock("sqlite-vec", async (importOriginal) => {
@@ -64,14 +65,15 @@ describe("upgrading a ledger", () => {
     const file = path.join(dir, "openorc.sqlite");
     try {
       Db.open(file).close();
-      // Back two versions: the first pending migration can run again, and the second fails on a column already there.
+      // Back to before the automations: that migration can run again, and the task choice after it fails on a column already there.
+      const before = migrations.indexOf(automationsMigration);
       const raw = new DatabaseSync(file);
       raw.exec("DROP TABLE automation_firings; DROP TABLE automations;");
-      raw.exec(`PRAGMA user_version = ${migrations.length - 2}`);
+      raw.exec(`PRAGMA user_version = ${before}`);
       raw.close();
       expect(() => Db.open(file)).toThrow(/duplicate column name: choice/);
       const after = new DatabaseSync(file);
-      expect(after.prepare("PRAGMA user_version").get()).toEqual({ user_version: migrations.length - 2 });
+      expect(after.prepare("PRAGMA user_version").get()).toEqual({ user_version: before });
       expect(after.prepare("SELECT name FROM sqlite_master WHERE name = 'automations'").get()).toBeUndefined();
       after.close();
     } finally {

@@ -16,6 +16,9 @@ CREATE TABLE team_task_threads (
 CREATE INDEX team_task_threads_thread ON team_task_threads(thread_id);
 `;
 
+/** The run of a column's agent its thread works now, so its end is told to the server even after a restart. */
+export const teamTaskRunMigration = `ALTER TABLE team_task_threads ADD COLUMN run_id TEXT;`;
+
 const key = (name: string) => name.trim().toLowerCase();
 
 /** The name a task's own thread is kept under, beside its columns' agents' threads. */
@@ -27,13 +30,24 @@ export const teamTaskThreads = {
     const row = db.stmt("SELECT thread_id FROM team_task_threads WHERE space_id = ? AND task_id = ? AND column_name = ?").get(spaceId, taskId, key(columnName)) as { thread_id: string } | undefined;
     return row?.thread_id ?? null;
   },
-  /** The team task a thread works, and under which column's name: none for a thread of this computer's own. */
-  ofThread(db: Db, threadId: string): { spaceId: string; taskId: string; columnName: string } | null {
-    const row = db.stmt("SELECT space_id, task_id, column_name FROM team_task_threads WHERE thread_id = ? LIMIT 1").get(threadId) as
-      { space_id: string; task_id: string; column_name: string } | undefined;
-    return row ? { spaceId: row.space_id, taskId: row.task_id, columnName: row.column_name } : null;
+  /** The team task a thread works, under which column's name, and the column run it works now: none for a thread of this computer's own. */
+  ofThread(db: Db, threadId: string): { spaceId: string; taskId: string; columnName: string; runId: string | null } | null {
+    const row = db.stmt("SELECT space_id, task_id, column_name, run_id FROM team_task_threads WHERE thread_id = ? LIMIT 1").get(threadId) as
+      { space_id: string; task_id: string; column_name: string; run_id: string | null } | undefined;
+    return row ? { spaceId: row.space_id, taskId: row.task_id, columnName: row.column_name, runId: row.run_id } : null;
   },
-  link(db: Db, spaceId: string, taskId: string, columnName: string, threadId: string): void {
-    db.stmt("INSERT OR REPLACE INTO team_task_threads (space_id, task_id, column_name, thread_id, created_at) VALUES (?, ?, ?, ?, ?)").run(spaceId, taskId, key(columnName), threadId, Date.now());
+  link(db: Db, spaceId: string, taskId: string, columnName: string, threadId: string, runId: string | null = null): void {
+    db.stmt("INSERT OR REPLACE INTO team_task_threads (space_id, task_id, column_name, thread_id, created_at, run_id) VALUES (?, ?, ?, ?, ?, ?)").run(
+      spaceId,
+      taskId,
+      key(columnName),
+      threadId,
+      Date.now(),
+      runId,
+    );
+  },
+  /** The column run a thread works now, or none once its end is told. */
+  working(db: Db, threadId: string, runId: string | null): void {
+    db.stmt("UPDATE team_task_threads SET run_id = ? WHERE thread_id = ?").run(runId, threadId);
   },
 };

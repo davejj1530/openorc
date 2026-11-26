@@ -75,6 +75,17 @@ export class TeamColumnRuns {
     return look;
   }
 
+  /** A turn ended in a thread: one a column's agent works a team task in tells the server, once, that its run finished. */
+  finished(threadId: string): void {
+    const link = teamTaskThreads.ofThread(this.deps.db, threadId);
+    if (!link?.runId) return;
+    teamTaskThreads.working(this.deps.db, threadId, null);
+    void this.deps
+      .account()
+      ?.taskRuns.finished(link.spaceId, link.runId)
+      .catch((error: unknown) => this.deps.log.warn(`team column agents: run ${link.runId} could not be told finished: ${errorText(error)}`));
+  }
+
   private async look(spaceId: string): Promise<void> {
     const account = this.deps.account();
     if (!account) return;
@@ -99,7 +110,10 @@ export class TeamColumnRuns {
     const told = brief(item);
     const earlier = teamTaskThreads.get(db, spaceId, item.task.id, item.column.name);
     const thread = earlier ? threadRows.get(db, earlier) : null;
-    if (thread && !thread.archivedAt) return void this.deps.threads.queue(thread.id, `This task is back in the "${item.column.name}" column.\n\n${told}`);
+    if (thread && !thread.archivedAt) {
+      teamTaskThreads.working(db, thread.id, item.run.id);
+      return void this.deps.threads.queue(thread.id, `This task is back in the "${item.column.name}" column.\n\n${told}`);
+    }
     const settings = new AppSettingsService(db);
     const { defaultPermissionMode: permissionMode, defaultWorkspaceMode: workspaceMode } = settings.get();
     const choice = item.column.job.choice;
@@ -116,6 +130,6 @@ export class TeamColumnRuns {
       attachments: undefined,
       title: `${item.column.name} · ${item.task.title}`.slice(0, 120),
     });
-    teamTaskThreads.link(db, spaceId, item.task.id, item.column.name, started.id);
+    teamTaskThreads.link(db, spaceId, item.task.id, item.column.name, started.id, item.run.id);
   }
 }

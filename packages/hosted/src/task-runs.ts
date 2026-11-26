@@ -78,6 +78,11 @@ export class TaskRuns {
     await this.deps.session.in(spaceId).request(RUN_ROUTES.report(id), { requestId: randomUUID(), state: "no_folder" });
   }
 
+  /** Says the run's agent finished its turn here, so its card stops saying it runs. */
+  async finished(spaceId: string, id: string): Promise<void> {
+    await this.deps.session.in(spaceId).request(RUN_ROUTES.report(id), { requestId: randomUUID(), state: "finished" });
+  }
+
   #emit(spaceIds: readonly string[]): void {
     for (const spaceId of spaceIds) for (const listener of this.#listeners) listener(spaceId);
   }

@@ -1,8 +1,15 @@
 import { z } from "zod";
 import { BoardStage, ThreadChoice } from "./domain.js";
 
-/** What a board column has an agent do with a card put in it: the instructions, and the model when the person chose one. Without one, the task's thread's. */
-export const BoardColumnJob = z.object({ prompt: z.string().trim().min(1).max(8000), choice: ThreadChoice.nullable() });
+/** Where a team board column's agent runs: on the computer of the task's assignee, or on OpenOrc Cloud as them. */
+export const BoardJobPlace = z.enum(["computer", "cloud"]);
+export type BoardJobPlace = z.infer<typeof BoardJobPlace>;
+
+/**
+ * What a board column has an agent do with a card put in it: the instructions, and the model when the person chose one.
+ * Without one, the task's thread's. `where` is a team board's: absent, its agent runs on the assignee's computer.
+ */
+export const BoardColumnJob = z.object({ prompt: z.string().trim().min(1).max(8000), choice: ThreadChoice.nullable(), where: BoardJobPlace.optional() });
 export type BoardColumnJob = z.infer<typeof BoardColumnJob>;
 /** One column of a project's board, in the order the project keeps them. A project that keeps none has a column for each stage. */
 export const BoardColumn = z.object({

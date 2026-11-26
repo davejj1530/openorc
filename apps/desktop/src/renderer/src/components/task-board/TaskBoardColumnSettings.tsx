@@ -1,7 +1,7 @@
 import { Popover } from "@base-ui/react/popover";
 import { useState } from "react";
 import type { AccountsProject } from "@openorc/client";
-import type { BoardStage, ThreadChoice } from "@openorc/protocol";
+import type { BoardJobPlace, BoardStage, ThreadChoice } from "@openorc/protocol";
 import { CoversPreview } from "../../lib/browser-preview";
 import type { BoardSlot } from "../../lib/task-board";
 import { floatingGround } from "../../lib/use-anchor-ground";
@@ -26,7 +26,8 @@ function ColumnAgent({ slot, project, shared, onChange }: { slot: BoardSlot; pro
   const [words, setWords] = useState(slot.job?.prompt ?? "");
   const [choice, setChoice] = useState<ThreadChoice | null>(slot.job?.choice ?? null);
   const save = (prompt: string, model: ThreadChoice | null) => {
-    const job = prompt.trim() ? { prompt: prompt.trim(), choice: model } : null;
+    // Where a team column's agent runs is chosen beside the words and kept as they change.
+    const job = prompt.trim() ? { prompt: prompt.trim(), choice: model, ...(slot.job?.where ? { where: slot.job.where } : {}) } : null;
     if (JSON.stringify(job) !== JSON.stringify(slot.job ?? null)) onChange(job ? { job } : { job: null, nextColumnId: null });
   };
   return (
@@ -173,6 +174,15 @@ export function TaskBoardColumnSettings({
                   <p className="task-board-setting-note">Its agent is told something else in {listed.format(across.agentDiffers)}. A change here sets it in every project.</p>
                 ) : null}
               </section>
+            ) : null}
+            {jobsStart && shared && slot.job ? (
+              <label className="task-board-setting task-board-setting-row">
+                <span className="task-board-setting-label">Runs on</span>
+                <Select value={slot.job.where ?? "computer"} onChange={(event) => put({ job: { ...slot.job!, where: event.currentTarget.value as BoardJobPlace } })}>
+                  <option value="computer">The assignee’s computer</option>
+                  <option value="cloud">OpenOrc Cloud</option>
+                </Select>
+              </label>
             ) : null}
             {jobsStart && slot.job ? (
               <label className="task-board-setting task-board-setting-row">

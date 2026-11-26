@@ -291,7 +291,7 @@ function OnlineCard({ record, keeper, ...card }: CardProps & { record: OnlineRec
         move={(column) => (asksForRunner(record, column, runs) ? setAsking(column) : place(column))}
         start={<TaskOnlineOpen task={record.task} reference={record.reference} />}
       />
-      {asking ? <RunHereAsk onRun={() => answer(true)} onMove={() => answer()} onCancel={() => setAsking(null)} /> : null}
+      {asking ? <RunHereAsk cloud={asking.kept?.job?.where === "cloud"} onRun={() => answer(true)} onMove={() => answer()} onCancel={() => setAsking(null)} /> : null}
     </>
   );
 }

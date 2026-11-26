@@ -477,6 +477,7 @@ export class OpenOrc {
       onRunFinished: (run, scope, project) => {
         this.memory.onRunFinished(run, { task: scope.task, thread: scope.thread ?? this.threads.scopeThreadFor(scope) }, project);
         if (scope.task) void this.threads.onTaskRunFinished(run, scope.task);
+        if (run.threadId) this.taskAutomation.team.finished(run.threadId);
       },
       onTurnSettled: (run, scope, _project, outcome) => {
         this.comments?.settled(run, outcome);

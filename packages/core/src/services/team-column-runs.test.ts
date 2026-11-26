@@ -15,6 +15,7 @@ let paired: SpaceProject[];
 let listener: ((spaceId: string) => void) | null;
 const claim = vi.fn(async (_spaceId: string, _id: string) => true);
 const noFolder = vi.fn(async (_spaceId: string, _id: string) => {});
+const finished = vi.fn(async (_spaceId: string, _id: string) => {});
 const start = vi.fn();
 const queue = vi.fn();
 
@@ -28,6 +29,7 @@ const account = {
     waiting: async () => waiting,
     claim,
     noFolder,
+    finished,
   },
   spaces: { projects: async () => paired },
 };
@@ -116,4 +118,22 @@ it("looks in each organization as it starts, and again whenever told runs may be
   await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(2));
   team.stop();
   expect(listener).toBeNull();
+});
+
+it("tells the server once when a column agent's turn ends, also for a card that came back", async () => {
+  waiting = [item("run-1")];
+  const team = runner();
+  await team.check("org-1");
+  const threadId = ((await start.mock.results[0]!.value) as { thread: { id: string } }).thread.id;
+  team.finished(threadId);
+  team.finished(threadId);
+  team.finished("a-thread-of-its-own");
+  expect(finished.mock.calls).toEqual([["org-1", "run-1"]]);
+  waiting = [item("run-2")];
+  await team.check("org-1");
+  team.finished(threadId);
+  expect(finished.mock.calls).toEqual([
+    ["org-1", "run-1"],
+    ["org-1", "run-2"],
+  ]);
 });

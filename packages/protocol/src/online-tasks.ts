@@ -26,15 +26,19 @@ export const OnlineTaskActivity = z.object({
   updatedAt: timestamp,
 });
 /**
- * The agent a team task's column started, asked of the person it runs for: waiting for one of their computers, running
- * on one, on a computer with no folder for the project, or held after agents sent the card to the column too often,
- * which a person's own move starts again.
+ * The agent a team task's column started, asked of the person it runs for, on one of their computers or on OpenOrc
+ * Cloud as them: waiting for it to start, running, on a computer with no folder for the project, held after agents sent
+ * the card to the column too often (a person's own move starts it again), failed to start with why, or finished.
  */
 export const OnlineTaskRun = z.object({
   id,
   columnId: id,
-  state: z.enum(["waiting", "running", "no_folder", "held"]),
+  /** On the runner's computer, or on OpenOrc Cloud as them; a server before cloud runs sends none, for a computer. */
+  where: z.enum(["computer", "cloud"]).optional(),
+  state: z.enum(["waiting", "running", "no_folder", "held", "failed", "finished"]),
   runner: z.object({ userId: id, name: z.string() }).nullable(),
+  /** Why a failed run did not start, in a teammate's words. */
+  reason: z.string().nullable().optional(),
   requestedAt: timestamp,
 });
 export type OnlineTaskRun = z.infer<typeof OnlineTaskRun>;

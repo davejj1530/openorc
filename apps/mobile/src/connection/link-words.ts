@@ -56,6 +56,9 @@ export function linkWords(state: LinkState): LinkWords {
   }
 }
 
+/** Whether what holds the link up stops the phone's own OpenOrc Cloud too: having no internet does, a Mac that is away does not. */
+export const stopsCloud = (state: LinkState): boolean => (state.kind === "waiting" || state.kind === "connecting") && state.why === "offline";
+
 /** Why the last Mac went, when the person did not forget it. */
 export const lostWords: Record<LostMac["why"], (name: string) => string> = {
   removed: (name) => `${name} removed this ${DEVICE}`,

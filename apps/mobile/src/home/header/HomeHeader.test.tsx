@@ -21,6 +21,9 @@ vi.mock("../../client", async () => {
 /** What the Mac says of its OpenOrc account: nothing, until a test signs someone in. */
 const account = vi.hoisted(() => ({ spaces: { state: "none" } as import("../../spaces/use-spaces").PhoneSpaces }));
 vi.mock("../../spaces/use-spaces", async (original) => ({ ...(await original<object>()), useSpaces: () => account.spaces }));
+/** Whether the phone holds an OpenOrc Cloud session of its own: none, until a test gives it one. */
+const cloud = vi.hoisted(() => ({ own: false }));
+vi.mock("../../cloud/use-own-cloud", () => ({ useOwnCloud: () => cloud.own }));
 vi.mock("../../generated/icons", async (original) => ({
   ...(await original<object>()),
   Laptop: () => <span data-testid="laptop" />,
@@ -31,6 +34,7 @@ vi.mock("../../generated/icons", async (original) => ({
 afterEach(() => {
   cleanup();
   account.spaces = { state: "none" };
+  cloud.own = false;
 });
 
 const studio = { id: "studio", name: "Studio" };
@@ -67,6 +71,19 @@ it("rings the connection and says what is wrong after the wordmark while the pho
   expect(screen.getAllByRole("button", { name: "Studio, Not reachable over Tailscale" })).toHaveLength(2);
   expect(screen.getByText("Check Tailscale")).toBeTruthy();
   expect(screen.getAllByTestId("link-dot")).toHaveLength(2);
+});
+
+it("says nothing after the title of a Mac that is away while the phone reads the cloud itself, and still rings the connection", () => {
+  cloud.own = true;
+  bar({ kind: "waiting", mac: studio, why: "silent", retryAt: null });
+  expect(screen.queryByTestId("link-status")).toBeNull();
+  expect(screen.getAllByRole("button", { name: "Studio, Not reachable" })).toHaveLength(1);
+  expect(screen.getAllByTestId("link-dot")).toHaveLength(1);
+  cleanup();
+  // No internet stops the cloud too, so that still speaks.
+  bar({ kind: "waiting", mac: studio, why: "offline", retryAt: null });
+  layOut(200, 120);
+  expect(screen.getByText("No internet")).toBeTruthy();
 });
 
 it("adds nothing after the wordmark while connected, or while a quick connect holds its words back", () => {

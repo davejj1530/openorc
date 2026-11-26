@@ -1,6 +1,8 @@
 import { Link } from "expo-router";
 import { useState } from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
+import { useOwnCloud } from "../../cloud/use-own-cloud";
+import { stopsCloud } from "../../connection/link-words";
 import type { LinkState } from "../../connection/manager";
 import { ChevronDown } from "../../generated/icons";
 import { SpaceMark } from "../../spaces/SpaceMark";
@@ -24,7 +26,9 @@ const statusFits = (room: number | null, status: number | null): boolean => room
 
 /**
  * What is wrong with the link, after the title: the dot and the short status, which open the connection sheet as the
- * connection button does. Nothing while the link is healthy, or while a quick connect holds its words back. It stands
+ * connection button does. Nothing while the link is healthy, or while a quick connect holds its words back. Nothing
+ * either while the phone reads OpenOrc Cloud itself and only its Mac is away: Home still works, the title beside it
+ * names a space that is there, and the connection button's ring says the Mac is not. It stands
  * in the room the title leaves, at its own size and whole, and where it does not fit it leaves: the space's name never
  * loses a letter to it, and its words never shrink. It is laid out at the window's width so it measures whole.
  */
@@ -34,9 +38,11 @@ function StatusRoom({ state }: { state: Exclude<LinkState, { kind: "unpaired" }>
   const [room, setRoom] = useState<number | null>(null);
   const [width, setWidth] = useState<number | null>(null);
   const fits = statusFits(room, width);
+  const ownCloud = useOwnCloud();
+  const says = line.trouble && (!ownCloud || stopsCloud(state)) ? line.status : null;
   return (
     <View testID="status-room" className="flex-1 self-stretch overflow-hidden" onLayout={(event) => setRoom(event.nativeEvent.layout.width)}>
-      {line.trouble && line.status ? (
+      {says ? (
         <View pointerEvents="box-none" className="absolute inset-y-0 left-4 flex-row items-center" style={{ width: window }}>
           <Link href="/connection" asChild>
             <Pressable
@@ -50,7 +56,7 @@ function StatusRoom({ state }: { state: Exclude<LinkState, { kind: "unpaired" }>
               className={cn("flex-row items-center gap-1.5 self-stretch active:opacity-60", !fits && "opacity-0")}
             >
               <LinkDot tone={line.tone} />
-              <StatusWords status={line.status} trouble={line.trouble} maxFontSizeMultiplier={WORDMARK_MAX_SCALE} />
+              <StatusWords status={says} trouble={line.trouble} maxFontSizeMultiplier={WORDMARK_MAX_SCALE} />
             </Pressable>
           </Link>
         </View>

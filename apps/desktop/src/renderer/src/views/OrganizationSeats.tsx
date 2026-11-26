@@ -145,14 +145,14 @@ function SeatSummary({
   );
 }
 
-/** Storage belongs to seats, so an organization with none shows no storage line. */
+/** Storage comes from seats and from members with Pro of their own, so its line shows with or without seats. */
 function SeatFacts({ spaceId, storage, billing }: { spaceId: string; storage?: OrganizationStorageTransport; billing: OrganizationBilling }) {
   const subscription = billing.subscription;
   return (
     <div>
       <h2>{seatSummaryTitle(billing)}</h2>
       {subscription ? <SeatRenewal subscription={subscription} /> : null}
-      {storage && subscription && subscription.standing !== "ended" ? <OrganizationStorage spaceId={spaceId} revision={billing.revision} transport={storage} /> : null}
+      {storage ? <OrganizationStorage spaceId={spaceId} revision={billing.revision} transport={storage} /> : null}
     </div>
   );
 }

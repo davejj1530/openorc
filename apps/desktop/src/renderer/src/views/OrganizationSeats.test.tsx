@@ -67,7 +67,7 @@ it("keeps billing usable while the independent storage read has no answer", asyn
   expect(screen.getByRole<HTMLButtonElement>("button", { name: "Buy seats" }).disabled).toBe(false);
 });
 
-it("shows storage only for an organization that has seats", async () => {
+it("shows storage with or without seats, since members with Pro of their own bring it too", async () => {
   const storage = { get: vi.fn(async () => ({ storage: { usedBytes: 2048, allowanceBytes: 10 * 1024 ** 3 }, error: null })), subscribe: vi.fn(() => () => {}) };
   const paid: OrganizationBillingStatus = {
     ...empty,
@@ -77,15 +77,12 @@ it("shows storage only for an organization that has seats", async () => {
       available: 2,
     },
   };
-  for (const [status, line] of [
-    [empty, false],
-    [paid, true],
-  ] as const) {
+  for (const status of [empty, paid]) {
     const f = await show(status);
     cleanup();
     render(<OrganizationSeats spaceId="team-a" view={f.view} offers={f.offers} storage={storage} />);
     await act(async () => {});
-    expect(screen.queryByText(/ used$/) !== null).toBe(line);
+    expect(screen.queryByText(/ used$/)).not.toBeNull();
     cleanup();
   }
 });

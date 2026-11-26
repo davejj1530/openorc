@@ -78,6 +78,17 @@ export function weeklyWindow(windows: AllowanceWindow[]): AllowanceWindow | null
   return weekly.find((window) => !singleModel(window)) ?? weekly[0] ?? null;
 }
 
+/** The limit of the given model alone, such as Claude's "7-day window · Fable" for claude-fable-5-2. */
+export function modelWindow(windows: AllowanceWindow[], model: string): AllowanceWindow | null {
+  const id = model.toLowerCase();
+  return (
+    windows.find((window) => {
+      const name = singleModel(window) ? / · (.+)$/.exec(window.label)?.[1] : undefined;
+      return name !== undefined && id.includes(name.toLowerCase());
+    }) ?? null
+  );
+}
+
 const SESSION = /hour|session/i;
 
 /** The account's short rolling limit, such as Claude's and Codex's 5-hour window, for the usage table beside the week. */

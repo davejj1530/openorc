@@ -1,5 +1,17 @@
 import { claudeAccounts, threads, type Db } from "@openorc/db";
-import { DEFAULT_CLAUDE_ACCOUNT, percentLeft, sessionWindow, weeklyWindow, type AllowanceWindow, type AppSettings, type ProviderUsage, type Run, type Thread } from "@openorc/protocol";
+import {
+  DEFAULT_CLAUDE_ACCOUNT,
+  modelWindow,
+  percentLeft,
+  sessionWindow,
+  weeklyWindow,
+  type AllowanceWindow,
+  type AppSettings,
+  type ModelOption,
+  type ProviderUsage,
+  type Run,
+  type Thread,
+} from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { PLAN_LIMITS_MAX_AGE_MS } from "./plan-limits.js";
 import { projectAccountPolicy, type ProjectAccountPolicy } from "./project-claude-accounts.js";
@@ -20,33 +32,58 @@ export interface AccountReport {
 /**
  * The account to go on with. One that shows an open 5-hour window comes first, the one with the most of it left. When
  * none does, a plan that has no 5-hour window at all is a place too, by what is left of its week. Only a current report
- * counts, and an account whose 5-hour or week-long limit is reached is never chosen: the conversation would stop again
- * on its first turn.
+ * counts, and an account whose 5-hour or week-long limit is reached, or the limit of the conversation's model alone, is
+ * never chosen: the conversation would stop again on its first turn.
  */
-export function mostFiveHourLeft(reports: readonly AccountReport[], now: number): string | null {
-  const open = (window: AllowanceWindow | null) => window !== null && !window.exhausted && (percentLeft(window) ?? 0) > 0 && now - window.observedAt < CURRENT_MS;
+export function mostFiveHourLeft(reports: readonly AccountReport[], now: number, model?: string | null): string | null {
   let best: { id: string; left: number } | null = null;
   let weekly: { id: string; left: number } | null = null;
   for (const { id, usage } of reports) {
-    if (usage.status !== "available") continue;
-    const session = sessionWindow(usage.windows);
-    const week = weeklyWindow(usage.windows);
-    if (week && !open(week)) continue;
-    if (session) {
-      if (!open(session)) continue;
-      const left = percentLeft(session)!;
-      if (!best || left > best.left) best = { id, left };
-    } else if (week) {
-      const left = percentLeft(week)!;
-      if (!weekly || left > weekly.left) weekly = { id, left };
-    }
+    const room = roomLeft(usage, now, model);
+    if (room?.fiveHour) {
+      if (!best || room.left > best.left) best = { id, left: room.left };
+    } else if (room && (!weekly || room.left > weekly.left)) weekly = { id, left: room.left };
   }
   return best?.id ?? weekly?.id ?? null;
+}
+
+const open = (window: AllowanceWindow, now: number) => !window.exhausted && (percentLeft(window) ?? 0) > 0 && now - window.observedAt < CURRENT_MS;
+
+/** What is left of the account's 5-hour window, or of its week on a plan without one; null when it is no place to go. */
+function roomLeft(usage: ProviderUsage, now: number, model?: string | null): { fiveHour: boolean; left: number } | null {
+  if (usage.status !== "available") return null;
+  const session = sessionWindow(usage.windows);
+  const week = weeklyWindow(usage.windows);
+  const own = model ? modelWindow(usage.windows, model) : null;
+  if ((week && !open(week, now)) || (own && !open(own, now))) return null;
+  if (session) return open(session, now) ? { fiveHour: true, left: percentLeft(session)! } : null;
+  return week ? { fiveHour: false, left: percentLeft(week)! } : null;
 }
 
 /** When the account's limits were last read: its 5-hour window's reading, or its week's on a plan without one. */
 function readAt(usage: ProviderUsage): number {
   return (sessionWindow(usage.windows) ?? weeklyWindow(usage.windows))?.observedAt ?? 0;
+}
+
+const reached = (window: AllowanceWindow) => window.exhausted || (percentLeft(window) ?? 0) <= 0;
+
+/** Whether the limit of the model alone is used up on the account, the account's own limits aside. */
+function modelLimitReached(usage: ProviderUsage, model: string): boolean {
+  const own = modelWindow(usage.windows, model);
+  return own !== null && reached(own);
+}
+
+/**
+ * Fable has a week-long limit of its own, which can run out on every account while their own limits still have room.
+ * A conversation on Fable then goes on with the newest Opus, at the same effort.
+ */
+const RUNS_OUT = /fable/i;
+const GOES_ON_WITH = /opus/i;
+
+const fallsBack = (model: string | null): model is string => model !== null && RUNS_OUT.test(model);
+
+function fallbackModel(models: readonly ModelOption[], effort: string | null): ModelOption | null {
+  return models.find((model) => model.agent === "claude" && GOES_ON_WITH.test(model.id) && !model.unavailable && !model.legacy && (!effort || model.efforts.includes(effort))) ?? null;
 }
 
 /** How a stopped conversation with no account to go on with keeps looking: soon, then at a steady pace, for a while. */
@@ -63,22 +100,23 @@ interface Dependencies {
   db: Db;
   settings: { get(): Pick<AppSettings, "claudeAccountAutoSwitch" | "claudeAccountsSeparate"> };
   usage: Pick<ProviderUsageService, "recent">;
-  runs: Pick<RunService, "threadSession">;
+  runs: Pick<RunService, "threadSession" | "models">;
   threads: Pick<ThreadService, "continueThread">;
   log: Pick<Logger, "warn">;
   lookAgain?: LookAgain;
 }
 
 /** Why an account is no place to go, in a few words for the log. */
-function whyNot(report: AccountReport | null, now: number): string {
+function whyNot(report: AccountReport | null, now: number, model: string | null): string {
   if (!report) return "its usage could not be read";
   if (report.usage.status !== "available") return "its usage is not available";
   const session = sessionWindow(report.usage.windows);
   const week = weeklyWindow(report.usage.windows);
   if (!session && !week) return "it reports no limits to judge by";
   if (now - readAt(report.usage) >= CURRENT_MS) return "its last usage reading is too old";
-  if (session && (session.exhausted || (percentLeft(session) ?? 0) <= 0)) return "its 5-hour limit is reached";
-  if (week && (week.exhausted || (percentLeft(week) ?? 0) <= 0)) return "its week's limit is reached";
+  if (session && reached(session)) return "its 5-hour limit is reached";
+  if (week && reached(week)) return "its week's limit is reached";
+  if (model && modelLimitReached(report.usage, model)) return `its limit for ${model} is reached`;
   return "nothing left";
 }
 
@@ -170,41 +208,85 @@ export class ClaudeAccountSwitch {
    * longer this switch's to move: the person moved it, wrote to it, or changed what its project allows.
    */
   private async move(threadId: string, from: string, since: number, first: boolean): Promise<"moved" | "none" | "left"> {
-    const { db, usage } = this.deps;
+    const { db } = this.deps;
     const current = threads.get(db, threadId);
     if (!current) return "left";
-    // Its own account is a place to go again once its limit has reset, never on the first look: the reading from just before the stop still says a little is left.
-    const places = this.policy(current).allowed.filter((id) => !first || id !== from);
+    // On the first look its own account is no place for its model, and is read only for the model Fable goes on with.
+    const places = this.policy(current).allowed.filter((id) => !first || id !== from || fallsBack(current.model));
     if (!places.length) return "left";
-    const read = await Promise.all(
+    const read = await this.read(places);
+    const now = Date.now();
+    const thread = this.stillStopped(threadId, from);
+    if (!thread) return "left";
+    const allowed = this.policy(thread).allowed;
+    // A reading of its own account from before the stop still says a little is left.
+    const reports = read.filter((report) => report !== null).filter((report) => allowed.includes(report.id) && (report.id !== from || readAt(report.usage) > since));
+    // Its own account is a place for its model again once its limit has reset, never on the first look: a reading just after the stop can still say a little is left.
+    const to = mostFiveHourLeft(
+      reports.filter((report) => !first || report.id !== from),
+      now,
+      thread.model,
+    );
+    if (to) {
+      const prompt =
+        to === from
+          ? `The usage limit of the Claude account ${name(db, from)} has reset. Continue where you left off.`
+          : `Moved to the Claude account ${name(db, to)} after ${name(db, from)} reached its usage limit. Continue where you left off.`;
+      await this.deps.threads.continueThread(threadId, continuation(thread, to, prompt));
+      return "moved";
+    }
+    const instead = await this.otherModel(thread, from, first, reports, now);
+    if (!instead) {
+      if (first) this.sayWhyNone(thread, from, places, read, now);
+      return "none";
+    }
+    const prompt =
+      instead.to === from
+        ? `No Claude account has Fable usage left, so this conversation goes on with ${instead.model.label} at the same effort. Continue where you left off.`
+        : `No Claude account has Fable usage left, so this conversation goes on with ${instead.model.label} on the Claude account ${name(db, instead.to)}, at the same effort. Continue where you left off.`;
+    await this.deps.threads.continueThread(threadId, { ...continuation(thread, instead.to, prompt), model: instead.model.id });
+    return "moved";
+  }
+
+  /** Each account's last report, or null where it could not be read. */
+  private read(places: readonly string[]): Promise<(AccountReport | null)[]> {
+    return Promise.all(
       places.map((id) =>
-        usage.recent("claude", id, PLAN_LIMITS_MAX_AGE_MS).then(
+        this.deps.usage.recent("claude", id, PLAN_LIMITS_MAX_AGE_MS).then(
           (report): AccountReport => ({ id, usage: report }),
           () => null,
         ),
       ),
     );
-    const now = Date.now();
-    const reports = read.filter((report) => report !== null).filter((report) => report.id !== from || readAt(report.usage) > since);
-    const to = mostFiveHourLeft(reports, now);
-    const thread = threads.get(db, threadId);
+  }
+
+  /** The thread while it is still this switch's to move: on the same account, stopped at its limit, its project switching. */
+  private stillStopped(threadId: string, from: string): Thread | null {
+    const thread = threads.get(this.deps.db, threadId);
     // While usage was read, the person may have moved the conversation, or written to it, or changed what its project allows.
-    if (!thread || thread.agent !== "claude" || (thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) !== from || !this.stoppedAtLimit(threadId)) return "left";
-    const policy = this.policy(thread);
-    if (!policy.autoSwitch) return "left";
-    if (!to || !policy.allowed.includes(to)) {
-      if (first) {
-        const why = places.map((id, index) => `${name(db, id)}: ${whyNot(read[index] ?? null, now)}`).join("; ");
-        this.deps.log.warn(`thread ${threadId}: stopped at ${name(db, from)}'s usage limit with no Claude account to go on with (${why}); looking again until one is free`);
-      }
-      return "none";
-    }
-    const prompt =
-      to === from
-        ? `The usage limit of the Claude account ${name(db, from)} has reset. Continue where you left off.`
-        : `Moved to the Claude account ${name(db, to)} after ${name(db, from)} reached its usage limit. Continue where you left off.`;
-    await this.deps.threads.continueThread(threadId, continuation(thread, to, prompt));
-    return "moved";
+    if (!thread || thread.agent !== "claude" || (thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) !== from || !this.stoppedAtLimit(threadId)) return null;
+    return this.policy(thread).autoSwitch ? thread : null;
+  }
+
+  /** For a conversation on Fable that no account has Fable left for: the model it goes on with, and where. */
+  private async otherModel(thread: Thread, from: string, first: boolean, reports: readonly AccountReport[], now: number): Promise<{ model: ModelOption; to: string } | null> {
+    const stopped = thread.model;
+    if (!fallsBack(stopped)) return null;
+    const model = fallbackModel(await this.deps.runs.models("claude", undefined, undefined, from), thread.effort);
+    if (!model) return null;
+    // When the model's own limit is what stopped it, its own account has room for the other model at once.
+    const to = mostFiveHourLeft(
+      reports.filter((report) => !first || report.id !== from || modelLimitReached(report.usage, stopped)),
+      now,
+      model.id,
+    );
+    return to ? { model, to } : null;
+  }
+
+  private sayWhyNone(thread: Thread, from: string, places: readonly string[], read: readonly (AccountReport | null)[], now: number): void {
+    const { db } = this.deps;
+    const why = places.flatMap((id, index) => (id === from ? [] : [`${name(db, id)}: ${whyNot(read[index] ?? null, now, thread.model)}`])).join("; ");
+    this.deps.log.warn(`thread ${thread.id}: stopped at ${name(db, from)}'s usage limit with no Claude account to go on with (${why}); looking again until one is free`);
   }
 }
 

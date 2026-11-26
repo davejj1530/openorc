@@ -410,6 +410,72 @@ it("keeps looking when no account has anything left, says why once, and goes on 
   switcher.close();
 });
 
+/** An account's limits as read now, with Fable's own week-long limit beside the account's. */
+function fableReport(fiveHourUsed: number, fableUsed: number): ProviderUsage {
+  const report = fiveHourReport(fiveHourUsed);
+  const fable: AllowanceWindow = {
+    ...report.windows[1]!,
+    id: "weekly_scoped:Fable",
+    label: "7-day window · Fable",
+    usedPercent: fableUsed,
+    remainingPercent: 100 - fableUsed,
+    exhausted: fableUsed >= 100,
+  };
+  return { ...report, windows: [...report.windows, fable] };
+}
+
+it("goes on with Fable only where Fable has room, and with Opus at the same effort once no account has Fable left", async () => {
+  const [work, personal, client] = ["Work", "Personal", "Client"].map((name) => accounts.add(name).id) as [string, string, string];
+  const used: Record<string, [number, number]> = { [work]: [20, 100], [personal]: [5, 100], [client]: [50, 40] };
+  // A live read takes a moment, so what it reports comes after the stop.
+  const recent = vi.fn(async (_provider: string, id: string | undefined) => {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    return used[id!] ? fableReport(...used[id!]!) : signedOut();
+  });
+  const option = (id: string, label: string) => ({ id, label, agent: "claude" as const, isDefault: false, efforts: ["high", "xhigh"], defaultEffort: "medium" });
+  const switcher = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: true, claudeAccountsSeparate: false }) },
+    usage: { recent },
+    runs: { threadSession: (id) => service.threadSession(id), models: async () => [option("claude-fable-5-2", "Fable 5.2"), option("claude-opus-5-5", "Opus 5.5")] },
+    threads: conversations,
+    log: quiet,
+  });
+  turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
+  const stopsAtFable = async () => {
+    const { thread, run } = await conversations.start({ ...input, model: "claude-fable-5-2", effort: "xhigh", projectId: project.id, claudeAccountId: work });
+    const ts = Date.now();
+    const handle = start.mock.results.at(-1)!.value;
+    handle.emit("event", { type: "activity.updated", runId: run!.id, ts, activityId: "rate-limit", label: "Rate limit reached", status: "error", recovery: { kind: "usage", provider: "claude" } });
+    handle.emit("event", { type: "turn.completed", runId: run!.id, ts, turnId: "fixture", status: "error", resultText: "You've hit your Fable limit", durationMs: 1 });
+    const calls = start.mock.calls.length;
+    await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(calls + 1));
+    const [spec] = start.mock.lastCall!;
+    const moved = threads.get(db, thread.id)!;
+    return { prompt: spec.prompt.split("\n")[0], spec: [spec.model, spec.effort], thread: [moved.claudeAccountId, moved.model, moved.effort] };
+  };
+
+  // Personal has the most 5-hour usage left but no Fable: Client, with Fable to spare, is the place.
+  expect(await stopsAtFable()).toMatchObject({ spec: ["claude-fable-5-2", "xhigh"], thread: [client, "claude-fable-5-2", "xhigh"] });
+
+  // No account has Fable left: it goes on with Opus, on the account with the most 5-hour usage left.
+  used[client] = [50, 100];
+  expect(await stopsAtFable()).toEqual({
+    prompt: "No Claude account has Fable usage left, so this conversation goes on with Opus 5.5 on the Claude account Personal, at the same effort. Continue where you left off.",
+    spec: ["claude-opus-5-5", "xhigh"],
+    thread: [personal, "claude-opus-5-5", "xhigh"],
+  });
+
+  // Fable's own limit is what stopped Work, so Work itself has room for Opus at once.
+  used[personal] = [100, 100];
+  expect(await stopsAtFable()).toEqual({
+    prompt: "No Claude account has Fable usage left, so this conversation goes on with Opus 5.5 at the same effort. Continue where you left off.",
+    spec: ["claude-opus-5-5", "xhigh"],
+    thread: [work, "claude-opus-5-5", "xhigh"],
+  });
+  switcher.close();
+});
+
 it("goes on with its own account once a reading taken after the stop says its limit has reset", async () => {
   const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
   const reports: Record<string, ProviderUsage> = { [work]: fiveHourReport(100), [personal]: fiveHourReport(100) };

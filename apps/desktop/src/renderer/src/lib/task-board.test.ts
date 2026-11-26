@@ -1,6 +1,6 @@
 import type { BoardColumn, Task } from "@openorc/protocol";
 import { expect, it } from "vitest";
-import { boardMove, taskBoardColumns } from "./task-board";
+import { agentSetupSlot, boardMove, taskBoardColumns } from "./task-board";
 import type { TaskRecord } from "./task-records";
 import { onlineReference, onlineTask } from "./test-fixtures/online-task";
 
@@ -51,4 +51,19 @@ it("puts a card dropped on a column in it when the board keeps that kind of task
   expect(boardMove(online("a"), review!, "local")).toEqual({ status: "in_progress" });
   const [statuses] = taskBoardColumns([], [], "online");
   expect(boardMove(online("a"), statuses!, "online")).toEqual({ status: "backlog" });
+});
+
+it("sets up a column's agent in the column named, else the first working column with no agent, else the first working one", () => {
+  const job = { prompt: "Build it.", choice: null };
+  const slots = [
+    { id: "inbox", name: "Inbox", stage: "backlog" as const },
+    { id: "build", name: "Build", stage: "in_progress" as const, job },
+    { id: "review", name: "Code review", stage: "in_progress" as const },
+    { id: "done", name: "Done", stage: "done" as const },
+  ];
+  expect(agentSetupSlot(slots, "done")).toBe(3);
+  expect(agentSetupSlot(slots, null)).toBe(2);
+  expect(agentSetupSlot(slots, "gone")).toBe(2);
+  expect(agentSetupSlot([slots[0]!, slots[1]!, slots[3]!], null)).toBe(1);
+  expect(agentSetupSlot([slots[0]!, slots[3]!], null)).toBe(0);
 });

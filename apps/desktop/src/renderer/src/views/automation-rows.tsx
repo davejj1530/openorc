@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { READY_MADE_AUTOMATIONS, harnessShortName, type Automation, type BoardColumn, type Project, type ReadyMadeAutomation } from "@openorc/protocol";
 import { HarnessLogo } from "../components/HarnessLogo";
-import { Automation as AutomationMark, CalendarClock, Columns2, Plus } from "../components/icons";
+import { Automation as AutomationMark, CalendarClock, Columns2, Plus, ChevronRight } from "../components/icons";
 import { menuItem, menuPopup } from "../components/menu";
 import { Button, Switch } from "../components/ui";
 import { CoversPreview } from "../lib/browser-preview";
@@ -13,11 +13,14 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { TriggerMark } from "../components/automations/TriggerMark";
 import "./schedules.css";
 
-/** A project's board, where its columns and their jobs are changed. */
-export function openBoard(projectId: string | null): void {
-  const layout = useLayout.getState();
-  if (projectId) layout.setWorkspace(projectId);
+/**
+ * A project's board, open on the settings of the column whose agent is set up there: the column named, else the first
+ * working column, so the agent's words are written at once.
+ */
+export function openBoard(projectId: string, columnId: string | null = null): void {
+  useLayout.getState().setWorkspace(projectId);
   useTasksView.getState().setView("board");
+  useTasksView.getState().setUpAgent({ projectId, columnId });
   useRouter.getState().navigate({ view: "tasks" });
 }
 
@@ -28,7 +31,7 @@ export function ColumnJobRow({ column, projectName }: { column: BoardColumn; pro
   return (
     <div data-job={column.id} className="schedule-row">
       <div className="schedule-row-line">
-        <button type="button" onClick={() => openBoard(column.projectId)} className="schedule-row-open">
+        <button type="button" onClick={() => openBoard(column.projectId, column.id)} className="schedule-row-open">
           <span className="schedule-row-well" aria-hidden="true">
             {agent ? <HarnessLogo id={agent} size={16} /> : <Columns2 size={16} />}
           </span>
@@ -54,13 +57,56 @@ export function ColumnJobRow({ column, projectName }: { column: BoardColumn; pro
   );
 }
 
-/** New automation, as a menu of the three ways one is made: a rule, a column's agent on the board, or a prompt on a timer. */
-export function NewAutomationMenu({ disabled, onRule, onBoard, onSchedule }: { disabled: boolean; onRule: () => void; onBoard: () => void; onSchedule: () => void }) {
-  const ways = [
-    { label: "When something happens", go: onRule },
-    { label: "When a card arrives in a column", go: onBoard },
-    { label: "On a schedule", go: onSchedule },
-  ];
+/**
+ * A column's agent is set up on its project's board. With that project in scope the item goes there; with every project
+ * in scope it first asks which, from the projects with a folder on this computer, where boards keep their own columns.
+ */
+function ColumnAgentItem({ projectId, projects }: { projectId: string | null; projects: readonly Project[] }) {
+  const label = "When a card arrives in a column";
+  const here = projects.find((project) => project.id === projectId);
+  if (here || projects.length === 0)
+    return (
+      <Menu.Item className={menuItem} disabled={!here} onClick={() => here && openBoard(here.id)}>
+        <span className="flex-1">{label}</span>
+      </Menu.Item>
+    );
+  return (
+    <Menu.SubmenuRoot>
+      <Menu.SubmenuTrigger className={menuItem}>
+        <span className="flex-1">{label}</span>
+        <ChevronRight size={14} />
+      </Menu.SubmenuTrigger>
+      <Menu.Portal>
+        <CoversPreview />
+        <Menu.Positioner sideOffset={4} alignOffset={-6} collisionPadding={8} className="z-40">
+          <Menu.Popup ref={floatingGround} className={menuPopup}>
+            {projects.map((project) => (
+              <Menu.Item key={project.id} className={menuItem} onClick={() => openBoard(project.id)}>
+                <span className="flex-1 truncate">{project.name}</span>
+              </Menu.Item>
+            ))}
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.SubmenuRoot>
+  );
+}
+
+/** New automation, as a menu of the three ways one is made: a rule, a column's agent on a board, or a prompt on a timer. */
+export function NewAutomationMenu({
+  disabled,
+  projectId,
+  boardProjects,
+  onRule,
+  onSchedule,
+}: {
+  disabled: boolean;
+  projectId: string | null;
+  /** The projects whose boards keep their own columns: the ones with a folder on this computer. */
+  boardProjects: readonly Project[];
+  onRule: () => void;
+  onSchedule: () => void;
+}) {
   return (
     <Menu.Root>
       <Menu.Trigger render={<Button variant="primary" size="lg" className="pl-2.5" disabled={disabled} />}>
@@ -70,11 +116,13 @@ export function NewAutomationMenu({ disabled, onRule, onBoard, onSchedule }: { d
         <CoversPreview />
         <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
           <Menu.Popup ref={floatingGround} className={menuPopup}>
-            {ways.map((way) => (
-              <Menu.Item key={way.label} className={menuItem} onClick={way.go}>
-                <span className="flex-1">{way.label}</span>
-              </Menu.Item>
-            ))}
+            <Menu.Item className={menuItem} onClick={onRule}>
+              <span className="flex-1">When something happens</span>
+            </Menu.Item>
+            <ColumnAgentItem projectId={projectId} projects={boardProjects} />
+            <Menu.Item className={menuItem} onClick={onSchedule}>
+              <span className="flex-1">On a schedule</span>
+            </Menu.Item>
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>

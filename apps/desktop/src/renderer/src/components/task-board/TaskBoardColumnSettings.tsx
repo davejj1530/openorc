@@ -63,7 +63,7 @@ export function TaskBoardColumnSettings({
   slots: readonly BoardSlot[];
   index: number;
   project: AccountsProject | undefined;
-  /** Whether the board's agents start: a board this computer keeps. An organization's keeps its words for later. */
+  /** Whether a column here can have an agent: a board this computer keeps. An organization's board is its columns alone. */
   jobsStart: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -107,14 +107,15 @@ export function TaskBoardColumnSettings({
               }}
             />
             <Segmented size="sm" label="Stage" value={slot.stage} options={stages} onChange={(stage) => put({ stage })} />
-            <section className="task-board-setting" aria-labelledby={`column-${index}-arrives`}>
-              <h3 id={`column-${index}-arrives`} className="task-board-setting-label">
-                When a card arrives
-              </h3>
-              <ColumnAgent key={slot.id ?? index} slot={slot} project={project} onChange={put} />
-              {jobsStart ? null : <p className="task-board-setting-note">Agents for organization tasks don’t start yet.</p>}
-            </section>
-            {slot.job ? (
+            {jobsStart ? (
+              <section className="task-board-setting" aria-labelledby={`column-${index}-arrives`}>
+                <h3 id={`column-${index}-arrives`} className="task-board-setting-label">
+                  When a card arrives
+                </h3>
+                <ColumnAgent key={slot.id ?? index} slot={slot} project={project} onChange={put} />
+              </section>
+            ) : null}
+            {jobsStart && slot.job ? (
               <label className="task-board-setting task-board-setting-row">
                 <span className="task-board-setting-label">When the work is done</span>
                 <Select value={later.some((each) => each.id === slot.nextColumnId) ? (slot.nextColumnId ?? "") : ""} onChange={(event) => put({ nextColumnId: event.currentTarget.value || null })}>

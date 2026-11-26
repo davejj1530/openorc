@@ -82,14 +82,14 @@ import { docHref } from "../../data/docs";
       </table>
     </div>
     <p>Changing a column's stage changes the status of the tasks in it. <strong>Remove column</strong> takes the column away and leaves its tasks in their status, so they show in the first column of that stage. A board keeps at least one column.</p>
-    <p>A project's columns are kept on this computer. A project with no folder on this computer keeps the four statuses as its columns for now. An organization's tasks have a status and no column, so on the board they sit in the first column of their stage, and one you drop on a column lands in the first column of that column's stage.</p>
+    <p>A project with a folder on this computer keeps its columns on this computer. An organization's project shares one board with everyone in it: anyone who can edit its tasks moves cards between its columns, and only an organization admin can add, rename, move or remove columns. Column agents work only on projects with a folder on this computer, so an organization's columns have no agent settings. A project with no folder on this computer and in no organization keeps the four statuses as its columns.</p>
   </section>
 
   <section aria-labelledby="agents">
     <h2 id="agents">Column agents</h2>
     <p>A column can start an agent for each card put in it. A Plan column can have an agent write a plan, and a Code review column can have a second agent check the build.</p>
     <ol class="docs-steps">
-      <li>Open the column's settings.</li>
+      <li>Open the column's settings, or on the Automations page choose <strong>New automation</strong>, then <strong>When a card arrives in a column</strong>: the project's board opens with a working column's settings already open, after you pick the project if every project is in view.</li>
       <li>Under <strong>When a card arrives</strong>, write what the agent should do with each card, as you would write a message.</li>
       <li>Under the words, choose the model that reads them. <strong>The task's model</strong> uses the <a href={docHref("tasks") + "#model"}>model set on the task</a>.</li>
       <li>Under <strong>When the work is done</strong>, choose <strong>The card stays here</strong>, or a later column for the card to move to.</li>

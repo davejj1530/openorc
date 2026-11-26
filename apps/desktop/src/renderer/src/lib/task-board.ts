@@ -33,6 +33,21 @@ function boardOrder(stage: TaskStatus): (a: TaskRecord, b: TaskRecord) => number
   return (a, b) => Number(taskNeedsYou(b)) - Number(taskNeedsYou(a)) || b.task.createdAt - a.task.createdAt;
 }
 
+/**
+ * Where a column's agent is set up: the column named while the board has it, else the first working column with no
+ * agent yet, else the first working column, else the first.
+ */
+export function agentSetupSlot(slots: readonly BoardSlot[], columnId: string | null): number {
+  const named = columnId ? slots.findIndex((slot) => slot.id === columnId) : -1;
+  if (named >= 0) return named;
+  const free = slots.findIndex((slot) => slot.stage === "in_progress" && !slot.job);
+  if (free >= 0) return free;
+  return Math.max(
+    0,
+    slots.findIndex((slot) => slot.stage === "in_progress"),
+  );
+}
+
 /** The columns a project can rename, add to, reorder and remove: its own, or one for each stage until it keeps some. */
 export function boardSlots(kept: readonly BoardColumn[]): BoardSlot[] {
   return kept.length > 0

@@ -31,9 +31,14 @@
   /* The model's own field sits on the box's fill, a step up from it. */
   --surface-2: var(--surface);
 }
+/* A select is as wide as its longest option; here the model takes two parts of the row and the account one. */
 .agent-brief-foot select {
+  flex: 1 1 0;
   min-width: 0;
   font-size: var(--text-sm);
+}
+.agent-brief-foot select:first-of-type {
+  flex-grow: 2;
 }
 .agent-brief-mark {
   display: grid;

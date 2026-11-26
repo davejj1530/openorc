@@ -1,14 +1,15 @@
-import { useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "../../lib/cn";
 import type { BoardColumnJob, Project } from "@openorc/protocol";
 import { relativeTime } from "@openorc/client";
 import { useRpcMutation } from "../../lib/client";
 import { useSpaceProjects } from "../../lib/space-queries";
-import { boardMove, boardSlots, taskBoardColumns, type BoardKeeper, type BoardSlot, type TaskBoardColumn } from "../../lib/task-board";
+import { agentSetupSlot, boardMove, boardSlots, taskBoardColumns, type BoardKeeper, type BoardSlot, type TaskBoardColumn } from "../../lib/task-board";
 import { boardProjectKey, useBoardColumns, type BoardOwner } from "../../lib/task-board-source";
 import { openTaskRecord } from "../../lib/task-open";
 import { useTaskProperty } from "../../lib/task-property";
 import { taskNeedsAttention, taskNeedsYou, taskRecordKey, type TaskRecord } from "../../lib/task-records";
+import { useTasksView } from "../../lib/tasks-view";
 import { useScrollEdges } from "../../lib/use-scroll-edges";
 import { HarnessLogo } from "../HarnessLogo";
 import { Automation, Plus } from "../icons";
@@ -48,6 +49,7 @@ export function TaskBoard({ tasks, owner, showProject, pane }: { tasks: TaskReco
   /** The column whose settings are open, by its place, which a save keeps where an unsaved column's id changes. */
   const [settings, setSettings] = useState<number | null>(null);
   const edges = useScrollEdges("x");
+  useAgentSetup(owner, board.columns, slots, setSettings);
   const change = board.editable
     ? (next: BoardSlot[], open: number | null) => {
         setSettings(open);
@@ -114,6 +116,16 @@ export function TaskBoard({ tasks, owner, showProject, pane }: { tasks: TaskReco
       </div>
     </>
   );
+}
+
+/** Opens the settings of the column the Automations page asked for, once this board is that project's and its columns are read. */
+function useAgentSetup(owner: BoardOwner | null, columns: readonly unknown[] | undefined, slots: readonly BoardSlot[], open: (slot: number) => void): void {
+  const setup = useTasksView((state) => state.agentSetup);
+  useEffect(() => {
+    if (!setup || owner?.place !== "local" || owner.projectId !== setup.projectId || columns === undefined) return;
+    open(agentSetupSlot(slots, setup.columnId));
+    useTasksView.getState().setUpAgent(null);
+  }, [setup, owner, columns, slots, open]);
 }
 
 /**

@@ -21,9 +21,14 @@ function save(view: TasksView): void {
   }
 }
 
+/** A project's board asked to open with a column's settings, for the person to give that column an agent: the column named, else its first working one. */
+export type AgentSetup = { projectId: string; columnId: string | null };
+
 interface TasksViewState {
   view: TasksView;
   setView: (view: TasksView) => void;
+  agentSetup: AgentSetup | null;
+  setUpAgent: (setup: AgentSetup | null) => void;
 }
 
 /** How the Tasks screen lays its tasks out, kept across launches. */
@@ -33,6 +38,8 @@ export const useTasksView = create<TasksViewState>((set) => ({
     save(view);
     set({ view });
   },
+  agentSetup: null,
+  setUpAgent: (agentSetup) => set({ agentSetup }),
 }));
 
 window.addEventListener("storage", (event) => {

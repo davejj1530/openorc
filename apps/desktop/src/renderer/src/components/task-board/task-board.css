@@ -47,16 +47,10 @@
 .task-board-column-head h2 {
   min-width: 0;
 }
-/* A column's settings wait at the end of its head until the pointer or the keyboard reaches the column, or they are open. */
+/* A column's settings at the end of its head, quiet until they are wanted. */
 .task-board-column-more {
   margin-left: auto;
-  opacity: 0;
-  transition: opacity var(--duration-leave) var(--ease-out);
-}
-.task-board-column-head:hover .task-board-column-more,
-.task-board-column-more:focus-visible,
-.task-board-column-more[aria-expanded="true"] {
-  opacity: 1;
+  color: var(--ink-3);
 }
 /* The mark of the job a card starts in the column, which keeps the settings beside it at the head's end. */
 .task-board-column-job {
@@ -71,7 +65,7 @@
 /* A column's settings: its name as its title, its stage, then what its agent is told, written as a message would be. */
 .task-board-settings {
   display: flex;
-  width: 420px;
+  width: 448px;
   flex-direction: column;
   gap: 12px;
   padding: 12px;
@@ -100,12 +94,6 @@
   color: var(--ink-3);
   font-size: var(--text-sm);
   line-height: 18px;
-}
-.task-board-setting-note {
-  padding-left: 2px;
-  color: var(--ink-4);
-  font-size: var(--text-xs);
-  line-height: 16px;
 }
 .task-board-settings-foot {
   display: flex;

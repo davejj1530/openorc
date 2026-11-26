@@ -27,7 +27,7 @@ import { ClaudeAccountScope } from "../lib/claude-account";
 import { useScheduleEditor, type SchedulePreset } from "../lib/use-schedule-editor";
 import { AutomationDialog } from "../components/automations/AutomationDialog";
 import { AutomationRow, ProposedAutomations } from "./automation-rule-rows";
-import { ColumnJobRow, NewAutomationMenu, openBoard, ReadyMadeAutomations } from "./automation-rows";
+import { ColumnJobRow, NewAutomationMenu, ReadyMadeAutomations } from "./automation-rows";
 import { intervalLabel, intervals, ScheduleRow } from "./schedule-row";
 import "./pages.css";
 
@@ -100,8 +100,9 @@ export function Scheduled() {
         actions={
           <NewAutomationMenu
             disabled={projects.length === 0}
+            projectId={projectId}
+            boardProjects={projects.filter((project) => project.rootPath)}
             onRule={() => setEditing({ kind: "rule", automation: null })}
-            onBoard={() => openBoard(projectId)}
             onSchedule={() => setEditing({ kind: "schedule", schedule: null })}
           />
         }

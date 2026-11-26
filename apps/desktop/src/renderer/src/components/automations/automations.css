@@ -146,7 +146,8 @@
 }
 
 /* The automations of a board or of one task, as a menu from the top bar: groups of lines split by hairlines. */
-.automations-menu {
+/* Named with the shared popover's class so its size wins over the popover's, whichever stylesheet loads last. */
+.automations-menu.floating-popover {
   display: flex;
   width: 420px;
   max-height: min(70vh, 640px);

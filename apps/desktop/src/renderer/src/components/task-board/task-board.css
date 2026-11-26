@@ -63,12 +63,13 @@
   margin-left: 0;
 }
 /* A column's settings: its name as its title, its stage, then what its agent is told, written as a message would be. */
-.task-board-settings {
+/* Named with the shared popover's class so its own room wins over the popover's, whichever stylesheet loads last. */
+.task-board-settings.floating-popover {
   display: flex;
-  width: 448px;
+  width: 472px;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
+  gap: 14px;
+  padding: 16px;
   border-radius: var(--radius-2xl);
 }
 .task-board-settings .segmented {
@@ -99,9 +100,9 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  margin: 0 -12px -12px;
+  margin: 2px -16px -16px;
   border-top: var(--hairline) solid var(--line);
-  padding: 8px 12px 8px 8px;
+  padding: 10px 16px 10px 12px;
 }
 .task-board-remove {
   margin-left: auto;

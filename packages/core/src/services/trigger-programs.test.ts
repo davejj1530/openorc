@@ -9,6 +9,8 @@ import { TriggerPrograms, type ProgramEvent } from "./trigger-programs.js";
 import { TriggerValues } from "./trigger-values.js";
 import { ensureWorkspaceHome } from "./workspace-home.js";
 
+/** A program starts in a login shell, which takes its time on a busy machine. */
+const WAIT = { timeout: 10_000 };
 let folder: string;
 let db: Db;
 let programs: TriggerPrograms;
@@ -43,12 +45,14 @@ const watching = (id: string): WatchedAutomation[] => [{ id: "automation", trigg
 it("runs a program for its automation with the values it names, and each line of JSON it prints is an event", async () => {
   const id = written(`echo '{"id":"'"$SLACK_TOKEN"'","title":"Dana messaged you","detail":"Lunch?"}'; echo Connected; sleep 30`, [{ name: "SLACK_TOKEN", about: "From your Slack app." }]);
   await programs.setValue(id, "SLACK_TOKEN", "xoxb-1", watching(id));
-  await vi.waitFor(() => expect(fire).toHaveBeenCalledWith("automation", { key: "program:xoxb-1", title: "Dana messaged you", detail: "Lunch?" }));
-  await vi.waitFor(async () =>
-    expect((await programs.state(id)).recent.map((line) => [line.text, line.event])).toEqual([
-      ["Dana messaged you", true],
-      ["Connected", false],
-    ]),
+  await vi.waitFor(() => expect(fire).toHaveBeenCalledWith("automation", { key: "program:xoxb-1", title: "Dana messaged you", detail: "Lunch?" }), WAIT);
+  await vi.waitFor(
+    async () =>
+      expect((await programs.state(id)).recent.map((line) => [line.text, line.event])).toEqual([
+        ["Dana messaged you", true],
+        ["Connected", false],
+      ]),
+    WAIT,
   );
   expect(report).toHaveBeenLastCalledWith("automation", null);
   expect(await programs.state(id)).toMatchObject({
@@ -62,23 +66,23 @@ it("runs a program for its automation with the values it names, and each line of
 it("waits for a value it names until the person adds it", async () => {
   const id = written(`echo '{"id":"1","title":"Ready"}'; sleep 30`, [{ name: "TOKEN", about: "" }]);
   programs.sync(watching(id));
-  await vi.waitFor(() => expect(report).toHaveBeenCalledWith("automation", "Add TOKEN to start it."));
+  await vi.waitFor(() => expect(report).toHaveBeenCalledWith("automation", "Add TOKEN to start it."), WAIT);
   expect(fire).not.toHaveBeenCalled();
   await programs.setValue(id, "TOKEN", "secret", watching(id));
-  await vi.waitFor(() => expect(fire).toHaveBeenCalledWith("automation", expect.objectContaining({ key: "program:1" })));
+  await vi.waitFor(() => expect(fire).toHaveBeenCalledWith("automation", expect.objectContaining({ key: "program:1" })), WAIT);
 });
 
 it("says why a program stopped, in its own last words", async () => {
   const id = written("echo 'The token was refused.' >&2; exit 3");
   programs.sync(watching(id));
-  await vi.waitFor(() => expect(report).toHaveBeenLastCalledWith("automation", "It stopped. The token was refused."));
+  await vi.waitFor(() => expect(report).toHaveBeenLastCalledWith("automation", "It stopped. The token was refused."), WAIT);
   expect((await programs.state(id)).state).toBe("stopped");
 });
 
 it("tries a program, showing what it prints and acting on none of it, until it is stopped", async () => {
   const id = written(`echo '{"id":"1","title":"A new file"}'; sleep 30`);
   await programs.try(id, true);
-  await vi.waitFor(async () => expect((await programs.state(id)).recent).toEqual([expect.objectContaining({ text: "A new file", event: true })]));
+  await vi.waitFor(async () => expect((await programs.state(id)).recent).toEqual([expect.objectContaining({ text: "A new file", event: true })]), WAIT);
   expect((await programs.state(id)).state).toBe("trying");
   await programs.try(id, false);
   expect(await programs.state(id)).toMatchObject({ state: "off", recent: [expect.objectContaining({ text: "A new file" })] });
@@ -101,10 +105,10 @@ it("starts a program its agent finishes after the automation was switched on, at
   const id = randomUUID();
   mkdirSync(programs.folder(id), { recursive: true });
   programs.sync(watching(id));
-  await vi.waitFor(() => expect(report).toHaveBeenCalledWith("automation", "Its program isn't written yet."));
+  await vi.waitFor(() => expect(report).toHaveBeenCalledWith("automation", "Its program isn't written yet."), WAIT);
   writeFileSync(path.join(programs.folder(id), "trigger.json"), JSON.stringify({ run: `echo '{"id":"1","title":"Written"}'; sleep 30` }));
   programs.sync(watching(id));
-  await vi.waitFor(() => expect(fire).toHaveBeenCalledWith("automation", expect.objectContaining({ key: "program:1" })));
+  await vi.waitFor(() => expect(fire).toHaveBeenCalledWith("automation", expect.objectContaining({ key: "program:1" })), WAIT);
 });
 
 it("finds the thread its agent writes it in, by the folder as the system resolves it", async () => {

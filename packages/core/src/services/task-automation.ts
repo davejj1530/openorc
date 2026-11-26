@@ -9,6 +9,7 @@ import { TaskAgents } from "./task-agents.js";
 import { TaskReports } from "./task-reports.js";
 import type { Hosted } from "@openorc/hosted";
 import { TeamColumnRuns } from "./team-column-runs.js";
+import { TeamTaskHere } from "./team-task-here.js";
 import { TriggerValues } from "./trigger-values.js";
 import type { ThreadService } from "./threads.js";
 
@@ -22,6 +23,8 @@ export interface TaskAutomation {
   rules: AutomationService;
   /** Team boards' column agents asked of this person, run here. */
   team: TeamColumnRuns;
+  /** Team tasks' own threads opened on this computer. */
+  here: TeamTaskHere;
   start(): void;
   stop(): void;
 }
@@ -35,7 +38,7 @@ type Dependencies = {
   options: Pick<OpenOrcOptions, "dataDir" | "automationSources" | "automationSecrets">;
   threads: ThreadService;
   /** The signed-in OpenOrc account, whose team boards' column agents may wait for this computer. */
-  account: () => Pick<Hosted, "taskRuns" | "spaces"> | null;
+  account: () => Pick<Hosted, "taskRuns" | "tasks" | "spaces"> | null;
   invalidate: (keys: string[]) => void;
   notify: (n: Omit<Notification, "type">) => void;
   log: Logger;
@@ -53,6 +56,7 @@ export function createTaskAutomation({ db, options, threads, account, invalidate
     board,
     rules,
     team,
+    here: new TeamTaskHere({ db, account, invalidate, log }),
     start() {
       rules.start();
       team.start();

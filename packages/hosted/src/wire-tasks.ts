@@ -42,4 +42,5 @@ export const TASK_ROUTES = {
   context: (id: string) => get(`${path(id)}/context`, context),
   board: (projectId: string) => get(board(projectId), OnlineBoard),
   saveBoard: (projectId: string): Route<OnlineBoardSave> => ({ method: "PUT", path: board(projectId), reply: OnlineBoardSave }),
+  computer: (id: string, method: "POST" | "DELETE"): Route<z.infer<typeof wireTaskEnvelope>> => ({ method, path: `${path(id)}/computer`, reply: wireTaskEnvelope }),
 };

@@ -62,6 +62,8 @@ export const OnlineTask = z.object({
   columnId: id.nullable().optional(),
   /** Its column's agent, while one is asked of someone. A server that runs none leaves it out. */
   run: OnlineTaskRun.nullable().optional(),
+  /** The person whose computer the task's work runs on, in a thread there, and since when. A server that knows none leaves it out. */
+  computer: z.object({ userId: id, name: z.string(), since: timestamp }).nullable().optional(),
   createdIn: OnlineTaskLink,
   execution: OnlineTaskLink,
   activity: OnlineTaskActivity.nullable(),
@@ -135,8 +137,12 @@ export const OnlineTaskList = z
   .strict();
 export type OnlineTaskCreation = ({ state: "saved" } & OnlineTaskEnvelope) | { state: "refused"; code: string; message: string };
 export type OnlineTaskMutation = ({ state: "saved" } | { state: "conflict" }) & OnlineTaskEnvelope;
-/** `execution`: the server opens task threads. `board`: it keeps a board of columns for each project. `runs`: its columns' agents run on the assignee's computer. */
-export type OnlineTaskAvailability = { state: "unavailable" } | { state: "ready"; accountId: string; spaceId: string; execution: boolean; board: boolean; runs: boolean; personal: boolean };
+/**
+ * `execution`: the server opens task threads. `board`: it keeps a board of columns for each project. `runs`: its
+ * columns' agents run on the assignee's computer. `computer`: a task's thread can open on a person's own computer.
+ */
+export type OnlineTaskAvailability =
+  { state: "unavailable" } | { state: "ready"; accountId: string; spaceId: string; execution: boolean; board: boolean; runs: boolean; computer: boolean; personal: boolean };
 /**
  * A project's shared board: its columns in order, none when it keeps the statuses, and the revision a save names.
  * `mayEdit`: the asking person may change its columns, which only an organization admin may. A server that does not

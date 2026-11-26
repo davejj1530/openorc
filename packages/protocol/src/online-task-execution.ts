@@ -42,8 +42,11 @@ export const OnlineTaskOpenThread = OnlineTaskOpen.extend({ settings: OnlineTask
 
 export const onlineTaskExecutionRpcParams = {
   "tasks.online.openThread": OnlineTaskOpenThread.extend({ spaceId: SpaceId, id: z.string().min(1) }).strict(),
+  /** The task's thread on this computer, in its project's folder here: the one it has, else a new one ready to send. */
+  "tasks.online.openHere": z.object({ spaceId: SpaceId, id: z.string().min(1) }).strict(),
 };
 export type OnlineTaskExecutionParams = z.infer<(typeof onlineTaskExecutionRpcParams)["tasks.online.openThread"]>;
 export interface OnlineTaskExecutionRpcResults {
   "tasks.online.openThread": OnlineTaskPreparation;
+  "tasks.online.openHere": { threadId: string };
 }

@@ -761,7 +761,7 @@ export class OpenOrc {
       createReviewerAppHandlers({ reviewerApp: this.reviewerApp }),
       createThreadQueriesHandlers({ threadService: this.threads, db: this.db, ledger: this.ledger, imports: this.imports }),
       createThreadLaunchHandlers({ threadService: this.threads, orclings: this.orclings, imports: this.imports }),
-      createThreadWorkspaceHandlers({ db: this.db, threadService: this.threads, upkeep: this.upkeep }),
+      createThreadWorkspaceHandlers({ db: this.db, threadService: this.threads, upkeep: this.upkeep, teamTasks: this.taskAutomation.here }),
       createThreadMessagesHandlers({ db: this.db, threadService: this.threads }),
       createTaskHandlers(this, { dataDir: this.options.dataDir, upkeep: this.upkeep, log: this.log, invalidate }),
       createWorktreeHandlers({ worktrees: new WorktreeCleanup({ db: this.db, workspaces: this.workspaces, runs: this.runs, writers: this.workspaceWriters, invalidate }) }),

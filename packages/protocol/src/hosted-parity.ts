@@ -68,6 +68,8 @@ export const HostedCapabilities = z.object({
     board: availability,
     /** A board column's agent, run on the computer of the task's assignee, which reads and claims what waits for it. */
     taskRuns: availability,
+    /** A task's thread opened on a person's own computer, which the task then names as where its work runs. */
+    taskComputer: availability,
     skills: availability,
     macCode: availability,
     terminal: availability,

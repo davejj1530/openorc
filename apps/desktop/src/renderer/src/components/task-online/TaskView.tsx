@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { OnlineTask, OnlineTaskRef } from "@openorc/protocol";
 import { useTaskOnlineQuery, useTaskOnlineScope } from "../../lib/task-online-query";
+import { computerName } from "../task-board/TeamRun";
 import { useTaskProjects } from "../../lib/task-list-source";
 import { useTaskOnlineSave } from "../../lib/task-online-save";
 import { useTaskOpenSeen } from "../../lib/task-open-seen";
@@ -75,6 +76,7 @@ function OnlineTaskWorkspace({ reference, task, tab, projectName }: { reference:
 }
 
 function OnlineTaskTab({ reference, task, tab }: { reference: OnlineTaskRef; task: OnlineTask; tab: TaskTab }) {
+  const me = useTaskOnlineScope().availability?.accountId ?? null;
   const context = useTaskOnlineQuery(reference, "tasks.online.context", { spaceId: reference.spaceId, id: reference.id }, tab === "memory");
   if (tab === "chat") return <TaskOnlineHistory reference={reference} task={task} />;
   if (tab === "memory") {
@@ -82,5 +84,11 @@ function OnlineTaskTab({ reference, task, tab }: { reference: OnlineTaskRef; tas
     if (!context.error && context.data?.context) return <pre className="whitespace-pre-wrap break-words text-sm">{context.data.context}</pre>;
     return <Empty title="Project context isn’t available here." />;
   }
-  return <Empty title={task.execution.state === "unavailable" ? "Thread unavailable" : "No execution yet"} />;
+  return <Empty title={executionTitle(task, me)} />;
+}
+
+/** Where the task's work runs, when no cloud thread shows it: on a person's computer, else not yet. */
+function executionTitle(task: OnlineTask, me: string | null): string {
+  if (task.computer) return `Its work runs on ${computerName(task.computer, me)}`;
+  return task.execution.state === "unavailable" ? "Thread unavailable" : "No execution yet";
 }

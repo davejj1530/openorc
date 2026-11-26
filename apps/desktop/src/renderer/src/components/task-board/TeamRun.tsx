@@ -13,16 +13,25 @@ function runWords(run: NonNullable<OnlineTask["run"]>, me: string | null): strin
   return who ? `Waiting for ${who}'s computer` : "Waiting for your computer";
 }
 
-/** A team task's column agent on its card, while one is asked of someone for the column the card is in. */
+/** The computer a team task's work runs on, in a thread there: the person's own, or a teammate's by first name. */
+export function computerName(computer: NonNullable<OnlineTask["computer"]>, me: string | null): string {
+  return computer.userId === me ? "your computer" : `${firstName(computer.name)}'s computer`;
+}
+
+/**
+ * Where a team task's work stands on its card: its column's agent, while one is asked of someone for the column the
+ * card is in, else the computer its thread works on.
+ */
 export function RunFact({ task }: { task: OnlineTask }) {
   const { availability } = useTaskOnlineScope();
-  const run = task.run;
-  if (!run || run.columnId !== task.columnId) return null;
-  const stuck = run.state === "held" || run.state === "no_folder";
+  const me = availability?.accountId ?? null;
+  const run = task.run && task.run.columnId === task.columnId ? task.run : null;
+  if (!run && !task.computer) return null;
+  const stuck = run?.state === "held" || run?.state === "no_folder";
   return (
     <span className="task-board-card-fact">
       <StatusDot tone={stuck ? "attention" : "muted"} />
-      <span className="truncate">{runWords(run, availability?.accountId ?? null)}</span>
+      <span className="truncate">{run ? runWords(run, me) : `On ${computerName(task.computer!, me)}`}</span>
     </span>
   );
 }

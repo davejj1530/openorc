@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type {
   OnlineBoard,
   OnlineBoardSave,
@@ -39,8 +40,8 @@ interface Identity {
 const changed = () => new Refused("Your OpenOrc session or project access changed. Try again.");
 const unavailable = () => new Refused("This task isn't available.", 404);
 /** What a space's server does with its tasks beyond keeping them. */
-type Serves = { execution: boolean; board: boolean; runs: boolean };
-const SERVES_NOTHING: Serves = { execution: false, board: false, runs: false };
+type Serves = { execution: boolean; board: boolean; runs: boolean; computer: boolean };
+const SERVES_NOTHING: Serves = { execution: false, board: false, runs: false, computer: false };
 
 /** Server tasks have an explicit target and never enter the Mac task dispatcher. */
 export class OnlineTasks {
@@ -125,6 +126,20 @@ export class OnlineTasks {
     return result;
   }
 
+  /** Names this person's computer as where the task's work runs; refused while it runs in a cloud thread or on someone else's computer. */
+  async onComputer(spaceId: string, id: string): Promise<OnlineTaskEnvelope> {
+    if (!(await this.#served(spaceId)).computer) throw new Refused("Opening a team task's thread on this computer isn't available yet.");
+    const result = await this.#request(spaceId, TASK_ROUTES.computer(id, "POST"), { requestId: randomUUID() });
+    this.#invalidate(spaceId);
+    return result;
+  }
+  /** Says the task's work no longer runs on this person's computer. */
+  async offComputer(spaceId: string, id: string): Promise<void> {
+    if (!(await this.#served(spaceId)).computer) return;
+    await this.#request(spaceId, TASK_ROUTES.computer(id, "DELETE"), { requestId: randomUUID() });
+    this.#invalidate(spaceId);
+  }
+
   creation(input: OnlineTaskParams<"tasks.online.create">) {
     return taskCreation(this.create(input));
   }
@@ -197,7 +212,12 @@ export class OnlineTasks {
       .in(spaceId)
       .request(PARITY_ROUTES.capabilities)
       .then(
-        ({ features }) => ({ execution: features.tasks?.available === true, board: features.board?.available === true, runs: features.taskRuns?.available === true }),
+        ({ features }) => ({
+          execution: features.tasks?.available === true,
+          board: features.board?.available === true,
+          runs: features.taskRuns?.available === true,
+          computer: features.taskComputer?.available === true,
+        }),
         (error: unknown) => {
           if (error instanceof Refused && error.status === 404) entry.until = Number.POSITIVE_INFINITY;
           else if (this.#serves.get(spaceId) === entry) this.#serves.delete(spaceId);

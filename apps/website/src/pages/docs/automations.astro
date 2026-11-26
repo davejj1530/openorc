@@ -1,0 +1,141 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const issueCheck = String.raw`gh issue list --json number,title \
+  --jq '.[] | "\(.number)\t#\(.number) \(.title)"'`;
+---
+
+<DocsLayout slug="automations">
+  <section aria-labelledby="how-it-works">
+    <h2 id="how-it-works">How automations work</h2>
+    <p>An automation is a rule: when something happens, OpenOrc does the steps you gave it. A pull request's checks fail and an agent fixes them. A task is created and an agent fills in its spec. An issue is opened and a task appears on the board.</p>
+    <p>The Automations page lists everything that starts work by itself: these rules, your <a href={docHref("schedules")}>schedules</a>, and the agents your <a href={docHref("board") + "#agents"}>board's columns</a> start. Each has a switch.</p>
+    <p>Automations run on your computer, inside OpenOrc, for projects with a folder there. Nothing runs while OpenOrc is closed.</p>
+  </section>
+
+  <section aria-labelledby="create">
+    <h2 id="create">Create an automation</h2>
+    <ol class="docs-steps">
+      <li>Click <strong>Automations</strong> in the sidebar.</li>
+      <li>Choose <strong>New automation</strong>, then <strong>When something happens</strong>.</li>
+      <li>Give it a name and a project, choose what sets it off under <strong>When</strong> and what it does under <strong>Do</strong>, then choose <strong>Create</strong>.</li>
+    </ol>
+    <p>A new automation is switched on. It acts on what happens from then: what is already there when you create it is only noted.</p>
+  </section>
+
+  <section aria-labelledby="when">
+    <h2 id="when">What sets one off</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">What it waits for</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>A pull request opens</strong></td>
+            <td>A new pull request on the project's GitHub repository.</td>
+          </tr>
+          <tr>
+            <td><strong>Checks fail on a pull request</strong></td>
+            <td>The checks on a pull request's newest commit have all finished and at least one failed. A new commit that fails sets it off again.</td>
+          </tr>
+          <tr>
+            <td><strong>A pull request merges</strong></td>
+            <td>A pull request is merged.</td>
+          </tr>
+          <tr>
+            <td><strong>A task is created</strong></td>
+            <td>You or an agent creates a task in the project. A task an automation creates does not count.</td>
+          </tr>
+          <tr>
+            <td><strong>A check of your own finds something</strong></td>
+            <td>A command you write prints a new line. See <a href="#checks">Checks</a>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>For pull requests, choose <strong>From your threads</strong> to keep to the ones OpenOrc's own threads opened, or <strong>Any in the repository</strong> for every pull request. OpenOrc reads GitHub through the <code>gh</code> command, every two minutes.</p>
+  </section>
+
+  <section aria-labelledby="checks">
+    <h2 id="checks">Checks</h2>
+    <p>A check is a shell command OpenOrc runs in the project folder on a timer, from every minute to once a day. Each line it prints is one thing that happened, and the automation acts on each new line once. A line printed again later is ignored.</p>
+    <p>To tell things apart by an id, print the id, a tab, then the words. This check sets the automation off once for each new issue, even if the issue's title changes later:</p>
+    <pre><code set:text={issueCheck} /></pre>
+    <p>If the command fails, the automation's row says why and tries again at the next run.</p>
+  </section>
+
+  <section aria-labelledby="do">
+    <h2 id="do">What it does</h2>
+    <p>An automation has up to four steps, done in order.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Step</th>
+            <th scope="col">What happens</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Start an agent</strong></td>
+            <td>An agent is told what you wrote, with what happened. For a task it works in a thread of its own on that task, and is told again there when more happens. With no task, it starts a new thread in the project.</td>
+          </tr>
+          <tr>
+            <td><strong>Move the task</strong></td>
+            <td>The task goes to the column or status you chose. A <a href={docHref("board") + "#agents"}>column's own agent</a> starts, as it does for a card you drop there.</td>
+          </tr>
+          <tr>
+            <td><strong>Create a task</strong></td>
+            <td>A task is made from what happened, in the column or status you chose. The steps after it work on that task.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <Callout>An agent an automation starts runs while you are away, with your usual permissions. Text from outside, such as a pull request's title, is given to it as information, and the ready-made prompts tell it to follow no instructions found there.</Callout>
+  </section>
+
+  <section aria-labelledby="from-an-agent">
+    <h2 id="from-an-agent">Ask an agent to write one</h2>
+    <p>In any thread, tell the agent what you want to happen from now on, such as "when an issue is opened, make a task for it" or "watch the release build and fix it when it fails". The agent writes the automation, with a check of its own when nothing built in fits.</p>
+    <p>What an agent writes is saved switched off, under <strong>Proposed</strong> on the Automations page. Read what sets it off and what it does, choose <strong>See the check</strong> to read its command, then <strong>Turn on</strong> or <strong>Dismiss</strong>. Nothing an agent writes runs before you turn it on.</p>
+  </section>
+
+  <section aria-labelledby="ready-made">
+    <h2 id="ready-made">Ready-made automations</h2>
+    <p>Under your own automations, <strong>Ready-made</strong> offers ones you can add as they are or change first:</p>
+    <ul>
+      <li><strong>Fix failed checks</strong>: when checks fail on a pull request from your threads, an agent finds the cause and pushes a fix.</li>
+      <li><strong>Review new pull requests</strong>: when a pull request opens in the repository, an agent reviews it.</li>
+      <li><strong>Triage new tasks</strong>: when a task is created, an agent reads the code and fills in its spec.</li>
+      <li><strong>Close merged work</strong>: when a task's pull request merges, its card moves to Done.</li>
+      <li><strong>Plan first</strong> and <strong>Build, then review</strong>: columns for your board whose agents plan, build and review each card. See <a href={docHref("board") + "#ready-made"}>Ready-made columns</a>.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="board-and-task">
+    <h2 id="board-and-task">On a board and on one task</h2>
+    <p>A project's <a href={docHref("board")}>board</a> has an <strong>Automations</strong> button in its header. It lists the board's column agents and the project's automations with their switches, and offers the ready-made ones the board lacks.</p>
+    <p>A task has the same button. <strong>Add automation</strong> there makes one for that task alone: only that task's pull request sets it off, and its steps work on that task.</p>
+  </section>
+
+  <section aria-labelledby="manage">
+    <h2 id="manage">Pause, change and delete</h2>
+    <ul>
+      <li>The switch on a row pauses and resumes it. Switched back on, it acts on what happens from then.</li>
+      <li>Click a row to change it. Point at it for <strong>Delete automation</strong>.</li>
+      <li>An automation that acts 20 times within an hour is switched off, and its row says so. That usually means its check prints something new every run.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "board" }, { slug: "schedules" }, { slug: "pull-requests" }]} columns={3} />
+  </section>
+</DocsLayout>

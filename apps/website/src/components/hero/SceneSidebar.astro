@@ -2,7 +2,7 @@
 /**
  * The app's navigation as Sidebar.tsx lays it out. On the window's top line, the sidebar toggle after the window
  * controls, then Back and Forward (off, with nothing to go forward to). Under it the screens as rows: New thread,
- * Tasks with the tasks waiting for review, Pull requests and Schedules. Then the list's name, which switches what the
+ * Tasks with the tasks waiting for review, Pull requests and Automations. Then the list's name, which switches what the
  * list holds, with search, a new folder and the filter, and each project's threads under its open cube
  * (SidebarProjectGroup.tsx), one line a thread (ThreadLibraryRow.tsx): the cube of its state leads, as dots at work,
  * in the attention colour while it waits on you and whole while a finished turn is unread, then its title. Today's
@@ -57,7 +57,7 @@ const screens = [
   { id: "newthread", icon: "penSquare", label: "New thread" },
   { id: "tasks", icon: "listTodo", label: "Tasks", count: review },
   { id: "pulls", icon: "gitPullRequest", label: "Pull requests" },
-  { id: "scheduled", icon: "calendarClock", label: "Schedules" },
+  { id: "scheduled", icon: "automation", label: "Automations" },
 ] as const;
 ---
 

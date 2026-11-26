@@ -15,8 +15,8 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="create">
     <h2 id="create">Create a schedule</h2>
     <ol class="docs-steps">
-      <li>Click <strong>Schedules</strong> in the sidebar.</li>
-      <li>Choose <strong>New schedule</strong>, the <strong>+</strong> button in the header.</li>
+      <li>Click <strong>Automations</strong> in the sidebar.</li>
+      <li>Choose <strong>New automation</strong>, the <strong>+</strong> button in the header, then <strong>On a schedule</strong>.</li>
       <li>Fill in the fields below and choose <strong>Create</strong>.</li>
     </ol>
     <div class="docs-table">
@@ -69,7 +69,7 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="results">
     <h2 id="results">Where results go</h2>
     <p>Each run creates a thread in the schedule's project, titled with the schedule's name followed by a date and time. The agent's work and its reply are in that thread, in the sidebar with your other threads. If desktop notifications are on, you also get one saying the run started.</p>
-    <p>In Schedules, each row shows how often the schedule runs, its model and its project, then when it runs next and how the last run went: <strong>Ran</strong>, <strong>Failed</strong>, <strong>Skipped</strong> or <strong>Cancelled</strong> with how long ago, <strong>Starting</strong> while a run starts, or <strong>Never run</strong>. Point at a row for <strong>Open thread</strong>, the arrow button, which opens the thread of the latest run. A run that failed in its thread has <strong>Open run</strong> on the row, and one that failed before it had a thread says why under the row.</p>
+    <p>In Automations, each schedule's row shows how often the schedule runs, its model and its project, then when it runs next and how the last run went: <strong>Ran</strong>, <strong>Failed</strong>, <strong>Skipped</strong> or <strong>Cancelled</strong> with how long ago, <strong>Starting</strong> while a run starts, or <strong>Never run</strong>. Point at a row for <strong>Open thread</strong>, the arrow button, which opens the thread of the latest run. A run that failed in its thread has <strong>Open run</strong> on the row, and one that failed before it had a thread says why under the row.</p>
     <Callout>Every run is a new thread, and a run in a fresh worktree also gets its own worktree and branch. Delete the run threads you are done with; see <a href={docHref("git") + "#delete"}>Delete a thread</a> for what stays.</Callout>
   </section>
 

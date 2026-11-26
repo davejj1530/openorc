@@ -19,7 +19,7 @@ export interface DocSection {
 }
 
 /** When these pages were last checked against the source. Update it when a page is revised. */
-export const docsReviewed = { date: "November 25, 2026" };
+export const docsReviewed = { date: "November 26, 2026" };
 
 /** The sidebar, in reading order. Groups are named after parts of the app. */
 export const docGroups: DocGroup[] = [
@@ -252,6 +252,36 @@ export const docGroups: DocGroup[] = [
         ],
       },
       {
+        slug: "board",
+        title: "Task board",
+        description: "See tasks as cards in columns, shape a project's columns to the way you work, and let a column start an agent for each card that arrives.",
+        sections: [
+          { id: "views", title: "List and Board" },
+          { id: "cards", title: "Cards" },
+          { id: "move", title: "Move a card" },
+          { id: "columns", title: "Change the columns" },
+          { id: "agents", title: "Column agents" },
+          { id: "rounds", title: "When agents can't settle it" },
+          { id: "ready-made", title: "Ready-made columns" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+      {
+        slug: "task-history",
+        title: "Task history and updates",
+        label: "Task history",
+        description: "Read what happened to a task on its Activity tab, one line at a time, and answer the updates agents post there.",
+        sections: [
+          { id: "activity", title: "The Activity tab" },
+          { id: "lines", title: "What the lines say" },
+          { id: "updates", title: "Updates from agents" },
+          { id: "cards", title: "Update cards" },
+          { id: "replies", title: "Answer an update" },
+          { id: "work", title: "Show work" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+      {
         slug: "discussions",
         title: "Task discussions",
         description: "Ask one or more models about a task before anyone builds it, then hand the work to a thread.",
@@ -261,6 +291,23 @@ export const docGroups: DocGroup[] = [
           { id: "replies", title: "How replies arrive" },
           { id: "several", title: "Ask several models" },
           { id: "work", title: "From discussion to work" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+      {
+        slug: "automations",
+        title: "Automations",
+        description: "When something happens, such as failed checks, a new task or a new issue, OpenOrc starts an agent, moves a card or creates a task.",
+        sections: [
+          { id: "how-it-works", title: "How automations work" },
+          { id: "create", title: "Create an automation" },
+          { id: "when", title: "What sets one off" },
+          { id: "checks", title: "Checks" },
+          { id: "do", title: "What it does" },
+          { id: "from-an-agent", title: "Ask an agent to write one" },
+          { id: "ready-made", title: "Ready-made automations" },
+          { id: "board-and-task", title: "On a board and on one task" },
+          { id: "manage", title: "Pause, change and delete" },
           { id: "next-steps", title: "Next steps" },
         ],
       },

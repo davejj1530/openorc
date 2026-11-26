@@ -96,6 +96,7 @@ import { docHref } from "../../data/docs";
       </table>
     </div>
     <p>Change a status from the status menu on the Overview, or click a task's status icon in the Tasks list. When an agent starts the work, the task moves to <strong>In progress</strong>, and the agent records later progress with its task tools, so a task can reach <strong>Review</strong> or <strong>Done</strong> without you. You can always set the status yourself.</p>
+    <p>On a project's <a href={docHref("board")}>board</a>, a status you set moves the task's card to the first column of that stage, and that column's agent starts.</p>
     <p>Priority is one of <strong>No priority</strong>, <strong>Low</strong>, <strong>Medium</strong>, <strong>High</strong> or <strong>Urgent</strong>. It shows beside the status at the top of the task's Overview.</p>
   </section>
 
@@ -116,7 +117,7 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td><strong>Activity</strong></td>
-            <td>Activity saved with the task itself. Work done in the task's thread stays in that thread.</td>
+            <td>The task's history: a line for each move, each agent a column started and each update an agent posted. Work done in the task's thread stays in that thread. See <a href={docHref("task-history")}>Task history and updates</a>.</td>
           </tr>
           <tr>
             <td><strong>Changes</strong></td>
@@ -146,6 +147,10 @@ import { docHref } from "../../data/docs";
     <p>The work runs in that thread's folder: your checkout, or a worktree of the thread's own. When OpenOrc creates a thread for the task, the task's <strong>Execution location</strong> decides where it works: <strong>Local checkout</strong> or <strong>Worktree</strong>, under <strong>Execution settings</strong> on the Overview. A new task takes the location of the thread it came from, or else your <strong>New thread workspace</strong> setting. Once the thread has started, changing the location moves the thread and its uncommitted changes. See <a href={docHref("git")}>Git and worktrees</a>.</p>
     <p>You can also start the work from the task's comments, by asking a model to build it. See <a href={docHref("discussions") + "#work"}>From discussion to work</a>.</p>
     <Callout>Once a task has a thread, its work stays there. An agent in another thread can't start it, so continue in the task's thread, and move that thread if the work belongs somewhere else.</Callout>
+    <h3 id="model">The task's model</h3>
+    <p>Under <strong>Execution settings</strong>, below <strong>Execution location</strong>, <strong>Model</strong> chooses the model the task's work runs on. For a Claude model, a menu for the account appears beside it.</p>
+    <p>Agents started for the task use it: its first thread, the agent of a <a href={docHref("board") + "#agents"}>board column</a>, the agent an <a href={docHref("automations")}>automation</a> starts, and a task button that makes its own thread. A column, an automation or a button that names its own model uses that one instead.</p>
+    <p>The choice applies to threads made from then on. The task's existing thread keeps its model. Left at <strong>Your usual model</strong>, the first choice, those agents follow the task's thread, or your default when the task has no thread yet.</p>
     <h3 id="threads">Several threads for one task</h3>
     <p>A task can have more than one thread. They are listed under <strong>Activity</strong> on the Overview, the current one first. <strong>Continue in a new thread</strong> there starts a fresh session in the task's folder, from the task and a brief of the last thread. It uses the current thread's model and account unless you choose others. <strong>Open thread</strong> then goes to the new thread, and the earlier one stays listed.</p>
     <p>Before a task has a thread, the arrow beside <strong>Open thread</strong> chooses the first thread's model and account.</p>
@@ -208,6 +213,8 @@ import { docHref } from "../../data/docs";
       <li>Tasks are grouped by status. Click a group's heading to fold it.</li>
     </ul>
     <p>The list works from the keyboard: <kbd>j</kbd> and <kbd>k</kbd>, or the arrow keys, move between tasks, and <kbd>↵</kbd> opens one.</p>
+    <h3 id="board">The Board</h3>
+    <p>The switch in the header chooses <strong>List</strong> or <strong>Board</strong>. The Board shows the same tasks as cards in columns, which you drag to move. A project's board has columns of its own, and a column can start an agent for each card that arrives. See <a href={docHref("board")}>Task board</a>.</p>
     <h3>Tasks in OpenOrc Cloud</h3>
     <p>
       In an <a href={docHref("organizations")}>organization</a>, the Tasks list holds the team's tasks, which carry the cloud mark. A task can be assigned to a person, and <strong>Assigned to me</strong> narrows the list to yours. In
@@ -218,6 +225,6 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="next-steps">
     <h2 id="next-steps">Next steps</h2>
-    <LinkCards cards={[{ slug: "discussions" }, { slug: "review" }, { slug: "git" }]} columns={3} />
+    <LinkCards cards={[{ slug: "board" }, { slug: "task-history" }, { slug: "discussions" }]} columns={3} />
   </section>
 </DocsLayout>

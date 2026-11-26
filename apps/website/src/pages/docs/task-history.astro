@@ -1,0 +1,119 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+---
+
+<DocsLayout slug="task-history">
+  <section aria-labelledby="activity">
+    <h2 id="activity">The Activity tab</h2>
+    <p>A task's <strong>Activity</strong> tab is its history: one line for each thing that happened to it, oldest first. A line says who did it, what changed, and when.</p>
+    <p>The history is a summary. The work itself stays in the task's threads, and the history takes you to them.</p>
+  </section>
+
+  <section aria-labelledby="lines">
+    <h2 id="lines">What the lines say</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Line</th>
+            <th scope="col">What happened</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>You created the task</td>
+            <td>The task was made, by you or by the agent the line names.</td>
+          </tr>
+          <tr>
+            <td>Moved to Review</td>
+            <td>The task took a new status, or its card was put in a column of the <a href={docHref("board")}>board</a>. The line names the column, or the status when the task is in no column.</td>
+          </tr>
+          <tr>
+            <td>Claude moved it to Code review</td>
+            <td>An agent moved the card.</td>
+          </tr>
+          <tr>
+            <td>Claude moved it back to Build</td>
+            <td>The card went to a column before the one it left.</td>
+          </tr>
+          <tr>
+            <td>Moved to Build, which started Claude</td>
+            <td>The move started the column's agent.</td>
+          </tr>
+          <tr>
+            <td>An agent's own words</td>
+            <td>An update the agent posted. See <a href="#updates">Updates from agents</a>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li>Click an agent's name to open the thread it worked in, for as long as that thread exists.</li>
+      <li>A line keeps the column's name as it was then, even if you rename or remove the column later.</li>
+      <li>A line led by the amber waiting mark is OpenOrc asking you to step in, as when agents have sent a card to the same column too often. See <a href={docHref("board") + "#rounds"}>When agents can't settle it</a>.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="updates">
+    <h2 id="updates">Updates from agents</h2>
+    <p>An agent can post an update on a task: a sentence or two on where the work stands. The update is a line of its own in the history, led by the agent's mark.</p>
+    <p>Any agent working in the project can post one, and you can ask for it in plain words, such as "post the plan on the task". The agents a board's columns start are told to post their progress this way, since nobody watches their threads.</p>
+    <p>An agent can change one of its own updates in place, as when the steps of a plan get done. The line stays where it was and shows the new content.</p>
+  </section>
+
+  <section aria-labelledby="cards">
+    <h2 id="cards">Update cards</h2>
+    <p>An update can carry one card under its words, when a card says it better.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Card</th>
+            <th scope="col">What it shows</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Checklist</strong></td>
+            <td>A plan or a set of review notes: a name, how many items are done, such as "2 of 3", and each item with whether it is done. An item can end in a few words, such as the file and line it is about.</td>
+          </tr>
+          <tr>
+            <td><strong>Pull request</strong></td>
+            <td>The pull request as GitHub has it now: its number and title, the lines added and removed, its state, its review and its branches. Click it to open the <a href={docHref("pull-requests")}>pull request</a>.</td>
+          </tr>
+          <tr>
+            <td><strong>Visual</strong></td>
+            <td>A diagram, a chart or a small interactive piece the agent drew, shown as it is in a conversation.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The pull request card is drawn fresh each time you look, so it stays current after the agent posted it. It shows no checks.</p>
+  </section>
+
+  <section aria-labelledby="replies">
+    <h2 id="replies">Answer an update</h2>
+    <p>When an agent needs your answer, its update offers up to three replies as buttons, such as <strong>Approve the plan</strong>.</p>
+    <ol class="docs-steps">
+      <li>Open the task's <strong>Activity</strong> tab and read the update.</li>
+      <li>Press a reply. It reaches the agent's thread as your message, and the agent carries on from there.</li>
+    </ol>
+    <p>The update then reads "You answered Approve the plan", with when. An update is answered once.</p>
+    <p>A task whose newest update still waits for an answer counts as needing you. Its card on the board says <strong>Needs you</strong>, and it is counted with what waits on you. A newer update from an agent withdraws the question.</p>
+    <p>To say more than a reply does, open the agent's thread from its name and write there.</p>
+  </section>
+
+  <section aria-labelledby="work">
+    <h2 id="work">Show work</h2>
+    <p>Under the history, <strong>Show work</strong> opens what the agents did in the task's own runs: their messages and the steps they took. <strong>Hide work</strong> closes it again. The button shows only when the task has such work.</p>
+    <p>The work is open already while it waits on you, so an approval it asks for is in view and you can answer it there.</p>
+    <p>Above the history, <strong>Open thread</strong> goes to the task's thread, where the conversation continues, and <strong>Stop agent</strong> shows while the task's latest run is still open.</p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "board" }, { slug: "automations" }, { slug: "work" }]} columns={3} />
+  </section>
+</DocsLayout>

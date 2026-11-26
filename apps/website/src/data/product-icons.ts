@@ -13,6 +13,8 @@ export const productIcons = {
   arrowUp: '<path d="M12 20V4m-6 6 6-6 6 6"></path>',
   arrowUpRight: '<path d="M6 18 18 6 M7 6h11v11"></path>',
   atSign: '<circle cx="11.5" cy="11.5" r="3.5"></circle><path d="M15 8v6c0 3 6 3 6-3a9 9 0 1 0-4 8.5"></path>',
+  automation:
+    '<rect x="3" y="16" width="5" height="5" rx="1.5"></rect><rect x="16" y="3" width="5" height="5" rx="1.5"></rect><path d="M8 18.5h8a2 2 0 0 0 2-2V14a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V7.5a2 2 0 0 1 2-2h8"></path>',
   bell: '<path d="M18 15.5V10a6 6 0 0 0-12 0v5.5L4.5 18h15L18 15.5Z M10 21h4"></path>',
   bold: '<path stroke-width="2.25" d="M6 4h7a4 4 0 0 1 0 8H6V4Z M6 12h8a4 4 0 0 1 0 8H6Z"></path>',
   bookText: '<path d="M5 18.5A2.5 2.5 0 0 1 7.5 16H19V3H7.5A2.5 2.5 0 0 0 5 5.5Z M5 18.5A2.5 2.5 0 0 0 7.5 21H19"></path>',

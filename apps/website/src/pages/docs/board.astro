@@ -1,0 +1,131 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+---
+
+<DocsLayout slug="board">
+  <section aria-labelledby="views">
+    <h2 id="views">List and Board</h2>
+    <p>Tasks has two views. The switch in the header chooses <strong>List</strong> or <strong>Board</strong>, and OpenOrc remembers your choice.</p>
+    <p>The Board shows each task as a card in a column. It holds every task that is not archived, so it has no Active, Done and Archived split and no status filter.</p>
+    <ul>
+      <li>With <strong>All projects</strong> chosen, the columns are the statuses: <strong>Backlog</strong>, <strong>In progress</strong>, <strong>Review</strong> and <strong>Done</strong>.</li>
+      <li>With one project chosen, the board is that project's own. It starts with the same four columns, and you can rename, add, reorder and remove them.</li>
+    </ul>
+    <p>A status that has tasks and no column, such as <strong>Proposed</strong>, shows as a column for as long as it holds a task. No task leaves the board because its column is gone.</p>
+  </section>
+
+  <section aria-labelledby="cards">
+    <h2 id="cards">Cards</h2>
+    <p>A card shows the task's title and one line of facts under it:</p>
+    <ul>
+      <li><strong>Needs you</strong> when the task waits on your answer, or else the task's first label.</li>
+      <li>On a board of all projects, the card's project instead of its first label.</li>
+      <li>How long ago the task last changed. A task in review shows a <strong>Review</strong> button there, which opens its changes.</li>
+      <li>On a task that has not started, the way to its thread.</li>
+    </ul>
+    <p>Press a card to open its task beside the board.</p>
+    <p>In a column, the cards that wait on you come first, then the newest tasks. A finished column reads latest first. A column shows 20 cards, then a row that shows 20 more. The number beside a column's name counts the cards that wait on you.</p>
+  </section>
+
+  <section aria-labelledby="move">
+    <h2 id="move">Move a card</h2>
+    <p>Drag a card to another column. The card is put in that column and takes its stage, so a card dropped on a finished column is done. If the move fails, the card says why.</p>
+    <p>Changing a task's status yourself is a move too. On a board with its own columns, the card goes to the first column of that stage, and that column's agent starts.</p>
+    <p>Agents move cards as well. An agent names the column, and the card goes there the same way. See <a href="#agents">Column agents</a>.</p>
+    <p>Every move is kept in the task's history. See <a href={docHref("task-history")}>Task history and updates</a>.</p>
+  </section>
+
+  <section aria-labelledby="columns">
+    <h2 id="columns">Change the columns</h2>
+    <p>Choose one project to change its board. Each column has a settings button at the end of its heading, and a plus after the last column adds one.</p>
+    <ol class="docs-steps">
+      <li>Click the plus after the last column. A column named <strong>New column</strong> is added and its settings open.</li>
+      <li>Type a name in the field at the top.</li>
+      <li>Choose its <strong>Stage</strong>.</li>
+      <li>Use <strong>Move left</strong> and <strong>Move right</strong> to place it.</li>
+    </ol>
+    <p>The stage tells OpenOrc what the column's cards are. It is the status those tasks hold, so the Tasks list, the sidebar's count and the board always agree.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Stage</th>
+            <th scope="col">Status of its cards</th>
+            <th scope="col">Use it for</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Waiting</strong></td>
+            <td>Backlog</td>
+            <td>Work that has not started.</td>
+          </tr>
+          <tr>
+            <td><strong>Working</strong></td>
+            <td>In progress</td>
+            <td>Work under way. A board can have several, such as Plan, Build and Code review.</td>
+          </tr>
+          <tr>
+            <td><strong>Needs you</strong></td>
+            <td>Review</td>
+            <td>Work that is ready for you to check. These cards count as waiting on you.</td>
+          </tr>
+          <tr>
+            <td><strong>Finished</strong></td>
+            <td>Done</td>
+            <td>Finished work.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Changing a column's stage changes the status of the tasks in it. <strong>Remove column</strong> takes the column away and leaves its tasks in their status, so they show in the first column of that stage. A board keeps at least one column.</p>
+    <p>A project's columns are kept on this computer. A project with no folder on this computer keeps the four statuses as its columns for now. An organization's tasks have a status and no column, so on the board they sit in the first column of their stage, and one you drop on a column lands in the first column of that column's stage.</p>
+  </section>
+
+  <section aria-labelledby="agents">
+    <h2 id="agents">Column agents</h2>
+    <p>A column can start an agent for each card put in it. A Plan column can have an agent write a plan, and a Code review column can have a second agent check the build.</p>
+    <ol class="docs-steps">
+      <li>Open the column's settings.</li>
+      <li>Under <strong>When a card arrives</strong>, write what the agent should do with each card, as you would write a message.</li>
+      <li>Under the words, choose the model that reads them. <strong>The task's model</strong> uses the <a href={docHref("tasks") + "#model"}>model set on the task</a>.</li>
+      <li>Under <strong>When the work is done</strong>, choose <strong>The card stays here</strong>, or a later column for the card to move to.</li>
+    </ol>
+    <p>The words save when you leave the field. A field left empty starts nothing. A column with an agent shows that agent's mark at the end of its heading.</p>
+    <h3>What happens when a card arrives</h3>
+    <ul>
+      <li>The agent starts in a thread of its own for that task, named after the column. It works in the task's folder.</li>
+      <li>It is told what you wrote, the column the card came from, and the column the card goes to next.</li>
+      <li>It posts where the work stands on the task, where you read it. See <a href={docHref("task-history") + "#updates"}>Updates from agents</a>.</li>
+      <li>It moves the card itself: on when its work is done, or back to an earlier column when the work it was given needs more.</li>
+      <li>A card that comes back to a column continues the same thread, with the latest notes another agent posted on the task.</li>
+    </ul>
+    <p>A column's agent is an automation. The <strong>Automations</strong> button in a project's board header lists each column's agent with a switch, and so does the <a href={docHref("automations")}>Automations</a> page. Switched off, the column still takes cards and starts nothing. If an agent cannot start, OpenOrc tells you why in a notice.</p>
+    <Callout>A column's agent runs with nobody watching its thread, with your usual permissions. Read its updates on the task, and open its thread from the task's history when you want the detail.</Callout>
+  </section>
+
+  <section aria-labelledby="rounds">
+    <h2 id="rounds">When agents can't settle it</h2>
+    <p>Agents can send a card back and forth, as when a reviewing agent returns a build to be fixed. Counting from the last time you moved the card, it may arrive in the same column three times. The next time nothing starts, and the task asks you instead.</p>
+    <p>The task's history then shows that the card was sent there again and is not settled, with two replies: <strong>Be more lenient</strong> and <strong>Resolve it yourself</strong>. The one you press goes to the agent that sent the card back, as your message.</p>
+    <p>Moving the card yourself always starts the column's agent, and starts the count again.</p>
+  </section>
+
+  <section aria-labelledby="ready-made">
+    <h2 id="ready-made">Ready-made columns</h2>
+    <p>OpenOrc has two sets of columns you can add as they are. Choose <strong>Automations</strong> in a project's board header, then <strong>Add</strong> under <strong>Ready-made</strong>.</p>
+    <ul>
+      <li><strong>Plan first</strong> adds a <strong>Plan</strong> column. Its agent writes a plan as a checklist and waits for you to approve it.</li>
+      <li><strong>Build, then review</strong> adds <strong>Build</strong> and <strong>Code review</strong> columns. One agent does the work, a second reviews it and sends it back until it is right.</li>
+    </ul>
+    <p>Each new column hands its cards to the column after it. Open a column's settings to change what its agent is told.</p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "task-history" }, { slug: "automations" }, { slug: "tasks" }]} columns={3} />
+  </section>
+</DocsLayout>

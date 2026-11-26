@@ -146,23 +146,23 @@ const orbit: Pattern["light"] = (point, at) => {
 
 const PATTERNS: Record<ThreadMarkKind, Pattern> = {
   // The light goes round the three faces: at work, on nothing the mark can name.
-  working: { tone: "work", period: 2400, light: orbit },
+  working: { tone: "work", period: 1400, light: orbit },
   // Rings spread from the centre.
-  thinking: { tone: "think", period: 1900, light: (point, at) => over((0.5 + 0.5 * Math.cos(TAU * (at - point.ring / 3.2))) ** 2) },
+  thinking: { tone: "think", period: 1500, light: (point, at) => over((0.5 + 0.5 * Math.cos(TAU * (at - point.ring / 3.2))) ** 2) },
   // A line reads down the cube.
-  reading: { tone: "work", period: 1700, light: (point, at) => over(bell(point.down - (at * 1.5 - 0.25), 0.2)) },
+  reading: { tone: "work", period: 1200, light: (point, at) => over(bell(point.down - (at * 1.5 - 0.25), 0.2)) },
   // A beam sweeps round, as a radar does.
-  searching: { tone: "work", period: 1700, light: (point, at) => (point.ring ? over(bell(between(point.angle, TAU - TAU * at), 0.62)) : 0.7) },
+  searching: { tone: "work", period: 1200, light: (point, at) => (point.ring ? over(bell(between(point.angle, TAU - TAU * at), 0.62)) : 0.7) },
   // The cube is built dot by dot, held, and cleared.
   editing: {
     tone: "work",
-    period: 2800,
+    period: 1800,
     light: (point, at) => over(clamp((at < 0.72 ? (at / 0.72) * 20 : 20) - point.order) * (at > 0.9 ? 1 - (at - 0.9) / 0.1 : 1)),
   },
   // Columns fall, each a little after its neighbour.
   running: { tone: "work", period: 1150, light: (point, at) => over(bell(point.down - ((((at + point.column * 0.37) % 1) + 1) % 1) * 1.5 + 0.25, 0.22)) },
   // The three faces take turns: several at work.
-  delegating: { tone: "work", period: 2000, light: orbit },
+  delegating: { tone: "work", period: 1300, light: orbit },
   // A wave runs along the middle, as a line being written.
   replying: { tone: "work", period: 1200, light: (point, at) => (Math.abs(point.y) > STEP * 0.6 ? REST : 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(TAU * (at - point.across * 0.9))) ** 1.5) },
   // The light rests on the top face and breathes: it asked something.

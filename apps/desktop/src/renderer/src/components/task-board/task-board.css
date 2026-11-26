@@ -58,6 +58,25 @@
 .task-board-column-more[aria-expanded="true"] {
   opacity: 1;
 }
+/* The mark of the job a card starts in the column, which keeps the settings beside it at the head's end. */
+.task-board-column-job {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--ink-3);
+}
+.task-board-column-job + .task-board-column-more {
+  margin-left: 0;
+}
+.task-board-buttons-link {
+  display: block;
+  margin: -4px 0 12px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.task-board-buttons-link:hover {
+  color: var(--ink);
+}
 .task-board-settings {
   width: 392px;
   padding: 14px;

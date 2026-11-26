@@ -153,15 +153,25 @@ function registerUpdate(mcp: McpServer, host: McpHost, runId: string, scopes: re
     "task_update",
     {
       description:
-        "Update any task in this project by ID, regardless of its originating thread or assigned agent. Set its board status or refine its spec. A status move does not stop an execution or change its recorded outcome.",
-      inputSchema: online(on, { id: z.string(), status: TaskStatus.optional(), spec: z.string().optional() }, { scope: scopeOf(scopes), ifRevision: revision }),
+        "Update any task in this project by ID, regardless of its originating thread or assigned agent. Set its board status, move it to a board column by name, or refine its spec. A column sets the status with it, a task moves forward only, and a column's own job starts when the task arrives. A move does not stop an execution or change its recorded outcome.",
+      inputSchema: online(
+        on,
+        { id: z.string(), status: TaskStatus.optional(), column: z.string().min(1).max(40).optional(), spec: z.string().optional() },
+        { scope: scopeOf(scopes), ifRevision: revision },
+      ),
     },
-    async ({ id, status, spec, scope, ifRevision }) => ({
+    async ({ id, status, column, spec, scope, ifRevision }) => ({
       content: [
         {
           type: "text",
           text: JSON.stringify(
-            await host.tasks.update(runId, id, { ...(scope ? { scope } : {}), ...(ifRevision !== undefined ? { ifRevision } : {}), ...(status ? { status } : {}), ...(spec ? { spec } : {}) }),
+            await host.tasks.update(runId, id, {
+              ...(scope ? { scope } : {}),
+              ...(ifRevision !== undefined ? { ifRevision } : {}),
+              ...(status ? { status } : {}),
+              ...(column ? { column } : {}),
+              ...(spec ? { spec } : {}),
+            }),
           ),
         },
       ],

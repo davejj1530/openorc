@@ -197,6 +197,47 @@ describe("core", () => {
     await expect(call("tasks.update", { id: task.id, patch: { columnId: "missing" } })).rejects.toThrow(/column/i);
   });
 
+  it("starts a column's job for a card put in the column, and tells the job where the card goes next", async () => {
+    const p = await call("projects.import", { rootPath: root });
+    const review = { id: "review", label: "Code review", prompt: "Review the work.", runsIn: "new" as const, mode: "thread" as const };
+    await call("projects.updateSettings", { id: p.id, settings: { taskButtons: [review] } });
+    const [build, reviewing] = await call("board.saveColumns", {
+      projectId: p.id,
+      columns: [
+        { name: "Build", stage: "in_progress" },
+        { name: "Code review", stage: "in_progress", jobButtonId: review.id },
+        { name: "Done", stage: "done" },
+      ],
+    });
+    const columns = await call("board.saveColumns", {
+      projectId: p.id,
+      columns: (await call("board.columns", { projectId: p.id })).map((column) => (column.id === reviewing!.id ? { ...column, nextColumnId: build!.id } : column)),
+    });
+    // A column hands on only to a column after it.
+    expect(columns[1]!.nextColumnId).toBeNull();
+    const done = columns[2]!;
+    await call("board.saveColumns", { projectId: p.id, columns: columns.map((column) => (column.id === reviewing!.id ? { ...column, nextColumnId: done.id } : column)) });
+    const pressed = vi.spyOn(core.threads, "runTaskButton").mockResolvedValue({ threadId: "job-thread" });
+    try {
+      const task = await call("tasks.create", { projectId: p.id, title: "A card", useWorktree: false });
+      await call("tasks.update", { id: task.id, patch: { columnId: build!.id } });
+      expect(pressed).not.toHaveBeenCalled();
+      await call("tasks.update", { id: task.id, patch: { columnId: reviewing!.id } });
+      await vi.waitFor(() => expect(pressed).toHaveBeenCalledTimes(1));
+      const [taskId, button] = pressed.mock.calls[0]!;
+      expect(taskId).toBe(task.id);
+      expect(button).toMatchObject({ id: "review", label: "Code review" });
+      expect(button.prompt).toMatch(/^Review the work\.\n\n.*move it to the "Done" column with task_update/);
+      // The agent's own move goes forward, starts nothing in a column with no job, and never goes back.
+      expect(core.boardJobs.moveForward(task.id, "done", "run")).toMatchObject({ status: "done", columnId: done.id });
+      expect(() => core.boardJobs.moveForward(task.id, "Build", "run")).toThrow(/forward only/);
+      expect(() => core.boardJobs.moveForward(task.id, "Shipped", "run")).toThrow(/Build, Code review, Done/);
+      expect(pressed).toHaveBeenCalledTimes(1);
+    } finally {
+      pressed.mockRestore();
+    }
+  });
+
   it("announces readiness with the MCP port", () => {
     const ready = pushed.find((m) => m.type === "ready");
     expect(ready && ready.type === "ready" && ready.mcpPort).toBeGreaterThan(0);

@@ -1,4 +1,5 @@
 import { boardColumns, Db, tasks, threads } from "@openorc/db";
+import type { BoardJobs } from "../services/board-jobs.js";
 import { RunService } from "../services/runs.js";
 import { ThreadService } from "../services/threads.js";
 import { WorkspaceWriters } from "../services/workspace-writers.js";
@@ -11,10 +12,11 @@ type Dependencies = {
   runService: Pick<RunService, "liveRunForTask">;
   workspaceWriters: Pick<WorkspaceWriters, "withLease">;
   workspaces: Pick<WorkspaceService, "cleanup">;
+  boardJobs: Pick<BoardJobs, "arrived">;
   invalidate: (keys: string[]) => void;
 };
 
-export function createTaskUpdateHandlers({ threadService, db, runService, workspaceWriters, workspaces, invalidate }: Dependencies): Pick<Handlers, "tasks.update"> {
+export function createTaskUpdateHandlers({ threadService, db, runService, workspaceWriters, workspaces, boardJobs, invalidate }: Dependencies): Pick<Handlers, "tasks.update"> {
   return {
     "tasks.update": async ({ id, patch }) => {
       const { task, project } = taskAndProject(db, id);
@@ -35,6 +37,8 @@ export function createTaskUpdateHandlers({ threadService, db, runService, worksp
             })
           : update();
       invalidate(["tasks", `task:${id}`, "inbox"]);
+      // Only a card put in a column starts its job. A status set by itself may be the work already under way.
+      if (patch.columnId !== undefined && patch.columnId !== task.columnId) boardJobs.arrived(id, patch.columnId);
       return t;
     },
   };

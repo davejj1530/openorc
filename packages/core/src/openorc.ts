@@ -116,6 +116,7 @@ import { ReviewService } from "./services/review.js";
 import { ReviewerAppService } from "./services/reviewer-app.js";
 import { RunService, type Notification, type RunHooks } from "./services/runs.js";
 import { ScheduleService } from "./services/schedules.js";
+import { BoardJobs } from "./services/board-jobs.js";
 import { OrclingWakeService } from "./services/orcling-wakes.js";
 import { AppSettingsService } from "./services/settings.js";
 import { ShellEnvironment, inheritedProbe } from "./services/shell-environment.js";
@@ -182,6 +183,7 @@ export class OpenOrc {
   readonly pullRequests: PullRequestService;
   readonly reviewerApp: ReviewerAppService;
   readonly schedules: ScheduleService;
+  readonly boardJobs: BoardJobs;
   readonly orclingWakes: OrclingWakeService;
   readonly files: FileService;
   readonly hostedFiles: HostedFiles;
@@ -301,6 +303,7 @@ export class OpenOrc {
     this.lifecycle = new LifecycleService(db, invalidate, this.log);
     const updating = (agent: string) => this.runs.agentUpdating(agent);
     this.schedules = new ScheduleService(db, this.threads, invalidate, notify, this.log, { updating });
+    this.boardJobs = new BoardJobs(db, options.dataDir, this.threads, invalidate, notify, this.log);
     this.orclingWakes = new OrclingWakeService({ db, activity: (id) => this.runs.threadActivity(id), threads: this.threads, log: this.log, updating });
     this.files = createFileService({ options, writers: this.workspaceWriters, invalidate, environment: () => this.environment.current() });
     this.imports = new ImportService(db, this.ledger, invalidate, this.log, this.toolImages);
@@ -574,6 +577,7 @@ export class OpenOrc {
   mcpServer(): Promise<OpenOrcMcpServer> {
     this.mcp ??= startCoreMcp({
       db: this.db,
+      boardJobs: this.boardJobs,
       threads: this.threads,
       runs: this.runs,
       comments: this.comments,
@@ -762,7 +766,15 @@ export class OpenOrc {
       createTaskQueriesHandlers({ db: this.db, comments: this.comments, threadService: this.threads, runService: this.runs }),
       createTaskWorkHandlers({ db: this.db, refines: this.refines, threadService: this.threads, dataDir: this.options.dataDir }),
       createTaskCreateHandlers({ db: this.db, settings: this.settings, threadService: this.threads, invalidate, dataDir: this.options.dataDir }),
-      createTaskUpdateHandlers({ threadService: this.threads, db: this.db, runService: this.runs, workspaceWriters: this.workspaceWriters, workspaces: this.workspaces, invalidate }),
+      createTaskUpdateHandlers({
+        threadService: this.threads,
+        db: this.db,
+        runService: this.runs,
+        workspaceWriters: this.workspaceWriters,
+        workspaces: this.workspaces,
+        boardJobs: this.boardJobs,
+        invalidate,
+      }),
       createTaskDeleteHandlers({ workspaces: this.workspaces, comments: this.comments, refines: this.refines, runService: this.runs, db: this.db, log: this.log, upkeep: this.upkeep, invalidate }),
       createWorkspaceHandlers({ runService: this.runs, workspaces: this.workspaces, db: this.db, invalidate }),
       createWorktreeHandlers({ worktrees: new WorktreeCleanup({ db: this.db, workspaces: this.workspaces, runs: this.runs, writers: this.workspaceWriters, invalidate }) }),

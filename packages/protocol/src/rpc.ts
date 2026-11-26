@@ -272,7 +272,15 @@ export const rpcParams = {
   "board.saveColumns": z.object({
     projectId: z.string(),
     columns: z
-      .array(z.object({ id: z.string().optional(), name: z.string().trim().min(1).max(40), stage: BoardStage }))
+      .array(
+        z.object({
+          id: z.string().optional(),
+          name: z.string().trim().min(1).max(40),
+          stage: BoardStage,
+          jobButtonId: z.string().nullable().optional(),
+          nextColumnId: z.string().nullable().optional(),
+        }),
+      )
       .min(1)
       .max(12),
   }),

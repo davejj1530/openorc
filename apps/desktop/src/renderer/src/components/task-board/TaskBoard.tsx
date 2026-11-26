@@ -1,14 +1,16 @@
 import { useId, useMemo, useRef, useState, type ReactNode } from "react";
-import type { Project } from "@openorc/protocol";
+import type { Project, TaskButton } from "@openorc/protocol";
 import { relativeTime } from "@openorc/client";
 import { useRpc, useRpcMutation } from "../../lib/client";
+import { openProject } from "../../lib/router";
 import { useSpaceProjects } from "../../lib/space-queries";
 import { boardSlots, taskBoardColumns, type BoardSlot, type TaskBoardColumn } from "../../lib/task-board";
 import { openTaskRecord } from "../../lib/task-open";
 import { useTaskProperty } from "../../lib/task-property";
 import { taskNeedsAttention, taskNeedsYou, taskRecordKey, type TaskRecord } from "../../lib/task-records";
 import { useScrollEdges } from "../../lib/use-scroll-edges";
-import { Plus } from "../icons";
+import { HarnessLogo } from "../HarnessLogo";
+import { Automation, Plus } from "../icons";
 import { ProjectLogo } from "../ProjectIconPicker";
 import { StatusIcon, statusLabel } from "../status";
 import { TaskStart } from "../TaskStart";
@@ -30,6 +32,7 @@ export function TaskBoard({ tasks, projectId }: { tasks: TaskRecord[]; projectId
   const kept = useRpc("board.columns", { projectId: projectId ?? "" }, { enabled: Boolean(projectId) });
   const save = useRpcMutation("board.saveColumns");
   const slots = useMemo(() => boardSlots(projectId ? (kept.data ?? []) : []), [projectId, kept.data]);
+  const buttons = (projectId ? projects.data?.find((project) => project.id === projectId)?.settings.taskButtons : undefined) ?? [];
   const columns = useMemo(() => taskBoardColumns(tasks, projectId ? kept.data : []), [tasks, projectId, kept.data]);
   const [drag, setDrag] = useState<Drag | null>(null);
   /** Set by the column a card was let go on. The card reads it as its drag ends, since the way to save a task is the card's own. */
@@ -55,9 +58,18 @@ export function TaskBoard({ tasks, projectId }: { tasks: TaskRecord[]; projectId
           onDrop={() => {
             dropped.current = column;
           }}
+          job={buttons.find((button) => button.id === column.kept?.jobButtonId)}
           settings={
-            change && column.slot !== null ? (
-              <TaskBoardColumnSettings slots={slots} index={column.slot} open={settings === column.slot} onOpenChange={(open) => setSettings(open ? column.slot : null)} onChange={change} />
+            change && projectId && column.slot !== null ? (
+              <TaskBoardColumnSettings
+                slots={slots}
+                index={column.slot}
+                buttons={buttons}
+                onEditButtons={() => openProject(projectId)}
+                open={settings === column.slot}
+                onOpenChange={(open) => setSettings(open ? column.slot : null)}
+                onChange={change}
+              />
             ) : null
           }
         >
@@ -102,10 +114,13 @@ function BoardColumn({
   over,
   onOver,
   onDrop,
+  job,
   settings,
   children,
 }: {
   column: TaskBoardColumn;
+  /** The task button a card starts when it is put here, shown as the mark of the agent it names. */
+  job: TaskButton | undefined;
   accepts: boolean;
   over: boolean;
   onOver: (column: string | null) => void;
@@ -146,6 +161,11 @@ function BoardColumn({
         {waiting ? (
           <span className="tabular text-attention" aria-label={`${waiting} waiting on you`}>
             {waiting}
+          </span>
+        ) : null}
+        {job ? (
+          <span className="task-board-column-job" data-tip={`Starts ${job.label}`}>
+            {job.choice ? <HarnessLogo id={job.choice.agent} size={14} /> : <Automation size={14} />}
           </span>
         ) : null}
         {settings}

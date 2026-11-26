@@ -506,7 +506,7 @@ void test("task tools name a space, a project and a revision only for a run the 
     task_get: ["id"],
     task_list: [],
     task_start: ["id", "workspace_mode"],
-    task_update: ["id", "spec", "status"],
+    task_update: ["column", "id", "spec", "status"],
   };
   assert.deepEqual(await argumentsOf("mac-run"), mac);
   host.onlineTaskScopes = async (runId) => (runId === "online-run" ? [{ spaceId: "space-1", projectId: "project-1", name: "Acme · openorc" }] : []);
@@ -516,7 +516,7 @@ void test("task tools name a space, a project and a revision only for a run the 
     task_get: ["id", "scope"],
     task_list: ["scope"],
     task_start: ["id", "ifRevision", "scope", "workspace_mode"],
-    task_update: ["id", "ifRevision", "scope", "spec", "status"],
+    task_update: ["column", "id", "ifRevision", "scope", "spec", "status"],
   });
   assert.deepEqual(await argumentsOf("other-run"), mac);
   // The run's own cloud project is offered by value and by name, so the agent knows what it may name.

@@ -251,6 +251,15 @@ export const Folders = icon(
 );
 /** An Orcling: the mascot's soft body and two upright eyes. */
 export const Orcling = icon("Orcling", <path d="M12 4.5c5.6 0 7.5 1.9 7.5 7.5s-1.9 7.5-7.5 7.5-7.5-1.9-7.5-7.5 1.9-7.5 7.5-7.5Z M9.75 10.25v2.5 M14.25 10.25v2.5" />);
+/** What runs by itself: a path from where it starts to where it ends. */
+export const Automation = icon(
+  "Automation",
+  <>
+    <rect x="3" y="16" width="5" height="5" rx="1.5" />
+    <rect x="16" y="3" width="5" height="5" rx="1.5" />
+    <path d="M8 18.5h8a2 2 0 0 0 2-2V14a2 2 0 0 0-2-2H8a2 2 0 0 1-2-2V7.5a2 2 0 0 1 2-2h8" />
+  </>,
+);
 export const Workflow = icon(
   "Workflow",
   <>

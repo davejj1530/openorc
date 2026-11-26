@@ -1,16 +1,18 @@
 import { type McpHost } from "@openorc/mcp";
 import { AttachmentService } from "../services/attachments.js";
+import type { BoardJobs } from "../services/board-jobs.js";
 import { ThreadService } from "../services/threads.js";
 import type { RunContext } from "./context.js";
 import { onlineTasks, type OnlineTasksHost } from "./online-tasks.js";
 type Dependencies = {
   threadService: Pick<ThreadService, "toolGet" | "toolStart" | "toolList" | "toolUpdate">;
+  board: Pick<BoardJobs, "moveForward">;
   dataDir: string;
   assertRunAvailable: RunContext["assertRunAvailable"];
   online?: OnlineTasksHost;
 };
 /** This Mac's tasks for a run's agent; a call that names a cloud project is the online tools'. */
-export function createTasksHost({ threadService, dataDir, assertRunAvailable, online = null }: Dependencies): Omit<McpHost["tasks"], "create"> {
+export function createTasksHost({ threadService, board, dataDir, assertRunAvailable, online = null }: Dependencies): Omit<McpHost["tasks"], "create"> {
   return {
     start: async (runId, id, options) => {
       assertRunAvailable(runId);
@@ -33,8 +35,17 @@ export function createTasksHost({ threadService, dataDir, assertRunAvailable, on
     },
     update: async (runId, id, patch) => {
       assertRunAvailable(runId);
-      if (patch.scope) return onlineTasks(online).update(runId, id, { ...patch, scope: patch.scope });
-      return threadService.toolUpdate(runId, id, patch);
+      const { column, ...rest } = patch;
+      if (rest.scope) {
+        if (column !== undefined) throw new Error("A cloud project's tasks have no board columns yet. Set the status instead.");
+        return onlineTasks(online).update(runId, id, { ...rest, scope: rest.scope });
+      }
+      if (column === undefined) return threadService.toolUpdate(runId, id, rest);
+      // The column decides the status, so one sent beside it is left out.
+      if (!(await threadService.toolGet(runId, id))) return null;
+      if (rest.spec) await threadService.toolUpdate(runId, id, { spec: rest.spec });
+      board.moveForward(id, column, runId);
+      return threadService.toolGet(runId, id);
     },
   };
 }

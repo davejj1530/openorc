@@ -51,5 +51,5 @@ export interface TaskTools {
   start(runId: string, id: string, options?: { workspaceMode?: "current" | "worktree"; scope?: TaskScope; ifRevision?: number }): Promise<TaskCard>;
   list(runId: string, scope?: TaskScope): Promise<TaskCard[]>;
   get(runId: string, id: string, scope?: TaskScope): Promise<TaskCard | null>;
-  update(runId: string, id: string, patch: { status?: TaskStatus; spec?: string; scope?: TaskScope; ifRevision?: number }): Promise<TaskCard | null>;
+  update(runId: string, id: string, patch: { status?: TaskStatus; column?: string; spec?: string; scope?: TaskScope; ifRevision?: number }): Promise<TaskCard | null>;
 }

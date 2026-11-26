@@ -15,7 +15,16 @@ export type TaskStatus = z.infer<typeof TaskStatus>;
 export const BoardStage = TaskStatus.extract(["backlog", "in_progress", "review", "done"]);
 export type BoardStage = z.infer<typeof BoardStage>;
 /** One column of a project's board, in the order the project keeps them. A project that keeps none has a column for each stage. */
-export const BoardColumn = z.object({ id: z.string(), projectId: z.string(), name: z.string(), stage: BoardStage });
+export const BoardColumn = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  name: z.string(),
+  stage: BoardStage,
+  /** The job a card starts when it is put in the column: the id of one of the project's task buttons. */
+  jobButtonId: z.string().nullable(),
+  /** The column that job hands the card on to when its work is done, always one after this one. */
+  nextColumnId: z.string().nullable(),
+});
 export type BoardColumn = z.infer<typeof BoardColumn>;
 
 export const TaskPriority = z.enum(["none", "low", "medium", "high", "urgent"]);

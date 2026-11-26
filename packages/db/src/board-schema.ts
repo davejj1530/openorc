@@ -14,3 +14,9 @@ CREATE TABLE board_columns (
 CREATE INDEX board_columns_project ON board_columns(project_id, position);
 ALTER TABLE tasks ADD COLUMN column_id TEXT REFERENCES board_columns(id) ON DELETE SET NULL;
 `;
+
+/** The job a column starts for a card put in it, which is one of its project's task buttons, and the column that job hands the card on to. */
+export const boardColumnJobsMigration = `
+ALTER TABLE board_columns ADD COLUMN job_button_id TEXT;
+ALTER TABLE board_columns ADD COLUMN next_column_id TEXT REFERENCES board_columns(id) ON DELETE SET NULL;
+`;

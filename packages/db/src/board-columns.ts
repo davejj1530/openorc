@@ -7,23 +7,29 @@ interface BoardColumnRow {
   project_id: string;
   name: string;
   stage: BoardStage;
+  job_button_id: string | null;
+  next_column_id: string | null;
 }
+/** A column as a board is saved with it. One without an id, or with an id the project does not keep, is new. */
+export type BoardColumnInput = { id?: string; name: string; stage: BoardStage; jobButtonId?: string | null; nextColumnId?: string | null };
 
-const fromRow = (row: BoardColumnRow): BoardColumn => ({ id: row.id, projectId: row.project_id, name: row.name, stage: row.stage });
+const FIELDS = "id, project_id, name, stage, job_button_id, next_column_id";
+const fromRow = (row: BoardColumnRow): BoardColumn => ({ id: row.id, projectId: row.project_id, name: row.name, stage: row.stage, jobButtonId: row.job_button_id, nextColumnId: row.next_column_id });
 
 export const boardColumns = {
   list(db: Db, projectId: string): BoardColumn[] {
-    return (db.stmt("SELECT id, project_id, name, stage FROM board_columns WHERE project_id = ? ORDER BY position").all(projectId) as unknown as BoardColumnRow[]).map(fromRow);
+    return (db.stmt(`SELECT ${FIELDS} FROM board_columns WHERE project_id = ? ORDER BY position`).all(projectId) as unknown as BoardColumnRow[]).map(fromRow);
   },
   get(db: Db, id: string): BoardColumn | null {
-    const row = db.stmt("SELECT id, project_id, name, stage FROM board_columns WHERE id = ?").get(id) as unknown as BoardColumnRow | undefined;
+    const row = db.stmt(`SELECT ${FIELDS} FROM board_columns WHERE id = ?`).get(id) as unknown as BoardColumnRow | undefined;
     return row ? fromRow(row) : null;
   },
   /**
    * Makes the project's board exactly these columns, in this order. A kept column that changes stage takes its tasks
-   * with it; one left out is removed, and its tasks stay in their status.
+   * with it; one left out is removed, and its tasks stay in their status. A column hands its cards on only to a column
+   * after it, so no chain of jobs comes back round.
    */
-  save(db: Db, projectId: string, columns: readonly { id?: string; name: string; stage: BoardStage }[]): BoardColumn[] {
+  save(db: Db, projectId: string, columns: readonly BoardColumnInput[]): BoardColumn[] {
     return db.transaction(() => {
       const ts = Date.now();
       const kept = new Map(boardColumns.list(db, projectId).map((column) => [column.id, column]));
@@ -32,22 +38,36 @@ export const boardColumns = {
       columns.forEach((column, position) => {
         const id = ids[position]!;
         const before = kept.get(id);
+        const job = column.jobButtonId ?? null;
         if (!before) {
-          db.stmt("INSERT INTO board_columns (id, project_id, name, stage, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+          db.stmt("INSERT INTO board_columns (id, project_id, name, stage, position, job_button_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
             id,
             projectId,
             column.name,
             column.stage,
             position,
+            job,
             ts,
             ts,
           );
           return;
         }
-        db.stmt("UPDATE board_columns SET name = ?, stage = ?, position = ?, updated_at = ? WHERE id = ?").run(column.name, column.stage, position, ts, id);
+        db.stmt("UPDATE board_columns SET name = ?, stage = ?, position = ?, job_button_id = ?, next_column_id = NULL, updated_at = ? WHERE id = ?").run(
+          column.name,
+          column.stage,
+          position,
+          job,
+          ts,
+          id,
+        );
         if (before.stage !== column.stage) {
           db.stmt("UPDATE tasks SET status = ?, status_is_explicit = 1, completed_at = ?, updated_at = ? WHERE column_id = ?").run(column.stage, column.stage === "done" ? ts : null, ts, id);
         }
+      });
+      // Set once every column is in place, since a column names another one.
+      columns.forEach((column, position) => {
+        const next = column.nextColumnId ? ids.indexOf(column.nextColumnId) : -1;
+        if (next > position) db.stmt("UPDATE board_columns SET next_column_id = ? WHERE id = ?").run(ids[next]!, ids[position]!);
       });
       return boardColumns.list(db, projectId);
     });

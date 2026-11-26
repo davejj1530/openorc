@@ -227,6 +227,25 @@ it("opens an edited file's line to the lines it changed, and no other file's", (
   expect(lines.textContent).toContain("new a");
   expect(lines.textContent).not.toContain("new b");
 });
+it("pins and unpins an edited file by clicking its mark on the turn timeline", () => {
+  const input = [
+    { path: "src/first.ts", kind: "update", diff: "@@ -1 +1 @@\n-old\n+first change" },
+    { path: "src/second.ts", kind: "update", diff: "@@ -1 +1 @@\n-old\n+second change" },
+  ];
+  const patch: Block = { ...tool, id: "patch", name: "apply_patch", input, output: "Success", done: true };
+  render(<WorkTranscript runId="run" blocks={[patch]} live />, { reactStrictMode: true });
+  fireEvent.click(screen.getByRole("button", { name: "Timeline" }));
+  const graph = screen.getByRole("slider", { name: "Turn timeline" });
+  expect(graph.getAttribute("aria-valuenow")).toBe("2");
+
+  fireEvent.click(graph, { clientX: 0 });
+  expect(graph.getAttribute("aria-valuenow")).toBe("1");
+  expect(piece(line(/^Edited first\.ts/)).textContent).toContain("first change");
+
+  fireEvent.click(graph, { clientX: 0 });
+  expect(graph.getAttribute("aria-valuenow")).toBe("2");
+  expect(piece(line(/^Edited second\.ts/)).textContent).toContain("second change");
+});
 it.each(["Read", "Bash", "Write", "Grep", "ToolSearch", "Skill", "mcp__codegraph__codegraph_explore"])("draws a %s call that has started and not yet said what it is for", (name) => {
   render(<WorkTranscript runId="run" blocks={[{ id: "call", kind: "tool", name, input: {}, done: false, at: Date.now() } as Block]} live />);
   expect(document.querySelector(".work-act")!.textContent!.trim()).not.toBe("");

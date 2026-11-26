@@ -33,7 +33,8 @@
   stroke: var(--ink-4);
 }
 .tl-reach {
-  transition: width var(--duration-quick) var(--ease-out);
+  transform-origin: 0 0;
+  transition: transform var(--duration-quick) var(--ease-out);
 }
 .tl-head {
   stroke: var(--line-strong);

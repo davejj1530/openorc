@@ -104,6 +104,7 @@ export function WorkTimeline({ entries, turn, live, renderBlocks }: { entries: W
   const shape = shapeOf(timeline, width, live);
   const height = ROW * (lanes.length + 1);
   if (!step || !resting) return <div ref={ref} className="work-timeline" />;
+  const headX = shape.x(column(view));
   const at = (event: MouseEvent) => Math.max(0, Math.min(last, Math.round((event.clientX - event.currentTarget.getBoundingClientRect().left - LEFT) / (shape.x(1) - shape.x(0))) - 1));
   const onKey = (event: KeyboardEvent) => {
     const move = STEPS[event.key] ?? 0;
@@ -125,20 +126,23 @@ export function WorkTimeline({ entries, turn, live, renderBlocks }: { entries: W
         aria-valuetext={`${objectVerb(step.object)} ${step.chip?.label ?? ""}`}
         onPointerMove={(event) => setHovered(at(event))}
         onPointerLeave={() => setHovered(null)}
-        onClick={(event) => setPinned((kept) => (kept === at(event) ? null : at(event)))}
+        onClick={(event) => {
+          const picked = at(event);
+          setPinned((kept) => (kept === picked ? null : picked));
+        }}
         onKeyDown={onKey}
       >
         <svg width={shape.width} height={height} aria-hidden="true">
           <defs>
             <clipPath id={clip}>
-              <rect x={0} y={0} height={height} className="tl-reach" style={{ width: shape.x(column(view)) + 1 }} />
+              <rect x={0} y={0} width={1} height={height} className="tl-reach" style={{ transform: `scaleX(${headX + 1})` }} />
             </clipPath>
           </defs>
           <Lines timeline={timeline} shape={shape} className="tl-base" />
           <g clipPath={`url(#${clip})`}>
             <Lines timeline={timeline} shape={shape} className="tl-lit" />
           </g>
-          <line className="tl-head" x1={0} x2={0} y1={4} y2={height - 4} style={{ translate: `${shape.x(column(view))}px 0` }} data-on={hovered !== null || pinned !== null || undefined} />
+          <line className="tl-head" x1={0} x2={0} y1={4} y2={height - 4} style={{ translate: `${headX}px 0` }} data-on={hovered !== null || pinned !== null || undefined} />
           <circle r={2.5} className="tl-fill tl-start" cx={shape.x(0)} cy={shape.y(0)} />
           {steps.map((each, index) => (
             <g

@@ -25,8 +25,15 @@ type OnlineRecord = Extract<TaskRecord, { kind: "online" }>;
 /** The card in hand, the column it came from and the column under it. */
 type Drag = { key: string; from: string; over: string | null };
 
-/** `projectId` is the one project whose board this is, with its own columns to change. Without one the board is every project's tasks by status. */
-export function TaskBoard({ tasks, projectId }: { tasks: TaskRecord[]; projectId: string | null }) {
+/** The card open beside the board, by its task, and what a press on a card kept on this computer does. */
+export type BoardPane = { id: string; opened: string | null; onOpen: (taskId: string) => void };
+
+/**
+ * `projectId` is the one project whose board this is, with its own columns to change: a project with a folder on this
+ * computer, where its columns are kept. Without one the board is its tasks by status. `showProject` names each card's
+ * project, on a board of several.
+ */
+export function TaskBoard({ tasks, projectId, showProject, pane }: { tasks: TaskRecord[]; projectId: string | null; showProject: boolean; pane: BoardPane }) {
   const projects = useSpaceProjects(true);
   const kept = useRpc("board.columns", { projectId: projectId ?? "" }, { enabled: Boolean(projectId) });
   const save = useRpcMutation("board.saveColumns");
@@ -72,11 +79,12 @@ export function TaskBoard({ tasks, projectId }: { tasks: TaskRecord[]; projectId
           }
         >
           {(record) => {
+            const key = taskRecordKey(record);
             const card = {
-              showProject: !projectId,
+              showProject,
               project: record.kind === "online" ? record.project : projects.data?.find((project) => project.id === record.task.projectId),
-              dragging: drag?.key === taskRecordKey(record),
-              onTake: () => setDrag({ key: taskRecordKey(record), from: column.id, over: null }),
+              dragging: drag?.key === key,
+              onTake: () => setDrag({ key, from: column.id, over: null }),
               onLetGo: () => {
                 const to = dropped.current;
                 dropped.current = null;
@@ -84,7 +92,7 @@ export function TaskBoard({ tasks, projectId }: { tasks: TaskRecord[]; projectId
                 return to && to.id !== column.id ? to : null;
               },
             };
-            return record.kind === "local" ? <LocalCard key={taskRecordKey(record)} record={record} {...card} /> : <OnlineCard key={taskRecordKey(record)} record={record} {...card} />;
+            return record.kind === "local" ? <LocalCard key={key} record={record} pane={pane} {...card} /> : <OnlineCard key={key} record={record} {...card} />;
           }}
         </BoardColumn>
       ))}
@@ -189,12 +197,15 @@ type CardProps = {
   onLetGo: () => TaskBoardColumn | null;
 };
 
-function LocalCard({ record, ...card }: CardProps & { record: LocalRecord }) {
+/** A task kept on this computer opens beside the board. */
+function LocalCard({ record, pane, ...card }: CardProps & { record: LocalRecord; pane: BoardPane }) {
   const update = useRpcMutation("tasks.update");
   return (
     <BoardCard
       {...card}
       record={record}
+      opens={{ id: pane.id, open: pane.opened === record.task.id }}
+      onOpen={() => pane.onOpen(record.task.id)}
       movable={!update.isPending}
       error={update.error ? `Couldn’t move: ${update.error.message}` : null}
       move={(column) => update.mutate({ id: record.task.id, patch: column.kept ? { columnId: column.kept.id } : { status: column.stage } })}
@@ -203,13 +214,17 @@ function LocalCard({ record, ...card }: CardProps & { record: LocalRecord }) {
   );
 }
 
-/** An organization's task knows its status and no column yet, so it lands in the first column of the stage it was dropped on. */
+/**
+ * An organization's task knows its status and no column yet, so it lands in the first column of the stage it was
+ * dropped on. Its card opens its page.
+ */
 function OnlineCard({ record, ...card }: CardProps & { record: OnlineRecord }) {
   const update = useTaskProperty(record.reference, record.task);
   return (
     <BoardCard
       {...card}
       record={record}
+      onOpen={() => openTaskRecord(record)}
       movable={record.task.viewer.mayEdit && !update.pending}
       error={update.state.propertyError}
       move={(column) => void update.controller.property({ status: column.stage })}
@@ -218,7 +233,7 @@ function OnlineCard({ record, ...card }: CardProps & { record: OnlineRecord }) {
   );
 }
 
-/** What a card says under its title: that it waits on the person, else its first label; its project on a board of several; and an organization task's own facts. */
+/** What a card says under its title: that it waits on the person, else its first label, or its project on a board of several; and an organization task's own facts. */
 function CardFacts({ record, needsYou, showProject, project }: { record: TaskRecord; needsYou: boolean; showProject: boolean; project: Project | undefined }) {
   const task = record.task;
   return (
@@ -229,7 +244,8 @@ function CardFacts({ record, needsYou, showProject, project }: { record: TaskRec
           Needs you
         </span>
       ) : null}
-      {!needsYou && task.labels[0] ? (
+      {/* A board of every project names each card's project, and a label has no room beside it. */}
+      {!needsYou && !showProject && task.labels[0] ? (
         <span className="task-board-card-fact">
           <StatusDot tone="muted" />
           <span className="truncate">{task.labels[0]}</span>
@@ -257,7 +273,18 @@ function BoardCard({
   error,
   move,
   start,
-}: CardProps & { record: TaskRecord; movable: boolean; error: string | null; move: (column: TaskBoardColumn) => void; start: ReactNode }) {
+  opens,
+  onOpen,
+}: CardProps & {
+  record: TaskRecord;
+  movable: boolean;
+  error: string | null;
+  move: (column: TaskBoardColumn) => void;
+  start: ReactNode;
+  /** The pane a press on the card opens, and whether this card's task is the one in it. */
+  opens?: { id: string; open: boolean };
+  onOpen: () => void;
+}) {
   const task = record.task;
   const needsYou = taskNeedsYou(record);
   const waits = task.status === "backlog" || task.status === "proposed";
@@ -266,6 +293,7 @@ function BoardCard({
       className="task-board-card"
       data-stage={task.status}
       data-dragging={dragging ? "" : undefined}
+      data-open={opens?.open ? "" : undefined}
       draggable={movable}
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = "move";
@@ -277,7 +305,14 @@ function BoardCard({
         if (column) move(column);
       }}
     >
-      <button type="button" className="task-board-card-open" onClick={() => openTaskRecord(record)} aria-label={`${task.title}, ${needsYou ? "needs your approval" : statusLabel[task.status]}`}>
+      <button
+        type="button"
+        className="task-board-card-open"
+        onClick={onOpen}
+        aria-controls={opens?.id}
+        aria-expanded={opens?.open}
+        aria-label={`${task.title}, ${needsYou ? "needs your approval" : statusLabel[task.status]}`}
+      >
         {task.title}
       </button>
       <div className="task-board-card-meta">

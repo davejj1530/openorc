@@ -151,7 +151,12 @@
   padding: 10px 12px 8px;
   transition:
     background-color var(--duration-leave) var(--ease-out),
+    box-shadow var(--duration-leave) var(--ease-out),
     opacity var(--duration-leave) var(--ease-out);
+}
+/* The card whose task is open beside the board wears a ring for as long as it is. */
+.task-board-card[data-open] {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ink) 20%, transparent);
 }
 .task-board-card:hover {
   background-color: color-mix(in srgb, var(--surface) 70%, var(--surface-3));

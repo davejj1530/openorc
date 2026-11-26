@@ -8,9 +8,11 @@ import { statusLabel } from "../components/status";
 import { core } from "../lib/rpc";
 import { queryClient } from "../lib/client";
 import { useRouter } from "../lib/router";
+import { useTasksView } from "../lib/tasks-view";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("../components/TopBar", () => ({ TopBar: ({ actions }: { actions?: ReactNode }) => <div>{actions}</div> }));
+vi.mock("../lib/window", () => ({ useTrafficLights: () => false, useWindowsControls: () => false }));
 const task: Task = {
   id: "task",
   projectId: "project",
@@ -47,6 +49,7 @@ beforeEach(() => {
   );
   Element.prototype.scrollIntoView = vi.fn();
   useRouter.setState({ route: { view: "tasks" }, threadIds: [] });
+  useTasksView.setState({ view: "list" });
   saved = [{ ...task }, { ...task, id: "other", title: "Review copy", status: "review" }];
   update = async () => {};
   vi.mocked(core.call).mockImplementation(async (method, params) => {
@@ -183,4 +186,37 @@ it("leads with the tasks whose run needs your approval and opens them on their c
     fireEvent.click(screen.getByRole("button", { name }));
     expect(useRouter.getState().route).toEqual({ view: "task", taskId: id, tab: "spec" });
   }
+});
+it("opens a board card's task beside the board, swaps it for another card's, and closes it with Escape or Close", async () => {
+  useTasksView.setState({ view: "board" });
+  const call = vi.mocked(core.call).getMockImplementation()!;
+  vi.mocked(core.call).mockImplementation(async (method, params) => {
+    if (method === "tasks.events") return [];
+    if (method === "tasks.executionThread") return null;
+    return call(method, params);
+  });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <TaskListView onNewTask={() => {}} />
+    </QueryClientProvider>,
+  );
+  const pane = () => document.querySelector<HTMLElement>(".task-pane-shell[data-open='true'] .task-pane");
+  const card = await screen.findByRole("button", { name: "Export rows, Backlog" });
+  fireEvent.click(card);
+  await waitFor(() => expect(pane()?.querySelector("h2")?.textContent).toBe("Export rows"));
+  expect(card.getAttribute("aria-expanded")).toBe("true");
+  expect(useRouter.getState().route).toEqual({ view: "tasks" });
+  fireEvent.click(screen.getByRole("button", { name: "Review copy, Review" }));
+  await waitFor(() => expect(pane()?.querySelector("h2")?.textContent).toBe("Review copy"));
+  expect(card.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  await waitFor(() => expect(pane()).toBeNull());
+  fireEvent.click(card);
+  await waitFor(() => expect(pane()).not.toBeNull());
+  fireEvent.click(within(pane()!).getByRole("button", { name: "Close" }));
+  await waitFor(() => expect(pane()).toBeNull());
+  fireEvent.click(card);
+  await waitFor(() => expect(pane()).not.toBeNull());
+  fireEvent.click(within(pane()!).getByRole("button", { name: "Open the full page" }));
+  expect(useRouter.getState().route).toEqual({ view: "task", taskId: "task", tab: "spec" });
 });

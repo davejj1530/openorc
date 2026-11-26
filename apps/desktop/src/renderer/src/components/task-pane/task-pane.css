@@ -1,0 +1,113 @@
+/* The pane of the card open on the board: a column of the Tasks screen's own, on the window's ground, past a seam.
+   It slides as the tools panel does: the shell animates its width and clips, and the pane inside keeps its full
+   width, so its content never reflows mid-slide. */
+.task-pane-shell {
+  --task-pane: clamp(360px, 42cqw, 520px);
+  flex-shrink: 0;
+  overflow: hidden;
+  width: var(--task-pane);
+  transition: width var(--duration-resize) var(--ease-out);
+}
+.task-pane-shell[data-open="false"] {
+  width: 0;
+}
+.task-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--task-pane);
+  height: 100%;
+  background: var(--bg);
+}
+.task-pane::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--seam);
+  background: var(--seam-line);
+  content: "";
+  pointer-events: none;
+}
+/* The head stands on the chrome band's line, level with the screen's title rail beside it. */
+.task-pane-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  height: var(--height-topbar);
+  padding: calc(var(--spacing-well) / 2) 12px 0 20px;
+  box-shadow: inset 0 calc(-1 * var(--seam)) 0 var(--line);
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+.task-pane-title {
+  min-width: 0;
+  flex: 1;
+}
+.task-pane-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+}
+.task-pane-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+.task-pane-properties {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 20px 0;
+}
+.task-pane-pull {
+  padding-right: 12px;
+  color: var(--ink);
+}
+.task-pane-pull:hover {
+  background-image: linear-gradient(var(--surface-2), var(--surface-2));
+}
+.task-pane-error {
+  padding: 8px 20px 0;
+  color: var(--bad);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.task-pane-history {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 20px 24px;
+}
+/* 860px of work row is a window of about 1100px beside the open sidebar: too narrow for the board and the pane side
+   by side, so the pane lies over the board's end instead of crushing its columns. */
+@container work-row (max-width: 860px) {
+  .task-pane-shell {
+    --task-pane: min(520px, calc(100cqw - 48px));
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+  }
+  .task-pane-shell[data-open="true"] .task-pane {
+    box-shadow: var(--shadow-overlay);
+  }
+}
+/* Another card pressed swaps its task in where the pane stands (swapInPlace in lib/motion.ts): the title and the body
+   cross-fade, and carry names only while the swap runs. */
+:root:active-view-transition-type(task-pane) .task-pane-title {
+  view-transition-name: task-pane-title;
+}
+:root:active-view-transition-type(task-pane) .task-pane-body {
+  view-transition-name: task-pane-body;
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-pane-shell {
+    transition: none;
+  }
+}

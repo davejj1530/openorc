@@ -1,6 +1,6 @@
 export { accountDay, cloudTime, hoursDetail, initials, periodLabel, planDate, planWords, priceText } from "./account-words.js";
 export { approvalDetail, approvalSummary, readQuestions, type Question } from "./approval-request.js";
-export { answerFor, emptyDraft, keptAnswers, LINE, lineWaiting, stepAnswers, type AnswerAction, type AnswerDraft } from "./ask-answers.js";
+export { answerFor, emptyDraft, LINE, lineWaiting, stepAnswers, type AnswerAction, type AnswerDraft } from "./ask-answers.js";
 export { askKeyAct, askKeyName, docks, waitingAsks, type AskAct, type AskKey, type AskPlace, type WaitingAsk } from "./ask-dock.js";
 export { pageHost, pageLabel, publicAddress } from "./browser-page.js";
 export { isUnifiedDiff, toolDiff } from "./chat-diff.js";

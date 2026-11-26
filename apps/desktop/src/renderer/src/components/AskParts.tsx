@@ -1,28 +1,45 @@
 import { askKeyAct, askKeyName, type AskPlace } from "@openorc/client";
 import { type KeyboardEvent, type ReactNode } from "react";
-import { Button } from "./ui";
+import { Check, ChevronLeft } from "./icons";
+import { Button, IconButton } from "./ui";
 
 /**
- * A waiting ask's top line: what it asks, where the keyboard enters it, then how many more wait, and last its one quiet
- * way out ("Decline" or "Deny").
+ * A waiting ask's top: what it asks, alone across the dock's width beside its mark, and where the keyboard enters it.
+ * The mark keeps its column whether or not there is one, so the words under it line up down the ask.
  */
-export function AskTop({ mark, more, count, children, way }: { mark: ReactNode; more: number; count?: string | undefined; children: ReactNode; way: ReactNode }) {
+export function AskTop({ mark, children }: { mark: ReactNode; children: ReactNode }) {
   return (
     <div className="composer-ask-top">
-      <span className="composer-ask-head" tabIndex={0} data-ask-control="head">
-        {mark}
-        <span className="min-w-0">{children}</span>
-      </span>
-      <span className="composer-ask-end">
+      <span className="composer-ask-mark">{mark}</span>
+      <div className="composer-ask-head" tabIndex={0} data-ask-control="head">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A waiting ask's one line under its body, which never scrolls away. At its start, where the ask stands: a step back
+ * and its count among several questions, then how many more asks wait. At its end, its quiet ways out ("Decline" or
+ * "Deny"), then its ways on.
+ */
+export function AskFoot({ back, count, more, ways, children }: { back?: ReactNode; count?: string | undefined; more: number; ways: ReactNode; children?: ReactNode }) {
+  return (
+    <div className="composer-ask-row">
+      <span className="composer-ask-where">
+        <span className="composer-ask-mark">{back}</span>
         {count ? <span className="composer-ask-count tabular">{count}</span> : null}
         {more > 0 ? <span className="composer-ask-count tabular">{more === 1 ? "1 more waits" : `${more} more wait`}</span> : null}
-        {way}
+      </span>
+      <span className="composer-ask-ways">
+        {ways}
+        {children}
       </span>
     </div>
   );
 }
 
-/** The quiet way out of an ask, last in the keyboard's walk though it is drawn in the top line. */
+/** A quiet way out of an ask, last in the keyboard's walk though it is drawn before the ways on. */
 export function AskWay({ children, disabled, tip, onClick }: { children: ReactNode; disabled: boolean; tip: string | undefined; onClick: () => void }) {
   return (
     <Button size="sm" variant="ghost" className="focus-ring" tabIndex={-1} data-ask-control="action" data-ask-last="" disabled={disabled} data-tip={tip} onClick={onClick}>
@@ -31,15 +48,35 @@ export function AskWay({ children, disabled, tip, onClick }: { children: ReactNo
   );
 }
 
+/** The step back to the question before, centred on the marks' column of the ask's row. */
+export function AskBack({ disabled, tip, onClick }: { disabled: boolean; tip: string | undefined; onClick: () => void }) {
+  return (
+    <IconButton size="xs" className="focus-ring" aria-label="Previous question" tabIndex={-1} data-ask-control="action" data-ask-last="" disabled={disabled} data-tip={tip} onClick={onClick}>
+      <ChevronLeft size={14} />
+    </IconButton>
+  );
+}
+
+/** A choice's mark: a ring, and an ink check once its row is picked. */
+export function AskRing() {
+  return (
+    <span className="composer-ask-ring">
+      <Check size={10} />
+    </span>
+  );
+}
+
 /**
- * The ask's own line for words: an answer of the person's own, or what to do instead. The words go only by its pill or
- * Enter in it, and the pill shows only while it has words to take; it is the column's ink unless the field below holds
- * words. A line kept among several choices wears a picked choice's edge.
+ * The ask's own line for words: an answer of the person's own, or what to do instead. It is one more row of the ask,
+ * its words in the words' column and a choice's ring before them where it stands among choices. The words go only by
+ * its pill or Enter in it, and the pill shows only while it has words to take; it is the column's ink unless the field
+ * below holds words. A line kept among several choices wears a picked choice's check.
  */
 export function AskLine({
   label,
   placeholder,
   secret,
+  mark,
   picked = false,
   value,
   onChange,
@@ -50,6 +87,7 @@ export function AskLine({
   label: string;
   placeholder: string;
   secret: boolean;
+  mark?: ReactNode;
   picked?: boolean;
   value: string;
   onChange: (value: string) => void;
@@ -59,6 +97,7 @@ export function AskLine({
 }) {
   return (
     <label className="composer-ask-line" data-ask-line="" data-picked={picked || undefined}>
+      <span className="composer-ask-mark">{mark}</span>
       <input
         type={secret ? "password" : "text"}
         className="native-field"

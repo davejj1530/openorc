@@ -1708,8 +1708,9 @@
 }
 
 /* An ask the agent waits on, docked at the top of the composer's piece above a hairline (components/ComposerAsk.tsx).
-   Its top line holds what it asks, how many more wait and its quiet way out; its choices are keys the width of the
-   piece less 12px a side, and its own line for words is a key the same width. Nothing is ringed at rest. */
+   It keeps two columns down its height, marks then words: the asker's mark, each choice's ring and the step back in
+   the first; the question, the choices' words and the count in the second. Nothing in it is filled at rest, so the
+   composer's piece is its only surface, and a row is lit only under the pointer. */
 /* The dock opens and folds by its height (ComposerAsk's motion), so it carries the piece's gap below it itself: a dock
    folded to nothing leaves no gap. The clip margin keeps a ringed control's outline. */
 .composer-ask-dock {
@@ -1727,23 +1728,27 @@
   padding-bottom: 12px;
   border-bottom: var(--hairline) solid var(--line);
 }
-/* In a narrow composer the quiet words drop under the question rather than squeeze it. */
+/* The top is what the ask asks, alone across the whole width beside its mark. */
 .composer-ask-top {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0 12px;
-  min-width: 0;
-  padding-left: 4px;
-}
-.composer-ask-head {
-  display: flex;
-  flex: 1 1 12rem;
   align-items: flex-start;
   gap: 8px;
   min-width: 0;
-  padding: 4px 0;
+  padding: 4px 0 4px 4px;
+}
+/* The marks' column: 14px wide and one line tall in every row, with or without a mark, so the words line up. A mark
+   wider than the column, as the step back is, stays centred on it. */
+.composer-ask-mark {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 23px;
+}
+.composer-ask-head {
+  flex: 1 1 0;
+  min-width: 0;
   border-radius: var(--radius-sm);
   font-size: var(--text-md);
   line-height: 23px;
@@ -1752,36 +1757,16 @@
   overflow-wrap: anywhere;
   outline: none;
 }
-/* 3px centers a 14px mark on the first 20px line of a question that wraps. */
-.composer-ask-head > :is(svg, img) {
-  flex-shrink: 0;
-  margin-top: 3px;
-}
 .composer-ask-head:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
-.composer-ask-end {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  margin-left: auto;
-  gap: 2px;
-  min-height: 28px;
-}
-.composer-ask-count {
-  padding: 0 8px;
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
-  color: var(--ink-3);
-  white-space: nowrap;
-}
-/* A long ask keeps to about half the window and scrolls inside, under its top line and above its row, which never
-   scroll away. The 4px inset keeps a ringed choice's outline inside the scroll. */
+/* A long ask keeps to about half the window and scrolls inside, under its top and above its row, which never scroll
+   away. Its rows reach 8px past the two columns on either side, into the 4px inset, so a lit row has room. */
 .composer-ask-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
   min-width: 0;
   max-height: 45vh;
   margin: -4px;
@@ -1791,50 +1776,24 @@
 .composer-ask-body:empty {
   display: none;
 }
-/* An answer kept above the question that shows, in an ask of several: the question on the left, the answer on the
-   right, a press reopens it. */
-.composer-ask-kept {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  min-width: 0;
-  min-height: 28px;
-  padding: 4px 8px;
-  border-radius: var(--radius-lg);
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
-  text-align: left;
+/* Its rows keep their height, so a long ask scrolls rather than squeeze them into each other. A ringed row draws its
+   ring inside, where the scroll does not clip it. */
+.composer-ask-body > * {
+  flex-shrink: 0;
 }
-.composer-ask-kept:hover:not(:disabled) {
-  background-color: var(--surface-2);
+.composer-ask-body .focus-ring:focus-visible {
+  outline-offset: -2px;
 }
-.composer-ask-kept-question {
-  flex: 1 1 0;
-  min-width: 0;
-  color: var(--ink-3);
-  overflow-wrap: anywhere;
-}
-.composer-ask-kept-answer {
-  flex: 0 1 auto;
-  min-width: 0;
-  color: var(--ink);
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-.composer-ask-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
-.composer-ask-choice {
+/* A choice, and the ask's own line for words: a row with its ring in the marks' column and its words, then what they
+   mean in smaller words, in the words' column. */
+.composer-ask-choice,
+.composer-ask-line {
   display: grid;
-  width: 100%;
-  min-width: 0;
-  min-height: 36px;
+  grid-template-columns: 14px minmax(0, 1fr);
+  column-gap: 8px;
+  margin: 0 -4px;
   padding: 6px 8px;
-  border-radius: var(--radius-xl);
-  background-color: var(--control-fill);
+  border-radius: var(--radius-lg);
   font-size: var(--text-base);
   line-height: 23px;
   color: var(--ink);
@@ -1842,16 +1801,115 @@
   overflow-wrap: anywhere;
   transition: background-color var(--duration-quick) var(--ease-out);
 }
-.composer-ask-choice:hover:not(:disabled) {
-  background-image: linear-gradient(var(--surface-2), var(--surface-2));
+.composer-ask-choice:hover:not(:disabled),
+.composer-ask-line:focus-within {
+  background-color: var(--surface-2);
+}
+.composer-ask-choice:active:not(:disabled) {
+  background-color: var(--surface-3);
 }
 .composer-ask-choice:disabled {
   color: var(--ink-3);
 }
+.composer-ask-choice > :not(.composer-ask-mark) {
+  grid-column: 2;
+}
+.composer-ask-choice-description {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--ink-3);
+}
+/* A choice's mark: a ring, and once its row is picked an ink disc whose check lands with a small overshoot. */
+.composer-ask-ring {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--ink-4);
+  color: var(--bg);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    box-shadow var(--duration-quick) var(--ease-out);
+}
+.composer-ask-ring > svg {
+  opacity: 0;
+  scale: 0.5;
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    scale var(--duration-confirm) var(--ease-overshoot);
+}
+[data-picked] > .composer-ask-mark > .composer-ask-ring {
+  background-color: var(--ink);
+  box-shadow: none;
+}
+[data-picked] > .composer-ask-mark > .composer-ask-ring > svg {
+  opacity: 1;
+  scale: 1;
+}
+/* The line's words sit where a choice's would; its pill, while it has words to take, ends the row without growing it. */
+.composer-ask-line {
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  cursor: text;
+}
+.composer-ask-line > input {
+  min-width: 0;
+  height: 23px;
+  background: transparent;
+  font-size: var(--text-base);
+  color: var(--ink);
+  outline: none;
+}
+.composer-ask-line > input::placeholder {
+  color: var(--ink-3);
+}
+.composer-ask-line > button {
+  margin-block: -2.5px;
+}
+/* Every answer of an ask of several, before it is sent: each question's short name, then its answer, in two columns
+   that start in the words' column and line up down the list. A press on a row reopens its question. */
+.composer-ask-answers {
+  display: grid;
+  grid-template-columns: fit-content(40%) minmax(0, 1fr);
+  column-gap: 20px;
+  row-gap: 2px;
+}
+.composer-ask-answer {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: baseline;
+  margin: 0 -4px;
+  padding: 6px 8px 6px 30px;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-base);
+  line-height: 23px;
+  text-align: left;
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.composer-ask-answer:hover:not(:disabled) {
+  background-color: var(--surface-2);
+}
+.composer-ask-answer:active:not(:disabled) {
+  background-color: var(--surface-3);
+}
+.composer-ask-answer-name {
+  min-width: 0;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-ask-answer-words {
+  display: grid;
+  min-width: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
 /* The request an approval asks about, as its agent sums it up: shown whole, so a command's last line is read before it
    is allowed. The raw request, on demand, can run long and scrolls. */
 .composer-ask-detail {
-  margin: 0;
+  margin: 0 0 6px;
   padding: 9px 8px;
   border-radius: var(--radius-xl);
   background-color: var(--control-fill);
@@ -1867,62 +1925,38 @@
   overflow: auto;
   color: var(--ink-2);
 }
-/* A picked choice of several, or a kept line among them: a key in the piece's own fill with an ink edge and a check. */
-.composer-ask-choice[data-picked],
-.composer-ask-line[data-picked] {
-  background-color: var(--well);
-  box-shadow: inset 0 0 0 1.5px var(--ink);
+/* The ask's one row under its body. At its start, where it stands: the step back in the marks' column from the second
+   of several questions on, the count in the words' column, then how many more asks wait. At its end, the quiet ways
+   out, then the ways on. It is as tall with a way on as without, so the ask holds still when one joins. In a narrow
+   composer the ways wrap under where it stands. */
+.composer-ask-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  min-height: 30px;
+  padding-left: 4px;
 }
-.composer-ask-choice:has(.composer-ask-check) {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-.composer-ask-choice > :not(.composer-ask-check) {
-  grid-column: 1;
-}
-.composer-ask-check {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  align-self: center;
-  opacity: 0;
-  scale: 0.5;
-  transition:
-    opacity var(--duration-leave) var(--ease-out),
-    scale var(--duration-confirm) var(--ease-overshoot);
-}
-.composer-ask-choice[data-picked] .composer-ask-check {
-  opacity: 1;
-  scale: 1;
-}
-.composer-ask-choice-description {
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
-  color: var(--ink-3);
-}
-.composer-ask-line {
+.composer-ask-where {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
-  padding: 0 4px 0 8px;
-  border-radius: var(--radius-xl);
-  background-color: var(--control-fill);
-  cursor: text;
-}
-.composer-ask-line:focus-within {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-.composer-ask-line > input {
-  flex: 1 1 0;
   min-width: 0;
-  height: 36px;
-  background: transparent;
-  font-size: var(--text-base);
-  color: var(--ink);
-  outline: none;
 }
-.composer-ask-line > input::placeholder {
+.composer-ask-count {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
   color: var(--ink-3);
+  white-space: nowrap;
+}
+.composer-ask-ways {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
 }
 .composer-ask-error {
   padding: 0 12px;

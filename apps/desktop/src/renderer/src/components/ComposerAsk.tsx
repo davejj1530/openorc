@@ -55,9 +55,10 @@ function playDock(dock: HTMLElement, from: number, how: "arrive" | "swap" | "lea
 
 /**
  * The ask the dock draws: the first waiting, or the one just answered while it leaves. The dock's motion plays as the
- * shown ask changes, from the height the dock had.
+ * shown ask changes, from the height the dock had; `step` counts the questions an ask of several has moved between,
+ * each of which plays as an ask taking another's place does.
  */
-function useDockMotion(ask: WaitingAsk | undefined) {
+function useDockMotion(ask: WaitingAsk | undefined, step: number) {
   const dock = useRef<HTMLDivElement>(null);
   const height = useRef(0);
   const [leaving, setLeaving] = useState<WaitingAsk | null>(null);
@@ -71,7 +72,7 @@ function useDockMotion(ask: WaitingAsk | undefined) {
   }
   const shown = ask ?? leaving ?? undefined;
   // What the dock shows, as one word: an ask by its id, or that one leaving. Motion plays when this changes.
-  const mode = shown ? `${ask ? "ask" : "leave"}:${shown.block.approvalId}` : null;
+  const mode = shown ? `${ask ? `ask:${step}` : "leave"}:${shown.block.approvalId}` : null;
   const played = useRef<string | null>(null);
   useLayoutEffect(() => {
     const node = dock.current;
@@ -91,8 +92,8 @@ function useDockMotion(ask: WaitingAsk | undefined) {
  * The ask an agent waits on, docked at the top of the composer's own piece above a hairline. One shows, and says how
  * many more wait. Its keys follow `askKeyAct`: the keyboard enters at its question only by the person's own key, and
  * Enter acts only on a control the keyboard was put on. Only its question is in the page's tab order and the walk is
- * its own, so no Tab can land on a choice, even one pressed as the ask arrives. Once it is answered the keyboard goes
- * back to the field, so the next key cannot land on the ask that takes its place.
+ * its own, so no Tab can land on a choice, even one pressed as the ask arrives. Once it is answered, or one of its
+ * questions is, the keyboard goes back to the field, so the next key cannot land on what takes its place.
  */
 export function ComposerAsk({
   asks,
@@ -110,9 +111,11 @@ export function ComposerAsk({
   focusField: () => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
-  const motion = useDockMotion(asks[0]);
+  const [step, setStep] = useState(0);
+  const motion = useDockMotion(asks[0], step);
   const ask = motion.shown;
-  const shown = asks[0]?.block.approvalId;
+  // What the person is asked now: an ask, and the question of it that shows.
+  const shown = asks[0] ? `${asks[0].block.approvalId}:${step}` : undefined;
   const last = useRef(shown);
   const [landing, setLanding] = useState(false);
   useEffect(() => {
@@ -122,8 +125,8 @@ export function ComposerAsk({
     const focused = document.activeElement;
     if (!focused || focused === document.body || root.current?.contains(focused)) focusField();
     if (!swapped) return;
-    // The ask that takes an answered one's place takes no press or key while it lands, so a second Enter or a double
-    // press cannot answer what was not read.
+    // The ask or question that takes an answered one's place takes no press or key while it lands, so a second Enter
+    // or a double press cannot answer what was not read.
     setLanding(true);
     const timer = setTimeout(() => setLanding(false), LANDING_MS);
     return () => clearTimeout(timer);
@@ -151,7 +154,7 @@ export function ComposerAsk({
             onClickCapture={hold}
           >
             {ask.block.approvalKind === "user_input" ? (
-              <QuestionAsk key={ask.block.approvalId} ask={ask} more={asks.length - 1} fieldHasWords={fieldHasWords} onStep={focusField} />
+              <QuestionAsk key={ask.block.approvalId} ask={ask} more={asks.length - 1} fieldHasWords={fieldHasWords} onStep={() => setStep((count) => count + 1)} />
             ) : (
               <ApprovalAsk key={ask.block.approvalId} ask={ask} more={asks.length - 1} fieldHasWords={fieldHasWords} />
             )}

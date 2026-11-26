@@ -2,7 +2,7 @@ import { useContext, useState } from "react";
 import { approvalDetail, approvalSummary, type Block, type WaitingAsk } from "@openorc/client";
 import { Hammer, Terminal, X } from "./icons";
 import { AskContinues, useAskAnswer } from "./ask-answer";
-import { askKeyDown, AskError, AskLine, AskTop, AskWay } from "./AskParts";
+import { askKeyDown, AskError, AskFoot, AskLine, AskTop, AskWay } from "./AskParts";
 import { Button } from "./ui";
 
 type ApprovalBlock = Extract<Block, { kind: "approval" }>;
@@ -49,10 +49,10 @@ export function ApprovalCard({ block, runId }: { block: ApprovalBlock; runId: st
 }
 
 /**
- * A request docked onto the composer while it waits: what it asks with Deny last in its top line, the request itself
- * as the agent sums it up (the raw request on demand when it says more), a line for what to do instead, and the
- * allows. Allow once is the ask's one ink; words in its line make Deny and send the ink, and words in the field below
- * take it from both.
+ * A request docked onto the composer while it waits: what it asks alone across the top, the request itself as the
+ * agent sums it up (the raw request on demand when it says more), a line for what to do instead, and one row for Deny
+ * and the allows. Allow once is the ask's one ink; words in its line make Deny and send the ink, and words in the field
+ * below take it from both.
  */
 export function ApprovalAsk({ ask, more, fieldHasWords }: { ask: WaitingAsk; more: number; fieldHasWords: boolean }) {
   const { block } = ask;
@@ -70,24 +70,7 @@ export function ApprovalAsk({ ask, more, fieldHasWords }: { ask: WaitingAsk; mor
   const allow = (decision: Allow) => ({ disabled: off, "data-tip": tip ?? continues ?? undefined, onClick: () => reply.answer(decision) });
   return (
     <>
-      <AskTop
-        mark={<Icon size={14} className="text-ink-3" aria-hidden="true" />}
-        more={more}
-        way={
-          <>
-            {command ? null : (
-              <AskWay disabled={false} tip={undefined} onClick={() => setRaw((v) => !v)}>
-                {raw ? "Hide request" : "Show request"}
-              </AskWay>
-            )}
-            <AskWay disabled={off} tip={tip} onClick={() => reply.answer("deny")}>
-              Deny
-            </AskWay>
-          </>
-        }
-      >
-        {askFor(block, label)}
-      </AskTop>
+      <AskTop mark={<Icon size={14} className="text-ink-3" aria-hidden="true" />}>{askFor(block, label)}</AskTop>
       <div className="composer-ask-body">
         <pre className="composer-ask-detail" data-raw={raw || undefined}>
           {raw ? pretty(block.input, 800) : approvalSummary(block)}
@@ -106,7 +89,23 @@ export function ApprovalAsk({ ask, more, fieldHasWords }: { ask: WaitingAsk; mor
         />
       </div>
       <AskError error={reply.error} />
-      <ApprovalRow onceOnly={Boolean(block.onceOnly)} continues={continues} ink={!(fieldHasWords || noted)} allow={allow} />
+      <AskFoot
+        more={more}
+        ways={
+          <>
+            {command ? null : (
+              <AskWay disabled={false} tip={undefined} onClick={() => setRaw((v) => !v)}>
+                {raw ? "Hide request" : "Show request"}
+              </AskWay>
+            )}
+            <AskWay disabled={off} tip={tip} onClick={() => reply.answer("deny")}>
+              Deny
+            </AskWay>
+          </>
+        }
+      >
+        <ApprovalWays onceOnly={Boolean(block.onceOnly)} continues={continues} ink={!(fieldHasWords || noted)} allow={allow} />
+      </AskFoot>
     </>
   );
 }
@@ -114,10 +113,10 @@ export function ApprovalAsk({ ask, more, fieldHasWords }: { ask: WaitingAsk; mor
 type Allow = "allow" | "allow_for_run";
 
 /**
- * The approval's row: Allow for this run and Allow once, or, where the answer continues on the reader's own sign-in and
- * hours, Approve and continue alone. The row's ink unless words wait elsewhere.
+ * The approval's ways on: Allow for this run and Allow once, or, where the answer continues on the reader's own sign-in
+ * and hours, Approve and continue alone. The row's ink unless words wait elsewhere.
  */
-function ApprovalRow({
+function ApprovalWays({
   onceOnly,
   continues,
   ink,
@@ -129,7 +128,7 @@ function ApprovalRow({
   allow: (decision: Allow) => { disabled: boolean; "data-tip": string | undefined; onClick: () => void };
 }) {
   return (
-    <div className="composer-ask-row">
+    <>
       {onceOnly || continues ? null : (
         <Button size="md" variant="secondary" className="focus-ring" tabIndex={-1} data-ask-control="action" {...allow("allow_for_run")}>
           Allow for this run
@@ -138,6 +137,6 @@ function ApprovalRow({
       <Button size="md" variant={ink ? "primary" : "secondary"} className="focus-ring" tabIndex={-1} data-ask-control="action" {...allow("allow")}>
         {continues ? "Approve and continue" : "Allow once"}
       </Button>
-    </div>
+    </>
   );
 }

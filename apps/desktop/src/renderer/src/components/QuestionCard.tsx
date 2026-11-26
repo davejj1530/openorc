@@ -1,5 +1,5 @@
 import { useContext, useState, type CSSProperties, type ReactNode } from "react";
-import { answerFor, emptyDraft, keptAnswers, LINE, lineWaiting, readQuestions, stepAnswers, type AnswerAction, type AnswerDraft, type Question, type WaitingAsk } from "@openorc/client";
+import { answerFor, emptyDraft, LINE, lineWaiting, readQuestions, stepAnswers, type AnswerAction, type AnswerDraft, type Question, type WaitingAsk } from "@openorc/client";
 import { harnessShortName, isHarnessId } from "@openorc/protocol";
 import { answeredInThisWindow, AskContinues, useAskAnswer } from "./ask-answer";
 import { useRunVoice } from "../lib/turn-authors";
@@ -7,7 +7,7 @@ import { Button } from "./ui";
 import { cn } from "../lib/cn";
 import { Check } from "./icons";
 import { HarnessLogo } from "./HarnessLogo";
-import { askKeyDown, AskError, AskLine, AskTop, AskWay } from "./AskParts";
+import { askKeyDown, AskBack, AskError, AskFoot, AskLine, AskRing, AskTop, AskWay } from "./AskParts";
 
 /** What was answered outside the options: a custom answer, or a question that had none. Secret answers stay hidden. */
 function answeredText(q: Question, answer: string[]): ReactNode {
@@ -100,9 +100,11 @@ export function QuestionCard({
 type Hold = { off: boolean; tip: string | undefined };
 
 /**
- * A question docked onto the composer while it waits: its top line, its choices as keys, its own line for words when
- * its agent takes them, and a row for Answer when the answer is more than one press. Several questions in one ask come
- * one at a time under one count, each answer kept above as a line that reopens it; the last Answer sends them all.
+ * A question docked onto the composer while it waits: the question alone across the top, its choices as rows, its own
+ * line for words when its agent takes them, and one row under them for its way out and, once the answer is more than
+ * one press, Answer. Several questions in one ask come one at a time: the row counts them and steps back to the one
+ * before, and with the last answered every answer shows, each a row that reopens its question, before Answer sends
+ * them all.
  */
 export function QuestionAsk({ ask, more, fieldHasWords, onStep }: { ask: WaitingAsk; more: number; fieldHasWords: boolean; onStep?: () => void }) {
   const questions = readQuestions(ask.block.input);
@@ -122,24 +124,26 @@ export function QuestionAsk({ ask, more, fieldHasWords, onStep }: { ask: Waiting
   const many = questions.length > 1;
   return (
     <>
-      <AskTop
-        mark={<AgentMark voice={voice} />}
+      <AskTop mark={<AgentMark voice={voice} />}>{q ? q.question || q.header : "Your answers"}</AskTop>
+      <div className="composer-ask-body">
+        {q ? (
+          <QuestionStep q={q} draft={draft} keepWords={many || q.multi || continues ? "Keep" : "Answer"} ink={!fieldHasWords} hold={hold} act={act} />
+        ) : (
+          <Answers questions={questions} draft={draft} hold={hold} act={act} />
+        )}
+      </div>
+      <AskError error={reply.error} />
+      <AskFoot
+        {...standing(questions, draft, hold, act)}
         more={more}
-        count={many && q ? `${draft.step + 1} of ${questions.length}` : undefined}
-        way={
+        ways={
           <AskWay disabled={hold.off} tip={hold.tip} onClick={() => reply.answer("deny")}>
             Decline
           </AskWay>
         }
       >
-        {q ? q.question || q.header : "Your answers"}
-      </AskTop>
-      <div className="composer-ask-body">
-        <KeptAnswers questions={questions} draft={draft} hold={hold} act={act} />
-        {q ? <QuestionStep q={q} draft={draft} confirm={Boolean(continues)} keepWords={many || q.multi || continues ? "Keep" : "Answer"} ink={!fieldHasWords} hold={hold} act={act} /> : null}
-      </div>
-      <AskError error={reply.error} />
-      <QuestionRow q={q} many={many} continues={continues} draft={draft} ink={!fieldHasWords && !lineWaiting(q, draft)} hold={hold} act={act} />
+        <Onward q={q} many={many} continues={continues} draft={draft} ink={!fieldHasWords && !lineWaiting(q, draft)} hold={hold} act={act} />
+      </AskFoot>
     </>
   );
 }
@@ -149,30 +153,37 @@ function AgentMark({ voice }: { voice: ReturnType<typeof useRunVoice> }) {
   return voice && isHarnessId(voice.agent) ? <HarnessLogo id={voice.agent} size={14} /> : null;
 }
 
-/** The answers already given above the question that shows, each a line that reopens it. */
-function KeptAnswers({ questions, draft, hold, act }: { questions: readonly Question[]; draft: AnswerDraft; hold: Hold; act: (action: AnswerAction) => void }) {
-  return keptAnswers(questions, draft).map((kept) => (
-    <button
-      key={kept.question.key}
-      type="button"
-      tabIndex={-1}
-      className="composer-ask-kept focus-ring"
-      data-ask-control="action"
-      disabled={hold.off}
-      onClick={() => act({ kind: "reopen", step: kept.step })}
-    >
-      <span className="composer-ask-kept-question">{kept.question.question || kept.question.header}</span>
-      <span className="composer-ask-kept-answer">{kept.question.secret ? "Answer hidden" : kept.answer.join(", ")}</span>
-    </button>
-  ));
+/**
+ * Where an ask of several questions stands, for its row: its count, behind a step back from the second question on.
+ * One question has nothing to count, and nor does the view of every answer.
+ */
+function standing(questions: readonly Question[], draft: AnswerDraft, hold: Hold, act: (action: AnswerAction) => void): { back?: ReactNode; count?: string } {
+  if (questions.length < 2 || draft.review) return {};
+  const count = `${draft.step + 1} of ${questions.length}`;
+  if (draft.step === 0) return { count };
+  return { count, back: <AskBack disabled={hold.off} tip={hold.tip} onClick={() => act({ kind: "reopen", step: draft.step - 1 })} /> };
+}
+
+/** Every answer before it is sent: each question by its short name, or its own words when it has none, each a row that reopens it. */
+function Answers({ questions, draft, hold, act }: { questions: readonly Question[]; draft: AnswerDraft; hold: Hold; act: (action: AnswerAction) => void }) {
+  return (
+    <div className="composer-ask-answers">
+      {questions.map((q, step) => (
+        <button key={q.key} type="button" tabIndex={-1} className="composer-ask-answer focus-ring" data-ask-control="action" disabled={hold.off} onClick={() => act({ kind: "reopen", step })}>
+          <span className="composer-ask-answer-name">{q.header || q.question}</span>
+          <span className="composer-ask-answer-words">{q.secret ? "Answer hidden" : answerFor(q, draft).map((words) => <span key={words}>{words}</span>)}</span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /**
- * The ask's row, once its answer is more than one press: Next while questions remain, Answer for the last, the ask's
+ * The ask's way on, once its answer is more than one press: Next while questions remain, Answer for the last, the ask's
  * one ink unless words wait elsewhere. With every answer in view it always shows. An answer that continues on the
  * reader's own hours is always confirmed here, and says so on demand.
  */
-function QuestionRow({
+function Onward({
   q,
   many,
   continues,
@@ -191,53 +202,33 @@ function QuestionRow({
 }) {
   if (q && !((q.multi || many || continues) && answerFor(q, draft).length > 0)) return null;
   return (
-    <div className="composer-ask-row">
-      <Button
-        size="md"
-        variant={ink ? "primary" : "secondary"}
-        className="focus-ring"
-        tabIndex={-1}
-        data-ask-control="action"
-        disabled={hold.off}
-        data-tip={hold.tip ?? continues ?? undefined}
-        onClick={() => act({ kind: "answer" })}
-      >
-        {rowWords(many && Boolean(q), continues)}
-      </Button>
-    </div>
+    <Button
+      size="md"
+      variant={ink ? "primary" : "secondary"}
+      className="focus-ring"
+      tabIndex={-1}
+      data-ask-control="action"
+      disabled={hold.off}
+      data-tip={hold.tip ?? continues ?? undefined}
+      onClick={() => act({ kind: "answer" })}
+    >
+      {onwardWords(many && Boolean(q), continues)}
+    </Button>
   );
 }
 
 /** Next while questions remain, else Answer, and Answer and continue where the answer starts the reader's own turn. */
-function rowWords(next: boolean, continues: string | null): string {
+function onwardWords(next: boolean, continues: string | null): string {
   if (next) return "Next";
   return continues ? "Answer and continue" : "Answer";
 }
 
 /**
- * The question that shows: its choices, then its own line for words when its agent takes them. A choice that is only
- * picked, as several choices are or one whose answer is confirmed, says so and wears its check.
+ * The question that shows: its choices as rows, each behind a ring that turns to an ink check once picked, then its
+ * own line for words when its agent takes them, as one more row.
  */
-function QuestionStep({
-  q,
-  draft,
-  confirm,
-  keepWords,
-  ink,
-  hold,
-  act,
-}: {
-  q: Question;
-  draft: AnswerDraft;
-  confirm: boolean;
-  keepWords: string;
-  ink: boolean;
-  hold: Hold;
-  act: (action: AnswerAction) => void;
-}) {
+function QuestionStep({ q, draft, keepWords, ink, hold, act }: { q: Question; draft: AnswerDraft; keepWords: string; ink: boolean; hold: Hold; act: (action: AnswerAction) => void }) {
   const picked = draft.picked[q.key] ?? [];
-  const picks = q.multi || confirm;
-  const words = draft.lines[q.key] ?? "";
   return (
     <>
       {q.options?.map((option) => (
@@ -246,16 +237,18 @@ function QuestionStep({
           type="button"
           tabIndex={-1}
           className="composer-ask-choice focus-ring"
-          aria-pressed={picks ? picked.includes(option.label) : undefined}
+          aria-pressed={picked.includes(option.label)}
           data-picked={picked.includes(option.label) || undefined}
           data-ask-control="choice"
           disabled={hold.off}
           data-tip={hold.tip}
           onClick={() => act({ kind: "choose", label: option.label })}
         >
+          <span className="composer-ask-mark">
+            <AskRing />
+          </span>
           <span>{option.label}</span>
           {option.description ? <span className="composer-ask-choice-description">{option.description}</span> : null}
-          {picks ? <Check size={16} className="composer-ask-check" /> : null}
         </button>
       ))}
       {q.allowOther ? (
@@ -264,8 +257,9 @@ function QuestionStep({
           label={q.options ? `Something else: ${q.question}` : q.question}
           placeholder={q.options ? "Something else" : "Your answer"}
           secret={q.secret}
+          mark={q.options ? <AskRing /> : null}
           picked={picked.includes(LINE)}
-          value={words}
+          value={draft.lines[q.key] ?? ""}
           onChange={(text) => act({ kind: "write", text })}
           send={lineWaiting(q, draft) ? { words: keepWords, ink, onSend: () => act({ kind: "keep" }) } : null}
           disabled={hold.off}

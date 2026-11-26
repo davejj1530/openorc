@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyDraft, keptAnswers, stepAnswers, type AnswerAction, type AnswerDraft } from "./ask-answers.js";
+import { answerFor, emptyDraft, stepAnswers, type AnswerAction, type AnswerDraft } from "./ask-answers.js";
 import { readQuestions } from "./approval-request.js";
 
 const land = { id: "land", question: "Where should the export land?", options: [{ label: "Downloads folder" }, { label: "Ask each time" }], isOther: true };
@@ -66,10 +66,10 @@ describe("answering a question ask", () => {
     expect(draft.step).toBe(0);
   });
 
-  it("takes three questions one at a time, keeps each answer above, and sends nothing until the last Answer", () => {
+  it("takes three questions one at a time, keeps each answer, and sends nothing until the last Answer", () => {
     const partway = play([land, format, checks], { kind: "choose", label: "Downloads folder" });
     expect([partway.draft.step, partway.sent]).toEqual([1, []]);
-    expect(keptAnswers(readQuestions({ questions: [land, format, checks] }), partway.draft).map((kept) => kept.answer)).toEqual([["Downloads folder"]]);
+    expect(readQuestions({ questions: [land, format, checks] }).map((q) => answerFor(q, partway.draft))).toEqual([["Downloads folder"], [], []]);
     const all = play(
       [land, format, checks],
       { kind: "choose", label: "Downloads folder" },

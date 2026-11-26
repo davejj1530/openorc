@@ -25,7 +25,7 @@ export type AnswerAction =
   | { kind: "keep" }
   /** Answer, or Next while questions remain. */
   | { kind: "answer" }
-  /** A kept answer's line pressed: that question shows again. */
+  /** A step back, or an answer's row pressed with every answer in view: that question shows again. */
   | { kind: "reopen"; step: number };
 
 /** What a draft turns into: the next draft, and the answers to send when the step sent them. */
@@ -50,15 +50,6 @@ export function lineWaiting(q: Question | undefined, draft: AnswerDraft): boolea
 /** Every question's answer, keyed as the agent asked them. */
 export function answersOf(questions: readonly Question[], draft: AnswerDraft): Record<string, string[]> {
   return Object.fromEntries(questions.map((q) => [q.key, answerFor(q, draft)]));
-}
-
-/** The answers already given above the question that shows: each can be reopened. */
-export function keptAnswers(questions: readonly Question[], draft: AnswerDraft): { step: number; question: Question; answer: string[] }[] {
-  if (questions.length < 2) return [];
-  return questions.flatMap((question, step) => {
-    const answer = answerFor(question, draft);
-    return answer.length && (draft.review || step !== draft.step) ? [{ step, question, answer }] : [];
-  });
 }
 
 /** On to the first question after this one still unanswered, or, with none left, every answer in view. */

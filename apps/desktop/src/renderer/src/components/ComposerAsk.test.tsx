@@ -317,31 +317,81 @@ describe("several choices, several questions, several asks", () => {
     expect(c.answered()).toEqual([{ runId: "run", approvalId: "checks", decision: "allow", answers: { checks: ["Type check", "Unit tests"] } }]);
   });
 
-  it("asks three questions one at a time under one count, and sends all three at the last Answer", () => {
-    const c = mount();
-    c.arrive("three");
-    expect(within(c.dock()!).getByText("1 of 3")).toBeTruthy();
-    press(/Downloads folder/);
-    expect([within(c.dock()!).getByText("2 of 3").textContent, c.where()]).toEqual(["2 of 3", "field"]);
-    press(/JSON/);
-    press(/Type check/);
-    press(/The packaged smoke test/);
-    press("Next");
-    expect(within(c.dock()!).getByText("Your answers")).toBeTruthy();
-    expect(c.answered()).toEqual([]);
-    press("Answer");
-    expect(c.answered()).toEqual([
-      { runId: "run", approvalId: "three", decision: "allow", answers: { land: ["Downloads folder"], format: ["JSON"], checks: ["Type check", "The packaged smoke test"] } },
-    ]);
-  });
+  /** A press, then the pause in which the question that takes its place lands and takes no press. */
+  const answer = (name: RegExp | string) => {
+    press(name);
+    act(() => void vi.advanceTimersByTime(300));
+  };
+  const several = (play: (c: ReturnType<typeof mount>) => void) => {
+    vi.useFakeTimers();
+    try {
+      const c = mount();
+      c.arrive("three");
+      play(c);
+    } finally {
+      vi.useRealTimers();
+    }
+  };
 
-  it("reopens a kept answer from its line", () => {
-    const c = mount();
-    c.arrive("three");
-    press(/Downloads folder/);
-    press(/Where should the export land\?/);
-    expect(within(c.dock()!).getByText("1 of 3")).toBeTruthy();
-  });
+  it("asks three questions one at a time under one count, and sends all three at the last Answer", () =>
+    several((c) => {
+      expect(within(c.dock()!).getByText("1 of 3")).toBeTruthy();
+      answer(/Downloads folder/);
+      expect([within(c.dock()!).getByText("2 of 3").textContent, c.where()]).toEqual(["2 of 3", "field"]);
+      answer(/JSON/);
+      press(/Type check/);
+      press(/The packaged smoke test/);
+      answer("Next");
+      expect(within(c.dock()!).getByText("Your answers")).toBeTruthy();
+      expect(c.answered()).toEqual([]);
+      press("Answer");
+      expect(c.answered()).toEqual([
+        { runId: "run", approvalId: "three", decision: "allow", answers: { land: ["Downloads folder"], format: ["JSON"], checks: ["Type check", "The packaged smoke test"] } },
+      ]);
+    }));
+
+  it("shows one question at a time, with no answer listed until all are in", () =>
+    several((c) => {
+      answer(/Downloads folder/);
+      expect(within(c.dock()!).queryByText(/Where should the export land\?/)).toBeNull();
+      expect(within(c.dock()!).queryByText("Downloads folder")).toBeNull();
+    }));
+
+  it("lets a second press where the first landed answer nothing of the next question", () =>
+    several((c) => {
+      press(/Downloads folder/);
+      press(/CSV/);
+      expect(within(c.dock()!).getByText("2 of 3")).toBeTruthy();
+      act(() => void vi.advanceTimersByTime(300));
+      press(/CSV/);
+      expect(within(c.dock()!).getByText("3 of 3")).toBeTruthy();
+    }));
+
+  it("steps back to the question before, its answer still picked, and on again at Next", () =>
+    several((c) => {
+      expect(screen.queryByRole("button", { name: "Previous question" })).toBeNull();
+      answer(/Downloads folder/);
+      answer("Previous question");
+      expect(within(c.dock()!).getByText("1 of 3")).toBeTruthy();
+      expect(screen.getByRole("button", { name: /Downloads folder/ }).getAttribute("aria-pressed")).toBe("true");
+      answer("Next");
+      expect(within(c.dock()!).getByText("2 of 3")).toBeTruthy();
+    }));
+
+  it("lists every answer before sending, and reopens a question from its row", () =>
+    several((c) => {
+      answer(/Downloads folder/);
+      answer(/JSON/);
+      press(/Unit tests/);
+      answer("Next");
+      expect([...c.dock()!.querySelectorAll(".composer-ask-answer")].map((row) => row.textContent)).toEqual([
+        "Where should the export land?Downloads folder",
+        "Which format comes first?JSON",
+        "Which checks should run before a merge?Unit tests",
+      ]);
+      answer(/Which format comes first\?/);
+      expect(within(c.dock()!).getByText("2 of 3")).toBeTruthy();
+    }));
 
   it("shows one ask of two, says one more waits, and lets nothing pressed for the first reach the second", () => {
     vi.useFakeTimers();

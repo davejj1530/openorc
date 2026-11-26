@@ -1,6 +1,6 @@
 import { Popover } from "@base-ui/react/popover";
 import { WorkingMark } from "./StateMark";
-import type { TeamChatPerson, TeamMessage } from "@openorc/protocol";
+import type { TeamChatPerson, TeamChatPins as PinsPage, TeamMessage } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import type { TeamChatContextValue } from "../lib/team-chat-context";
 import { answeredOf } from "@openorc/client";
@@ -40,7 +40,15 @@ export function TeamChatPins({ scope, conversationId, people, onOpen, onUnpin }:
         <Popover.Positioner side="bottom" align="end" sideOffset={6} collisionPadding={8} className="z-50">
           <Popover.Popup ref={floatingGround} className="floating-popover team-chat-pins" aria-label="Pinned messages">
             <div className="floating-popover-title">Pinned messages</div>
-            <PinsBody pins={pins} people={people} onOpen={onOpen} onUnpin={onUnpin} />
+            <PinsBody
+              pending={pins.isPending}
+              error={pins.error?.message ?? null}
+              pinned={pins.data?.pins ?? []}
+              onRetry={() => void pins.refetch()}
+              people={people}
+              onOpen={onOpen}
+              onUnpin={onUnpin}
+            />
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>
@@ -48,26 +56,38 @@ export function TeamChatPins({ scope, conversationId, people, onOpen, onUnpin }:
   );
 }
 
-function PinsBody({ pins, people, onOpen, onUnpin }: { pins: ReturnType<typeof useTeamChatPins> } & Pick<TeamChatPinsProps, "people" | "onOpen" | "onUnpin">) {
-  if (pins.isPending)
+/**
+ * What the popover shows, read while the heading draws: the query's state is read here, not handed down, so a failed
+ * read redraws the heading and the popover opened after it shows the failure.
+ */
+function PinsBody({
+  pending,
+  error,
+  pinned,
+  onRetry,
+  people,
+  onOpen,
+  onUnpin,
+}: { pending: boolean; error: string | null; pinned: PinsPage["pins"]; onRetry(): void } & Pick<TeamChatPinsProps, "people" | "onOpen" | "onUnpin">) {
+  if (pending)
     return (
       <div className="team-chat-pins-state" role="status">
         <WorkingMark size={14} />
       </div>
     );
-  if (pins.error)
+  if (error)
     return (
       <div className="team-chat-pins-state" role="status">
-        <p>{pins.error.message}</p>
-        <Button size="sm" onClick={() => void pins.refetch()}>
+        <p>{error}</p>
+        <Button size="sm" onClick={onRetry}>
           Try again
         </Button>
       </div>
     );
-  if (!pins.data.pins.length) return <p className="team-chat-pins-state">No pinned messages</p>;
+  if (!pinned.length) return <p className="team-chat-pins-state">No pinned messages</p>;
   return (
     <ul className="team-chat-pins-list">
-      {pins.data.pins.map(({ message }) => (
+      {pinned.map(({ message }) => (
         <li key={message.id} className="team-chat-pin">
           <Popover.Close className="team-chat-pin-open" onClick={() => onOpen(message)}>
             <TeamChatActorFace actor={message.actor} size={20} />

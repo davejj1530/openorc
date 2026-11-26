@@ -25,6 +25,7 @@ interface TaskRow {
   title: string;
   spec: string | null;
   status: TaskStatus;
+  column_id: string | null;
   priority: Task["priority"];
   labels: string;
   workspace_mode: Task["workspaceMode"];
@@ -51,6 +52,7 @@ function taskFromRow(db: Db, r: TaskRow): Task {
     title: r.title,
     spec: r.spec,
     status: r.status,
+    columnId: r.column_id,
     priority: r.priority,
     labels: JSON.parse(r.labels) as string[],
     workspaceMode: r.workspace_mode,
@@ -77,6 +79,8 @@ export interface TaskPatch {
   title?: string;
   spec?: string | null;
   status?: TaskStatus;
+  /** Set with the column's stage as the status. A status set alone takes the task out of a column of another stage. */
+  columnId?: string | null;
   priority?: Task["priority"];
   labels?: string[];
   baseRef?: string | null;
@@ -95,6 +99,7 @@ const taskColumns: Record<keyof TaskPatch, string> = {
   title: "title",
   spec: "spec",
   status: "status",
+  columnId: "column_id",
   priority: "priority",
   labels: "labels",
   baseRef: "base_ref",
@@ -179,6 +184,11 @@ export const tasks = {
       args.push(key === "labels" ? JSON.stringify(value) : value);
     }
     if (explicitStatus) sets.push("status_is_explicit = 1");
+    // SET reads the row as it was, so this compares the status before the change.
+    if (patch.status !== undefined && patch.columnId === undefined) {
+      sets.push(`column_id = CASE WHEN status = ?${explicitStatus ? "" : " OR status_is_explicit = 1"} THEN column_id ELSE NULL END`);
+      args.push(patch.status);
+    }
     sets.push("updated_at = ?");
     args.push(now(), id);
     db.stmt(`UPDATE tasks SET ${sets.join(", ")} WHERE id = ?`).run(...(args as (string | number | null)[]));

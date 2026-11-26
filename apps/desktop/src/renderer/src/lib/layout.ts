@@ -77,6 +77,9 @@ interface LayoutState {
   previewUrls: Record<string, string>;
   /** The panel fills the work row. Never persisted: a relaunch opens it at its saved width. */
   panelExpanded: boolean;
+  /** How the Tasks screen lays its tasks out. */
+  tasksView: TasksView;
+  setTasksView: (view: TasksView) => void;
   toggleSidebar: () => void;
   setSidebarWidth: (px: number) => void;
   setPanel: (open: boolean, tab?: PanelTab) => void;
@@ -96,6 +99,8 @@ interface LayoutState {
   setPanelExpanded: (expanded: boolean) => void;
 }
 
+export type TasksView = "list" | "board";
+
 export const limits = {
   sidebar: { min: 224, max: 380, default: 247 },
   panel: { min: 340, max: 900, default: 640 },
@@ -103,7 +108,7 @@ export const limits = {
 
 const KEY = "openorc.layout";
 
-type Saved = Partial<Pick<LayoutState, "sidebarOpen" | "panelOpen" | "panelWidth" | "panelSide" | "agentsOpenPanel" | "workspace" | "hiddenWorkspaces" | "collapsed" | "previewUrls">> & {
+type Saved = Partial<Pick<LayoutState, "sidebarOpen" | "panelOpen" | "panelWidth" | "panelSide" | "agentsOpenPanel" | "workspace" | "hiddenWorkspaces" | "collapsed" | "previewUrls" | "tasksView">> & {
   /** The whole sidebar's width. The rail's layouts saved `sidebarWidth`, the thread list's width beside it, which no longer applies. */
   navigationWidth?: number;
 };
@@ -131,6 +136,7 @@ function persist(s: LayoutState): void {
         hiddenWorkspaces: navigationScope.active ? read().hiddenWorkspaces : s.hiddenWorkspaces,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
+        tasksView: s.tasksView,
       }),
     );
   } catch {
@@ -196,6 +202,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     collapsed: (saved.collapsed ?? []).filter(liveGroupedFold),
     previewUrls: saved.previewUrls ?? {},
     panelExpanded: false,
+    tasksView: saved.tasksView === "board" ? ("board" as const) : ("list" as const),
   };
   applyWidths(initial.sidebarWidth, initial.panelWidth);
   const commit = (patch: Partial<LayoutState>) => {
@@ -240,6 +247,7 @@ export const useLayout = create<LayoutState>((set, get) => {
       ),
     openFiles: (threadId) => commit({ selectedFile: null, panelOpen: true, panelTab: "file", panelRequest: { tab: "file" }, ...(threadId ? { panelThreadId: threadId } : {}) }),
     setPanelWidth: (px) => commit({ panelWidth: clamp(px, limits.panel) }),
+    setTasksView: (tasksView) => commit({ tasksView }),
     togglePanelSide: () => commit({ panelSide: get().panelSide === "left" ? "right" : "left" }),
     setWorkspace: (workspace) => commit({ workspace }),
     // Workspace's threads have no project of their own in the filter, so they show under All projects.

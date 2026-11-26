@@ -20,11 +20,14 @@ export const groupOrder: TaskStatus[] = ["in_progress", "review", "proposed", "b
 /** A group heading may say more than the status's short name. */
 export const groupLabel: Record<TaskStatus, string> = { ...statusLabel, review: "Ready for review" };
 
+const ARC = 37.7;
+
 /**
  * A task's status as a 16px mark: an arc for work under way, the amber disc for review (it waits on the person), an
- * attention ring for a proposal, an empty ring for the backlog, a check for done.
+ * attention ring for a proposal, an empty ring for the backlog, a check for done. `share` is how far round the arc
+ * goes, for a board that keeps several columns of work under way and draws each further along than the one before.
  */
-export function StatusIcon({ status, className }: { status: TaskStatus; className?: string }) {
+export function StatusIcon({ status, className, share = 0.4 }: { status: TaskStatus; className?: string; share?: number }) {
   const c = cn("status-mark shrink-0", className);
   switch (status) {
     case "proposed":
@@ -35,7 +38,17 @@ export function StatusIcon({ status, className }: { status: TaskStatus; classNam
       return (
         <svg width={16} height={16} viewBox="0 0 16 16" fill="none" aria-hidden="true" className={c}>
           <circle cx="8" cy="8" r="6" strokeWidth="2" className="status-mark-track" />
-          <circle cx="8" cy="8" r="6" strokeWidth="2" strokeLinecap="round" strokeDasharray="15 37.7" transform="rotate(-90 8 8)" stroke="currentColor" className="text-ink" />
+          <circle
+            cx="8"
+            cy="8"
+            r="6"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeDasharray={`${(ARC * share).toFixed(1)} ${ARC}`}
+            transform="rotate(-90 8 8)"
+            stroke="currentColor"
+            className="text-ink"
+          />
         </svg>
       );
     case "review":

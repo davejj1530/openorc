@@ -68,6 +68,7 @@ import { createReviewWorkspaceHandlers } from "./handlers/review-workspace.js";
 import { createReviewerAppHandlers } from "./handlers/reviewer-app.js";
 import { createRunsHandlers } from "./handlers/runs.js";
 import { createSchedulesHandlers } from "./handlers/schedules.js";
+import { createBoardHandlers } from "./handlers/board.js";
 import { createSettingsHandlers } from "./handlers/settings.js";
 import { createSlackHandlers } from "./handlers/slack.js";
 import { createSystemHandlers } from "./handlers/system.js";
@@ -784,6 +785,7 @@ export class OpenOrc {
       createInstructionsHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
       createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate, claudeSessions: this.claudeAccounts }),
       createSchedulesHandlers({ schedules: this.schedules }),
+      createBoardHandlers({ db: this.db, invalidate }),
       createCatalogHandlers({ runService: this.runs, invalidate }),
       createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files }),
       createOrclingHandlers({ orclings: this.orclings, threads: this.threads, db: this.db, ledger: this.ledger }),

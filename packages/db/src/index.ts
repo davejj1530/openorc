@@ -12,6 +12,7 @@ export { cloudMoves, type CloudMove, type MoveDirection, type MovePhase } from "
 export { usageHistory } from "./usage-history.js";
 export { projectActivity } from "./project-activity.js";
 export { scheduleFirings, schedules, type SchedulePatch } from "./schedules.js";
+export { boardColumns } from "./board-columns.js";
 export { messages } from "./search.js";
 export { subagents, type SubagentRecord } from "./subagents.js";
 export { taskComments } from "./task-comments.js";

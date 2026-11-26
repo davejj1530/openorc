@@ -1,0 +1,213 @@
+/* The Tasks board: a tile set into the ground for each column, its cards as planes on it. Columns hug their cards and
+   scroll on their own; the board scrolls sideways when its columns outgrow the window. */
+.task-board-page {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+.task-board {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: flex-start;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 16px 24px 24px;
+  scrollbar-width: none;
+}
+.task-board::-webkit-scrollbar {
+  display: none;
+}
+.task-board-column {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 216px;
+  max-width: 360px;
+  max-height: 100%;
+  border-radius: var(--radius-2xl);
+  background-color: var(--surface-2);
+  padding: 6px;
+  transition: box-shadow var(--duration-leave) var(--ease-out);
+}
+.task-board-column[data-over] {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.task-board-column-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 9px;
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+.task-board-column-head h2 {
+  min-width: 0;
+}
+/* A column's settings wait at the end of its head until the pointer or the keyboard reaches the column, or they are open. */
+.task-board-column-more {
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity var(--duration-leave) var(--ease-out);
+}
+.task-board-column-head:hover .task-board-column-more,
+.task-board-column-more:focus-visible,
+.task-board-column-more[aria-expanded="true"] {
+  opacity: 1;
+}
+.task-board-settings {
+  width: 392px;
+  padding: 14px;
+  border-radius: var(--radius-2xl);
+}
+.task-board-setting {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  margin-bottom: 12px;
+}
+.task-board-settings-row {
+  display: flex;
+  gap: 6px;
+}
+.task-board-remove {
+  display: block;
+  width: calc(100% + 28px);
+  margin: 12px -14px -14px;
+  padding: 10px 14px 12px;
+  border-top: var(--hairline) solid var(--line);
+  border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
+  color: var(--bad);
+  font-size: var(--text-sm);
+  text-align: left;
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.task-board-remove:hover:not(:disabled) {
+  background-color: var(--bad-soft);
+}
+.task-board-remove:disabled {
+  color: var(--ink-4);
+}
+.task-board-add {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 6px;
+  width: 30px;
+  padding-top: 9px;
+}
+.task-board-add-error {
+  width: 200px;
+  color: var(--bad);
+  font-size: var(--text-xs);
+  line-height: 18px;
+}
+.task-board-cards {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+/* A column with no cards is still somewhere to drop one. */
+.task-board[data-dragging] .task-board-cards {
+  min-height: 48px;
+}
+.task-board-card {
+  position: relative;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  /* A key on a card takes the key's fill: the ground's own control fill is the card's color. */
+  --control-fill: var(--key);
+  background-color: var(--surface);
+  padding: 10px 12px 8px;
+  transition:
+    background-color var(--duration-leave) var(--ease-out),
+    opacity var(--duration-leave) var(--ease-out);
+}
+.task-board-card:hover {
+  background-color: color-mix(in srgb, var(--surface) 70%, var(--surface-3));
+}
+.task-board-card:active {
+  background-color: color-mix(in srgb, var(--surface) 40%, var(--surface-3));
+}
+.task-board-card[data-dragging] {
+  opacity: 0.4;
+}
+.task-board-card:has(.task-board-card-open:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.task-board-card-open {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: 20px;
+  text-align: left;
+  outline: none;
+}
+/* The title's button answers a press anywhere on its card; the card's own controls sit over it. */
+.task-board-card-open::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  content: "";
+}
+.task-board-card:is([data-stage="backlog"], [data-stage="proposed"], [data-stage="done"]) .task-board-card-open {
+  color: var(--ink-2);
+}
+.task-board-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  margin-top: 4px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.task-board-card-fact {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+.task-board-card-end {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.task-board-card-error {
+  margin-top: 6px;
+  color: var(--bad);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+.task-board-more {
+  flex-shrink: 0;
+  height: 32px;
+  border-radius: var(--radius-md);
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.task-board-more:hover {
+  background-color: var(--surface-3);
+  color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-board-column,
+  .task-board-card,
+  .task-board-more {
+    transition: none;
+  }
+}

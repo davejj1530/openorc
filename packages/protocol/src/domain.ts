@@ -11,6 +11,12 @@ import { ThreadMoving } from "./cloud-moves.js";
 
 export const TaskStatus = z.enum(["proposed", "backlog", "in_progress", "review", "done", "archived"]);
 export type TaskStatus = z.infer<typeof TaskStatus>;
+/** The stage of work a board column stands for: waiting, being worked on, waiting on the person, finished. */
+export const BoardStage = TaskStatus.extract(["backlog", "in_progress", "review", "done"]);
+export type BoardStage = z.infer<typeof BoardStage>;
+/** One column of a project's board, in the order the project keeps them. A project that keeps none has a column for each stage. */
+export const BoardColumn = z.object({ id: z.string(), projectId: z.string(), name: z.string(), stage: BoardStage });
+export type BoardColumn = z.infer<typeof BoardColumn>;
 
 export const TaskPriority = z.enum(["none", "low", "medium", "high", "urgent"]);
 export type TaskPriority = z.infer<typeof TaskPriority>;
@@ -129,6 +135,8 @@ export const Task = z.object({
   title: z.string(),
   spec: z.string().nullable(),
   status: TaskStatus,
+  /** The board column it sits in, always one of its status's stage. Without one it sits in the first column of that stage. */
+  columnId: z.string().nullable().optional(),
   priority: TaskPriority,
   labels: z.array(z.string()),
   /** Isolated worktree, or the project's current checkout. */

@@ -2,6 +2,7 @@ import { claudeAccountMigration } from "./claude-account-schema.js";
 import { taskCommentsMigration } from "./task-comments-schema.js";
 import { taskRefineMigration } from "./task-refine-schema.js";
 import { taskThreadsMigration } from "./task-threads-schema.js";
+import { boardColumnsMigration } from "./board-schema.js";
 import type { DatabaseSync } from "node:sqlite";
 import { teamTaskMigration } from "./team-task-schema.js";
 import { retireTeamSchedulesMigration, scheduleMigration, teamNotificationMigration } from "./schedule-schema.js";
@@ -738,4 +739,5 @@ export const migrations: Migration[] = [
   relocationFolderMigration,
   taskRefineMigration,
   taskThreadsMigration,
+  boardColumnsMigration,
 ];

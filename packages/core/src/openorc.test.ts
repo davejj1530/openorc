@@ -181,6 +181,22 @@ describe("core", () => {
     await expect(call("tasks.create", { projectId: p.id, threadId: "missing", title: "Invalid parent", useWorktree: true })).rejects.toThrow(/parent thread/i);
   });
 
+  it("puts a task in a board column with the column's stage as its status, and takes it out when its status leaves that stage", async () => {
+    const p = await call("projects.import", { rootPath: root });
+    const [, review] = await call("board.saveColumns", {
+      projectId: p.id,
+      columns: [
+        { name: "Build", stage: "in_progress" },
+        { name: "Code review", stage: "in_progress" },
+        { name: "Done", stage: "done" },
+      ],
+    });
+    const task = await call("tasks.create", { projectId: p.id, title: "A card", useWorktree: false });
+    expect(await call("tasks.update", { id: task.id, patch: { columnId: review!.id } })).toMatchObject({ status: "in_progress", columnId: review!.id });
+    expect(await call("tasks.update", { id: task.id, patch: { status: "done" } })).toMatchObject({ status: "done", columnId: null });
+    await expect(call("tasks.update", { id: task.id, patch: { columnId: "missing" } })).rejects.toThrow(/column/i);
+  });
+
   it("announces readiness with the MCP port", () => {
     const ready = pushed.find((m) => m.type === "ready");
     expect(ready && ready.type === "ready" && ready.mcpPort).toBeGreaterThan(0);

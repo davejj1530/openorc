@@ -28,6 +28,8 @@ import { editorRpcParams, type EditorRpcResults } from "./code-intelligence.js";
 import { DevicePanelPush, devicePanelRpcParams, type DevicePanelRpcResults } from "./devices.js";
 import {
   AgentSkill,
+  BoardColumn,
+  BoardStage,
   AppSettings,
   Commit,
   CommitId,
@@ -258,10 +260,21 @@ export const rpcParams = {
       title: z.string().min(1).optional(),
       spec: z.string().nullable().optional(),
       status: TaskStatus.optional(),
+      /** A board move: the task takes the column's stage as its status. */
+      columnId: z.string().optional(),
       priority: TaskPriority.optional(),
       labels: z.array(z.string()).optional(),
       workspaceMode: WorkspaceMode.optional(),
     }),
+  }),
+  "board.columns": z.object({ projectId: z.string() }),
+  /** The project's whole board, in order. A column without an id is new; a kept column left out is removed and its tasks stay in their stage. */
+  "board.saveColumns": z.object({
+    projectId: z.string(),
+    columns: z
+      .array(z.object({ id: z.string().optional(), name: z.string().trim().min(1).max(40), stage: BoardStage }))
+      .min(1)
+      .max(12),
   }),
   "tasks.prepareWorkspace": z.object({ taskId: z.string() }),
   /** Deleting the branch as well needs `acceptLoss` to cover whatever work exists only there. */
@@ -682,6 +695,9 @@ export interface RpcResults
   "tasks.executionThread": ThreadSummary | null;
   "tasks.create": Task;
   "tasks.update": Task;
+  /** The columns the project keeps; none when its board is the default one. */
+  "board.columns": BoardColumn[];
+  "board.saveColumns": BoardColumn[];
   "tasks.prepareWorkspace": Task;
   "tasks.delete": null;
   "workspace.cleanup": Task;

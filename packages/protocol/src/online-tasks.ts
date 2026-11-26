@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { BoardColumn, BoardColumnsSave } from "./board.js";
 import { TaskPriority, TaskStatus } from "./domain.js";
+import { AgentKind } from "./events.js";
 import { SpaceId } from "./spaces.js";
+import { TaskUpdateCard } from "./task-events.js";
 
 const id = z.string().min(1).max(200);
 const revision = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -42,6 +44,22 @@ export const OnlineTaskRun = z.object({
   requestedAt: timestamp,
 });
 export type OnlineTaskRun = z.infer<typeof OnlineTaskRun>;
+
+/**
+ * An agent's update on a team task, which everyone who reads the task sees: who posted it (the person whose agent it
+ * is, on their computer or on OpenOrc Cloud), where the work stands, a card when one says it better, the replies it
+ * offers, and the one chosen, by whom.
+ */
+export const OnlineTaskReport = z.object({
+  id,
+  at: timestamp,
+  author: z.object({ agent: AgentKind, place: z.enum(["computer", "cloud"]), userId: id, name: z.string() }),
+  message: z.string(),
+  card: TaskUpdateCard.nullable(),
+  replies: z.array(z.string()),
+  answer: z.object({ reply: z.string(), at: timestamp, userId: id, name: z.string() }).nullable(),
+});
+export type OnlineTaskReport = z.infer<typeof OnlineTaskReport>;
 
 export const OnlineTask = z.object({
   id,
@@ -157,6 +175,8 @@ export type OnlineTaskAvailability =
       /** Whether its columns' agents can run on OpenOrc Cloud, or why not. */
       runsCloud: { available: boolean; reason: string | null };
       computer: boolean;
+      /** Whether agents' updates on its tasks are kept on the server, for everyone to read. */
+      reports: boolean;
       personal: boolean;
     };
 /**
@@ -186,6 +206,10 @@ export const onlineTaskRpcParams = {
   "tasks.online.board": z.object({ ...scope, projectId: id }).strict(),
   /** Several projects' shared boards at once, for the board of all of an organization's projects. */
   "tasks.online.boards": z.object({ ...scope, projectIds: z.array(id).max(200) }).strict(),
+  /** A team task's agents' updates, oldest first. */
+  "tasks.online.reports": z.object(target).strict(),
+  /** One of an update's replies, chosen by the task's assignee (anyone while it has none), which reaches its agent's thread. */
+  "tasks.online.answerReport": z.object({ ...target, reportId: id, reply: z.string().min(1).max(40) }).strict(),
   "tasks.online.saveBoard": OnlineBoardUpdate.extend({ ...scope, projectId: id }).strict(),
 };
 export type OnlineTaskParams<M extends keyof typeof onlineTaskRpcParams> = z.infer<(typeof onlineTaskRpcParams)[M]>;
@@ -203,5 +227,7 @@ export interface OnlineTaskRpcResults {
   "tasks.online.context": z.infer<typeof OnlineTaskContext>;
   "tasks.online.board": OnlineBoard;
   "tasks.online.boards": (OnlineBoard & { projectId: string })[];
+  "tasks.online.reports": OnlineTaskReport[];
+  "tasks.online.answerReport": OnlineTaskReport;
   "tasks.online.saveBoard": OnlineBoardSave;
 }

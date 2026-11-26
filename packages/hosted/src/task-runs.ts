@@ -5,7 +5,8 @@ import type { HostedSpaces } from "./index.js";
 import type { Session } from "./session.js";
 import type { OnlineTasks } from "./tasks.js";
 import { wireOnlineTask } from "./wire-tasks.js";
-import { SOCKET, wireTopics, type Route } from "./wire.js";
+import { organizationsOf, watchPersonNotices } from "./person-notices.js";
+import type { Route } from "./wire.js";
 
 const date = z.iso.datetime().transform((value) => Date.parse(value));
 const wireRun = OnlineTaskRun.extend({ requestedAt: z.union([z.number(), date]) });
@@ -40,13 +41,7 @@ export class TaskRuns {
   readonly #listeners = new Set<(spaceId: string) => void>();
 
   constructor(private readonly deps: Dependencies) {
-    deps.session.onSocket(SOCKET.changed, (body) => {
-      const parsed = wireTopics.safeParse(body);
-      if (parsed.success && parsed.data.organizationId && parsed.data.topics.includes("task-runs")) this.#emit([parsed.data.organizationId]);
-    });
-    deps.session.onChange((change) => {
-      if (change === "connected") this.#emit(this.organizations());
-    });
+    watchPersonNotices(deps.session, deps.spaces, "task-runs", (spaceId) => this.#emit([spaceId]));
   }
 
   /** Called with an organization that may have runs waiting for this computer. */
@@ -57,8 +52,7 @@ export class TaskRuns {
 
   /** The organizations this person is in, whose runs may wait for them. */
   organizations(): string[] {
-    const status = this.deps.spaces.status();
-    return status.state === "ready" ? status.spaces.filter((space) => space.kind === "organization").map((space) => space.id) : [];
+    return organizationsOf(this.deps.spaces);
   }
 
   /** The runs waiting for this person in an organization; none where its server runs no column agents. */

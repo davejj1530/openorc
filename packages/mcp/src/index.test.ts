@@ -558,7 +558,7 @@ void test("task tools name a space, a project and a revision only for a run the 
     task_create: ["execution", "labels", "priority", "scope", "spec", "title", "workspace_mode"],
     task_get: ["id", "scope"],
     task_list: ["scope"],
-    task_report: ["card", "id", "message", "replaces", "replies"],
+    task_report: ["card", "id", "message", "replaces", "replies", "scope"],
     task_start: ["id", "ifRevision", "scope", "workspace_mode"],
     task_update: ["column", "id", "ifRevision", "scope", "spec", "status"],
   });

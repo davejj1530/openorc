@@ -24,6 +24,7 @@ export async function onlineToolsFixture(overrides: Partial<HostedDeps> = {}, ex
   const tools = new OnlineTaskTools({
     account: () => account,
     projectFor: () => state.project,
+    runOf: () => ({ threadId: "thread-1", agent: "claude" }),
     captureProcess: () => {
       const generation = state.generation;
       return () => state.active && state.generation === generation;

@@ -57,11 +57,13 @@ import type { HostedNotice } from "./notices.js";
 import { Session } from "./session.js";
 import { Threads, type HeardRow } from "./threads.js";
 import { Spaces } from "./spaces.js";
+import { TaskAnswers } from "./task-answers.js";
 import { TaskRuns } from "./task-runs.js";
 import { OnlineTasks } from "./tasks.js";
 
 export { OnlineTasks } from "./tasks.js";
 export { TaskRuns, type WaitingTaskRun } from "./task-runs.js";
+export { TaskAnswers, type WaitingTaskAnswer } from "./task-answers.js";
 export { isTeamChatMethod, noOrclingRunner, runsOrcling, teamChatCalls, type TeamChatCalls, type TeamChatMethod, type TeamChatOrclingRunner } from "./chat-calls.js";
 export type { CloudFileScope, CloudFileReference, FileDestination } from "./files.js";
 export type { FileByteSource } from "./file-transfer.js";
@@ -320,6 +322,8 @@ export interface Hosted {
   readonly tasks: OnlineTasks;
   /** Team boards' column agents waiting for this person's computer. */
   readonly taskRuns: TaskRuns;
+  /** Answers to updates this person's computer's agents posted on team tasks, waiting for their threads. */
+  readonly taskAnswers: TaskAnswers;
   readonly files: Files;
   /** A cloud project's own environment variables, read by name and set by value. */
   readonly environment: ProjectEnvironment;
@@ -392,6 +396,7 @@ export function createHosted(deps: HostedDeps): Hosted {
   const chat = new TeamChat({ session, spaces, push: deps.push });
   const tasks = new OnlineTasks({ session, spaces, push: deps.push, prepared: () => threads.refresh() });
   const taskRuns = new TaskRuns({ session, spaces, tasks });
+  const taskAnswers = new TaskAnswers({ session, spaces, tasks });
   const files = new Files({ session, spaces, fetch: deps.fetch, push: deps.push });
   // How many of the person's skills have gone up is read by the start that waits on them.
   const skills = new Skills({ session, own: deps.skills, now: deps.now, changed: () => deps.push({ type: "invalidate", keys: ["hostedSkillsSending"] }) });
@@ -437,6 +442,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     chat,
     tasks,
     taskRuns,
+    taskAnswers,
     files,
     ...parityServices(session, deps, threads),
     skills: { sending: (agent) => skills.sending(agent), changed: () => skillsAhead(true) },

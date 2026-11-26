@@ -26,6 +26,8 @@ export function createOnlineTaskHandlers(tasks: OnlineTasks | null): OnlineTaskH
     "tasks.online.context": (input) => service().context(input),
     "tasks.online.board": (input) => service().board(input),
     "tasks.online.boards": (input) => service().boards(input),
+    "tasks.online.reports": (input) => service().reports(input),
+    "tasks.online.answerReport": (input) => service().answerReport(input),
     "tasks.online.saveBoard": (input) => service().saveBoard(input),
   };
 }

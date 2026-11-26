@@ -42,7 +42,7 @@ export function registerTaskTools(mcp: McpServer, host: McpHost, runId: string, 
   registerList(mcp, host, runId, scopes);
   registerGet(mcp, host, runId, scopes);
   registerUpdate(mcp, host, runId, scopes);
-  registerReport(mcp, host, runId);
+  registerReport(mcp, host, runId, scopes);
 }
 
 function registerCreate(mcp: McpServer, host: McpHost, runId: string, scopes: readonly OnlineTaskScopeChoice[]) {
@@ -148,15 +148,26 @@ function registerGet(mcp: McpServer, host: McpHost, runId: string, scopes: reado
   );
 }
 
-function registerReport(mcp: McpServer, host: McpHost, runId: string) {
+function registerReport(mcp: McpServer, host: McpHost, runId: string, scopes: readonly OnlineTaskScopeChoice[]) {
   mcp.registerTool(
     "task_report",
     {
       description:
         "Post an update on a task in this project for the person to read on the task's page: a sentence or two on where the work stands, with a card when one says it better. A checklist card suits a plan or review notes, each item with whether it is done. A pull_request card takes only the number, and the app draws its title, state and size from GitHub and keeps them current. A visual card is a self-contained HTML fragment, as visualize takes. Offer replies only when the person should answer, such as \"Approve the plan\": the one they press reaches this thread as their message, so end your turn after asking. Pass replaces with an earlier update's id to change that update in place, as when a plan's steps get done.",
-      inputSchema: { id: z.string().min(1), ...TaskUpdate.shape, replaces: z.number().int().optional().describe("The updateId an earlier task_report answered with.") },
+      inputSchema: online(
+        scopes.length > 0,
+        {
+          id: z.string().min(1),
+          ...TaskUpdate.shape,
+          replaces: z
+            .union([z.number().int(), z.string().min(1)])
+            .optional()
+            .describe("The updateId an earlier task_report answered with."),
+        },
+        { scope: scopeOf(scopes) },
+      ),
     },
-    async ({ id, replaces, ...update }) => ({ content: [{ type: "text", text: JSON.stringify(await host.tasks.report(runId, id, update, replaces)) }] }),
+    async ({ id, replaces, scope, ...update }) => ({ content: [{ type: "text", text: JSON.stringify(await host.tasks.report(runId, id, update, replaces, scope)) }] }),
   );
 }
 

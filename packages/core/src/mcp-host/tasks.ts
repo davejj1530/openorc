@@ -46,8 +46,10 @@ export function createTasksHost({ threadService, board, reports, dataDir, assert
       board.move(id, column, runId);
       return threadService.toolGet(runId, id);
     },
-    report: async (runId, id, update, replaces) => {
+    report: async (runId, id, update, replaces, scope) => {
       assertRunAvailable(runId);
+      if (scope) return onlineTasks(online).report(runId, id, update, scope, typeof replaces === "string" ? replaces : undefined);
+      if (typeof replaces === "string") throw new Error("That update is on a task on OpenOrc Cloud. Name its scope to change it.");
       if (!(await threadService.toolGet(runId, id))) throw new Error("Task not found in this agent's project.");
       return { updateId: reports.post(id, runId, update, replaces) };
     },

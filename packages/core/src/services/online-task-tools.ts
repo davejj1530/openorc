@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { TaskCard, TaskScope, TaskTools } from "@openorc/mcp";
-import { TaskPriority, type OnlineTask } from "@openorc/protocol";
+import { TaskPriority, type AgentKind, type OnlineTask, type TaskUpdate } from "@openorc/protocol";
 import type { OnlineTaskScopeChoice } from "@openorc/mcp";
 import { captureOnlineTaskScope, onlineTaskScopeChoices, type CapturedOnlineTaskScope, type OnlineTaskScopeDependencies } from "./online-task-scope.js";
 
@@ -26,7 +26,7 @@ export class OnlineTaskTools {
   readonly #seen = new Map<string, Map<string, number>>();
   /** A write's request id until the server answers it, by captured target and the write's words. */
   readonly #requests = new Map<string, string>();
-  constructor(readonly deps: OnlineTaskScopeDependencies) {}
+  constructor(readonly deps: OnlineTaskScopeDependencies & { runOf(runId: string): { threadId: string | null; agent: AgentKind } | null }) {}
 
   /** The cloud projects this run's agent may name in its task tools. */
   scopes(runId: string): Promise<OnlineTaskScopeChoice[]> {
@@ -76,6 +76,15 @@ export class OnlineTaskTools {
       throw new Error(READ_AGAIN);
     }
     return this.#card(at, at.task(result.task));
+  }
+  /** An update on a team task from this run's agent, which everyone who reads the task sees, kept with the run's thread for its answer. */
+  async report(runId: string, id: string, update: TaskUpdate, scope: TaskScope, replaces?: string): Promise<{ updateId: string }> {
+    const at = await this.#capture(runId, scope);
+    await this.#read(at, id);
+    const run = this.deps.runOf(runId);
+    if (!run?.threadId) throw new Error("Only an agent working in a thread can post an update on a team task.");
+    const posted = await at.tasks.report(at.spaceId, id, { ...update, ...(replaces ? { replaces } : {}), agent: run.agent, threadId: run.threadId });
+    return { updateId: posted.id };
   }
   async start(runId: string, id: string, scope: TaskScope): Promise<TaskCard> {
     const at = await this.#capture(runId, scope);

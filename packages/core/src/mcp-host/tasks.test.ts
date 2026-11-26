@@ -22,6 +22,7 @@ function hosts(online = true) {
     start: vi.fn(async (_runId: string, id: string) => (calls.push("online start"), card(id))),
     create: vi.fn(async () => (calls.push("online create"), { task: card("new"), duplicate: false, started: false, message: "Saved" })),
     context: vi.fn(async () => (calls.push("online context"), "No task context.")),
+    report: vi.fn(async () => (calls.push("online report"), { updateId: "report-1" })),
   };
   const deps = {
     threadService: threadService as never,
@@ -68,4 +69,12 @@ it("reads an online task's context from the server, and a Mac run's from its mem
   });
   await expect(memory.taskContext("run", { scope, taskId: "a" })).resolves.toBe("No task context.");
   expect(tools.context).toHaveBeenCalledWith("run", scope, "a");
+});
+
+it("posts an update on a team task to the server when the agent names its scope, and never on this Mac's tasks", async () => {
+  const { tasks, calls } = hosts(true);
+  const scope = { spaceId: "org:studio", projectId: "cloud-project" };
+  expect(await tasks.report("run-1", "team-task", { message: "Plan is ready." }, undefined, scope)).toEqual({ updateId: "report-1" });
+  expect(calls).toEqual(["online report"]);
+  await expect(tasks.report("run-1", "local-task", { message: "x" }, "report-1")).rejects.toThrow("That update is on a task on OpenOrc Cloud.");
 });

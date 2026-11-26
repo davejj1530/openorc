@@ -4,6 +4,7 @@ import { useShownTaskActivity } from "../../lib/task-activity-shown";
 import { activityWords, useTaskHistory } from "../../lib/task-history";
 import { AccountFace } from "../AccountFace";
 import { Button } from "../ui";
+import { TeamReports } from "./TaskReports";
 
 export function TaskOnlineHistory({ reference, task }: { reference: OnlineTaskRef; task: OnlineTask }) {
   const history = useTaskHistory(reference);
@@ -17,6 +18,7 @@ export function TaskOnlineHistory({ reference, task }: { reference: OnlineTaskRe
           <p className="mt-1 text-ink-3 break-words">{activity.latestMessage ?? activity.lastAction}</p>
         </div>
       ) : null}
+      <TeamReports reference={reference} task={task} />
       {history.error ? (
         <p role="alert" className="text-sm text-bad">
           Activity couldn’t load.{" "}

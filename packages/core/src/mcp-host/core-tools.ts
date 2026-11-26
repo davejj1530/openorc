@@ -1,3 +1,4 @@
+import { runs } from "@openorc/db";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import type { OpenOrc } from "../openorc.js";
 import type { OpenOrcOptions } from "../options.js";
@@ -39,6 +40,10 @@ export function startCoreMcp(core: CoreTools): Promise<OpenOrcMcpServer> {
       }
     },
     captureProcess: (runId) => core.runs.captureProcess(runId),
+    runOf: (runId) => {
+      const run = runs.get(core.db, runId);
+      return run ? { threadId: run.threadId, agent: run.agent } : null;
+    },
   });
   return startMcpServer({
     ...createRunHost({ runService: core.runs, db: core.db, comments: core.comments, refines: core.refines, assertRunAvailable }),

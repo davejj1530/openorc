@@ -9,6 +9,7 @@ import { TaskAgents } from "./task-agents.js";
 import { TaskReports } from "./task-reports.js";
 import type { Hosted } from "@openorc/hosted";
 import { TeamColumnRuns } from "./team-column-runs.js";
+import { TeamTaskAnswers } from "./team-task-answers.js";
 import { TeamTaskHere } from "./team-task-here.js";
 import { TriggerValues } from "./trigger-values.js";
 import type { ThreadService } from "./threads.js";
@@ -25,6 +26,8 @@ export interface TaskAutomation {
   team: TeamColumnRuns;
   /** Team tasks' own threads opened on this computer. */
   here: TeamTaskHere;
+  /** Answers to this computer's agents' updates on team tasks, passed to their threads. */
+  answers: TeamTaskAnswers;
   start(): void;
   stop(): void;
 }
@@ -38,7 +41,7 @@ type Dependencies = {
   options: Pick<OpenOrcOptions, "dataDir" | "automationSources" | "automationSecrets">;
   threads: ThreadService;
   /** The signed-in OpenOrc account, whose team boards' column agents may wait for this computer. */
-  account: () => Pick<Hosted, "taskRuns" | "tasks" | "spaces"> | null;
+  account: () => Pick<Hosted, "taskRuns" | "taskAnswers" | "tasks" | "spaces"> | null;
   invalidate: (keys: string[]) => void;
   notify: (n: Omit<Notification, "type">) => void;
   log: Logger;
@@ -51,19 +54,23 @@ export function createTaskAutomation({ db, options, threads, account, invalidate
   const board = new BoardJobs(db, agents, reports, invalidate, notify, log);
   const rules = new AutomationService(db, { agents, threads, board, sources, programs: { dataDir, values: new TriggerValues(options.automationSecrets) }, invalidate, notify, log });
   const team = new TeamColumnRuns({ db, account, threads, log });
+  const answers = new TeamTaskAnswers({ db, account, threads, log });
   return {
     reports,
     board,
     rules,
     team,
     here: new TeamTaskHere({ db, account, invalidate, log }),
+    answers,
     start() {
       rules.start();
       team.start();
+      answers.start();
     },
     stop() {
       rules.stop();
       team.stop();
+      answers.stop();
     },
   };
 }

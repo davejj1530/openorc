@@ -65,18 +65,49 @@ function PullRequestCard({ projectId, number }: { projectId: string; number: num
   );
 }
 
+/** A pull request on an update: drawn from GitHub where its project has a folder here, else named by its number. */
+function PullRequestPiece({ projectId, number }: { projectId: string | null; number: number }) {
+  if (projectId) return <PullRequestCard projectId={projectId} number={number} />;
+  return <p className="text-sm text-ink-2">Pull request #{number}</p>;
+}
+
 /**
- * What an agent's update carries under its words, on a piece of its own: its card, and the replies it offers. A reply
- * pressed reaches the agent's thread as the person's message, and the piece keeps which one it was.
+ * How an update's reply is sent and what came of it: the one chosen and by whom when it was someone else, whether the
+ * person may answer, and why a send failed.
  */
+export type UpdateAnswering = { send: (reply: string) => void; pending: boolean; error: string | null; given: { reply: string; at: number; by: string | null } | null; mayAnswer: boolean };
+
+/** An update on a task kept here: its reply goes to the agent's thread through this computer's core. */
 export function TaskUpdate({ taskId, projectId, eventId, update }: { taskId: string; projectId: string; eventId: number; update: TaskLineUpdate }) {
   const answer = useRpcMutation("tasks.answerUpdate");
-  const { card, replies, answer: given } = update;
+  return (
+    <UpdatePiece
+      projectId={projectId}
+      card={update.card}
+      replies={update.replies}
+      answering={{
+        send: (reply) => answer.mutate({ taskId, eventId, reply }),
+        pending: answer.isPending,
+        error: answer.error?.message ?? null,
+        given: update.answer ? { ...update.answer, by: null } : null,
+        mayAnswer: true,
+      }}
+    />
+  );
+}
+
+/**
+ * What an agent's update carries under its words, on a piece of its own: its card, and the replies it offers. A reply
+ * pressed reaches the agent's thread as the person's message, and the piece keeps which one it was. A pull request is
+ * drawn from GitHub where its project has a folder here, else named by its number.
+ */
+export function UpdatePiece({ projectId, card, replies, answering }: { projectId: string | null; card: TaskUpdateCard | null; replies: string[]; answering: UpdateAnswering }) {
+  const given = answering.given;
   if (!card && replies.length === 0) return null;
   return (
     <div className="task-update" data-plane>
       {card?.kind === "checklist" ? <ChecklistCard card={card} /> : null}
-      {card?.kind === "pull_request" ? <PullRequestCard projectId={projectId} number={card.number} /> : null}
+      {card?.kind === "pull_request" ? <PullRequestPiece projectId={projectId} number={card.number} /> : null}
       {card?.kind === "visual" ? (
         <Suspense fallback={<p className="text-sm text-ink-3">{card.title}</p>}>
           <VisualizationResult visualization={card} />
@@ -86,18 +117,18 @@ export function TaskUpdate({ taskId, projectId, eventId, update }: { taskId: str
         <div className="task-update-foot" data-alone={card ? undefined : ""}>
           {given ? (
             <span>
-              You answered <span className="text-ink">{given.reply}</span> · {relativeTime(given.at)}
+              {given.by ?? "You"} answered <span className="text-ink">{given.reply}</span> · {relativeTime(given.at)}
             </span>
           ) : (
             replies.map((reply, index) => (
-              <Button key={reply} size="sm" variant={index === 0 ? "primary" : "secondary"} disabled={answer.isPending} onClick={() => answer.mutate({ taskId, eventId, reply })}>
+              <Button key={reply} size="sm" variant={index === 0 ? "primary" : "secondary"} disabled={answering.pending || !answering.mayAnswer} onClick={() => answering.send(reply)}>
                 {reply}
               </Button>
             ))
           )}
-          {answer.error ? (
+          {answering.error ? (
             <p role="alert" className="task-update-error">
-              Couldn’t send: {answer.error.message}
+              Couldn’t send: {answering.error}
             </p>
           ) : null}
         </div>

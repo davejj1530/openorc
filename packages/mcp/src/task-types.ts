@@ -52,6 +52,9 @@ export interface TaskTools {
   list(runId: string, scope?: TaskScope): Promise<TaskCard[]>;
   get(runId: string, id: string, scope?: TaskScope): Promise<TaskCard | null>;
   update(runId: string, id: string, patch: { status?: TaskStatus; column?: string; spec?: string; scope?: TaskScope; ifRevision?: number }): Promise<TaskCard | null>;
-  /** Posts an update on a task's history, or changes an earlier one in place. Answers with the update's id. */
-  report(runId: string, id: string, update: TaskUpdate, replaces?: number): Promise<{ updateId: number }>;
+  /**
+   * Posts an update on a task's history, or changes an earlier one in place. Answers with the update's id: a number on
+   * this Mac's tasks, the server's on a task on OpenOrc Cloud, which `scope` names.
+   */
+  report(runId: string, id: string, update: TaskUpdate, replaces?: number | string, scope?: TaskScope): Promise<{ updateId: number | string }>;
 }

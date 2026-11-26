@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type {
+  AgentKind,
   OnlineBoard,
   OnlineBoardSave,
   OnlineTaskAvailability,
@@ -7,7 +8,9 @@ import type {
   OnlineTaskExecutionParams,
   OnlineTaskMutation,
   OnlineTaskParams,
+  OnlineTaskReport,
   OnlineTaskRpcResults,
+  TaskUpdateCard,
 } from "@openorc/protocol";
 import type { HostedDeps, HostedSpaces } from "./index.js";
 import { Refused, type Session } from "./session.js";
@@ -40,8 +43,8 @@ interface Identity {
 const changed = () => new Refused("Your OpenOrc session or project access changed. Try again.");
 const unavailable = () => new Refused("This task isn't available.", 404);
 /** What a space's server does with its tasks beyond keeping them. */
-type Serves = { execution: boolean; board: boolean; runs: boolean; runsCloud: { available: boolean; reason: string | null }; computer: boolean };
-const SERVES_NOTHING: Serves = { execution: false, board: false, runs: false, runsCloud: { available: false, reason: null }, computer: false };
+type Serves = { execution: boolean; board: boolean; runs: boolean; runsCloud: { available: boolean; reason: string | null }; computer: boolean; reports: boolean };
+const SERVES_NOTHING: Serves = { execution: false, board: false, runs: false, runsCloud: { available: false, reason: null }, computer: false, reports: false };
 
 /** Server tasks have an explicit target and never enter the Mac task dispatcher. */
 export class OnlineTasks {
@@ -144,6 +147,28 @@ export class OnlineTasks {
     this.#invalidate(spaceId);
   }
 
+  /** A team task's agents' updates; none where the server keeps none. */
+  async reports({ spaceId, id }: OnlineTaskParams<"tasks.online.reports">): Promise<OnlineTaskReport[]> {
+    if (!(await this.#served(spaceId)).reports) return [];
+    return this.#request(spaceId, TASK_ROUTES.reports(id));
+  }
+  /** An update posted by an agent working the task on this computer: its words, card and replies, or a change to its own earlier one. */
+  async report(
+    spaceId: string,
+    id: string,
+    input: { message: string; card?: TaskUpdateCard | undefined; replies?: string[] | undefined; replaces?: string | undefined; agent: AgentKind; threadId: string },
+  ): Promise<OnlineTaskReport> {
+    if (!(await this.#served(spaceId)).reports) throw new Refused("Updates on this organization's tasks aren't kept yet.");
+    const result = await this.#request(spaceId, TASK_ROUTES.postReport(id), { requestId: randomUUID(), ...input });
+    this.#invalidate(spaceId);
+    return result;
+  }
+  async answerReport({ spaceId, id, reportId, reply }: OnlineTaskParams<"tasks.online.answerReport">): Promise<OnlineTaskReport> {
+    const result = await this.#request(spaceId, TASK_ROUTES.answer(id, reportId), { requestId: randomUUID(), reply });
+    this.#invalidate(spaceId);
+    return result;
+  }
+
   creation(input: OnlineTaskParams<"tasks.online.create">) {
     return taskCreation(this.create(input));
   }
@@ -222,6 +247,7 @@ export class OnlineTasks {
           runs: features.taskRuns?.available === true,
           runsCloud: features.taskRunsCloud?.available ? { available: true, reason: null } : { available: false, reason: features.taskRunsCloud?.reason ?? null },
           computer: features.taskComputer?.available === true,
+          reports: features.taskReports?.available === true,
         }),
         (error: unknown) => {
           if (error instanceof Refused && error.status === 404) entry.until = Number.POSITIVE_INFINITY;

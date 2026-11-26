@@ -72,6 +72,8 @@ export const HostedCapabilities = z.object({
     taskComputer: availability,
     /** A board column's agent run on OpenOrc Cloud as the task's assignee; off with why when the server runs none there. */
     taskRunsCloud: availability,
+    /** Agents' updates on a team task, kept on the server for everyone who reads it, and answered there. */
+    taskReports: availability,
     skills: availability,
     macCode: availability,
     terminal: availability,

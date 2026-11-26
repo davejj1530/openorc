@@ -3,6 +3,7 @@ import { READY_MADE_AUTOMATIONS, harnessShortName, type Automation, type BoardCo
 import { HarnessLogo } from "../components/HarnessLogo";
 import { Automation as AutomationMark, CalendarClock, Columns2, Plus, ChevronRight } from "../components/icons";
 import { menuItem, menuPopup } from "../components/menu";
+import { ProjectMenuItems } from "../components/ProjectMenuItems";
 import { Button, Switch } from "../components/ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpcMutation } from "../lib/client";
@@ -80,11 +81,7 @@ function ColumnAgentItem({ projectId, projects }: { projectId: string | null; pr
         <CoversPreview />
         <Menu.Positioner sideOffset={4} alignOffset={-6} collisionPadding={8} className="z-40">
           <Menu.Popup ref={floatingGround} className={menuPopup}>
-            {projects.map((project) => (
-              <Menu.Item key={project.id} className={menuItem} onClick={() => openBoard(project.id)}>
-                <span className="flex-1 truncate">{project.name}</span>
-              </Menu.Item>
-            ))}
+            <ProjectMenuItems projects={projects} onSelect={openBoard} />
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>
@@ -157,11 +154,7 @@ function BoardAction({ made, added, projectId, projects, onAdd, disabled }: Boar
         <CoversPreview />
         <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
           <Menu.Popup ref={floatingGround} className={menuPopup}>
-            {projects.map((project) => (
-              <Menu.Item key={project.id} className={menuItem} onClick={() => onAdd(project.id)}>
-                <span className="flex-1">{project.name}</span>
-              </Menu.Item>
-            ))}
+            <ProjectMenuItems projects={projects} onSelect={onAdd} />
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>

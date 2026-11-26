@@ -120,6 +120,12 @@
   max-height: min(360px, 60vh);
   overflow-y: auto;
 }
+.project-menu-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(360px, 60vh);
+}
 .project-option {
   border-radius: var(--radius-md);
   color: var(--ink-2);

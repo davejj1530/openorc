@@ -13,8 +13,11 @@ function phoneStatus(status: SpacesStatus): SpacesStatus {
 /** What the router asks the Mac for a space's list: answered from the Mac's last word while it cannot answer. */
 const KEPT: ReadonlySet<string> = new Set(["threads.list", "threads.resolvedCount"]);
 
-/** The Mac's side of the phone: its link, which answers for the Mac's own threads, folders and everything else. */
-export type MacLine = Pick<CoreConnection, "call" | "onPush" | "setFrameInterest">;
+/**
+ * The Mac's side of the phone: its link, which answers for the Mac's own threads, folders and everything else, and
+ * whether it has a session with the Mac now (`attached`); without one a call waits some seconds for one to come.
+ */
+export type MacLine = Pick<CoreConnection, "call" | "onPush" | "setFrameInterest"> & { readonly attached: boolean };
 
 /**
  * The phone's one connection for its client state, as the Mac's place router makes one for its windows: while the
@@ -28,7 +31,8 @@ export class RoutedConnection implements CoreConnection {
   private nextId = 0;
   private readonly listeners = new Set<(push: ClientPush) => void>();
   private readonly router: PlaceRouter;
-  /** The Mac's last answer to each list and count the router asked of it. */
+  /** A list was answered from the Mac's last word while the Mac was away, so it is read again once the Mac is back. */
+  private answeredAway = false;
   constructor(
     private readonly mac: MacLine,
     private readonly cloud: { readonly hosted: Hosted | null },
@@ -41,7 +45,12 @@ export class RoutedConnection implements CoreConnection {
       chat: () => this.signedIn()?.chat ?? null,
       next: (request) => this.toMac(request),
     });
-    mac.onPush((push) => this.emit(push));
+    mac.onPush((push) => {
+      this.emit(push);
+      if (push.type !== "session" || !this.answeredAway) return;
+      this.answeredAway = false;
+      this.emit({ type: "invalidate", keys: ["threads"] });
+    });
   }
 
   call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
@@ -99,19 +108,23 @@ export class RoutedConnection implements CoreConnection {
 
   /**
    * A call the cloud does not hold, to the Mac. A list or a count the Mac cannot answer now (asleep, out of reach)
-   * answers with what it last said for the same call, or nothing, so the cloud's rows still list beside it.
+   * answers with what it last said for the same call, or nothing, so the cloud's rows still list beside it. With no
+   * session open it answers so at once: the cloud's rows never wait out the link's wait for a Mac that is away, and
+   * the lists are read again when its session starts.
    */
   private toMac(request: RpcRequest): Promise<RpcReply> {
     const key = KEPT.has(request.method) ? JSON.stringify([request.method, request.params]) : null;
+    const kept = (): RpcReply => ({ type: "rpc.result", id: request.id, result: this.lastHeard.get(key ?? "") ?? (request.method === "threads.list" ? [] : 0) });
+    if (key && !this.mac.attached) {
+      this.answeredAway = true;
+      return Promise.resolve(kept());
+    }
     return this.mac.call(request.method as RpcMethod, request.params as never).then(
       (result): RpcReply => {
         if (key) this.lastHeard.set(key, result);
         return { type: "rpc.result", id: request.id, result };
       },
-      (error: unknown): RpcReply => {
-        if (key) return { type: "rpc.result", id: request.id, result: this.lastHeard.get(key) ?? (request.method === "threads.list" ? [] : 0) };
-        return { type: "rpc.error", id: request.id, message: error instanceof Error ? error.message : String(error) };
-      },
+      (error: unknown): RpcReply => (key ? kept() : { type: "rpc.error", id: request.id, message: error instanceof Error ? error.message : String(error) }),
     );
   }
 

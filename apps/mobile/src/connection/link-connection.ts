@@ -168,6 +168,11 @@ export class LinkConnection implements CoreConnection {
     private readonly canWait: () => boolean,
   ) {}
 
+  /** Whether a session with the Mac is open now, so a call goes out at once instead of waiting for one. */
+  get attached(): boolean {
+    return this.current !== null;
+  }
+
   call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
     const gate = gateOf(method, params);
     if (!gate) return this.rpc(method, params) as Promise<RpcResults[M]>;

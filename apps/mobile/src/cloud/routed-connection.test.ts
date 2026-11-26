@@ -53,6 +53,9 @@ function macLink(macRow: ThreadSummary) {
       return () => void listeners.delete(listener);
     },
     setFrameInterest: (runIds) => void (at.interest = [...runIds]),
+    get attached() {
+      return !at.down;
+    },
   };
   return { at, line, push: (push: ClientPush) => listeners.forEach((listener) => listener(push)) };
 }
@@ -108,6 +111,26 @@ it("keeps listing, opening and paging the cloud's threads with the Mac asleep, t
   expect(await connection.call("events.toolOutput", { runId: hostedRunId(cloudThread), toolCallId: "tool-whole" })).toEqual({ output: "line of output\n".repeat(2_000) });
   // The Mac's own thread waits for the Mac.
   await expect(connection.call("threads.get", { id: "mac-thread" })).rejects.toThrow("not connected");
+});
+
+it("answers a list at once while the Mac is away, without waiting on its link, and reads the lists again when its session starts", async () => {
+  const { connection, mac } = await routed();
+  await connection.call("threads.list", { spaceId: birch });
+  mac.at.down = true;
+  mac.at.asked.length = 0;
+  const list = await connection.call("threads.list", { spaceId: birch });
+  expect(list.map((row) => row.id).sort()).toEqual([cloudThread, "mac-thread"].sort());
+  expect(mac.at.asked).toEqual([]);
+  // The Mac is back: its session's start has the lists read again, once.
+  mac.at.down = false;
+  pushes.length = 0;
+  mac.push({ type: "session", resumed: false });
+  expect(pushes).toEqual([
+    { type: "session", resumed: false },
+    { type: "invalidate", keys: ["threads"] },
+  ]);
+  mac.push({ type: "session", resumed: true });
+  expect(pushes).toHaveLength(3);
 });
 
 it("lists the Mac's last rows after a relaunch with the Mac asleep, from the answers kept for it", async () => {

@@ -36,6 +36,7 @@ const asleep: MacLine = {
   call: (() => Promise.reject(new Error("The phone is not connected to its Mac."))) as MacLine["call"],
   onPush: () => () => undefined,
   setFrameInterest: () => undefined,
+  attached: false,
 };
 
 beforeAll(async () => {

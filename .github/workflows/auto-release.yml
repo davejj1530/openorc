@@ -20,13 +20,13 @@ jobs:
     name: Choose the version
     # Pushes to this repository only: a pull request from a fork can use a branch named main.
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: write
     outputs:
       tag: ${{ steps.plan.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           # Release tags and every commit since the last one.
@@ -72,7 +72,7 @@ jobs:
     needs: [plan, release]
     # A failed or cancelled release leaves no tag or draft behind, so the next push can take the same version.
     if: (failure() || cancelled()) && needs.plan.outputs.tag
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: write
     steps:
